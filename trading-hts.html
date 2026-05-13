@@ -740,8 +740,15 @@ function loadState(){
   mock.cash=mock.cash||cfg.capital;
   if(!mock.positions)mock.positions={};
   if(!mock.trades)mock.trades=[];
+  // BUG15 FIX: stopOrders 복원
+  const so=localStorage.getItem("htsStopOrders");
+  if(so){try{stopOrders={...JSON.parse(so)};}catch(e){}}
 }
-function saveMock(){localStorage.setItem("htsMock",JSON.stringify(mock));}
+function saveMock(){
+  localStorage.setItem("htsMock",JSON.stringify(mock));
+  // BUG15 FIX: stopOrders도 저장
+  localStorage.setItem("htsStopOrders",JSON.stringify(stopOrders));
+}
 function renderAll(){renderWL();renderCands();renderFilters();renderNews();renderPort();renderTradeLog();updCash();updCredLim();}
 
 // ═══════════════════════════════
@@ -767,7 +774,7 @@ function genCandles(tk,dt){
     res.push({t:`${String(Math.floor(hm/60)).padStart(2,"0")}:${String(hm%60).padStart(2,"0")}`,o:Math.round(o),h:Math.round(Math.max(o,c,h)),l:Math.round(Math.min(o,c,l)),c:Math.round(c),v});
     base=c;
   }
-  sim.candles=res; sim.idx=0; updPrice(res[0]); return res;
+  sim.candles=res; sim.idx=0; if(res.length>0)updPrice(res[0]); return res;
 }
 function getDashData(dt){try{const r=localStorage.getItem("dashMarket_"+dt);return r?JSON.parse(r):null;}catch(e){return null;}}
 
@@ -1005,7 +1012,10 @@ function submitOrder(autoExec){
     const stopPr=parseFloat(document.getElementById("ofStop").value)||Math.round(pr*(1-autoState.cfg.stop/100));
     const t1Pr=parseFloat(document.getElementById("ofT1").value)||Math.round(pr*(1+autoState.cfg.t1/100));
     const t2Pr=parseFloat(document.getElementById("ofT2").value)||Math.round(pr*(1+autoState.cfg.t2/100));
-    stopOrders[activeTk]={stop:stopPr,t1:t1Pr,t2:t2Pr,t1done:false,t2done:false,trail:trailMode,trailHigh:pr,origQty:qty,origStop:stopPr};
+    // BUG2 FIX: 추가 매수 시 origQty 누적, 기존 손절선 유지
+    const prevSO=stopOrders[activeTk];
+    const newOrigQty=prevSO?(prevSO.origQty||0)+qty:qty;
+    stopOrders[activeTk]={stop:stopPr,t1:t1Pr,t2:t2Pr,t1done:prevSO?prevSO.t1done:false,t2done:prevSO?prevSO.t2done:false,trail:trailMode,trailHigh:Math.max(pr,prevSO?.trailHigh||0),origQty:newOrigQty,origStop:stopPr};
     mock.trades.push({date:sim.date,tk:activeTk,nm:stk.nm,side:"buy",price:pr,qty,fee:Math.round(fee),pnl:0,creditType:credType,auto:autoExec||false});
   } else {
     const pos=mock.positions[activeTk];
@@ -1037,10 +1047,10 @@ function checkStopOrders(){
     if(so.trail==="ma5"){const cs=sim.candles.slice(0,sim.idx+1);const ma=calcMA(cs.map(c=>c.c),5);const m=ma[ma.length-1];if(m&&m>so.stop)so.stop=Math.round(m);}
     // Stop hit
     if(pr<=so.stop&&pos.qty>0){
-      const saveTk=activeTk,saveSide=oSide,saveType=oType;
-      activeTk=tk;oSide="sell";oType="market";document.getElementById("ofQty").value=pos.qty;
+      const saveTk=activeTk,saveSide=oSide,saveType=oType,saveCred=credType;
+      activeTk=tk;oSide="sell";oType="market";credType="cash";document.getElementById("ofQty").value=pos.qty;
       submitOrder(true);
-      activeTk=saveTk;oSide=saveSide;oType=saveType;
+      activeTk=saveTk;oSide=saveSide;oType=saveType;credType=saveCred;
       delete stopOrders[tk];
       addMsg("ai",`🔴 손절 실행! ${stk.nm} ${pr.toLocaleString()}원\n손절가 ${so.stop.toLocaleString()}원 도달 → 전량 청산\n[Phase 9-4: 손절은 시장가 즉시]`);
       return;
@@ -1147,8 +1157,8 @@ function runAutoStep(cs){
       Object.keys(mock.positions).forEach(tk=>{
         const pos=mock.positions[tk];if(!pos||pos.qty<=0)return;
         const stk=STOCKS.find(s=>s.tk===tk);if(!stk)return;
-        const sv=activeTk;activeTk=tk;oSide="sell";oType="market";document.getElementById("ofQty").value=pos.qty;
-        submitOrder(true);activeTk=sv;
+        const sv=activeTk,svSide=oSide,svType=oType,svCred=credType;activeTk=tk;oSide="sell";oType="market";credType="cash";document.getElementById("ofQty").value=pos.qty;
+        submitOrder(true);activeTk=sv;oSide=svSide;oType=svType;credType=svCred;
         addDecisionLog(`[${stk.nm}] 15:20 자동 전량 청산`,"당일매매 원칙","Phase 12-2: 14:30~15:20 마감");
       });
     }
@@ -1235,7 +1245,12 @@ async function sendChat(txt){
   }catch(e){removeTyping();addMsg("ai","⚠ API 오류. /api/claude 서버 확인 필요");}
   chatBusy=false;document.getElementById("sendBtn").disabled=false;
 }
-function qa(t){brTab(document.querySelector(".brpt:last-child"),"brpb-ai");sendChat(t);}
+function qa(t){
+  // BUG13 FIX: brp 패널의 마지막 탭 직접 지정
+  const aiTab=document.querySelector(".brp-tabs .brpt:last-child");
+  if(aiTab)brTab(aiTab,"brpb-ai");
+  sendChat(t);
+}
 function addMsg(role,content){
   const m=document.getElementById("aiMsgs");
   const tm=new Date().toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"});
