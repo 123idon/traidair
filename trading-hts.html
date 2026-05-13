@@ -34,7 +34,7 @@ button{cursor:pointer;font-family:var(--sans);}
 .tab{padding:4px 11px;border-radius:6px;font-size:11px;color:var(--ts);border:none;background:transparent;white-space:nowrap;transition:all .15s;font-weight:500;}
 .tab.on{background:var(--pan);color:var(--b);border:none;font-weight:700;box-shadow:var(--sh0);}
 .srch-wrap{position:relative;flex-shrink:0;}
-.srch-box{display:flex;align-items:center;gap:5px;background:var(--bg);border:1.5px solid var(--br);border-radius:20px;padding:0 10px;height:30px;width:170px;transition:border-color .15s;}
+.srch-box{display:flex;align-items:center;gap:5px;background:var(--bg);border:1.5px solid var(--br);border-radius:8px;padding:0 10px;height:30px;width:160px;transition:border-color .15s;}
 .srch-box input{background:none;border:none;color:var(--tp);font-family:var(--mono);font-size:11px;outline:none;width:100%;}
 .srch-box input::placeholder{color:var(--tm);}
 .srch-drop{position:absolute;top:34px;left:0;right:0;background:var(--pan);border:none;border-radius:12px;z-index:200;overflow:hidden;box-shadow:var(--sh2);display:none;}
@@ -65,8 +65,16 @@ button{cursor:pointer;font-family:var(--sans);}
 .ibtn.pur.on{background:rgba(167,139,250,.2)!important;color:var(--p)!important;}
 .page{display:none;flex:1;overflow:hidden;min-height:0;}
 .page.on{display:flex;flex-direction:column;}
-.hts{flex:1;display:grid;grid-template-columns:168px 1fr 300px;grid-template-rows:1fr 106px;overflow:hidden;position:relative;}
-.lp{grid-row:1/3;background:var(--pan);border-right:1px solid var(--br);display:flex;flex-direction:column;overflow:hidden;box-shadow:1px 0 0 var(--br);}
+.hts{
+  flex:1;
+  display:grid;
+  grid-template-columns:162px 1fr 186px 232px;
+  grid-template-rows:1fr auto;
+  overflow:hidden;
+  position:relative;
+  background:var(--bg);
+}
+.lp{grid-column:1;grid-row:1/3;background:var(--pan);border-right:1px solid var(--br);display:flex;flex-direction:column;overflow:hidden;}
 .lp-tabs{display:flex;border-bottom:1px solid var(--br);flex-shrink:0;}
 .lpt{flex:1;padding:8px 2px;text-align:center;font-size:10px;cursor:pointer;color:var(--ts);border-bottom:2px solid transparent;transition:all .12s;font-weight:500;}
 .lpt.on{color:var(--b);border-bottom-color:var(--b);font-weight:700;}
@@ -86,7 +94,7 @@ button{cursor:pointer;font-family:var(--sans);}
 .fi-d{width:5px;height:5px;border-radius:50%;flex-shrink:0;}
 .fi-t{font-size:9px;color:var(--ts);flex:1;}
 .fi.on .fi-t{color:var(--tp);}
-.cp{display:flex;flex-direction:column;overflow:hidden;background:var(--bg);border-right:1px solid var(--br);}
+.cp{grid-column:2;grid-row:1;display:flex;flex-direction:column;overflow:hidden;background:var(--pan);border-right:1px solid var(--br);}
 .cp-head{display:flex;align-items:center;gap:5px;padding:6px 10px;background:var(--pan);border-bottom:1px solid var(--br);flex-shrink:0;flex-wrap:wrap;row-gap:3px;box-shadow:var(--sh0);}
 .tf-btn,.ind-btn{padding:3px 7px;border-radius:6px;border:1.5px solid transparent;background:transparent;color:var(--ts);font-size:9px;font-family:var(--mono);transition:all .12s;font-weight:500;}
 .tf-btn.on{background:var(--b);border-color:var(--b);color:#fff;font-weight:700;}
@@ -101,7 +109,7 @@ button{cursor:pointer;font-family:var(--sans);}
 .subc.hide{display:none;}
 .subc canvas{position:absolute;inset:0;}
 .slbl{position:absolute;top:2px;left:6px;font-family:var(--mono);font-size:9px;color:var(--tm);z-index:2;pointer-events:none;}
-.mock-bar{background:var(--pan);border-top:1px solid var(--br);padding:7px 10px;display:flex;align-items:center;gap:7px;flex-shrink:0;flex-wrap:nowrap;overflow:hidden;box-shadow:0 -1px 0 var(--br);}
+.mock-bar{grid-column:2;grid-row:2;background:var(--pan);border-top:1px solid var(--br);border-right:1px solid var(--br);padding:7px 10px;display:flex;align-items:center;gap:7px;flex-wrap:nowrap;overflow:hidden;flex-shrink:0;}
 .dp{display:flex;align-items:center;gap:4px;flex-shrink:0;}
 .dp label{font-size:9px;color:var(--tm);font-family:var(--mono);}
 .dp input{background:var(--bg);border:1.5px solid var(--br);border-radius:8px;color:var(--tp);font-family:var(--mono);font-size:10px;padding:4px 8px;outline:none;width:108px;transition:border-color .12s;}
@@ -115,10 +123,10 @@ button{cursor:pointer;font-family:var(--sans);}
 .prog{flex:1;height:4px;background:var(--bg);border-radius:4px;overflow:hidden;min-width:40px;}
 .prog-f{height:100%;background:var(--b);border-radius:4px;transition:width .07s;}
 .mst{display:flex;align-items:center;gap:9px;flex-shrink:0;}
-.ms{text-align:center;background:var(--bg);padding:3px 7px;border-radius:8px;}
+.ms{text-align:center;background:var(--bg);padding:2px 6px;border-radius:6px;}
 .ms-l{font-size:8px;color:var(--tm);font-family:var(--mono);}
 .ms-v{font-family:var(--mono);font-size:11px;font-weight:600;}
-.rp{grid-row:1/2;display:flex;flex-direction:column;overflow:hidden;background:var(--pan);box-shadow:var(--sh0);}
+.rp{grid-column:3;grid-row:1/3;display:flex;flex-direction:column;overflow:hidden;background:var(--pan);border-right:1px solid var(--br);}
 .rp-tabs{display:flex;border-bottom:1px solid var(--br);flex-shrink:0;}
 .rpt{flex:1;padding:8px 2px;text-align:center;font-size:10px;cursor:pointer;color:var(--ts);border-bottom:2px solid transparent;transition:all .12s;font-weight:500;}
 .rpt.on{color:var(--b);border-bottom-color:var(--b);font-weight:700;}
@@ -162,12 +170,12 @@ button{cursor:pointer;font-family:var(--sans);}
 .of-area.stop{background:rgba(240,62,62,.04);border:1.5px solid rgba(240,62,62,.15);border-radius:10px;}
 .of-area.tgt{background:rgba(5,192,114,.04);border:1.5px solid rgba(5,192,114,.15);border-radius:10px;}
 .of-area-t{font-size:9px;font-weight:700;font-family:var(--mono);margin-bottom:3px;}
-.brp{grid-column:3;background:var(--pan);border-top:1px solid var(--br);border-left:1px solid var(--br);display:flex;flex-direction:column;overflow:hidden;}
+.brp{grid-column:4;grid-row:1/3;background:var(--pan);border-left:1px solid var(--br);display:flex;flex-direction:column;overflow:hidden;}
 .brp-tabs{display:flex;border-bottom:1px solid var(--br);flex-shrink:0;}
 .brpt{flex:1;padding:7px 2px;text-align:center;font-size:10px;cursor:pointer;color:var(--ts);border-bottom:2px solid transparent;transition:all .12s;font-weight:500;}
 .brpt.on{color:var(--b);border-bottom-color:var(--b);font-weight:700;}
-.brpb{flex:1;overflow-y:auto;display:none;}
-.brpb.on{display:block;}
+.brpb{flex:1;overflow-y:auto;display:none;flex-direction:column;}
+.brpb.on{display:flex;flex-direction:column;}
 .cash-row{display:flex;justify-content:space-between;align-items:center;padding:7px 10px;border-bottom:1px solid var(--br);}
 .cash-lbl{font-size:9px;color:var(--tm);font-family:var(--mono);}
 .cash-val{font-family:var(--mono);font-size:12px;font-weight:600;}
@@ -308,8 +316,8 @@ button{cursor:pointer;font-family:var(--sans);}
 .live-sub{width:100%;padding:9px;border-radius:6px;border:none;background:var(--g);color:#000;font-size:12px;font-weight:700;opacity:.55;cursor:not-allowed;margin-top:4px;}
 .live-note{font-size:9px;color:var(--tm);text-align:center;margin-top:6px;font-family:var(--mono);}
 @media(max-width:860px){
-  .hts{grid-template-columns:0 1fr 0;grid-template-rows:1fr 96px;}
-  .lp,.brp{display:none;}
+  .hts{grid-template-columns:0 1fr 0 0;grid-template-rows:1fr auto;}
+  .lp,.rp,.brp{display:none;}
   .mock-bar{flex-wrap:wrap;height:auto;gap:4px;}
   .si,.clk{display:none;}
   .spd-btn:nth-child(n+5){display:none;}
@@ -384,7 +392,8 @@ button{cursor:pointer;font-family:var(--sans);}
   </div>
 
   <div class="hts">
-    <!-- LEFT PANEL -->
+
+    <!-- ① LEFT: 관심종목 (col1 row1/3) -->
     <div class="lp">
       <div class="lp-tabs">
         <div class="lpt on" onclick="lTab(this,'lpb-w')">관심</div>
@@ -394,14 +403,14 @@ button{cursor:pointer;font-family:var(--sans);}
       <div class="lpb on" id="lpb-w">
         <div class="sec">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
-            <div class="sec-t" style="margin-bottom:0;">오늘 후보 <span style="color:var(--r);font-size:8px;">(3개 이하)</span></div>
+            <span class="sec-t" style="margin-bottom:0;">오늘 후보</span>
             <span style="font-size:8px;color:var(--ts);font-family:var(--mono);" id="candCount">0/3</span>
           </div>
           <div id="candList"></div>
         </div>
         <div class="sec"><div class="sec-t">관심 종목</div><div id="wlList"></div></div>
         <div class="sec">
-          <div class="sec-t" style="color:var(--r);">🚫 매매 금지</div>
+          <div class="sec-t" style="color:var(--r);">🚫 매매금지</div>
           <div id="banList" style="font-size:9px;color:var(--tm);padding:3px 0;">없음</div>
         </div>
       </div>
@@ -412,7 +421,7 @@ button{cursor:pointer;font-family:var(--sans);}
       <div class="lpb" id="lpb-n"><div id="newsList"></div></div>
     </div>
 
-    <!-- CENTER: CHART + MOCK BAR -->
+    <!-- ② CENTER: 차트 (col2 row1) -->
     <div class="cp">
       <div class="cp-head">
         <div style="display:flex;gap:2px;">
@@ -433,128 +442,179 @@ button{cursor:pointer;font-family:var(--sans);}
         <div class="vsep"></div>
         <span class="cinfo" id="cinfo">O- H- L- C- V-</span>
         <div class="vsep"></div>
-        <span style="font-family:var(--mono);font-size:8px;color:var(--tm);" id="phaseHint">5분봉 기본 · MA+거래량 권장</span>
+        <span style="font-family:var(--mono);font-size:8px;color:var(--tm);" id="phaseHint">5분봉 권장</span>
       </div>
       <div class="chart-area">
         <div class="chart-main"><canvas id="mainChart"></canvas></div>
         <div class="subc hide" id="rsiSub"><div class="slbl">RSI(14)</div><canvas id="rsiCanvas"></canvas></div>
         <div class="subc hide" id="macdSub"><div class="slbl">MACD(12,26,9)</div><canvas id="macdCanvas"></canvas></div>
       </div>
-      <div class="mock-bar">
-        <div class="dp">
-          <label>날짜</label>
-          <input type="date" id="mockDate" onchange="onDateChange()">
-          <button class="ibtn" onclick="adjDate(-1)">◀</button>
-          <button class="ibtn" onclick="adjDate(1)">▶</button>
-        </div>
-        <div class="vsep" style="height:18px;"></div>
-        <button class="play-btn" id="playBtn" onclick="togPlay()">▶</button>
-        <div class="spd-wrap">
-          <span class="spd-l">배속</span>
-          <button class="spd-btn on" onclick="setSpd(this,1)">x1</button>
-          <button class="spd-btn" onclick="setSpd(this,2)">x2</button>
-          <button class="spd-btn" onclick="setSpd(this,4)">x4</button>
-          <button class="spd-btn" onclick="setSpd(this,8)">x8</button>
-          <button class="spd-btn" onclick="setSpd(this,16)">x16</button>
-          <button class="spd-btn" onclick="setSpd(this,32)">x32</button>
-          <button class="spd-btn" onclick="setSpd(this,64)">x64</button>
-        </div>
-        <div class="prog"><div class="prog-f" id="progF" style="width:0%"></div></div>
-        <div class="mst">
-          <div class="ms"><div class="ms-l">봉</div><div class="ms-v cn" id="msBar">0</div></div>
-          <div class="ms"><div class="ms-l">시각</div><div class="ms-v cn" id="msTime">09:00</div></div>
-          <div class="ms" style="border-left:1px solid var(--br);padding-left:9px;"><div class="ms-l">평가손익</div><div class="ms-v" id="msPnl">+0원</div></div>
-          <div class="ms"><div class="ms-l">수익률</div><div class="ms-v" id="msPct">0.00%</div></div>
-          <div class="ms" style="border-left:1px solid var(--br);padding-left:9px;"><div class="ms-l">오늘손익</div><div class="ms-v" id="msTodayPnl">+0원</div></div>
-          <div class="ms"><div class="ms-l">매매횟수</div><div class="ms-v cn" id="msTrades">0회</div></div>
-        </div>
+    </div>
+
+    <!-- ③ CENTER BOTTOM: 모의투자 컨트롤 (col2 row2) -->
+    <div class="mock-bar">
+      <div class="dp">
+        <label>날짜</label>
+        <input type="date" id="mockDate" onchange="onDateChange()">
+        <button class="ibtn" onclick="adjDate(-1)">◀</button>
+        <button class="ibtn" onclick="adjDate(1)">▶</button>
+      </div>
+      <div class="vsep" style="height:18px;"></div>
+      <button class="play-btn" id="playBtn" onclick="togPlay()">▶</button>
+      <div class="spd-wrap">
+        <span class="spd-l">배속</span>
+        <button class="spd-btn on" onclick="setSpd(this,1)">x1</button>
+        <button class="spd-btn" onclick="setSpd(this,2)">x2</button>
+        <button class="spd-btn" onclick="setSpd(this,4)">x4</button>
+        <button class="spd-btn" onclick="setSpd(this,8)">x8</button>
+        <button class="spd-btn" onclick="setSpd(this,16)">x16</button>
+        <button class="spd-btn" onclick="setSpd(this,32)">x32</button>
+        <button class="spd-btn" onclick="setSpd(this,64)">x64</button>
+      </div>
+      <div class="prog"><div class="prog-f" id="progF" style="width:0%"></div></div>
+      <div class="mst">
+        <div class="ms"><div class="ms-l">봉</div><div class="ms-v cn" id="msBar">0</div></div>
+        <div class="ms"><div class="ms-l">시각</div><div class="ms-v cn" id="msTime">09:00</div></div>
+        <div class="ms" style="border-left:1px solid var(--br);padding-left:9px;"><div class="ms-l">평가손익</div><div class="ms-v" id="msPnl">+0원</div></div>
+        <div class="ms"><div class="ms-l">수익률</div><div class="ms-v" id="msPct">0.00%</div></div>
+        <div class="ms" style="border-left:1px solid var(--br);padding-left:9px;"><div class="ms-l">오늘손익</div><div class="ms-v" id="msTodayPnl">+0원</div></div>
+        <div class="ms"><div class="ms-l">매매횟수</div><div class="ms-v cn" id="msTrades">0회</div></div>
       </div>
     </div>
 
-    <!-- RIGHT PANEL: ORDER BOOK / TRADE / ORDER -->
+    <!-- ④ RIGHT: 호가창+체결창 (col3 row1/3) -->
     <div class="rp">
-      <div class="rp-tabs">
-        <div class="rpt on" onclick="rTab(this,'rpb-ob')">호가창</div>
-        <div class="rpt" onclick="rTab(this,'rpb-th')">체결</div>
-        <div class="rpt" onclick="rTab(this,'rpb-order')">주문</div>
+      <!-- 호가창 헤더 -->
+      <div style="padding:6px 8px 5px;border-bottom:1px solid var(--br);background:var(--pan);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+        <span style="font-size:10px;font-weight:700;color:var(--tp);">호가창</span>
+        <span style="font-family:var(--mono);font-size:9px;color:var(--ts);" id="obTkName">삼성전자</span>
       </div>
-      <div class="rpb on" id="rpb-ob">
-        <div id="obSell"></div>
-        <div class="ob-cur">
-          <div class="ob-cur-p cu" id="obPr">71,500</div>
-          <div class="ob-cur-i" id="obInfo">+876 (+1.24%)</div>
-          <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:2px;">
-            <span style="font-family:var(--mono);font-size:9px;color:var(--ts);">체결강도</span>
-            <span style="font-family:var(--mono);font-size:11px;font-weight:700;color:var(--g);" id="obStrength">115</span>
-            <span style="font-family:var(--mono);font-size:9px;color:var(--ts);">매수잔량</span>
-            <span style="font-family:var(--mono);font-size:10px;font-weight:600;" id="obBuyTotal">32,451</span>
-          </div>
+      <!-- 매도호가 -->
+      <div id="obSell" style="flex-shrink:0;"></div>
+      <!-- 현재가 -->
+      <div class="ob-cur" id="obCur">
+        <div class="ob-cur-p cu" id="obPr">71,500</div>
+        <div class="ob-cur-i" id="obInfo">+876 (+1.24%)</div>
+        <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:3px;">
+          <span style="font-size:9px;color:var(--ts);">체결강도</span>
+          <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--g);" id="obStrength">115</span>
+          <span style="font-size:9px;color:var(--ts);">매수잔량</span>
+          <span style="font-family:var(--mono);font-size:10px;font-weight:600;" id="obBuyTotal">-</span>
         </div>
-        <div id="obBuy"></div>
       </div>
-      <div class="rpb" id="rpb-th">
-        <div style="display:flex;padding:3px 8px;font-size:9px;color:var(--tm);font-family:var(--mono);border-bottom:1px solid var(--br);">
-          <span style="width:36px;">시간</span><span style="flex:1;text-align:right;">체결가</span><span style="min-width:30px;text-align:right;">수량</span>
+      <!-- 매수호가 -->
+      <div id="obBuy" style="flex-shrink:0;"></div>
+      <!-- 여백 채우기 -->
+      <div style="flex:1;"></div>
+      <!-- 체결창 (하단 고정) -->
+      <div style="border-top:2px solid var(--br);flex-shrink:0;">
+        <div style="padding:5px 8px;border-bottom:1px solid var(--br);display:flex;align-items:center;justify-content:space-between;">
+          <span style="font-size:10px;font-weight:700;color:var(--tp);">체결</span>
+          <span style="font-size:9px;color:var(--ts);">강도 <span id="obStrength2" style="font-weight:700;color:var(--g);">-</span></span>
         </div>
-        <div id="thList"></div>
+        <div style="display:flex;padding:2px 8px;font-size:8px;color:var(--tm);font-family:var(--mono);border-bottom:1px solid var(--br);">
+          <span style="width:38px;">시간</span>
+          <span style="flex:1;text-align:right;">체결가</span>
+          <span style="min-width:34px;text-align:right;">수량</span>
+        </div>
+        <div id="thList" style="max-height:160px;overflow-y:auto;"></div>
       </div>
-      <div class="rpb" id="rpb-order">
+    </div>
+
+    <!-- ⑤ FAR RIGHT: 주문+보유+AI (col4 row1/3) -->
+    <div class="brp">
+      <div class="brp-tabs">
+        <div class="brpt on" onclick="brTab(this,'brpb-order')">주문</div>
+        <div class="brpt" onclick="brTab(this,'brpb-port')">보유</div>
+        <div class="brpt" onclick="brTab(this,'brpb-log')">거래</div>
+        <div class="brpt" onclick="brTab(this,'brpb-ai')">AI</div>
+      </div>
+
+      <!-- 주문 패널 -->
+      <div class="brpb on" id="brpb-order" style="overflow-y:auto;">
         <div class="of">
           <div class="of-tabs">
             <button class="of-t buy on" id="otBuy" onclick="setOSide('buy')">매수</button>
             <button class="of-t sell" id="otSell" onclick="setOSide('sell')">매도</button>
           </div>
-          <div class="of-r"><span class="of-l">유형</span><div class="ot-g"><button class="ot-b on" id="ott-limit" onclick="setOType(this,'limit')">지정가</button><button class="ot-b" id="ott-market" onclick="setOType(this,'market')">시장가</button></div></div>
-          <div class="of-r"><span class="of-l">거래방식</span><select class="cred-sel" id="credSel" onchange="onCredChange()"><option value="cash">현금</option><option value="credit">신용 (담보 140%)</option><option value="margin">미수 (위탁 40%)</option></select></div>
+          <div class="of-r">
+            <span class="of-l">유형</span>
+            <div class="ot-g">
+              <button class="ot-b on" id="ott-limit" onclick="setOType(this,'limit')">지정가</button>
+              <button class="ot-b" id="ott-market" onclick="setOType(this,'market')">시장가</button>
+            </div>
+          </div>
+          <div class="of-r">
+            <span class="of-l">거래방식</span>
+            <select class="cred-sel" id="credSel" onchange="onCredChange()">
+              <option value="cash">현금</option>
+              <option value="credit">신용(담보140%)</option>
+              <option value="margin">미수(위탁40%)</option>
+            </select>
+          </div>
           <div class="cred-info" id="credInfo"></div>
-          <div class="of-r"><span class="of-l">주문가격</span><input class="of-i" id="ofPr" type="number" oninput="updOSum()"></div>
-          <div class="of-r"><span class="of-l">수량</span><input class="of-i" id="ofQty" type="number" value="10" oninput="updOSum()"></div>
+          <div class="of-r">
+            <span class="of-l">주문가격</span>
+            <input class="of-i" id="ofPr" type="number" oninput="updOSum()">
+          </div>
+          <div class="of-r">
+            <span class="of-l">수량</span>
+            <input class="of-i" id="ofQty" type="number" value="10" oninput="updOSum()">
+          </div>
           <div class="pct-r">
             <button class="pct-b" onclick="setPct(10)">10%</button>
             <button class="pct-b" onclick="setPct(25)">25%</button>
             <button class="pct-b" onclick="setPct(50)">50%</button>
             <button class="pct-b" onclick="setPct(100)">전량</button>
           </div>
-          <!-- 손절가 -->
           <div class="of-area stop">
-            <div class="of-area-t" style="color:var(--r);">🔴 손절가 (Phase 9-4)</div>
-            <div class="of-r" style="margin-bottom:2px;"><span class="of-l">손절가</span><input class="of-i" id="ofStop" type="number" placeholder="자동 -3%" oninput="updOSum()"></div>
-            <div class="of-r" style="margin-bottom:0;"><span class="of-l">트레일링</span><div class="ot-g"><button class="ot-b on" id="trail-off" onclick="setTrail(this,'off')">끔</button><button class="ot-b" id="trail-pct" onclick="setTrail(this,'pct')">%</button><button class="ot-b" id="trail-ma" onclick="setTrail(this,'ma5')">5MA</button></div></div>
+            <div class="of-area-t" style="color:var(--r);">🔴 손절가 자동설정</div>
+            <div class="of-r" style="margin-bottom:2px;">
+              <span class="of-l">손절가</span>
+              <input class="of-i" id="ofStop" type="number" placeholder="자동 -3%" oninput="updOSum()">
+            </div>
+            <div class="of-r" style="margin-bottom:0;">
+              <span class="of-l">트레일링</span>
+              <div class="ot-g">
+                <button class="ot-b on" id="trail-off" onclick="setTrail(this,'off')">끔</button>
+                <button class="ot-b" id="trail-pct" onclick="setTrail(this,'pct')">%</button>
+                <button class="ot-b" id="trail-ma" onclick="setTrail(this,'ma5')">5MA</button>
+              </div>
+            </div>
           </div>
-          <!-- 익절가 -->
           <div class="of-area tgt">
-            <div class="of-area-t" style="color:var(--g);">🟢 분할 익절 (Phase 9-2)</div>
-            <div class="of-r" style="margin-bottom:2px;"><span class="of-l">1차(50%)</span><input class="of-i" id="ofT1" type="number" placeholder="자동 +3%" oninput="updOSum()"></div>
-            <div class="of-r" style="margin-bottom:0;"><span class="of-l">2차(30%)</span><input class="of-i" id="ofT2" type="number" placeholder="자동 +5%" oninput="updOSum()"></div>
+            <div class="of-area-t" style="color:var(--g);">🟢 분할 익절 설정</div>
+            <div class="of-r" style="margin-bottom:2px;">
+              <span class="of-l">1차(50%)</span>
+              <input class="of-i" id="ofT1" type="number" placeholder="자동 +3%" oninput="updOSum()">
+            </div>
+            <div class="of-r" style="margin-bottom:0;">
+              <span class="of-l">2차(30%)</span>
+              <input class="of-i" id="ofT2" type="number" placeholder="자동 +5%" oninput="updOSum()">
+            </div>
           </div>
           <div class="of-sum" id="ofSum">예상금액: -</div>
           <div class="of-warn" id="ofWarn"></div>
           <button class="sub-btn buy" id="subBtn" onclick="submitOrder()">매수 주문</button>
-          <!-- 빠른 청산 버튼 (Phase 3-4: F4/F7 개념) -->
+          <!-- 빠른 청산 -->
           <div id="quickSellBtns" style="display:none;margin-top:6px;display:flex;gap:4px;flex-direction:column;">
-            <button onclick="quickSell(50)" style="width:100%;padding:5px;border-radius:8px;border:1.5px solid var(--r);background:rgba(240,62,62,.07);color:var(--r);font-size:10px;font-weight:700;cursor:pointer;transition:all .12s;" onmouseover="this.style.background='rgba(240,62,62,.15)'" onmouseout="this.style.background='rgba(240,62,62,.07)'">⚡ 50% 시장가 매도</button>
-            <button onclick="quickSell(100)" style="width:100%;padding:5px;border-radius:8px;border:none;background:var(--r);color:#fff;font-size:10px;font-weight:700;cursor:pointer;transition:all .12s;box-shadow:0 2px 8px rgba(240,62,62,.3);" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">🚨 전량 손절 (시장가)</button>
+            <button onclick="quickSell(50)" style="width:100%;padding:6px;border-radius:8px;border:1.5px solid var(--r);background:rgba(240,62,62,.07);color:var(--r);font-size:10px;font-weight:700;cursor:pointer;">⚡ 50% 시장가 매도</button>
+            <button onclick="quickSell(100)" style="width:100%;padding:6px;border-radius:8px;border:none;background:var(--r);color:#fff;font-size:10px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(240,62,62,.3);">🚨 전량 손절 (시장가)</button>
           </div>
         </div>
       </div>
-    </div>
 
-    <!-- BOTTOM RIGHT: PORTFOLIO + AI ADVISOR -->
-    <div class="brp">
-      <div class="brp-tabs">
-        <div class="brpt on" onclick="brTab(this,'brpb-port')">포트폴리오</div>
-        <div class="brpt" onclick="brTab(this,'brpb-log')">거래</div>
-        <div class="brpt" onclick="brTab(this,'brpb-ai')">AI조언</div>
-      </div>
-      <!-- portfolio -->
-      <div class="brpb on" id="brpb-port">
+      <!-- 보유 패널 -->
+      <div class="brpb" id="brpb-port">
         <div class="cash-row"><span class="cash-lbl">모의잔고</span><span class="cash-val" id="cashVal">10,000,000원</span></div>
         <div class="cash-row"><span class="cash-lbl">신용/미수한도</span><span style="font-family:var(--mono);font-size:9px;color:var(--a);" id="credLim">-</span></div>
         <div id="portItems" style="font-size:9px;color:var(--tm);text-align:center;padding:12px 0;">보유 종목 없음</div>
       </div>
-      <!-- trade log -->
+
+      <!-- 거래내역 -->
       <div class="brpb" id="brpb-log"><div id="tradeLog"></div></div>
-      <!-- AI advisor -->
+
+      <!-- AI 조언 -->
       <div class="brpb" id="brpb-ai" style="display:flex;flex-direction:column;height:100%;">
         <div class="ai-adv-hdr" style="flex-shrink:0;">
           <div class="ai-adv-t"><div class="ai-dot"></div>AI 실시간 조언</div>
@@ -563,25 +623,27 @@ button{cursor:pointer;font-family:var(--sans);}
         <div class="adv-boxes" id="advBoxes">
           <div class="adv-box">
             <div class="adv-box-t">📊 현재 상황</div>
-            <div class="adv-txt ld" id="advNow">종목 선택 또는 재생 시 분석 시작</div>
+            <div class="adv-txt ld" id="advNow">종목 선택 시 분석 시작</div>
           </div>
           <div class="adv-box">
             <div class="adv-box-t">🎯 진입/청산 조언</div>
             <div class="adv-txt ld" id="advAction">분석 대기중...</div>
           </div>
         </div>
-        <div class="ai-msgs" id="aiMsgs" style="flex:1;min-height:0;">
+        <div class="ai-msgs" id="aiMsgs" style="flex:1;min-height:0;overflow-y:auto;">
           <div class="ai-msg">
             <div class="ai-av ai">AI</div>
-            <div><div class="ai-bub">안녕하세요! 실시간 차트 분석과 매매 조언을 드립니다.<br><br><span class="adv-tag pha">🤖 자동매매</span> 버튼으로 AI 자동매매를 설정하세요.</div><div class="ai-meta">Claude · 지금</div></div>
+            <div>
+              <div class="ai-bub">안녕하세요! 실시간 차트 분석 및 매매 조언을 드립니다.</div>
+              <div class="ai-meta">Claude · 지금</div>
+            </div>
           </div>
         </div>
         <div class="ai-quick">
-          <button class="qb" onclick="qa('Phase 8 체크리스트 기준으로 지금 진입 가능해?')">✅ 진입 점검</button>
+          <button class="qb" onclick="qa('Phase 8 체크리스트 기준으로 지금 진입 가능해?')">✅ 진입점검</button>
           <button class="qb" onclick="qa('지금 R/R 계산해줘')">📐 R/R</button>
           <button class="qb" onclick="qa('손절선 어디에 잡아야 해?')">✂ 손절선</button>
           <button class="qb" onclick="qa('지금 차트 패턴이 뭐야?')">🔍 패턴</button>
-          <button class="qb" onclick="qa('수급 현황 분석해줘')">📊 수급</button>
           <button class="qb" onclick="qa('오늘 매매 복기해줘')">📝 복기</button>
         </div>
         <div class="ai-in-area">
@@ -590,7 +652,8 @@ button{cursor:pointer;font-family:var(--sans);}
           <button class="send-btn" id="sendBtn" onclick="sendChat()">↑</button>
         </div>
       </div>
-    </div>
+    </div><!-- /brp -->
+
   </div><!-- /hts -->
 </div><!-- /page-hts -->
 
@@ -903,7 +966,7 @@ function runStep(){
   sim.timer=setTimeout(runStep,Math.max(25,1000/sim.speed));
 }
 function setSpd(el,v){sim.speed=v;document.querySelectorAll(".spd-btn").forEach(b=>b.classList.remove("on"));el.classList.add("on");}
-function setTF(el,tf){sim.tf=tf;document.querySelectorAll(".tf-btn").forEach(b=>b.classList.remove("on"));el.classList.add("on");genCandles();initChart();}
+function setTF(el,tf){sim.tf=tf;document.querySelectorAll(".tf-btn").forEach(b=>b.classList.remove("on"));el.classList.add("on");genCandles(activeTk,sim.date);initChart();}
 function onDateChange(){
   sim.date=document.getElementById("mockDate").value;
   mock.todayPnl=0;mock.todayTrades=0;mock.lossSeries=0;
@@ -1338,9 +1401,9 @@ function autoResize(el){el.style.height="auto";el.style.height=Math.min(el.scrol
 // ═══════════════════════════════
 function updCash(){document.getElementById("cashVal").textContent=mock.cash.toLocaleString()+"원";}
 function switchToSell(){
-  // 보유 종목 클릭 시 주문탭 + 매도 자동 선택 (빠른 청산)
-  const orderTab=document.querySelector(".rp-tabs .rpt:nth-child(3)");
-  if(orderTab)rTab(orderTab,"rpb-order");
+  // 보유 종목 클릭 시 주문탭 + 매도 자동 선택
+  const orderTab=document.querySelector(".brp-tabs .brpt:first-child");
+  if(orderTab)brTab(orderTab,"brpb-order");
   setOSide("sell");
 }
 function renderPort(){
@@ -1375,7 +1438,8 @@ function renderCands(){
 function renderFilters(){document.getElementById("filterList").innerHTML=FILTERS.map((f,i)=>`<div class="fi" onclick="applyFil(${i},this)"><div class="fi-d" style="background:${f.col}"></div><span class="fi-t">${f.nm}</span></div>`).join("");}
 function applyFil(i,el){document.querySelectorAll(".fi").forEach(f=>f.classList.remove("on"));el.classList.add("on");const f=FILTERS[i];document.getElementById("filterResult").innerHTML=f.stocks.map(tk=>{const s=STOCKS.find(s=>s.tk===tk)||{tk,nm:tk,pr:0,base:1};const c=((s.pr-s.base)/s.base*100).toFixed(2),up=c>=0;return`<div class="wli" onclick="selectStk('${tk}')"><div class="wl-tk">${tk.slice(-4)}</div><div class="wl-nm">${s.nm}</div><div class="wl-ch ${up?"cu":"cd"}">${up?"+":""}${c}%</div></div>`;}).join("");}
 function renderNews(){document.getElementById("newsList").innerHTML=NEWS.map(n=>`<div style="padding:5px 9px;border-bottom:1px solid var(--br);cursor:pointer;" onmouseover="this.style.background='var(--card)'" onmouseout="this.style.background=''"><div style="font-size:10px;line-height:1.4;margin-bottom:2px;">${n.ttl}</div><div style="display:flex;gap:5px;align-items:center;"><span style="font-size:8px;color:var(--tm);font-family:var(--mono);">${n.tm}</span><span style="font-size:8px;padding:1px 4px;border-radius:2px;background:rgba(255,255,255,.05);color:${n.col};">${n.cat}</span></div></div>`).join("");}
-function selectStk(tk){activeTk=tk;const s=STOCKS.find(s=>s.tk===tk)||STOCKS[0];document.getElementById("siNm").textContent=s.nm;document.getElementById("srchIn").value="";hideSrch();renderWL();genCandles(tk,sim.date);initChart();renderOB();renderTH();}
+function selectStk(tk){activeTk=tk;const s=STOCKS.find(s=>s.tk===tk)||STOCKS[0];document.getElementById("siNm").textContent=s.nm;
+  const tkEl=document.getElementById("obTkName");if(tkEl)tkEl.textContent=s.nm;document.getElementById("srchIn").value="";hideSrch();renderWL();genCandles(tk,sim.date);initChart();renderOB();renderTH();}
 
 // ═══════════════════════════════
 // SEARCH
