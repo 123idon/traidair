@@ -74,7 +74,7 @@ button{cursor:pointer;font-family:var(--sans);}
   position:relative;
   background:var(--bg);
 }
-.lp{grid-column:1;grid-row:1/3;background:var(--pan);border-right:1px solid var(--br);display:flex;flex-direction:column;overflow:hidden;}
+.lp{grid-column:1;grid-row:1/4;background:var(--pan);border-right:1px solid var(--br);display:flex;flex-direction:column;overflow:hidden;}
 .lp-tabs{display:flex;border-bottom:1px solid var(--br);flex-shrink:0;}
 .lpt{flex:1;padding:8px 2px;text-align:center;font-size:10px;cursor:pointer;color:var(--ts);border-bottom:2px solid transparent;transition:all .12s;font-weight:500;}
 .lpt.on{color:var(--b);border-bottom-color:var(--b);font-weight:700;}
@@ -94,7 +94,7 @@ button{cursor:pointer;font-family:var(--sans);}
 .fi-d{width:5px;height:5px;border-radius:50%;flex-shrink:0;}
 .fi-t{font-size:9px;color:var(--ts);flex:1;}
 .fi.on .fi-t{color:var(--tp);}
-.cp{grid-column:2;grid-row:1;display:flex;flex-direction:column;overflow:hidden;background:var(--pan);border-right:1px solid var(--br);}
+.cp{grid-column:2;grid-row:1;display:flex;flex-direction:column;overflow:hidden;background:var(--pan);border-right:1px solid var(--br);min-height:0;}
 .cp-head{display:flex;align-items:center;gap:5px;padding:6px 10px;background:var(--pan);border-bottom:1px solid var(--br);flex-shrink:0;flex-wrap:wrap;row-gap:3px;box-shadow:var(--sh0);}
 .tf-btn,.ind-btn{padding:3px 7px;border-radius:6px;border:1.5px solid transparent;background:transparent;color:var(--ts);font-size:9px;font-family:var(--mono);transition:all .12s;font-weight:500;}
 .tf-btn.on{background:var(--b);border-color:var(--b);color:#fff;font-weight:700;}
@@ -109,7 +109,7 @@ button{cursor:pointer;font-family:var(--sans);}
 .subc.hide{display:none;}
 .subc canvas{position:absolute;inset:0;}
 .slbl{position:absolute;top:2px;left:6px;font-family:var(--mono);font-size:9px;color:var(--tm);z-index:2;pointer-events:none;}
-.mock-bar{grid-column:2;grid-row:2;background:var(--pan);border-top:1px solid var(--br);border-right:1px solid var(--br);padding:7px 10px;display:flex;align-items:center;gap:7px;flex-wrap:nowrap;overflow:hidden;flex-shrink:0;}
+.mock-bar{grid-column:2;grid-row:3;background:var(--pan);border-top:1px solid var(--br);border-right:1px solid var(--br);padding:6px 10px;display:flex;align-items:center;gap:7px;flex-wrap:nowrap;overflow:hidden;flex-shrink:0;}
 .dp{display:flex;align-items:center;gap:4px;flex-shrink:0;}
 .dp label{font-size:9px;color:var(--tm);font-family:var(--mono);}
 .dp input{background:var(--bg);border:1.5px solid var(--br);border-radius:8px;color:var(--tp);font-family:var(--mono);font-size:10px;padding:4px 8px;outline:none;width:108px;transition:border-color .12s;}
@@ -126,7 +126,7 @@ button{cursor:pointer;font-family:var(--sans);}
 .ms{text-align:center;background:var(--bg);padding:2px 6px;border-radius:6px;}
 .ms-l{font-size:8px;color:var(--tm);font-family:var(--mono);}
 .ms-v{font-family:var(--mono);font-size:11px;font-weight:600;}
-.rp{grid-column:3;grid-row:1/3;display:flex;flex-direction:column;overflow:hidden;background:var(--pan);border-right:1px solid var(--br);}
+.rp{grid-column:3;grid-row:1/4;display:flex;flex-direction:column;overflow:hidden;background:var(--pan);border-right:1px solid var(--br);}
 .rp-tabs{display:flex;border-bottom:1px solid var(--br);flex-shrink:0;}
 .rpt{flex:1;padding:8px 2px;text-align:center;font-size:10px;cursor:pointer;color:var(--ts);border-bottom:2px solid transparent;transition:all .12s;font-weight:500;}
 .rpt.on{color:var(--b);border-bottom-color:var(--b);font-weight:700;}
@@ -316,7 +316,7 @@ button{cursor:pointer;font-family:var(--sans);}
 .live-sub{width:100%;padding:9px;border-radius:6px;border:none;background:var(--g);color:#000;font-size:12px;font-weight:700;opacity:.55;cursor:not-allowed;margin-top:4px;}
 .live-note{font-size:9px;color:var(--tm);text-align:center;margin-top:6px;font-family:var(--mono);}
 @media(max-width:860px){
-  .hts{grid-template-columns:0 1fr 0 0;grid-template-rows:1fr auto;}
+  .hts{grid-template-columns:0 1fr 0 0;grid-template-rows:1fr 80px 80px;}
   .lp,.rp,.brp{display:none;}
   .mock-bar{flex-wrap:wrap;height:auto;gap:4px;}
   .si,.clk{display:none;}
@@ -419,7 +419,19 @@ button{cursor:pointer;font-family:var(--sans);}
         <div class="sec"><div class="sec-t">조건 검색</div><div id="filterList"></div></div>
         <div class="sec"><div class="sec-t">결과</div><div id="filterResult" style="font-size:9px;color:var(--tm);padding:3px 0;">조건을 선택하세요</div></div>
       </div>
-      <div class="lpb" id="lpb-n"><div id="newsList"></div></div>
+      <div class="lpb" id="lpb-n">
+        <div class="sec" style="padding:5px 8px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+            <span class="sec-t" style="margin-bottom:0;">📢 공시 (DART)</span>
+            <button onclick="fetchDartNews()" style="padding:1px 6px;border-radius:4px;border:none;background:var(--b);color:#fff;font-size:8px;cursor:pointer;">새로고침</button>
+          </div>
+          <div id="dartList" style="font-size:9px;color:var(--tm);">로딩 중...</div>
+        </div>
+        <div class="sec" style="padding:5px 8px;">
+          <span class="sec-t">📰 시장 뉴스</span>
+          <div id="newsList"></div>
+        </div>
+      </div>
 
       <!-- AI 섹터/종목 추천 패널 (Phase 6, 7 기반) -->
       <div class="lpb" id="lpb-ai">
@@ -482,7 +494,35 @@ button{cursor:pointer;font-family:var(--sans);}
       </div>
     </div>
 
-    <!-- ③ CENTER BOTTOM: 모의투자 컨트롤 (col2 row2) -->
+    <!-- AI 종합분석 패널 (col2 row2) -->
+    <div id="aiAnalysisPanel" style="grid-column:2;grid-row:2;background:var(--pan);border-top:2px solid rgba(49,130,246,.25);border-right:1px solid var(--br);overflow:hidden;display:flex;flex-direction:column;">
+      <div style="display:flex;align-items:center;gap:6px;padding:4px 10px;border-bottom:1px solid var(--br);flex-shrink:0;">
+        <div style="width:6px;height:6px;border-radius:50%;background:var(--b);animation:pu 2s infinite;flex-shrink:0;"></div>
+        <span style="font-size:10px;font-weight:700;">AI 종합분석</span>
+        <span style="font-size:8px;color:var(--tm);font-family:var(--mono);" id="analysisTk">종목선택시 자동분석</span>
+        <div style="margin-left:auto;display:flex;align-items:center;gap:4px;">
+          <span id="goNogoTag" style="font-size:9px;padding:1px 7px;border-radius:4px;font-weight:700;font-family:var(--mono);background:var(--bg);">-</span>
+          <button onclick="runFullAnalysis()" style="padding:2px 8px;border-radius:5px;border:none;background:var(--b);color:#fff;font-size:9px;cursor:pointer;font-weight:600;">🔍 분석</button>
+        </div>
+      </div>
+      <div style="display:flex;flex:1;min-height:0;overflow:hidden;">
+        <div style="flex:1;padding:4px 8px;border-right:1px solid var(--br);overflow-y:auto;min-width:0;">
+          <div style="font-size:8px;color:var(--tm);font-family:var(--mono);margin-bottom:2px;">🎯 매매기법 (AI선택)</div>
+          <div id="techniqueTag" style="font-size:12px;font-weight:700;color:var(--b);">-</div>
+          <div id="techniqueReason" style="font-size:9px;color:var(--ts);line-height:1.4;margin-top:1px;">분석 버튼 또는 종목 선택 시 자동</div>
+        </div>
+        <div style="flex:1.2;padding:4px 8px;border-right:1px solid var(--br);overflow-y:auto;min-width:0;">
+          <div style="font-size:8px;color:var(--tm);font-family:var(--mono);margin-bottom:2px;">📍 진입·청산 타점</div>
+          <div id="entryPoint" style="font-size:9px;color:var(--ts);line-height:1.7;">-</div>
+        </div>
+        <div style="flex:1.5;padding:4px 8px;overflow-y:auto;min-width:0;">
+          <div style="font-size:8px;color:var(--tm);font-family:var(--mono);margin-bottom:2px;">Phase 8 체크리스트</div>
+          <div id="phase8Check" style="font-size:8px;color:var(--ts);line-height:1.6;">-</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ③ CENTER BOTTOM: 모의투자 컨트롤 (col2 row3) -->
     <div class="mock-bar">
       <div class="dp">
         <label>날짜</label>
@@ -828,16 +868,57 @@ button{cursor:pointer;font-family:var(--sans);}
 // DATA
 // ═══════════════════════════════
 const STOCKS=[
-  {tk:"005930",nm:"삼성전자",pr:71500,base:71500},
-  {tk:"000660",nm:"SK하이닉스",pr:189300,base:189300},
-  {tk:"373220",nm:"LG에너지솔루션",pr:298500,base:298500},
-  {tk:"035420",nm:"NAVER",pr:182200,base:182200},
-  {tk:"207940",nm:"삼성바이오로직스",pr:831000,base:831000},
-  {tk:"035720",nm:"카카오",pr:42350,base:42350},
-  {tk:"005380",nm:"현대차",pr:212000,base:212000},
-  {tk:"051910",nm:"LG화학",pr:318500,base:318500},
-  {tk:"068270",nm:"셀트리온",pr:186500,base:186500},
-  {tk:"012330",nm:"현대모비스",pr:248500,base:248500},
+  // 코스피 대형주
+  {tk:"005930",nm:"삼성전자",pr:71500,base:71500,sec:"반도체",cap:"대형"},
+  {tk:"000660",nm:"SK하이닉스",pr:189300,base:189300,sec:"반도체",cap:"대형"},
+  {tk:"005380",nm:"현대차",pr:212000,base:212000,sec:"자동차",cap:"대형"},
+  {tk:"005490",nm:"POSCO홀딩스",pr:312000,base:312000,sec:"철강",cap:"대형"},
+  {tk:"035420",nm:"NAVER",pr:182200,base:182200,sec:"인터넷",cap:"대형"},
+  {tk:"051910",nm:"LG화학",pr:318500,base:318500,sec:"화학",cap:"대형"},
+  {tk:"006400",nm:"삼성SDI",pr:285000,base:285000,sec:"2차전지",cap:"대형"},
+  {tk:"003550",nm:"LG",pr:78500,base:78500,sec:"지주",cap:"대형"},
+  {tk:"028260",nm:"삼성물산",pr:138500,base:138500,sec:"건설",cap:"대형"},
+  {tk:"012330",nm:"현대모비스",pr:248500,base:248500,sec:"자동차부품",cap:"대형"},
+  {tk:"066570",nm:"LG전자",pr:95800,base:95800,sec:"가전",cap:"대형"},
+  {tk:"032830",nm:"삼성생명",pr:91800,base:91800,sec:"보험",cap:"대형"},
+  {tk:"055550",nm:"신한지주",pr:45350,base:45350,sec:"금융",cap:"대형"},
+  {tk:"105560",nm:"KB금융",pr:78200,base:78200,sec:"금융",cap:"대형"},
+  {tk:"000270",nm:"기아",pr:98100,base:98100,sec:"자동차",cap:"대형"},
+  {tk:"096770",nm:"SK이노베이션",pr:115500,base:115500,sec:"에너지",cap:"대형"},
+  {tk:"003670",nm:"포스코퓨처엠",pr:198000,base:198000,sec:"2차전지",cap:"중형"},
+  {tk:"247540",nm:"에코프로비엠",pr:152000,base:152000,sec:"2차전지",cap:"중형"},
+  // 코스닥
+  {tk:"373220",nm:"LG에너지솔루션",pr:298500,base:298500,sec:"2차전지",cap:"대형"},
+  {tk:"207940",nm:"삼성바이오로직스",pr:831000,base:831000,sec:"바이오",cap:"대형"},
+  {tk:"068270",nm:"셀트리온",pr:186500,base:186500,sec:"바이오",cap:"대형"},
+  {tk:"035720",nm:"카카오",pr:42350,base:42350,sec:"인터넷",cap:"대형"},
+  {tk:"000810",nm:"삼성화재",pr:335000,base:335000,sec:"보험",cap:"대형"},
+  {tk:"086520",nm:"에코프로",pr:68500,base:68500,sec:"2차전지",cap:"중형"},
+  {tk:"091990",nm:"셀트리온헬스케어",pr:45200,base:45200,sec:"바이오",cap:"중형"},
+  {tk:"263750",nm:"펄어비스",pr:32500,base:32500,sec:"게임",cap:"중형"},
+  {tk:"041510",nm:"에스엠",pr:58700,base:58700,sec:"엔터",cap:"중형"},
+  {tk:"035900",nm:"JYP Ent.",pr:47800,base:47800,sec:"엔터",cap:"중형"},
+  {tk:"122870",nm:"YG엔터테인먼트",pr:38900,base:38900,sec:"엔터",cap:"중형"},
+  {tk:"278530",nm:"HLB",pr:52300,base:52300,sec:"바이오",cap:"중형"},
+  {tk:"950130",nm:"엑세스바이오",pr:8500,base:8500,sec:"바이오",cap:"소형"},
+  {tk:"196170",nm:"알테오젠",pr:285000,base:285000,sec:"바이오",cap:"중형"},
+  {tk:"145020",nm:"휴젤",pr:198000,base:198000,sec:"바이오",cap:"중형"},
+  {tk:"048260",nm:"오스템임플란트",pr:178500,base:178500,sec:"의료기기",cap:"중형"},
+  {tk:"215600",nm:"신라젠",pr:3240,base:3240,sec:"바이오",cap:"소형"},
+  {tk:"039030",nm:"이오테크닉스",pr:89500,base:89500,sec:"반도체장비",cap:"중형"},
+  {tk:"042700",nm:"한미반도체",pr:68500,base:68500,sec:"반도체장비",cap:"중형"},
+  {tk:"357780",nm:"솔브레인",pr:295000,base:295000,sec:"반도체소재",cap:"중형"},
+  {tk:"095340",nm:"ISC",pr:42500,base:42500,sec:"반도체",cap:"소형"},
+  {tk:"009150",nm:"삼성전기",pr:155000,base:155000,sec:"전자부품",cap:"중형"},
+  {tk:"010130",nm:"고려아연",pr:498000,base:498000,sec:"비철금속",cap:"중형"},
+  {tk:"326030",nm:"SK바이오팜",pr:78500,base:78500,sec:"바이오",cap:"중형"},
+  {tk:"247540",nm:"에코프로비엠",pr:152000,base:152000,sec:"2차전지",cap:"중형"},
+  {tk:"011200",nm:"HMM",pr:18250,base:18250,sec:"해운",cap:"중형"},
+  {tk:"000120",nm:"CJ대한통운",pr:98500,base:98500,sec:"물류",cap:"중형"},
+  {tk:"180640",nm:"한진칼",pr:62400,base:62400,sec:"항공",cap:"중형"},
+  {tk:"003490",nm:"대한항공",pr:21500,base:21500,sec:"항공",cap:"중형"},
+  {tk:"021240",nm:"코웨이",pr:52300,base:52300,sec:"가전",cap:"중형"},
+  {tk:"259960",nm:"크래프톤",pr:218000,base:218000,sec:"게임",cap:"대형"},
 ];
 const WL=["005930","000660","373220","035420","207940"];
 const CANDS=[{tk:"373220",why:"기관 3일 연속 순매수"},{tk:"207940",why:"바이오 테마 강세"}];
@@ -886,8 +967,12 @@ window.onload=()=>{
   setInterval(liveUpdate,2200);
   setInterval(checkStopOrders,800);
   setInterval(autoAdvUpdate,8000);
-  // 종목 선택 시 즉시 업데이트
-  setTimeout(updateAIAdvisor, 500);
+  // 초기 실행
+  setTimeout(()=>{
+    updateAIAdvisor();
+    fetchDartNews();
+    runFullAnalysis();
+  }, 800);
 };
 function loadState(){
   const c=localStorage.getItem("htsCfg");if(c)cfg={...cfg,...JSON.parse(c)};
@@ -1491,9 +1576,308 @@ RSI: ${lrsi} / 5MA: ${lma5} / 20MA: ${lma20}
     if(t)addMsg("ai","📚 AI 결정 설명:\n"+t);
   }catch(e){}
 }
+// ═══════════════════════════════
+// DART 공시 조회 (Phase 6-5, 웹 검색 활용)
+// ═══════════════════════════════
+const DART_REACTIONS = {
+  "신규 수주": {reaction:"+5~15%", timing:"공시 직후 거래량 확인 후", grade:"A"},
+  "유상증자": {reaction:"-5~20%", timing:"낙폭 안정 후 판단", grade:"B"},
+  "무상증자": {reaction:"권리락 후 반등", timing:"권리락일 시가 안정 후", grade:"B"},
+  "실적 호조": {reaction:"+3~10%", timing:"시가 이후 안정 확인", grade:"A"},
+  "실적 부진": {reaction:"-5~15%", timing:"낙폭 안정 후 반등 노림", grade:"B"},
+  "대주주 매수": {reaction:"+5~20%", timing:"연속 매수 여부 확인", grade:"A"},
+  "자사주 매입": {reaction:"+3~10%", timing:"공시 직후", grade:"A"},
+  "FDA 임상 성공": {reaction:"+15~30%", timing:"공시 직후", grade:"S"},
+  "FDA 임상 실패": {reaction:"-20~50%", timing:"진입 금지", grade:"C"},
+  "CB/BW 발행": {reaction:"-3~10%", timing:"진입 자제", grade:"C"},
+};
+const SAMPLE_DARTS = [
+  {time:"08:42",corp:"삼성전자",title:"HBM4 NVIDIA 공급 계약 체결 (8조원 규모)",type:"신규 수주",impact:"S"},
+  {time:"08:55",corp:"LG에너지솔루션",title:"유럽 전기차 배터리 장기 공급 계약",type:"신규 수주",impact:"A"},
+  {time:"09:10",corp:"셀트리온",title:"미국 FDA 임상 2상 긍정적 중간 결과 발표",type:"FDA 임상 성공",impact:"A"},
+  {time:"07:30",corp:"카카오",title:"자사주 1,000억원 매입 결정",type:"자사주 매입",impact:"A"},
+  {time:"09:35",corp:"에코프로",title:"제3자 배정 유상증자 결정 (1,200억원)",type:"유상증자",impact:"B"},
+  {time:"10:05",corp:"HMM",title:"1분기 영업이익 컨센서스 40% 상회",type:"실적 호조",impact:"A"},
+];
+
+async function fetchDartNews(){
+  const el=document.getElementById("dartList");
+  el.innerHTML='<span style="color:var(--tm);font-style:italic;">공시 로딩 중...</span>';
+  // 실제 구현: 웹 검색으로 DART 공시 가져오기 (서버 필요)
+  // 현재: 샘플 데이터 + AI 분석 표시
+  await new Promise(r=>setTimeout(r,400));
+  const stk=STOCKS.find(s=>s.tk===activeTk)||STOCKS[0];
+  const relevant=SAMPLE_DARTS.filter(d=>d.corp===stk.nm||Math.random()>0.5).slice(0,4);
+  el.innerHTML=relevant.map(d=>{
+    const rx=DART_REACTIONS[d.type]||{reaction:"불명확",grade:"B"};
+    const gc={"S":"var(--p)","A":"var(--b)","B":"var(--a)","C":"var(--r)"}[d.impact]||"var(--ts)";
+    return`<div style="padding:4px 0;border-bottom:1px solid var(--br);cursor:pointer;" onclick="analyzeDart('${d.title}','${d.type}','${d.corp}')">
+      <div style="display:flex;align-items:center;gap:4px;margin-bottom:2px;">
+        <span style="font-family:var(--mono);font-size:8px;color:var(--tm);">${d.time}</span>
+        <span style="font-family:var(--mono);font-size:9px;padding:0 4px;border-radius:3px;font-weight:700;color:${gc};background:${gc}18;">${d.impact}급</span>
+        <span style="font-size:9px;font-weight:600;">${d.corp}</span>
+      </div>
+      <div style="font-size:9px;color:var(--ts);line-height:1.4;">${d.title}</div>
+      <div style="font-size:8px;color:var(--tm);margin-top:1px;">예상반응 ${rx.reaction} · ${rx.timing}</div>
+    </div>`;
+  }).join("")||"<div style='font-size:9px;color:var(--tm);'>공시 없음</div>";
+}
+async function analyzeDart(title, type, corp){
+  // 공시 클릭 시 재료 강도 자동 분석
+  document.getElementById("materialInput").value=`[${corp}] ${title} (${type})`;
+  // AI 추천 탭으로 이동해서 분석
+  const aiTab=document.querySelector(".lp-tabs .lpt:last-child");
+  if(aiTab)lTab(aiTab,"lpb-ai");
+  await runMaterialAnalysis();
+  addMsg("ai",`📢 공시 분석: ${corp}
+${title}
+
+공시 유형: ${type}
+→ 재료 분석 패널에서 결과를 확인하세요. (Phase 6-5)`);
+}
+
+// ═══════════════════════════════
+// 매매 타점 AI 추천 (Phase 10)
+// ═══════════════════════════════
+const TECHNIQUES = {
+  "눌림목": {phase:"10-4", cond:"20MA 지지 + 거래량 감소 후 회복", stop:"눌림 저점 이탈", target:"직전 고점"},
+  "돌파": {phase:"10-5", cond:"전고점 저항선 돌파 + 거래량 300%+", stop:"돌파선 아래", target:"다음 저항선"},
+  "첫봉": {phase:"10-3", cond:"시가 후 첫봉 양봉 + 거래량 150%+", stop:"첫봉 저가", target:"전일 고점"},
+  "갭상승": {phase:"10-2", cond:"갭업 후 첫봉 양봉 확정", stop:"갭 아래 (시가)", target:"이전 저항 or +5%"},
+  "스캘핑": {phase:"10-1", cond:"체결강도 120+ + 호가창 매도벽 소화", stop:"-0.3% 즉시", target:"+0.5~1%"},
+  "이슈테마": {phase:"10-6", cond:"재료 A급 이상 + 선도주 + 거래량 1위", stop:"시가 이탈", target:"R/R 1:2"},
+};
+
+async function detectTechnique(cs, stk){
+  if(!cs||cs.length<10) return null;
+  const cls=cs.map(c=>c.c), vls=cs.map(c=>c.v);
+  const lc=cs[cs.length-1], pc=cs[cs.length-2]||lc;
+  const ma5=calcMA(cls,5), ma20=calcMA(cls,20);
+  const lma5=ma5[ma5.length-1]||0, lma20=ma20[ma20.length-1]||0;
+  const rsi=(calcRSI(cls,14).slice(-1)[0]||50);
+  const volRatio=vls.length>=2?vls[vls.length-1]/vls[vls.length-2]:1;
+  const chgPct=(lc.c-lc.o)/lc.o*100;
+  const prevHighs=cs.slice(-20).map(c=>c.h), maxHigh=Math.max(...prevHighs);
+  const isBreakout=lc.h>=maxHigh*0.99&&volRatio>=2;
+  const isPullback=lc.c>lma20&&lc.c<lma5&&volRatio<1;
+  const isGap=lc.o>pc.c*1.01;
+  const isFirstBar=sim.idx<=3;
+  const isMomentum=rsi>=50&&volRatio>=1.5&&chgPct>0;
+  let technique="눌림목", score=0;
+  if(isBreakout){technique="돌파";score=4;}
+  else if(isGap&&isFirstBar){technique="갭상승";score=4;}
+  else if(isFirstBar&&lc.c>lc.o&&volRatio>=1.5){technique="첫봉";score=3;}
+  else if(isPullback){technique="눌림목";score=3;}
+  else if(isMomentum&&volRatio>=2){technique="이슈테마";score=3;}
+  else{technique="스캘핑";score=2;}
+  const t=TECHNIQUES[technique];
+  const entryPr=lc.c;
+  const stopPr=technique==="스캘핑"?Math.round(entryPr*0.997):Math.round(lma20*0.995);
+  const rr=2;
+  const targetPr=Math.round(entryPr+(entryPr-stopPr)*rr);
+  return {technique,score,phase:t.phase,cond:t.cond,entry:entryPr,stop:stopPr,target:targetPr,rr,ma5:Math.round(lma5),ma20:Math.round(lma20),rsi:rsi.toFixed(0),volRatio:volRatio.toFixed(1)};
+}
+
+// ═══════════════════════════════
+// AI 종합분석 + Phase 8 체크리스트
+// ═══════════════════════════════
+let analysisRunning=false;
+async function runFullAnalysis(){
+  if(analysisRunning)return;
+  analysisRunning=true;
+  const stk=STOCKS.find(s=>s.tk===activeTk)||STOCKS[0];
+  const cs=sim.candles.slice(0,Math.max(sim.idx+1,20));
+  if(cs.length<5){analysisRunning=false;return;}
+  document.getElementById("analysisTk").textContent=stk.nm;
+  document.getElementById("techniqueTag").textContent="분석 중...";
+  document.getElementById("entryPoint").textContent="계산 중...";
+  document.getElementById("phase8Check").textContent="체크 중...";
+  document.getElementById("goNogoTag").textContent="-";
+  document.getElementById("goNogoTag").style.cssText="font-size:9px;padding:1px 6px;border-radius:3px;font-weight:700;font-family:var(--mono);";
+
+  // 1. 로컬 기법 감지
+  const tech=await detectTechnique(cs, stk);
+  if(tech){
+    document.getElementById("techniqueTag").textContent=tech.technique;
+    document.getElementById("techniqueTag").style.color="var(--b)";
+  }
+
+  // 2. Claude API로 종합 분석
+  const cls=cs.map(c=>c.c), vls=cs.map(c=>c.v);
+  const ma5=calcMA(cls,5), ma20=calcMA(cls,20), ma60=calcMA(cls,60);
+  const rsi=(calcRSI(cls,14).slice(-1)[0]||50).toFixed(1);
+  const lma5=(ma5.slice(-1)[0]||0).toFixed(0);
+  const lma20=(ma20.slice(-1)[0]||0).toFixed(0);
+  const lma60=(ma60.slice(-1)[0]||0).toFixed(0);
+  const lc=cs[cs.length-1];
+  const volR=vls.length>=2?(vls[vls.length-1]/vls[vls.length-2]).toFixed(1):"1.0";
+  const pos=mock.positions[activeTk];
+  const so=stopOrders[activeTk];
+
+  const prompt=`단타 트레이딩 멘토. Phase 8 통합 점검 기준으로 분석해줘.
+
+종목: ${stk.nm}(${activeTk}) ${stk.sec||""} ${stk.cap||""}
+현재가: ${lc.c.toLocaleString()}원
+5MA: ${lma5} / 20MA: ${lma20} / 60MA: ${lma60}
+RSI: ${rsi} / 거래량비율: ${volR}배
+감지된 기법: ${tech?.technique||"불명확"}
+${pos?`보유: ${pos.qty}주 평단 ${Math.round(pos.avgPrice).toLocaleString()}원${so?` 손절${so.stop.toLocaleString()} 목표${so.t1.toLocaleString()}`:""}`:""} 
+
+Phase 8 STEP 0~7 간략 점검 결과를 JSON으로 답해:
+{
+  "technique": "매매기법명",
+  "techniqueReason": "이 기법을 선택한 이유 1문장",
+  "entry": 진입가숫자,
+  "stop": 손절가숫자,
+  "target1": 1차목표가숫자,
+  "target2": 2차목표가숫자,
+  "rr": RR비율숫자,
+  "entryTiming": "진입 타이밍 설명",
+  "phase8": {
+    "step0_psych": "심리상태: 정상/주의",
+    "step1_market": "시장환경: 우호/중립/비우호",
+    "step2_sector": "섹터: 강/보통/약",
+    "step3_screen": "스크리닝: 통과/주의/실패",
+    "step4_chart": "차트: 진입가능/주의/불가",
+    "step5_supply": "수급: 강/보통/약",
+    "step6_rr": "R/R: 충족/미달",
+    "step7_final": "최종: GO/NO-GO"
+  },
+  "goNogo": "GO" or "NO-GO",
+  "goScore": 0~8,
+  "caution": "주의사항"
+}`;
+
+  try{
+    const res=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:700,messages:[{role:"user",content:prompt}]})});
+    const data=await res.json();
+    const raw=data.content?.[0]?.text||"{}";
+    let p;try{const m=raw.match(/\{[\s\S]*\}/);p=JSON.parse(m?m[0]:"{}"); }catch(e){p={};}
+
+    // 매매기법
+    if(p.technique){
+      document.getElementById("techniqueTag").textContent=p.technique;
+      document.getElementById("techniqueTag").style.color="var(--b)";
+      document.getElementById("techniqueReason").textContent=(p.techniqueReason||"")+(p.phase8?.step4_chart?` · ${p.phase8.step4_chart}`:"");
+    }
+
+    // 타점
+    if(p.entry){
+      const rrStr=p.rr?` (R/R 1:${p.rr})`:"";
+      document.getElementById("entryPoint").innerHTML=
+        `<span style="color:var(--b);font-weight:700;">진입 ${(p.entry||0).toLocaleString()}원</span><br>`+
+        `<span style="color:var(--r);">✂ 손절 ${(p.stop||0).toLocaleString()}원</span><br>`+
+        `<span style="color:var(--g);">🎯 1차 ${(p.target1||0).toLocaleString()}원</span><br>`+
+        `<span style="color:var(--g);">🎯 2차 ${(p.target2||0).toLocaleString()}원</span>`+
+        `<br><span style="font-size:8px;color:var(--ts);">${p.entryTiming||""}${rrStr}</span>`;
+      // 주문창에 자동 입력
+      document.getElementById("ofPr").value=p.entry;
+      document.getElementById("ofStop").value=p.stop;
+      document.getElementById("ofT1").value=p.target1;
+      document.getElementById("ofT2").value=p.target2;
+      updOSum();
+    }
+
+    // Phase 8 체크리스트
+    if(p.phase8){
+      const ph=p.phase8;
+      const checkIcon=v=>v&&(v.includes("우호")||v.includes("강")||v.includes("통과")||v.includes("GO")||v.includes("충족")||v.includes("정상"))?"✅":v&&(v.includes("비우호")||v.includes("약")||v.includes("실패")||v.includes("NO")||v.includes("미달"))?"❌":"🟡";
+      document.getElementById("phase8Check").innerHTML=
+        `${checkIcon(ph.step0_psych)} STEP0 ${ph.step0_psych||"-"}<br>`+
+        `${checkIcon(ph.step1_market)} STEP1 ${ph.step1_market||"-"}<br>`+
+        `${checkIcon(ph.step2_sector)} STEP2 ${ph.step2_sector||"-"}<br>`+
+        `${checkIcon(ph.step3_screen)} STEP3 ${ph.step3_screen||"-"}<br>`+
+        `${checkIcon(ph.step4_chart)} STEP4 ${ph.step4_chart||"-"}<br>`+
+        `${checkIcon(ph.step5_supply)} STEP5 ${ph.step5_supply||"-"}<br>`+
+        `${checkIcon(ph.step6_rr)} STEP6 ${ph.step6_rr||"-"}<br>`+
+        `${checkIcon(ph.step7_final)} STEP7 ${ph.step7_final||"-"}`;
+    }
+
+    // GO/NO-GO 태그
+    const isGo=p.goNogo==="GO";
+    const tag=document.getElementById("goNogoTag");
+    tag.textContent=isGo?`✅ GO (${p.goScore||0}/8)`:p.goNogo?`❌ NO-GO (${p.goScore||0}/8)`:`🟡 (${p.goScore||0}/8)`;
+    tag.style.background=isGo?"rgba(5,192,114,.15)":"rgba(240,62,62,.15)";
+    tag.style.color=isGo?"var(--g)":"var(--r)";
+
+    // AI 결정 로그
+    addDecisionLog(
+      `[${stk.nm}] ${p.technique||"분석"} → ${p.goNogo||"분석중"}`,
+      `진입 ${(p.entry||0).toLocaleString()} / 손절 ${(p.stop||0).toLocaleString()} / 목표 ${(p.target1||0).toLocaleString()} · ${p.phase8?.step7_final||""}`,
+      `Phase ${TECHNIQUES[p.technique]?.phase||"10"} · Phase 8`
+    );
+
+    // 채팅에도 알림
+    if(p.goNogo){
+      addMsg("ai",
+        `📊 AI 종합분석 완료: ${stk.nm}
+
+`+
+        `매매기법: ${p.technique||"-"} (${TECHNIQUES[p.technique]?.phase||""})
+`+
+        `${p.techniqueReason||""}
+
+`+
+        `진입가: ${(p.entry||0).toLocaleString()}원
+`+
+        `손절가: ${(p.stop||0).toLocaleString()}원
+`+
+        `1차목표: ${(p.target1||0).toLocaleString()}원
+`+
+        `2차목표: ${(p.target2||0).toLocaleString()}원
+`+
+        `R/R: 1:${p.rr||"-"}
+
+`+
+        `Phase 8 점수: ${p.goScore||0}/8 → ${p.goNogo}
+`+
+        `${p.caution?"⚠ "+p.caution:""}`
+      );
+    }
+  }catch(e){
+    document.getElementById("techniqueTag").textContent=tech?.technique||"분석실패";
+    document.getElementById("entryPoint").textContent="API 오류";
+    document.getElementById("phase8Check").textContent="API 오류";
+  }
+  analysisRunning=false;
+}
+
+// ═══════════════════════════════
+// AI 자동매매 — 결정 이유 실시간 표시 강화
+// ═══════════════════════════════
+async function runFullAutoStep(cs, stk){
+  if(!autoState.running) return;
+  const tech=await detectTechnique(cs, stk);
+  if(!tech) return;
+  const reason=`${tech.technique} 기법 감지 · RSI${tech.rsi} · 거래량×${tech.volRatio} · R/R 1:${tech.rr}`;
+  addDecisionLog(`[${stk.nm}] 기법감지: ${tech.technique}`, reason, `Phase ${tech.phase}`);
+  // Level 2 이상: 진입 신호 표시
+  if(autoState.level>=2 && tech.score>=3){
+    updAdvBoxes(
+      `${tech.technique} 셋업 감지 — ${stk.nm}`,
+      `진입 ${tech.entry.toLocaleString()} / 손절 ${tech.stop.toLocaleString()} / 목표 ${tech.target.toLocaleString()}
+${TECHNIQUES[tech.technique]?.cond||""}`
+    );
+    if(autoState.level>=3 && tech.score>=3){
+      // 진입가/손절/목표 주문창에 자동 세팅 후 매수
+      document.getElementById("ofPr").value=tech.entry;
+      document.getElementById("ofStop").value=tech.stop;
+      document.getElementById("ofT1").value=tech.target;
+      document.getElementById("ofT2").value=Math.round(tech.entry+(tech.target-tech.entry)*1.5);
+      await execAutoBuy(tech.entry, stk);
+    }
+  }
+}
+
 async function autoAdvUpdate(){
   // 자동매매 레벨 무관하게 항상 차트 분석 업데이트
   await updateAIAdvisor();
+  // 자동매매 실행 중이면 기법 감지도 실행
+  if(autoState.running && autoState.level>=1){
+    const stk=STOCKS.find(s=>s.tk===activeTk)||STOCKS[0];
+    const cs=sim.candles.slice(0,Math.max(sim.idx+1,20));
+    if(cs.length>=10) await runFullAutoStep(cs, stk);
+  }
 }
 // ═══════════════════════════════
 // AI SECTOR & STOCK RECOMMENDATION (Phase 6, 7)
@@ -1725,20 +2109,26 @@ function updAdvBoxes(now,action){
 function buildSys(){
   const stk=STOCKS.find(s=>s.tk===activeTk)||STOCKS[0];
   const cs=sim.candles.slice(0,Math.max(sim.idx+1,20));
-  const cls=cs.map(c=>c.c);
+  const cls=cs.map(c=>c.c),vls=cs.map(c=>c.v);
+  const lc=cs[cs.length-1]||{o:0,h:0,l:0,c:stk.pr,v:0};
   const lrsi=(calcRSI(cls,14).slice(-1)[0]||50).toFixed(1);
   const lma5=(calcMA(cls,5).slice(-1)[0]||0).toFixed(0);
   const lma20=(calcMA(cls,20).slice(-1)[0]||0).toFixed(0);
+  const lma60=(calcMA(cls,60).slice(-1)[0]||0).toFixed(0);
+  const volR=vls.length>=2?(vls[vls.length-1]/vls[vls.length-2]).toFixed(1):"1.0";
+  const maArr=parseFloat(lma5)>parseFloat(lma20)&&parseFloat(lma20)>parseFloat(lma60)?"정배열":parseFloat(lma5)<parseFloat(lma20)?"역배열":"혼합";
   const pos=mock.positions[activeTk];
   const so=stopOrders[activeTk];
-  return `20년 경력 단타 트레이딩 멘토. 현재 모의투자 HTS:
-종목: ${stk.nm}(${activeTk}) 현재가: ${stk.pr.toLocaleString()}원
-RSI: ${lrsi} | 5MA: ${lma5} | 20MA: ${lma20}
-보유: ${pos?`${pos.qty}주 평단${Math.round(pos.avgPrice).toLocaleString()}원${so?` | 손절${so.stop.toLocaleString()} | 1차목표${so.t1.toLocaleString()}`:""}`:없음}
-신용/미수: ${credType} | 잔고: ${mock.cash.toLocaleString()}원
-오늘손익: ${mock.todayPnl>=0?"+":""}${Math.round(mock.todayPnl).toLocaleString()}원
+  const pnlPct=pos?((stk.pr-pos.avgPrice)/pos.avgPrice*100).toFixed(2):null;
+  return `20년 경력 단타 트레이딩 멘토이자 AI 투자 파트너.
+현재 HTS 상황:
+종목: ${stk.nm}(${activeTk}) ${stk.sec||""} ${stk.cap||""} | 현재가: ${stk.pr.toLocaleString()}원
+차트: RSI ${lrsi} | MA ${maArr} (5MA:${lma5}/20MA:${lma20}/60MA:${lma60}) | 거래량×${volR}
+캔들: O${lc.o.toLocaleString()} H${lc.h.toLocaleString()} L${lc.l.toLocaleString()} C${lc.c.toLocaleString()}
+보유: ${pos?`${pos.qty}주 평단${Math.round(pos.avgPrice).toLocaleString()}원 (${pnlPct>=0?"+":""}${pnlPct}%)${so?` | 손절${so.stop.toLocaleString()} | 1차목표${so.t1.toLocaleString()}`:""}`:없음}
+계좌: 잔고${mock.cash.toLocaleString()}원 | 신용${credType} | 오늘손익${mock.todayPnl>=0?"+":""}${Math.round(mock.todayPnl).toLocaleString()}원 (${mock.todayTrades}매매)
 AI자동매매: 레벨${autoState.level} ${autoState.running?"실행중":"중지"}
-원칙: 결론 먼저, Phase 번호 포함, 수치 근거, 100자 이내, 한국어.`;
+원칙: 결론 먼저, Phase 번호 포함, 수치 근거, 200자 이내, 한국어.`;
 }
 async function sendChat(txt){
   if(chatBusy)return;
@@ -1876,12 +2266,38 @@ function renderNews(){
   }).join("");
 }
 function selectStk(tk){activeTk=tk;const s=STOCKS.find(s=>s.tk===tk)||STOCKS[0];document.getElementById("siNm").textContent=s.nm;
-  const tkEl=document.getElementById("obTkName");if(tkEl)tkEl.textContent=s.nm;document.getElementById("srchIn").value="";hideSrch();renderWL();genCandles(tk,sim.date);initChart();renderOB();renderTH();setTimeout(updateAIAdvisor,300);}
+  const tkEl=document.getElementById("obTkName");if(tkEl)tkEl.textContent=s.nm;document.getElementById("srchIn").value="";hideSrch();renderWL();genCandles(tk,sim.date);initChart();renderOB();renderTH();
+  const tkEl=document.getElementById("obTkName");if(tkEl)tkEl.textContent=s.nm;
+  const atk=document.getElementById("analysisTk");if(atk)atk.textContent=s.nm;
+  setTimeout(()=>{updateAIAdvisor();runFullAnalysis();fetchDartNews();},400);}
 
 // ═══════════════════════════════
 // SEARCH
 // ═══════════════════════════════
-function onSearch(q){if(!q){hideSrch();return;}const res=STOCKS.filter(s=>s.nm.includes(q)||s.tk.includes(q)).slice(0,6);if(!res.length){hideSrch();return;}const el=document.getElementById("srchDrop");el.style.display="block";el.innerHTML=res.map(s=>{const c=((s.pr-s.base)/s.base*100).toFixed(2),up=c>=0;return`<div class="sri" onclick="selectStk('${s.tk}')"><div class="sri-tk">${s.tk}</div><div class="sri-nm">${s.nm}</div><div class="sri-pr ${up?"cu":"cd"}">${s.pr.toLocaleString()}</div></div>`;}).join("");}
+function onSearch(q){
+  if(!q){hideSrch();return;}
+  const res=STOCKS.filter(s=>s.nm.includes(q)||s.tk.includes(q)||(s.sec&&s.sec.includes(q))).slice(0,8);
+  if(!res.length){hideSrch();return;}
+  const el=document.getElementById("srchDrop");el.style.display="block";
+  el.innerHTML=res.map(s=>{
+    const c=((s.pr-s.base)/s.base*100).toFixed(2),up=c>=0;
+    const capCol=s.cap==="대형"?"var(--b)":s.cap==="중형"?"var(--a)":"var(--ts)";
+    return`<div class="sri" onclick="selectStk('${s.tk}')">
+      <div style="display:flex;flex-direction:column;width:48px;flex-shrink:0;">
+        <div class="sri-tk">${s.tk}</div>
+        <div style="font-size:8px;color:${capCol};">${s.cap||""}</div>
+      </div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${s.nm}</div>
+        <div style="font-size:9px;color:var(--ts);">${s.sec||""}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0;">
+        <div class="sri-pr ${up?"cu":"cd"}">${s.pr.toLocaleString()}</div>
+        <div style="font-size:9px;" class="${up?"cu":"cd"}">${up?"+":""}${c}%</div>
+      </div>
+    </div>`;
+  }).join("");
+}
 function hideSrch(){document.getElementById("srchDrop").style.display="none";}
 function togInd(nm,el){inds[nm]=!inds[nm];el.classList.toggle("on",inds[nm]);if(!inds[nm]){if(nm==="rsi"){document.getElementById("rsiSub").classList.add("hide");if(rsiChart){rsiChart.destroy();rsiChart=null;}}if(nm==="macd"){document.getElementById("macdSub").classList.add("hide");if(macdChart){macdChart.destroy();macdChart=null;}}}initChart();}
 
