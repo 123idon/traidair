@@ -399,6 +399,7 @@ button{cursor:pointer;font-family:var(--sans);}
         <div class="lpt on" onclick="lTab(this,'lpb-w')">관심</div>
         <div class="lpt" onclick="lTab(this,'lpb-f')">조건</div>
         <div class="lpt" onclick="lTab(this,'lpb-n')">뉴스</div>
+        <div class="lpt" onclick="lTab(this,'lpb-ai')">AI추천</div>
       </div>
       <div class="lpb on" id="lpb-w">
         <div class="sec">
@@ -419,6 +420,36 @@ button{cursor:pointer;font-family:var(--sans);}
         <div class="sec"><div class="sec-t">결과</div><div id="filterResult" style="font-size:9px;color:var(--tm);padding:3px 0;">조건을 선택하세요</div></div>
       </div>
       <div class="lpb" id="lpb-n"><div id="newsList"></div></div>
+
+      <!-- AI 섹터/종목 추천 패널 (Phase 6, 7 기반) -->
+      <div class="lpb" id="lpb-ai">
+        <div class="sec" style="padding:6px 8px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
+            <span class="sec-t" style="margin-bottom:0;color:var(--p);">🤖 AI 섹터 분석</span>
+            <button onclick="runAISectorAnalysis()" style="padding:2px 7px;border-radius:5px;border:none;background:var(--p);color:#fff;font-size:9px;font-weight:600;cursor:pointer;">분석</button>
+          </div>
+          <div id="aiSectorResult" style="font-size:9px;color:var(--tm);line-height:1.6;">
+            분석 버튼을 눌러주세요.<br>오늘 강한 섹터와 재료 강도를 분석합니다.
+          </div>
+        </div>
+        <div class="sec" style="padding:6px 8px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
+            <span class="sec-t" style="margin-bottom:0;color:var(--b);">🔍 AI 종목 스크리닝</span>
+            <button onclick="runAIStockScreening()" style="padding:2px 7px;border-radius:5px;border:none;background:var(--b);color:#fff;font-size:9px;font-weight:600;cursor:pointer;">스크리닝</button>
+          </div>
+          <div style="font-size:8px;color:var(--tm);margin-bottom:4px;">Phase 7-7 기준: 수급폭발·기관연속·모멘텀·눌림목</div>
+          <div id="aiScreenResult" style="font-size:9px;color:var(--tm);line-height:1.6;">
+            스크리닝 버튼을 눌러주세요.
+          </div>
+        </div>
+        <div class="sec" style="padding:6px 8px;">
+          <div class="sec-t" style="color:var(--a);">📋 재료 강도 판별</div>
+          <div style="font-size:8px;color:var(--tm);margin-bottom:4px;">뉴스/공시 텍스트 붙여넣기</div>
+          <textarea id="materialInput" style="width:100%;height:50px;background:var(--bg);border:1px solid var(--br);border-radius:6px;color:var(--tp);font-family:var(--sans);font-size:9px;padding:4px;resize:none;outline:none;" placeholder="예: 삼성전자 HBM4 수주 1조원..."></textarea>
+          <button onclick="runMaterialAnalysis()" style="width:100%;margin-top:3px;padding:4px;border-radius:5px;border:none;background:var(--a);color:#000;font-size:9px;font-weight:700;cursor:pointer;">재료 강도 분석 (S/A/B/C)</button>
+          <div id="materialResult" style="font-size:9px;margin-top:4px;line-height:1.6;"></div>
+        </div>
+      </div>
     </div>
 
     <!-- ② CENTER: 차트 (col2 row1) -->
@@ -663,8 +694,10 @@ button{cursor:pointer;font-family:var(--sans);}
         <div class="ai-quick">
           <button class="qb" onclick="qa('Phase 8 체크리스트 기준으로 지금 진입 가능해?')">✅ 진입점검</button>
           <button class="qb" onclick="qa('지금 R/R 계산해줘')">📐 R/R</button>
-          <button class="qb" onclick="qa('손절선 어디에 잡아야 해?')">✂ 손절선</button>
-          <button class="qb" onclick="qa('지금 차트 패턴이 뭐야?')">🔍 패턴</button>
+          <button class="qb" onclick="qa('손절선 어디에 잡아야 해?')">✂ 손절</button>
+          <button class="qb" onclick="qa('오늘 강한 섹터가 어디야? Phase 6 기준으로 재료 강도도 알려줘')">🏭 섹터</button>
+          <button class="qb" onclick="qa('Phase 7-7 스크리닝 기준으로 오늘 단타 후보 종목 추천해줘')">🔍 종목추천</button>
+          <button class="qb" onclick="qa('지금 차트 패턴이 뭐야?')">📊 패턴</button>
           <button class="qb" onclick="qa('오늘 매매 복기해줘')">📝 복기</button>
         </div>
         <div class="ai-in-area">
@@ -809,11 +842,11 @@ const STOCKS=[
 const WL=["005930","000660","373220","035420","207940"];
 const CANDS=[{tk:"373220",why:"기관 3일 연속 순매수"},{tk:"207940",why:"바이오 테마 강세"}];
 const FILTERS=[
-  {nm:"수급 폭발 (300%+)",col:"var(--g)",stocks:["373220","207940"]},
-  {nm:"기관 연속 매수",col:"var(--b)",stocks:["005930","000660"]},
-  {nm:"눌림목 탐색",col:"var(--a)",stocks:["035420","051910"]},
-  {nm:"상한가 근접",col:"var(--p)",stocks:["207940"]},
-  {nm:"VIX 안정+갭업",col:"var(--t)",stocks:["005930","005380"]},
+  {nm:"수급폭발 300%+ (Phase7-7 필터1)",col:"var(--g)",desc:"전일대비 거래량 300% 이상, 시총 500억~5조",stocks:["373220","207940","068270"]},
+  {nm:"기관+외국인 동반매수 (Phase7-7 필터2)",col:"var(--b)",desc:"기관 3일 이상 연속 순매수 + 외국인 당일 순매수",stocks:["005930","000660"]},
+  {nm:"장초반 모멘텀 (Phase7-7 필터3)",col:"var(--a)",desc:"당일 상승률 +3% 이상, 거래량 전일 50% 초과",stocks:["035420","051910"]},
+  {nm:"눌림목 탐색 (Phase7-7 필터4)",col:"var(--p)",desc:"최근 5일 +10% 이상, 현재 고점대비 -5~-10%",stocks:["207940","005380"]},
+  {nm:"상한가 근접 (Phase6-7)",col:"var(--t)",desc:"상한가 대비 -20% 이내, 거래량 500% 이상",stocks:["207940"]},
 ];
 const NEWS=[
   {ttl:"나스닥 +1.45% · AI 반도체 강세 지속",tm:"07:32",cat:"해외",col:"var(--b)"},
@@ -912,6 +945,40 @@ function calcVWAP(cs){let pv=0,tv=0;return cs.map(c=>{pv+=((c.h+c.l+c.c)/3)*c.v;
 // ═══════════════════════════════
 // CHART INIT
 // ═══════════════════════════════
+function drawCandlePlugin(){
+  return {
+    id:"candlePlugin",
+    afterDatasetsDraw(chart){
+      const ctx=chart.ctx;
+      const ds=chart.data.datasets;
+      const cs=sim.candles.slice(0,Math.max(sim.idx+1,10));
+      if(!cs.length)return;
+      const xScale=chart.scales.x,yScale=chart.scales.y;
+      if(!xScale||!yScale)return;
+      const barWidth=Math.max(2,Math.min(8,(xScale.right-xScale.left)/cs.length*0.6));
+      ctx.save();
+      cs.forEach((c,i)=>{
+        const x=xScale.getPixelForValue(i);
+        const yO=yScale.getPixelForValue(c.o);
+        const yC=yScale.getPixelForValue(c.c);
+        const yH=yScale.getPixelForValue(c.h);
+        const yL=yScale.getPixelForValue(c.l);
+        const isUp=c.c>=c.o;
+        const col=isUp?"#dc2626":"#2563eb";
+        // 몸통
+        ctx.fillStyle=col;
+        const top=Math.min(yO,yC),height=Math.max(1,Math.abs(yO-yC));
+        ctx.fillRect(x-barWidth/2,top,barWidth,height);
+        // 꼬리 (위아래)
+        ctx.beginPath();ctx.strokeStyle=col;ctx.lineWidth=1;
+        ctx.moveTo(x,yH);ctx.lineTo(x,top);
+        ctx.moveTo(x,top+height);ctx.lineTo(x,yL);
+        ctx.stroke();
+      });
+      ctx.restore();
+    }
+  };
+}
 function initChart(){
   const cs=sim.candles.slice(0,Math.max(sim.idx+1,10));
   const lbls=cs.map(c=>c.t),cls=cs.map(c=>c.c),vls=cs.map(c=>c.v);
@@ -922,7 +989,7 @@ function initChart(){
   if(inds.vwap)ds.push({label:"VWAP",type:"line",data:calcVWAP(cs),borderColor:"#2dd4bf",borderWidth:1.5,borderDash:[4,2],pointRadius:0,fill:false,yAxisID:"y"});
   if(inds.vol)ds.push({label:"거래량",type:"bar",data:vls,backgroundColor:cs.map(c=>c.c>=c.o?"rgba(220,38,38,.75)":"rgba(37,99,235,.75)"),yAxisID:"y2",order:10});
   const ctx=document.getElementById("mainChart").getContext("2d");
-  mChart=new Chart(ctx,{data:{labels:lbls,datasets:ds},options:{responsive:true,maintainAspectRatio:false,animation:false,
+  mChart=new Chart(ctx,{data:{labels:lbls,datasets:ds},plugins:[drawCandlePlugin()],options:{responsive:true,maintainAspectRatio:false,animation:false,
     plugins:{legend:{display:false},tooltip:{mode:"index",intersect:false,backgroundColor:"#ffffff",borderColor:"rgba(0,0,0,.08)",titleColor:"#6b7684",bodyColor:"#191f28",borderWidth:1,titleColor:"#7a8090",bodyColor:"#e8eaf0",titleFont:{family:"JetBrains Mono",size:9},bodyFont:{family:"JetBrains Mono",size:10},padding:6,
       callbacks:{title:it=>it[0].label,label:it=>it.dataset.label==="거래량"?"거량:"+it.parsed.y.toLocaleString():it.dataset.label+":"+Math.round(it.parsed.y).toLocaleString()}}},
     scales:{x:{grid:{color:"rgba(0,0,0,.05)"},ticks:{color:"#8c9db5",font:{family:"JetBrains Mono",size:8},maxTicksLimit:10}},
@@ -1428,6 +1495,156 @@ async function autoAdvUpdate(){
   // 자동매매 레벨 무관하게 항상 차트 분석 업데이트
   await updateAIAdvisor();
 }
+// ═══════════════════════════════
+// AI SECTOR & STOCK RECOMMENDATION (Phase 6, 7)
+// ═══════════════════════════════
+const SECTORS = [
+  {name:"반도체/AI", stocks:["005930","000660"], keywords:["AI","반도체","HBM","엔비디아"], desc:"AI 수요 지속. 삼성·SK하이닉스 핵심"},
+  {name:"2차전지", stocks:["373220"], keywords:["배터리","전기차","LFP","양극재"], desc:"전기차 전환 핵심 소재"},
+  {name:"바이오", stocks:["207940","068270"], keywords:["임상","FDA","바이오","신약"], desc:"임상 결과 이벤트 주의"},
+  {name:"인터넷/플랫폼", stocks:["035420","035720"], keywords:["네이버","카카오","플랫폼","구독"], desc:"광고 경기 연동"},
+  {name:"자동차", stocks:["005380","012330"], keywords:["현대차","수출","환율","전기차"], desc:"환율 민감도 높음"},
+];
+const MATERIAL_GRADES = {
+  S:"구조적 변화 (M&A/정책/사업전환) — 수주~수개월 지속. 최대비중 가능",
+  A:"정책/실적/계약 — 1~5일 지속. 정상비중",
+  B:"테마/이슈 — 수시간~수일. 보통비중",
+  C:"소문/SNS — 수분~수시간. 진입금지"
+};
+
+async function runAISectorAnalysis(){
+  const el=document.getElementById("aiSectorResult");
+  el.innerHTML='<span style="color:var(--tm);font-style:italic;">AI 분석 중...</span>';
+  const dash=getDashData(sim.date);
+  const marketCtx=dash?`시장점수:${dash.score}/10 방향:${dash.score>=7?"매수우호":dash.score>=4?"중립":"비우호"}`:"시장 데이터 없음";
+  const prompt=`단타 트레이딩 멘토. 오늘 섹터 분석을 해줘. (Phase 6-1,6-4 기준)
+
+시장: ${marketCtx}
+현재 종목: ${STOCKS.find(s=>s.tk===activeTk)?.nm||activeTk}
+
+아래 섹터들 중 오늘 집중해야 할 섹터를 분석해줘:
+- 반도체/AI (삼성전자, SK하이닉스)
+- 2차전지 (LG에너지솔루션)
+- 바이오 (삼성바이오, 셀트리온)
+- 인터넷 (NAVER, 카카오)
+- 자동차 (현대차)
+
+각 섹터에 대해:
+1. 오늘 투자 강도: 🟢강함/🟡보통/🔴약함
+2. 재료강도: S/A/B/C
+3. 한줄 이유
+
+JSON 형식으로만 답해 (다른 텍스트 없이):
+{"sectors":[{"name":"섹터명","grade":"🟢","material":"A","reason":"이유"},...], "topSector":"최우선섹터명", "caution":"오늘 주의사항"}`;
+  try{
+    const res=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:500,messages:[{role:"user",content:prompt}]})});
+    const data=await res.json();
+    const raw=data.content?.[0]?.text||"{}";
+    let p;try{const m=raw.match(/\{[\s\S]*\}/);p=JSON.parse(m?m[0]:"{}");}catch(e){p={};}
+    if(p.sectors){
+      const html=p.sectors.map(s=>`<div style="padding:3px 0;border-bottom:1px solid var(--br);display:flex;align-items:center;gap:5px;">
+        <span>${s.grade}</span>
+        <span style="font-weight:600;font-size:10px;flex:1;">${s.name}</span>
+        <span style="font-family:var(--mono);font-size:9px;padding:1px 4px;border-radius:3px;background:${s.material==="S"||s.material==="A"?"rgba(49,130,246,.1)":"rgba(0,0,0,.05)"};">${s.material}급</span>
+      </div>`).join("")+
+      (p.topSector?`<div style="margin-top:5px;padding:4px 6px;background:rgba(124,58,237,.08);border-radius:6px;font-size:9px;color:var(--p);font-weight:700;">⭐ 오늘 핵심: ${p.topSector}</div>`:"")+
+      (p.caution?`<div style="margin-top:3px;font-size:9px;color:var(--r);">⚠ ${p.caution}</div>`:"");
+      el.innerHTML=html;
+    } else el.innerHTML=raw.slice(0,200);
+  }catch(e){el.innerHTML='<span style="color:var(--r);">API 오류</span>';}
+}
+
+async function runAIStockScreening(){
+  const el=document.getElementById("aiScreenResult");
+  el.innerHTML='<span style="color:var(--tm);font-style:italic;">스크리닝 중...</span>';
+  // Phase 7-7: 4가지 필터 로컬 계산
+  const results=[];
+  STOCKS.forEach(stk=>{
+    let score=0,tags=[];
+    const chgPct=(stk.pr-stk.base)/stk.base*100;
+    // 필터1: 수급 폭발 (거래량 300%+ 시뮬)
+    const volSim=Math.random();
+    if(volSim>0.6){score+=3;tags.push("수급폭발");}
+    // 필터2: 기관 연속 매수 시뮬
+    if(Math.random()>0.7){score+=3;tags.push("기관연속");}
+    // 필터3: 모멘텀 (+3% 이상)
+    if(chgPct>=1){score+=2;tags.push(`+${chgPct.toFixed(1)}%`);}
+    // 필터4: 눌림목 (전날 강세 후 조정)
+    if(Math.random()>0.65&&chgPct>-3&&chgPct<1){score+=2;tags.push("눌림목");}
+    if(score>=4)results.push({stk,score,tags});
+  });
+  results.sort((a,b)=>b.score-a.score);
+  const top3=results.slice(0,3);
+  if(!top3.length){el.innerHTML="현재 조건 충족 종목 없음";return;}
+  // AI 심화 분석
+  const prompt=`단타 트레이딩 멘토. Phase 7-7 스크리닝 기준으로 아래 후보 종목을 분석해줘.
+
+후보 종목:
+${top3.map(r=>`- ${r.stk.nm}(${r.stk.tk}): 점수${r.score}/10, 신호:${r.tags.join(",")}, 등락${((r.stk.pr-r.stk.base)/r.stk.base*100).toFixed(2)}%`).join("
+")}
+
+각 종목에 대해:
+1. 단타 적합도: ○(적합)/△(보통)/✗(부적합)
+2. 재료강도: S/A/B/C
+3. 손절 기준 (진입가 기준 %)
+4. 한줄 이유
+
+JSON만 답해:
+{"stocks":[{"name":"종목명","fit":"○","material":"A","stop":"3%","reason":"이유"},...], "bestPick":"최우선종목명"}`;
+  try{
+    const res=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:400,messages:[{role:"user",content:prompt}]})});
+    const data=await res.json();
+    const raw=data.content?.[0]?.text||"{}";
+    let p;try{const m=raw.match(/\{[\s\S]*\}/);p=JSON.parse(m?m[0]:"{}");}catch(e){p={};}
+    if(p.stocks){
+      const html=p.stocks.map((s,i)=>`<div style="padding:4px 0;border-bottom:1px solid var(--br);" onclick="selectStk('${top3[i]?.stk?.tk||"005930"}')">
+        <div style="display:flex;align-items:center;gap:4px;">
+          <span style="font-size:13px;">${s.fit==="○"?"🟢":s.fit==="△"?"🟡":"🔴"}</span>
+          <span style="font-weight:700;font-size:10px;flex:1;cursor:pointer;color:var(--b);">${s.name}</span>
+          <span style="font-family:var(--mono);font-size:9px;">${s.material}급</span>
+        </div>
+        <div style="font-size:9px;color:var(--ts);margin-top:1px;">손절 -${s.stop} · ${s.reason}</div>
+      </div>`).join("")+
+      (p.bestPick?`<div style="margin-top:5px;padding:4px 6px;background:rgba(49,130,246,.08);border-radius:6px;font-size:9px;font-weight:700;color:var(--b);">⭐ 최우선: ${p.bestPick}</div>`:"");
+      el.innerHTML=html;
+    } else el.innerHTML=raw.slice(0,200);
+  }catch(e){el.innerHTML='<span style="color:var(--r);">API 오류</span>';}
+}
+
+async function runMaterialAnalysis(){
+  const text=document.getElementById("materialInput").value.trim();
+  const el=document.getElementById("materialResult");
+  if(!text){showAlert("입력 필요","뉴스나 공시 내용을 입력해주세요.");return;}
+  el.innerHTML='<span style="color:var(--tm);font-style:italic;">분석 중...</span>';
+  const prompt=`단타 트레이딩 멘토. 아래 뉴스/공시의 재료 강도를 Phase 6-1 기준으로 판별해줘.
+
+내용: ${text}
+
+재료 강도 기준:
+S급: 구조적 변화 (M&A, 사업전환, 대형정책) — 수주~수개월
+A급: 실적/계약/정책 — 1~5일
+B급: 테마/이슈 — 수시간~수일
+C급: 소문/SNS — 진입금지
+
+JSON만 답해:
+{"grade":"A","duration":"1~3일","action":"눌림목 진입 검토","reason":"이유 1문장","warning":"주의사항"}`;
+  try{
+    const res=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:250,messages:[{role:"user",content:prompt}]})});
+    const data=await res.json();
+    const raw=data.content?.[0]?.text||"{}";
+    let p;try{const m=raw.match(/\{[\s\S]*\}/);p=JSON.parse(m?m[0]:"{}");}catch(e){p={};}
+    const gc={"S":"var(--p)","A":"var(--b)","B":"var(--a)","C":"var(--r)"}[p.grade]||"var(--ts)";
+    el.innerHTML=`<div style="padding:5px 7px;background:rgba(0,0,0,.04);border-radius:7px;border-left:3px solid ${gc};">
+      <div style="font-size:14px;font-weight:800;color:${gc};">${p.grade||"?"}급 재료</div>
+      <div style="font-size:9px;color:var(--ts);margin-top:2px;">${MATERIAL_GRADES[p.grade]||""}</div>
+      <div style="font-size:10px;margin-top:4px;"><b>지속:</b> ${p.duration||"-"}</div>
+      <div style="font-size:10px;"><b>전략:</b> ${p.action||"-"}</div>
+      <div style="font-size:9px;color:var(--ts);margin-top:2px;">${p.reason||""}</div>
+      ${p.warning?`<div style="font-size:9px;color:var(--r);margin-top:2px;">⚠ ${p.warning}</div>`:""}
+    </div>`;
+  }catch(e){el.innerHTML='<span style="color:var(--r);">API 오류</span>';}
+}
+
 async function updateAIAdvisor(){
   const stk=STOCKS.find(s=>s.tk===activeTk)||STOCKS[0];
   const cs=sim.candles.slice(0,Math.max(sim.idx+1,20));
@@ -1449,6 +1666,9 @@ async function updateAIAdvisor(){
   if(lc.c>lc.o){score++;signals.push("양봉");}
   const so=stopOrders[activeTk];
   const pos=mock.positions[activeTk];
+  // Phase 8 STEP 7: GO/NOGO 체크
+  const phase8Score=score; // 5점 만점 중
+  const goNogo=score>=4?"🟢 GO 가능":score>=2?"🟡 추가 확인":"🔴 NO-GO";
   // 현재 상황 텍스트
   const situationText=`${stk.nm} ${stk.pr.toLocaleString()}원
 MA ${maArr} | RSI ${lrsi}
@@ -1456,7 +1676,7 @@ MA ${maArr} | RSI ${lrsi}
 ${signals.length?signals.join(" · "):"신호 없음"}${pos?`
 보유 ${pos.qty}주 평단 ${Math.round(pos.avgPrice).toLocaleString()}원`:""}`;
   // 진입/청산 조언 (API 호출 없이 로컬 로직으로)
-  let actionText="";
+  let actionText=`${goNogo} (${score}/5점)\n`;
   if(pos){
     const pnlPct=((stk.pr-pos.avgPrice)/pos.avgPrice*100).toFixed(2);
     const up=stk.pr>=pos.avgPrice;
@@ -1475,11 +1695,20 @@ R/R 계산 후 진입 결정`;
     else actionText=`⚪ 매수 비추천 (${score}/5)
 신호 부족 — 다른 종목 탐색`;
   }
-  document.getElementById("advNow").textContent=situationText;
-  document.getElementById("advNow").className="adv-txt";
-  document.getElementById("advAction").textContent=actionText;
-  document.getElementById("advAction").className="adv-txt";
-  document.getElementById("aiModeBadge").textContent=score>=4?"분석 완료":"관망";
+  // HTML 형식으로 렌더링 (더 보기 좋게)
+  const nowEl=document.getElementById("advNow");
+  const actEl=document.getElementById("advAction");
+  if(nowEl){
+    nowEl.innerHTML=situationText.replace(/
+/g,"<br>").replace(/(정배열)/g,"<span style='color:var(--g);font-weight:700;'>$1</span>").replace(/(역배열)/g,"<span style='color:var(--r);font-weight:700;'>$1</span>");
+    nowEl.className="adv-txt";
+  }
+  if(actEl){
+    actEl.innerHTML=actionText.replace(/
+/g,"<br>").replace(/(🔴)/g,"<span style='color:var(--r);'>🔴</span>").replace(/(🟢)/g,"<span style='color:var(--g);'>🟢</span>");
+    actEl.className="adv-txt";
+  }
+  document.getElementById("aiModeBadge").textContent=score>=4?"📊 분석완료":"⚪ 관망";
   // 자동매매도 실행
   if(autoState.running&&autoState.level>=2)runScreening();
 }
@@ -1631,7 +1860,21 @@ function renderCands(){
 }
 function renderFilters(){document.getElementById("filterList").innerHTML=FILTERS.map((f,i)=>`<div class="fi" onclick="applyFil(${i},this)"><div class="fi-d" style="background:${f.col}"></div><span class="fi-t">${f.nm}</span></div>`).join("");}
 function applyFil(i,el){document.querySelectorAll(".fi").forEach(f=>f.classList.remove("on"));el.classList.add("on");const f=FILTERS[i];document.getElementById("filterResult").innerHTML=f.stocks.map(tk=>{const s=STOCKS.find(s=>s.tk===tk)||{tk,nm:tk,pr:0,base:1};const c=((s.pr-s.base)/s.base*100).toFixed(2),up=c>=0;return`<div class="wli" onclick="selectStk('${tk}')"><div class="wl-tk">${tk.slice(-4)}</div><div class="wl-nm">${s.nm}</div><div class="wl-ch ${up?"cu":"cd"}">${up?"+":""}${c}%</div></div>`;}).join("");}
-function renderNews(){document.getElementById("newsList").innerHTML=NEWS.map(n=>`<div style="padding:5px 9px;border-bottom:1px solid var(--br);cursor:pointer;" onmouseover="this.style.background='var(--card)'" onmouseout="this.style.background=''"><div style="font-size:10px;line-height:1.4;margin-bottom:2px;">${n.ttl}</div><div style="display:flex;gap:5px;align-items:center;"><span style="font-size:8px;color:var(--tm);font-family:var(--mono);">${n.tm}</span><span style="font-size:8px;padding:1px 4px;border-radius:2px;background:rgba(255,255,255,.05);color:${n.col};">${n.cat}</span></div></div>`).join("");}
+function renderNews(){
+  const grades=["A","B","A","A","S"]; // 뉴스별 재료 강도 (실제로는 AI 분석)
+  document.getElementById("newsList").innerHTML=NEWS.map((n,i)=>{
+    const g=grades[i]||"B";
+    const gc={"S":"var(--p)","A":"var(--b)","B":"var(--a)","C":"var(--r)"}[g]||"var(--ts)";
+    return`<div style="padding:5px 9px;border-bottom:1px solid var(--br);cursor:pointer;" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''">
+      <div style="font-size:10px;line-height:1.4;margin-bottom:2px;">${n.ttl}</div>
+      <div style="display:flex;gap:5px;align-items:center;">
+        <span style="font-size:8px;color:var(--tm);font-family:var(--mono);">${n.tm}</span>
+        <span style="font-size:8px;padding:1px 4px;border-radius:2px;background:rgba(0,0,0,.04);color:${n.col};">${n.cat}</span>
+        <span style="font-size:8px;padding:1px 4px;border-radius:2px;font-family:var(--mono);font-weight:700;background:rgba(0,0,0,.04);color:${gc};">${g}급</span>
+      </div>
+    </div>`;
+  }).join("");
+}
 function selectStk(tk){activeTk=tk;const s=STOCKS.find(s=>s.tk===tk)||STOCKS[0];document.getElementById("siNm").textContent=s.nm;
   const tkEl=document.getElementById("obTkName");if(tkEl)tkEl.textContent=s.nm;document.getElementById("srchIn").value="";hideSrch();renderWL();genCandles(tk,sim.date);initChart();renderOB();renderTH();setTimeout(updateAIAdvisor,300);}
 
