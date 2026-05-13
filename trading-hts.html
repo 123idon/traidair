@@ -968,11 +968,14 @@ window.onload=()=>{
   setInterval(checkStopOrders,800);
   setInterval(autoAdvUpdate,8000);
   // 초기 실행
-  setTimeout(()=>{
+  setTimeout(async()=>{
+    await checkDartApiStatus();
     updateAIAdvisor();
     fetchDartNews();
     runFullAnalysis();
   }, 800);
+  // 30초마다 공시 갱신 (실시간 딜레이 최소화)
+  setInterval(()=>fetchDartNews(), 30000);
 };
 function loadState(){
   const c=localStorage.getItem("htsCfg");if(c)cfg={...cfg,...JSON.parse(c)};
@@ -1600,27 +1603,108 @@ const SAMPLE_DARTS = [
   {time:"10:05",corp:"HMM",title:"1분기 영업이익 컨센서스 40% 상회",type:"실적 호조",impact:"A"},
 ];
 
-async function fetchDartNews(){
+// DART API 상태
+let dartApiAvailable = false;
+async function checkDartApiStatus(){
+  try{
+    const r=await fetch("/api/dart/status");
+    const d=await r.json();
+    dartApiAvailable=d.has_key;
+    return d;
+  }catch(e){return {has_key:false};}
+}
+
+async function fetchDartNews(corpName){
   const el=document.getElementById("dartList");
-  el.innerHTML='<span style="color:var(--tm);font-style:italic;">공시 로딩 중...</span>';
-  // 실제 구현: 웹 검색으로 DART 공시 가져오기 (서버 필요)
-  // 현재: 샘플 데이터 + AI 분석 표시
-  await new Promise(r=>setTimeout(r,400));
+  el.innerHTML='<div style="font-size:9px;color:var(--tm);padding:4px 0;display:flex;align-items:center;gap:5px;"><span style="animation:pu 1s infinite;display:inline-block;">●</span> 공시 로딩 중...</div>';
   const stk=STOCKS.find(s=>s.tk===activeTk)||STOCKS[0];
-  const relevant=SAMPLE_DARTS.filter(d=>d.corp===stk.nm||Math.random()>0.5).slice(0,4);
-  el.innerHTML=relevant.map(d=>{
-    const rx=DART_REACTIONS[d.type]||{reaction:"불명확",grade:"B"};
+  const nm=corpName||stk.nm;
+  // 고유번호 조회
+  let corpCode="";
+  try{
+    const cr=await fetch(`/api/dart/corpcode?nm=${encodeURIComponent(nm)}`);
+    const cd=await cr.json();
+    corpCode=cd.corp_code||"";
+  }catch(e){}
+  // DART API 호출
+  try{
+    const params=new URLSearchParams({days:3});
+    if(corpCode)params.set("corp_code",corpCode);
+    const r=await fetch(`/api/dart/list?${params}`);
+    const d=await r.json();
+    if(d.status==="no_key"){
+      // API 키 없음 — 샘플 데이터 + 안내
+      renderDartSample(el, stk.nm);
+      return;
+    }
+    if(d.status==="ok"&&d.list&&d.list.length>0){
+      dartApiAvailable=true;
+      renderDartReal(el, d.list);
+      return;
+    }
+    // 데이터 없으면 샘플
+    renderDartSample(el, stk.nm);
+  }catch(e){
+    renderDartSample(el, stk.nm);
+  }
+}
+
+function renderDartReal(el, list){
+  el.innerHTML=`<div style="font-size:8px;color:var(--g);font-family:var(--mono);padding:2px 0;margin-bottom:3px;">✅ DART 실시간 (딜레이 없음)</div>`+
+  list.slice(0,8).map(d=>{
+    const rcptNo=d.rcept_no||"";
+    const dartUrl=`https://dart.fss.or.kr/dsaf001/main.do?rcpNo=${rcptNo}`;
+    // 공시 유형 자동 판단
+    const title=d.report_nm||"";
+    const grade=classifyDartGrade(title);
+    const gc={"S":"var(--p)","A":"var(--b)","B":"var(--a)","C":"var(--r)"}[grade]||"var(--ts)";
+    const reaction=getDartReaction(title);
+    const timeStr=(d.rcept_dt||"").slice(4,8).replace(/(\d{2})(\d{2})/,"$1:$2");
+    return`<div style="padding:4px 0;border-bottom:1px solid var(--br);cursor:pointer;" onclick="window.open('${dartUrl}','_blank');analyzeDart('${title.replace(/'/g,"\'")}','','${d.corp_name||""}')">
+      <div style="display:flex;align-items:center;gap:4px;margin-bottom:1px;">
+        <span style="font-family:var(--mono);font-size:8px;color:var(--tm);">${timeStr}</span>
+        <span style="font-size:8px;padding:0 4px;border-radius:3px;font-weight:700;color:${gc};background:${gc}18;">${grade}급</span>
+        <span style="font-size:9px;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${d.corp_name||""}</span>
+      </div>
+      <div style="font-size:9px;color:var(--ts);line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${title}</div>
+      ${reaction?`<div style="font-size:8px;color:var(--tm);margin-top:1px;">${reaction}</div>`:""}
+    </div>`;
+  }).join("")||`<div style='font-size:9px;color:var(--tm);'>최근 공시 없음</div>`;
+}
+
+function renderDartSample(el, corpName){
+  const relevant=SAMPLE_DARTS.filter(d=>d.corp===corpName||Math.random()>0.6).slice(0,4);
+  el.innerHTML=`<div style="font-size:8px;color:var(--a);font-family:var(--mono);padding:2px 0;margin-bottom:3px;">
+    ⚠ DART_API_KEY 미설정 — 샘플 데이터
+    <br><span style="color:var(--tm);">Railway Variables에 DART_API_KEY 추가 시 실시간 전환</span>
+  </div>`+
+  relevant.map(d=>{
+    const rx=DART_REACTIONS[d.type]||{reaction:"불명확"};
     const gc={"S":"var(--p)","A":"var(--b)","B":"var(--a)","C":"var(--r)"}[d.impact]||"var(--ts)";
     return`<div style="padding:4px 0;border-bottom:1px solid var(--br);cursor:pointer;" onclick="analyzeDart('${d.title}','${d.type}','${d.corp}')">
-      <div style="display:flex;align-items:center;gap:4px;margin-bottom:2px;">
+      <div style="display:flex;align-items:center;gap:4px;margin-bottom:1px;">
         <span style="font-family:var(--mono);font-size:8px;color:var(--tm);">${d.time}</span>
-        <span style="font-family:var(--mono);font-size:9px;padding:0 4px;border-radius:3px;font-weight:700;color:${gc};background:${gc}18;">${d.impact}급</span>
+        <span style="font-size:8px;padding:0 4px;border-radius:3px;font-weight:700;color:${gc};background:${gc}18;">${d.impact}급</span>
         <span style="font-size:9px;font-weight:600;">${d.corp}</span>
       </div>
-      <div style="font-size:9px;color:var(--ts);line-height:1.4;">${d.title}</div>
-      <div style="font-size:8px;color:var(--tm);margin-top:1px;">예상반응 ${rx.reaction} · ${rx.timing}</div>
+      <div style="font-size:9px;color:var(--ts);line-height:1.35;">${d.title}</div>
+      <div style="font-size:8px;color:var(--tm);margin-top:1px;">예상 ${rx.reaction}</div>
     </div>`;
   }).join("")||"<div style='font-size:9px;color:var(--tm);'>공시 없음</div>";
+}
+
+function classifyDartGrade(title){
+  if(title.includes("합병")||title.includes("인수")||title.includes("사업전환")||title.includes("대규모"))return "S";
+  if(title.includes("수주")||title.includes("공급계약")||title.includes("실적")||title.includes("FDA")||title.includes("임상")||title.includes("자사주")||title.includes("대주주"))return "A";
+  if(title.includes("CB")||title.includes("BW")||title.includes("유상증자")||title.includes("전환사채")||title.includes("신주"))return "C";
+  return "B";
+}
+
+function getDartReaction(title){
+  for(const [key,val] of Object.entries(DART_REACTIONS)){
+    if(title.includes(key.split(" ")[0]))return `예상반응 ${val.reaction}`;
+  }
+  return "";
 }
 async function analyzeDart(title, type, corp){
   // 공시 클릭 시 재료 강도 자동 분석
