@@ -433,6 +433,7 @@ function emkt(k) {
   if(['up','down','neutral','warn'].includes(t))md[k].trend=t;
   rmkt();
   document.getElementById('upd').textContent=new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'})+' 기준';
+  saveDashData();
 }
 
 // ── AI 장 전 분석 ──
@@ -440,7 +441,10 @@ function mctx() {
   return Object.values(md).map(d=>`${d.label}: ${d.value}(${d.change})`).join(', ');
 }
 
+let refreshBusy = false;
 async function doRefresh() {
+  if(refreshBusy) return;
+  refreshBusy = true;
   const btn=document.getElementById('rfb');
   btn.classList.add('spin');
   document.getElementById('astat').textContent='분석중...';
@@ -462,7 +466,7 @@ strategy: 심리점수·시장방향 기반 오늘 매매 원칙 2가지(손절/
 한국어로 작성.`;
 
   try {
-    const res=await fetch('https://api.anthropic.com/v1/messages',{
+    const res=await fetch('/api/claude',{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:800,messages:[{role:'user',content:prompt}]})
     });
@@ -476,6 +480,8 @@ strategy: 심리점수·시장방향 기반 오늘 매매 원칙 2가지(손절/
     rAsec('s4',p.strategy||'분석 결과 없음');
     document.getElementById('astat').textContent=new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'})+' 업데이트';
     document.getElementById('astat').style.color='var(--g)';
+    // HTS 연동: 오늘 날짜에 시장 데이터 저장
+    saveDashData();
   } catch(e) {
     ['s1','s2','s3','s4'].forEach(id=>{
       document.getElementById(id).className='asc';
@@ -485,6 +491,24 @@ strategy: 심리점수·시장방향 기반 오늘 매매 원칙 2가지(손절/
     document.getElementById('astat').style.color='var(--r)';
   }
   btn.classList.remove('spin');
+}
+
+function saveDashData() {
+  const today = new Date();
+  const dateStr = today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');
+  const vals = Object.values(md);
+  const ups = vals.filter(d=>d.trend==='up').length;
+  const score = Math.round(ups/8*10);
+  const payload = {
+    date: dateStr,
+    score: score,
+    verdict: document.getElementById('vp').textContent,
+    data: md,
+    savedAt: new Date().toISOString()
+  };
+  try {
+    localStorage.setItem('dashMarket_'+dateStr, JSON.stringify(payload));
+  } catch(e) {}
 }
 
 function rAsec(id, txt) {
@@ -602,7 +626,7 @@ async function send(t) {
   amsg('me',msg);hist.push({role:'user',content:msg});
   aty(); busy=true; document.getElementById('sb').disabled=true;
   try {
-    const res=await fetch('https://api.anthropic.com/v1/messages',{
+    const res=await fetch('/api/claude',{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:800,system:sysp(),messages:hist.slice(-10)})
     });

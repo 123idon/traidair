@@ -241,9 +241,9 @@ body{background:var(--bg);color:var(--tp);font-family:var(--sans);font-size:12px
   <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
     <div class="logo">Trad<em>AI</em>r</div>
     <div class="tabs">
-      <button class="tab" onclick="goPage('dash')">대시보드</button>
-      <button class="tab on" onclick="goPage('hts')">HTS</button>
-      <button class="tab" onclick="goPage('journal')">매매일지</button>
+      <button class="tab" onclick="goPage('dash',this)">대시보드</button>
+      <button class="tab on" onclick="goPage('hts',this)">HTS</button>
+      <button class="tab" onclick="goPage('journal',this)">매매일지</button>
     </div>
   </div>
   <div class="bar-mid">
@@ -827,7 +827,7 @@ function initMainChart() {
       scales:{
         x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#454b58',font:{family:"'JetBrains Mono'",size:9},maxTicksLimit:10}},
         y:{position:'right',grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#7a8090',font:{family:"'JetBrains Mono'",size:9},callback:v=>v.toLocaleString()}},
-        y2:{position:'left',display:activeInds.vol,grid:{display:false},ticks:{display:false},max:v=>(Math.max(...vols)*5)},
+        y2:{position:'left',display:activeInds.vol,grid:{display:false},ticks:{display:false},max:vols.length?Math.max(...vols)*5:100000},
       },
       onHover:(e,items)=>{
         if(items.length){
@@ -910,7 +910,7 @@ function calcRSI(data, n) {
   for(let i=0;i<data.length;i++){
     if(i<n){rsi.push(null);continue;}
     let gain=0,loss=0;
-    for(let j=i-n+1;j<=i;j++){const d=data[j]-data[j-1];if(d>0)gain+=d;else loss-=d;}
+    for(let j=i-n+1;j<=i;j++){if(j<1)continue;const d=data[j]-data[j-1];if(d>0)gain+=d;else loss-=d;}
     const rs=(gain/n)/((loss/n)||0.001);
     rsi.push(100-100/(1+rs));
   }
@@ -963,15 +963,28 @@ function updateChartToIdx() {
   const closes = candles.map(c=>c.c);
   const vols = candles.map(c=>c.v);
   const labels = candles.map(c=>c.t);
+  // Safe: find each dataset by label instead of hardcoded index
   mainChartInst.data.labels = labels;
-  // update each dataset
-  const ma5=calcMA(closes,5),ma20=calcMA(closes,20),ma60=calcMA(closes,60);
-  let dsIdx=0;
-  mainChartInst.data.datasets[dsIdx++].data=closes;
-  if(activeInds.ma){mainChartInst.data.datasets[dsIdx++].data=ma5;mainChartInst.data.datasets[dsIdx++].data=ma20;mainChartInst.data.datasets[dsIdx++].data=ma60;}
-  if(activeInds.bb){const{upper,lower}=calcBB(closes,20,2);mainChartInst.data.datasets[dsIdx++].data=upper;mainChartInst.data.datasets[dsIdx++].data=lower;}
-  if(activeInds.vwap){mainChartInst.data.datasets[dsIdx++].data=calcVWAP(candles);}
-  if(activeInds.vol){mainChartInst.data.datasets[dsIdx++].data=vols;mainChartInst.data.datasets[dsIdx-1].backgroundColor=candles.map(c=>c.c>=c.o?'rgba(0,217,126,.35)':'rgba(255,71,87,.35)');}
+  const ds = mainChartInst.data.datasets;
+  const findDs = (lbl) => ds.find(d=>d.label===lbl);
+  if(findDs('종가')) findDs('종가').data = closes;
+  if(activeInds.ma) {
+    const ma5=calcMA(closes,5),ma20=calcMA(closes,20),ma60=calcMA(closes,60);
+    if(findDs('MA5')) findDs('MA5').data=ma5;
+    if(findDs('MA20')) findDs('MA20').data=ma20;
+    if(findDs('MA60')) findDs('MA60').data=ma60;
+  }
+  if(activeInds.bb) {
+    const{upper,lower}=calcBB(closes,20,2);
+    if(findDs('BB상단')) findDs('BB상단').data=upper;
+    if(findDs('BB하단')) findDs('BB하단').data=lower;
+  }
+  if(activeInds.vwap && findDs('VWAP')) findDs('VWAP').data=calcVWAP(candles);
+  if(activeInds.vol && findDs('거래량')) {
+    findDs('거래량').data=vols;
+    findDs('거래량').backgroundColor=candles.map(c=>c.c>=c.o?'rgba(0,217,126,.35)':'rgba(255,71,87,.35)');
+    mainChartInst.options.scales.y2.max = vols.length ? Math.max(...vols)*5 : 100000;
+  }
   mainChartInst.update('none');
 
   const cur = candles[candles.length-1];
@@ -1036,6 +1049,10 @@ function setTF(el, tf) {
 
 function onDateChange() {
   sim.date = document.getElementById('mockDate').value;
+  // Reset daily stats on date change
+  mock.todayPnl = 0;
+  mock.todayTrades = 0;
+  mock.lossSeries = 0;
   genCandles(activeTk, sim.date);
   initMainChart();
 }
@@ -1109,7 +1126,7 @@ function setPct(pct) {
   const avail = orderSide==='buy' ? mock.cash : (mock.positions[activeTk]?.qty||0);
   let qty;
   if(orderSide==='buy') qty=Math.floor(mock.cash*(pct/100)/price);
-  else qty=Math.floor((mock.positions[activeTk]?.qty||0)*(pct/100));
+  else { const pos=mock.positions[activeTk]; qty=pos?Math.floor(pos.qty*(pct/100)):0; }
   document.getElementById('ofQty').value=qty;
   updateOrderSummary();
 }
@@ -1381,7 +1398,7 @@ ${tradeStr}
 한국어로 작성.`;
 
   try {
-    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},
+    const res=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:600,messages:[{role:'user',content:prompt}]})});
     const data=await res.json();
     const raw=data.content?.[0]?.text||'{}';
@@ -1434,7 +1451,7 @@ async function genAllJournals(){
     const total=trades.filter(t=>t.side==='sell').length;
     const tradeStr=trades.map(t=>`${t.side==='buy'?'매수':'매도'} ${t.nm} @${t.price.toLocaleString()} ${t.qty}주`).join(', ');
     try{
-      const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},
+      const res=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:400,messages:[{role:'user',content:`매매내역: ${tradeStr}\n총손익: ${pnl>=0?'+':''}${pnl}원\n승률: ${total?Math.round(wins/total*100):0}%\nJSON only: {"summary":"...","analysis":"...","mistakes":"...","tomorrow":"...","score":"..."} 한국어`}]})});
       const data=await res.json();
       const raw=data.content?.[0]?.text||'{}';
@@ -1450,6 +1467,8 @@ async function genAllJournals(){
 // LIVE UPDATE (simulated price movement)
 // ═══════════════════════════════════════════
 function liveUpdate(){
+  // Don't override sim prices while simulation is playing
+  if(sim.playing) return;
   STOCKS.forEach(s=>{
     const change=(Math.random()-.499)*0.002;
     s.pr=Math.max(s.base*0.7,Math.round(s.pr*(1+change)));
@@ -1457,7 +1476,7 @@ function liveUpdate(){
   const stock=STOCKS.find(s=>s.tk===activeTk)||STOCKS[0];
   updateCurrentPrice({c:stock.pr});
   renderWatchlist();
-  if(!sim.playing){renderOrderbook();}
+  renderOrderbook();
   updatePnlDisplay();
 }
 
@@ -1469,11 +1488,11 @@ function tick(){
   document.getElementById('clk').textContent=[n.getHours(),n.getMinutes(),n.getSeconds()].map(v=>v.toString().padStart(2,'0')).join(':');
 }
 
-function goPage(p){
+function goPage(p, el){
   document.querySelectorAll('.page').forEach(el=>el.classList.remove('on'));
   document.querySelectorAll('.tab').forEach(el=>el.classList.remove('on'));
   document.getElementById('page-'+p).classList.add('on');
-  event.target.classList.add('on');
+  el.classList.add('on');
   if(p==='journal')renderJournalPage();
 }
 
@@ -1496,7 +1515,7 @@ function rTab(el,id){
 }
 
 function brTab(el,id){
-  document.querySelectorAll('.rpt').forEach(t=>{if(t.closest('.brp'))t.classList.remove('on');});
+  document.querySelectorAll('.brp .rpt').forEach(t=>t.classList.remove('on'));
   el.classList.add('on');
   ['brp-port','brp-log'].forEach(i=>{
     const el2=document.getElementById(i);
