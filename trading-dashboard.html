@@ -443,6 +443,7 @@ const CK_ITEMS=[
   '오늘 예정 이벤트 (FOMC 등) 확인',
   '전일 외국인/기관 순매수 확인',
   '오늘 후보 종목 3개 이하 선정',
+  '오버나잇 보유 시 갭하락 대응 계획 확인 (Phase 9-7)',
 ];
 let ckState=JSON.parse(localStorage.getItem('dashCk')||'[]');
 function renderCk(){
@@ -798,7 +799,15 @@ function tick(){
 }
 
 // ── INIT ──
-loadDash();renderMkt();calcScore();renderCk();updatePsy(7);tick();setInterval(tick,1000);renderPostCL();renderCapitalStage();
+// 심리점수 HTS↔대시보드 연동 (Phase 11-13)
+const _savedTrust = localStorage.getItem('trustScore');
+const _initPsy = _savedTrust ? Math.round(parseInt(_savedTrust)*10/10) : 7;
+const _psySlider = document.getElementById('psySlider');
+if(_psySlider){ _psySlider.value = _initPsy; }
+loadDash();renderMkt();calcScore();renderCk();updatePsy(_initPsy);tick();setInterval(tick,1000);renderPostCL();renderCapitalStage();
+// 슬라이더 변경 시 trustScore도 동기화
+const _psl = document.getElementById('psySlider');
+if(_psl) _psl.addEventListener('input', function(){ localStorage.setItem('trustScore', this.value); });
 </script>
 </body>
 </html>

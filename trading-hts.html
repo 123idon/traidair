@@ -367,6 +367,7 @@ button{cursor:pointer;font-family:var(--sans);}
     <button class="ibtn" id="quickSwitchBtn" onclick="quickSwitch()" title="대시보드 ↔ HTS 전환 (단축키: D)">
       <span id="quickSwitchIcon">📊</span> <span id="quickSwitchTxt">대시보드</span>
     </button>
+    <button class="ibtn" onclick="openModal('shortcuts')" title="단축키 도움말">⌨</button>
     <button class="ibtn" onclick="openModal('settings')">⚙</button>
     <button class="ibtn red" onclick="endMock()">■ 종료</button>
     <button class="ibtn pri" onclick="openModal('journal')">📓</button>
@@ -700,6 +701,13 @@ button{cursor:pointer;font-family:var(--sans);}
         <div class="ms"><div class="ms-l">수익률</div><div class="ms-v" id="msPct">0.00%</div></div>
         <div class="ms" style="border-left:1px solid var(--br);padding-left:9px;"><div class="ms-l">오늘손익</div><div class="ms-v" id="msTodayPnl">+0원</div></div>
         <div class="ms"><div class="ms-l">매매횟수</div><div class="ms-v cn" id="msTrades">0회</div></div>
+        <div class="ms" style="border-left:1px solid var(--br);padding-left:9px;flex:1;min-width:70px;">
+          <div class="ms-l">목표달성</div>
+          <div style="display:flex;align-items:center;gap:4px;margin-top:1px;">
+            <div style="flex:1;height:4px;background:var(--bg);border-radius:2px;overflow:hidden;"><div id="goalProgressBar" style="height:100%;width:0%;background:var(--g);border-radius:2px;transition:width .5s;"></div></div>
+            <span class="ms-v" id="goalProgressPct" style="font-size:9px;">0%</span>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -839,6 +847,15 @@ button{cursor:pointer;font-family:var(--sans);}
             <div id="alertList" style="margin-top:4px;font-size:9px;color:var(--tm);"></div>
           </div>
           <button class="sub-btn buy" id="subBtn" onclick="submitOrder()">매수 주문</button>
+          <!-- 스캘핑 수수료 계산기 (Phase 10-1) -->
+          <div style="margin-top:5px;padding:5px 6px;background:rgba(14,165,233,.06);border-radius:7px;border:1px solid rgba(14,165,233,.2);">
+            <div style="font-size:9px;color:var(--t);font-weight:700;margin-bottom:4px;">⚡ 스캘핑 실질수익 (Phase 10-1)</div>
+            <div style="display:flex;gap:3px;margin-bottom:3px;">
+              <input id="scalpAmt" type="number" placeholder="투자금액" style="flex:1;background:var(--pan);border:1px solid var(--br);border-radius:5px;color:var(--tp);font-family:var(--mono);font-size:10px;padding:3px 5px;outline:none;" oninput="calcScalpFee()">
+              <input id="scalpPct" type="number" placeholder="목표%" step="0.1" value="0.5" style="width:52px;background:var(--pan);border:1px solid var(--br);border-radius:5px;color:var(--tp);font-family:var(--mono);font-size:10px;padding:3px 5px;outline:none;" oninput="calcScalpFee()">
+            </div>
+            <div id="scalpResult" style="font-size:9px;color:var(--ts);padding:3px 5px;background:var(--bg);border-radius:4px;min-height:20px;"></div>
+          </div>
           <!-- 피라미딩 계산기 (Phase 10-8) -->
           <div style="margin-top:5px;padding:5px 6px;background:rgba(49,130,246,.05);border-radius:7px;border:1px solid rgba(49,130,246,.15);">
             <div style="font-size:9px;color:var(--b);font-family:var(--mono);font-weight:700;margin-bottom:4px;">📐 피라미딩 계산기 (Phase 10-8)</div>
@@ -952,7 +969,10 @@ button{cursor:pointer;font-family:var(--sans);}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
       <!-- 수익/손실 패턴 -->
       <div class="chart-card" style="margin-bottom:0;">
-        <div class="chart-card-t">✅ 수익 나는 패턴</div>
+        <div class="chart-card-t" style="display:flex;align-items:center;justify-content:space-between;">
+          <span>✅ 수익 나는 패턴</span>
+          <button onclick="runMySetupAI()" style="padding:2px 7px;border-radius:4px;border:none;background:var(--p);color:#fff;font-size:9px;cursor:pointer;">🤖 나만의 셋업 추출 (Phase 10-10)</button>
+        </div>
         <div id="winPatterns" style="font-size:11px;color:var(--tm);">데이터 없음</div>
       </div>
       <div class="chart-card" style="margin-bottom:0;">
@@ -1161,7 +1181,10 @@ button{cursor:pointer;font-family:var(--sans);}
             <div id="mcl-post"></div>
           </div>
         </div>
-        <button onclick="resetMasterChecklist()" style="margin-top:12px;padding:6px 14px;border-radius:7px;border:1.5px solid var(--br);background:var(--bg);color:var(--ts);font-size:10px;cursor:pointer;">↺ 초기화</button>
+        <div style="display:flex;gap:6px;margin-top:12px;">
+          <button onclick="resetMasterChecklist()" style="padding:6px 14px;border-radius:7px;border:1.5px solid var(--br);background:var(--bg);color:var(--ts);font-size:10px;cursor:pointer;">↺ 초기화</button>
+          <button onclick="printChecklist()" style="padding:6px 14px;border-radius:7px;border:1.5px solid var(--b);background:rgba(49,130,246,.08);color:var(--b);font-size:10px;cursor:pointer;">🖨 인쇄</button>
+        </div>
       </div>
     </div>
 
@@ -1412,6 +1435,43 @@ button{cursor:pointer;font-family:var(--sans);}
     <div class="modal-hdr"><span class="modal-ttl">📓 AI 매매일지</span><button class="modal-x" onclick="closeModal('journal')">×</button></div>
     <div class="modal-body"><div id="jModalBody"></div></div>
     <div class="modal-ft"><button class="ibtn" onclick="closeModal('journal')">닫기</button><button class="ibtn pri" onclick="genJModal()">🤖 AI 일지 생성</button></div>
+  </div>
+</div>
+
+<!-- ── SHORTCUTS MODAL (Phase 3-4) ── -->
+<div class="modal-bg" id="modal-shortcuts">
+  <div class="modal" style="width:480px;">
+    <div class="modal-hdr"><span class="modal-ttl">⌨ 단축키 도움말 (Phase 3-4)</span><button class="modal-x" onclick="closeModal('shortcuts')">×</button></div>
+    <div class="modal-body">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div>
+          <div class="sg-title" style="margin-bottom:8px;">📈 주문 단축키</div>
+          <div style="font-size:11px;">
+            <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--br);"><span style="font-family:var(--mono);font-weight:700;color:var(--b);">F1</span><span>지정가 매수</span></div>
+            <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--br);"><span style="font-family:var(--mono);font-weight:700;color:var(--b);">F2</span><span>시장가 매수</span></div>
+            <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--br);"><span style="font-family:var(--mono);font-weight:700;color:var(--r);">F3</span><span>지정가 매도</span></div>
+            <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--br);"><span style="font-family:var(--mono);font-weight:700;color:var(--r);">F4</span><span>시장가 매도 (긴급손절)</span></div>
+            <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--br);"><span style="font-family:var(--mono);font-weight:700;">F5</span><span>주문 취소</span></div>
+            <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--br);"><span style="font-family:var(--mono);font-weight:700;color:var(--g);">F6</span><span>전량 지정가 매도</span></div>
+            <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--br);"><span style="font-family:var(--mono);font-weight:700;color:var(--g);">F7</span><span>전량 시장가 매도</span></div>
+            <div style="display:flex;justify-content:space-between;padding:5px 0;"><span style="font-family:var(--mono);font-weight:700;color:var(--a);">F8</span><span>50% 시장가 매도</span></div>
+          </div>
+          <div style="margin-top:10px;padding:8px;background:rgba(49,130,246,.06);border-radius:7px;font-size:9px;color:var(--ts);">F1~F2 매수 / F3~F8 매도 — 물리적 분리</div>
+        </div>
+        <div>
+          <div class="sg-title" style="margin-bottom:8px;">🖥 화면 단축키</div>
+          <div style="font-size:11px;">
+            <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--br);"><span style="font-family:var(--mono);font-weight:700;color:var(--b);">D</span><span>대시보드 ↔ HTS</span></div>
+            <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--br);"><span style="font-family:var(--mono);font-weight:700;">Space</span><span>차트 재생/정지</span></div>
+            <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--br);"><span style="font-family:var(--mono);font-weight:700;">← →</span><span>날짜 이전/다음</span></div>
+            <div style="display:flex;justify-content:space-between;padding:5px 0;"><span style="font-family:var(--mono);font-weight:700;">Esc</span><span>모달 닫기</span></div>
+          </div>
+          <div class="sg-title" style="margin-top:14px;margin-bottom:8px;">📐 차트 권장</div>
+          <div style="font-size:10px;color:var(--ts);line-height:1.8;">1분봉: 스캘핑<br>5분봉 ★: 당일매매 기본<br>일봉: 큰 추세 확인</div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-ft"><button class="ibtn pri" onclick="closeModal('shortcuts')">닫기</button></div>
   </div>
 </div>
 
@@ -1865,6 +1925,9 @@ function updPnl(){
   document.getElementById("msPct").textContent=(up?"+":"")+(tot/cfg.capital*100).toFixed(2)+"%";
   document.getElementById("msPct").className="ms-v "+(up?"cu":"cd");
   // 오늘 손익 + 매매 횟수
+    // 목표달성 진행바
+  const _gb=document.getElementById('goalProgressBar'),_gp=document.getElementById('goalProgressPct');
+  if(_gb&&_gp){const _dt=(cfg.capital||10000000)*(cfg.dayloss||2)/100/2;const _pp=_dt>0?Math.min(100,Math.max(-100,mock.todayPnl/_dt*100)):0;_gb.style.width=Math.abs(_pp)+'%';_gb.style.background=mock.todayPnl>=0?'var(--g)':'var(--r)';_gp.textContent=Math.round(_pp)+'%';}
   const tpEl=document.getElementById("msTodayPnl");
   const trEl=document.getElementById("msTrades");
   if(tpEl){const tp=mock.todayPnl>=0;tpEl.textContent=(tp?"+":"")+Math.round(mock.todayPnl).toLocaleString()+"원";tpEl.className="ms-v "+(tp?"cu":"cd");}
@@ -2077,8 +2140,15 @@ function submitOrder(autoExec){
     mock.cash+=tot-fee-tax;pos.qty-=qty;
     if(pos.qty<=0){delete mock.positions[activeTk];}
     mock.todayPnl+=pnl;mock.todayTrades++;
-    if(pnl<0){mock.lossSeries++;if(cfg.bd&&mock.lossSeries>=3)showAlert("🚨 뇌동매매 경고",`연속 손절 ${mock.lossSeries}회!\n잠시 휴식 후 복기하세요. (Phase 11)`);}
-    else mock.lossSeries=0;
+    if(pnl<0){mock.lossSeries++;mock.winSeries=0;}
+    else{
+      mock.lossSeries=0;
+      mock.winSeries=(mock.winSeries||0)+1;
+      if(mock.winSeries>=5&&cfg.bd){
+        showAlert("⚠ 과잉확신 경보 (Phase 11-5)",
+          "연속 수익 "+mock.winSeries+"회!\n\n지금이 가장 위험한 순간입니다.\n\n• 비중 절대 늘리지 않음\n• 체크리스트 더 꼼꼼히\n• 연속수익은 운과 실력을 구분할 수 없음");
+      }
+    }
     mock.trades.push({date:sim.date,tk:activeTk,nm:stk.nm,side:"sell",price:pr,qty,fee:Math.round(fee+tax),pnl:Math.round(pnl),creditType:credType,auto:autoExec||false,time:new Date().toLocaleTimeString("ko-KR",{hour:"2-digit"})});
   bdMetrics.lastSellTime=Date.now();checkBrainDong("sell",pr,qty,stk);
     if(cfg.al){const lr=-mock.todayPnl/cfg.capital*100;if(lr>=cfg.dayloss)showAlert("⚠ 일일 손실 한도",`한도 ${cfg.dayloss}% 도달\n매매 중단 권고.`);}
@@ -2438,6 +2508,23 @@ ${trades.slice(-10).map(t=>`${t.side==="buy"?"매수":"매도"} ${t.nm} ${t.pric
   }catch(e){el.textContent="API 오류";}
 }
 
+// 자신만의 셋업 개발 AI (Phase 10-10)
+async function runMySetupAI(){
+  const el=document.getElementById('aiPatternResult'); if(!el)return;
+  const trades=mock.trades||[];
+  if(trades.length<10){el.textContent='10회 이상 매매 필요';return;}
+  el.innerHTML='<span style="color:var(--tm);font-style:italic;">수익 패턴에서 나만의 셋업 추출 중...</span>';
+  const wins=trades.filter(t=>t.pnl>0);
+  const summary=`수익 매매 ${wins.length}회 / 총 ${trades.length}회\n승률 ${(wins.length/trades.length*100).toFixed(0)}%\n평균수익 ${wins.length?Math.round(wins.reduce((a,t)=>a+t.pnl,0)/wins.length).toLocaleString():'0'}원`;
+  try{
+    const data=await callClaude({model:"claude-sonnet-4-20250514",max_tokens:500,
+      messages:[{role:"user",content:`단타 트레이딩 Phase 10-10. 아래 매매 데이터에서 나만의 셋업을 추출해줘.\n\n${summary}\n\n수익 거래: ${wins.slice(-10).map(t=>`${t.nm} ${(t.price||0).toLocaleString()}원 +${Math.round(t.pnl)}원 (${t.time||''})`).join(' / ')}\n\n분석:\n1. 수익 패턴의 공통 조건 (시간대/종목특성/진입방식)\n2. 나만의 셋업 이름 제안\n3. 셋업 진입 조건 3가지\n4. 셋업 청산 조건\n5. 백테스트 권장 사항\n100자 이내.`}]},
+      "나만의셋업AI");
+    el.style.whiteSpace='pre-wrap'; el.style.color='var(--ts)';
+    el.textContent=data.content?.[0]?.text||'분석 실패';
+  }catch(e){el.textContent='API 오류';}
+}
+
 function renderStatsEnhanced(){
   const trades=mock.trades||[];
   // 수익/손실 패턴
@@ -2511,6 +2598,18 @@ function renderStatsEnhanced(){
 // ══════════════════════════════════════════════════════════
 // 피라미딩 계산기 (Phase 10-8)
 // ══════════════════════════════════════════════════════════
+function calcScalpFee(){
+  const amt=parseFloat(document.getElementById('scalpAmt')?.value)||0;
+  const pct=parseFloat(document.getElementById('scalpPct')?.value)||0.5;
+  const el=document.getElementById('scalpResult'); if(!el)return;
+  if(!amt){el.textContent='금액 입력';return;}
+  const gross=amt*pct/100;
+  const fee=(amt*(cfg.bf||0.015)/100)+(amt*(cfg.sf||0.015)/100);
+  const tax=amt*(cfg.tx||0.18)/100;
+  const net=gross-fee-tax;
+  const bep=(fee+tax)/amt*100;
+  el.innerHTML='<span style="color:'+(net>=0?'var(--g)':'var(--r)')+'">실질 '+(net>=0?'+':'')+Math.round(net).toLocaleString()+'원</span> | 비용 '+Math.round(fee+tax).toLocaleString()+'원 | 손익분기 +'+bep.toFixed(2)+'%';
+}
 function calcPyramid(){
   const amt = parseFloat(document.getElementById('pyAmt')?.value)||0;
   const pr = parseFloat(document.getElementById('pyPr')?.value)||0;
@@ -2652,6 +2751,59 @@ function checkPsychWarnings(){
 // ══════════════════════════════════════════════════════════
 // 주간/월간 통계 (Phase 12-7)
 // ══════════════════════════════════════════════════════════
+// 종목별 누적 손익
+function renderSymbolPnl(){
+  const el=document.getElementById('symbolPnl'); if(!el)return;
+  const trades=mock.trades||[];
+  if(!trades.length){el.textContent='거래 없음';return;}
+  const bySymbol={};
+  trades.forEach(t=>{
+    if(t.side!=='sell')return;
+    if(!bySymbol[t.nm])bySymbol[t.nm]={pnl:0,cnt:0,wins:0};
+    bySymbol[t.nm].pnl+=(t.pnl||0);
+    bySymbol[t.nm].cnt++;
+    if(t.pnl>0)bySymbol[t.nm].wins++;
+  });
+  const sorted=Object.entries(bySymbol).sort((a,b)=>b[1].pnl-a[1].pnl);
+  el.innerHTML=sorted.map(([nm,d])=>{
+    const wr=d.cnt>0?(d.wins/d.cnt*100).toFixed(0):0;
+    const up=d.pnl>=0;
+    return`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--br);">
+      <div style="flex:1;font-size:11px;font-weight:600;">${nm}</div>
+      <div style="font-size:10px;color:var(--tm);">${d.cnt}회 | 승률${wr}%</div>
+      <div style="width:80px;height:4px;background:var(--bg);border-radius:2px;overflow:hidden;">
+        <div style="height:100%;width:${Math.min(100,Math.abs(d.pnl)/10000)}%;background:${up?'var(--g)':'var(--r)'};border-radius:2px;"></div>
+      </div>
+      <div style="font-family:var(--mono);font-size:11px;font-weight:700;color:${up?'var(--g)':'var(--r)'};">${up?'+':''}${Math.round(d.pnl).toLocaleString()}</div>
+    </div>`;
+  }).join('');
+}
+
+// 당일 매매 타임라인
+function renderTimeline(){
+  const el=document.getElementById('tradeTimeline'); if(!el)return;
+  const today=new Date().toISOString().slice(0,10);
+  const trades=(mock.trades||[]).filter(t=>t.date===today||!today);
+  if(!trades.length){el.textContent='오늘 거래 없음';return;}
+  el.innerHTML=`<div style="position:relative;padding-left:20px;">
+    <div style="position:absolute;left:8px;top:0;bottom:0;width:2px;background:var(--br);border-radius:1px;"></div>
+    ${trades.map(t=>{
+      const up=t.pnl>=0||t.side==='buy';
+      const col=t.side==='buy'?'var(--b)':t.pnl>=0?'var(--g)':'var(--r)';
+      return`<div style="position:relative;padding:5px 0 5px 12px;margin-bottom:2px;">
+        <div style="position:absolute;left:3px;top:9px;width:10px;height:10px;border-radius:50%;background:${col};border:2px solid #fff;"></div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span style="font-family:var(--mono);font-size:9px;color:var(--tm);">${t.time||'--:--'}</span>
+          <span style="font-size:10px;font-weight:600;">${t.nm}</span>
+          <span style="font-size:9px;color:${col};font-weight:700;">${t.side==='buy'?'▲ 매수':'▼ 매도'}</span>
+          <span style="font-family:var(--mono);font-size:9px;color:var(--ts);">${(t.price||0).toLocaleString()}원 × ${t.qty}주</span>
+          ${t.pnl!==0?`<span style="font-family:var(--mono);font-size:9px;font-weight:700;color:${col};margin-left:auto;">${t.pnl>=0?'+':''}${Math.round(t.pnl).toLocaleString()}</span>`:''}
+        </div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
 function renderWeeklyStats(){
   const el=document.getElementById('weeklyStatsPanel'); if(!el)return;
   const trades=mock.trades||[];
@@ -2865,6 +3017,19 @@ function resetMasterChecklist(){masterCLState={};localStorage.setItem('masterCL'
 // ══════════════════════════════════════════════════════════
 // 일지 탭 전환
 // ══════════════════════════════════════════════════════════
+function printChecklist(){
+  var secs={pre:'장 시작 전',entry:'진입 시',hold:'보유 중',post:'장 후'};
+  var body='<h1>TraidAIr 통합 체크리스트 '+new Date().toLocaleDateString('ko-KR')+'</h1>';
+  Object.entries(secs).forEach(function(e){
+    body+='<h2>'+e[1]+'</h2>';
+    (MASTER_CL[e[0]]||[]).forEach(function(t){
+      body+='<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #eee;"><div style="width:14px;height:14px;border:1.5px solid #ccc;border-radius:50%;flex-shrink:0;"></div><div>'+t+'</div></div>';
+    });
+  });
+  var w=window.open('','_blank');
+  w.document.write('<html><head><meta charset="UTF-8"><style>body{font-family:sans-serif;font-size:12px;padding:24px;}h1{font-size:16px;margin-bottom:16px;}h2{font-size:13px;margin-top:16px;margin-bottom:8px;border-bottom:1px solid #ddd;padding-bottom:4px;}</style></head><body>'+body+'</body></html>');
+  w.document.close();w.print();
+}
 function jTab(el,id){
   document.querySelectorAll('#page-journal .stab').forEach(t=>t.classList.remove('on'));
   el.classList.add('on');
@@ -2879,6 +3044,35 @@ function jTab(el,id){
 // ══════════════════════════════════════════════════════════
 // 개인원칙 저장/로드 (Phase 11-13)
 // ══════════════════════════════════════════════════════════
+// 실전전환 준비도 체크 (Phase 12-5)
+function checkRealReadiness(){
+  const el=document.getElementById('realReadiness'); if(!el)return;
+  const trades=mock.trades||[];
+  const total=trades.length;
+  const wins=trades.filter(t=>t.pnl>0).length;
+  const wr=total>0?wins/total:0;
+  const journals=JSON.parse(localStorage.getItem('manualJournals')||'[]');
+  const rules=JSON.parse(localStorage.getItem('personalRules')||'{}');
+  const items=[
+    {txt:"Phase 0~12 전체 완료",done:true},
+    {txt:`소액 실전 20회 이상 (현재 ${total}회)`,done:total>=20},
+    {txt:`복기 일지 20개 이상 (현재 ${journals.length}개)`,done:journals.length>=20},
+    {txt:`승률 45% 이상 (현재 ${(wr*100).toFixed(0)}%)`,done:wr>=0.45},
+    {txt:"개인 매매 원칙 작성 완료",done:!!(rules.strength&&rules.weakness)},
+    {txt:"나만의 강점 패턴 1개 파악",done:!!(rules.strength&&rules.strength.length>10)},
+    {txt:"손절 원칙 준수율 90% 이상 (복기 기반)",done:total>=10&&wr>=0.4},
+  ];
+  const done=items.filter(i=>i.done).length;
+  const ready=done>=6;
+  el.innerHTML=`<div style="font-weight:700;font-size:12px;color:${ready?'var(--g)':'var(--a)'};margin-bottom:8px;">${ready?'✅ 실전 전환 준비 완료':'⏳ 준비 중 ('+done+'/'+items.length+')'}</div>`+
+    items.map(i=>`<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--br);">
+      <div style="width:14px;height:14px;border-radius:50%;background:${i.done?'var(--g)':'var(--bg)'};border:1.5px solid ${i.done?'var(--g)':'var(--br)'};display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff;flex-shrink:0;">${i.done?'✓':''}</div>
+      <div style="font-size:10px;color:${i.done?'var(--tp)':'var(--ts)'};">${i.txt}</div>
+    </div>`).join('')+
+    (ready?`<div style="margin-top:8px;padding:6px 8px;background:rgba(5,192,114,.08);border-radius:7px;font-size:10px;color:var(--g);">소액(정상비중 10%)으로 시작 → 10회 안정 → 비중 20% → 점진 확대</div>`:
+    `<div style="margin-top:8px;padding:6px 8px;background:rgba(255,153,0,.08);border-radius:7px;font-size:10px;color:var(--a);">아직 ${items.length-done}개 조건 미충족. 모의투자 계속 진행</div>`);
+}
+
 function savePersonalRules(){
   const rules={
     strength:document.getElementById('pr-strength')?.value||'',
@@ -2905,6 +3099,28 @@ function loadPersonalRules(){
 // ══════════════════════════════════════════════════════════
 // 일지 작성 폼 — 오늘 거래 자동입력 (Phase 12-6)
 // ══════════════════════════════════════════════════════════
+// AI 복기 프롬프트 4종 (Phase 12-9)
+const REVIEW_PROMPTS = {
+  1: (trades, pnl) => `아래 매매를 Phase 8~12 기준으로 분석해줘.\n\n매매: ${trades.slice(-1).map(t=>`${t.nm} ${t.side==='buy'?'매수':'매도'} ${(t.price||0).toLocaleString()}원 ${t.qty}주 손익${t.pnl>=0?'+':''}${Math.round(t.pnl||0)}원`).join(', ')}\n\n평가:\n1. 진입 타점 적절성 (Phase 8)\n2. 청산 타이밍 (Phase 9)\n3. R/R 수준\n4. 원칙 준수 여부\n5. 반복 실수 여부\n6. 같은 상황 다시 오면?`,
+  2: (trades, pnl) => `이번 주 매매 패턴 분석해줘. (Phase 12-7)\n\n${trades.slice(-20).map(t=>`${t.nm} ${t.side} ${(t.pnl>=0?'+':'')}${Math.round(t.pnl||0)}원`).join(' / ')}\n\n분석:\n1. 수익 매매 공통점\n2. 손실 매매 공통점\n3. 반복 실수 Top 3\n4. 이번 주 가장 잘한 결정\n5. 다음 주 개선 1가지`,
+  3: (trades, pnl) => `연속 손실 분석해줘. (Phase 11-10)\n\n최근 매매: ${trades.slice(-5).map(t=>`${t.nm} ${t.side} ${(t.pnl>=0?'+':'')}${Math.round(t.pnl||0)}원`).join(' → ')}\n\n분석:\n1. 반복되는 실수 패턴\n2. 원인: 시장/전략/심리 중 어느 것?\n3. 내일도 같은 실수 위험?\n4. 당장 적용할 개선 1가지\n5. 매매 중단 필요한 상태인가?`,
+  4: (trades, pnl) => `슬럼프 감지 분석해줘. (Phase 11-12)\n\n최근 ${trades.slice(-30).length}회 매매\n승률: ${trades.slice(-30).length>0?(trades.slice(-30).filter(t=>t.pnl>0).length/trades.slice(-30).length*100).toFixed(0):'0'}%\n총손익: ${(pnl>=0?'+':'')+Math.round(pnl).toLocaleString()}원\n\n판단:\n1. 슬럼프 여부\n2. 원인 (시장/전략/심리)\n3. 현재 단계 (주의/경고/중단필요)\n4. 다음 행동 (구체적으로)\n5. 복귀 기준`
+};
+function useReviewPrompt(n){
+  const trades=mock.trades||[];
+  const pnl=mock.todayPnl||0;
+  const prompt=REVIEW_PROMPTS[n]?REVIEW_PROMPTS[n](trades,pnl):'';
+  const box=document.getElementById('reviewPromptBox');
+  const txt=document.getElementById('reviewPromptText');
+  if(box)box.style.display='block';
+  if(txt)txt.value=prompt;
+}
+function copyPrompt(){
+  const txt=document.getElementById('reviewPromptText');
+  if(!txt)return;
+  navigator.clipboard.writeText(txt.value).then(()=>showAlert('복사 완료','AI 채팅 창에 붙여넣기 하세요.'));
+}
+
 function autoFillJournal(){
   const today=new Date().toISOString().slice(0,10);
   const el=document.getElementById('jf-date'); if(el)el.value=today;
@@ -3082,23 +3298,7 @@ function execAutoBuy(pr,stk){
     if(autoState.cfg.explain)setTimeout(()=>explainAutoDecision(stk,pr,qty),600);
   }
 }
-async function explainAutoDecision(stk,pr,qty){
-  const cs=sim.candles.slice(0,Math.max(sim.idx+1,20));
-  const cls=cs.map(c=>c.c),rsi=calcRSI(cls,14);
-  const lrsi=(rsi[rsi.length-1]||50).toFixed(0);
-  const ma5=calcMA(cls,5),ma20=calcMA(cls,20);
-  const lma5=(ma5[ma5.length-1]||0).toFixed(0),lma20=(ma20[ma20.length-1]||0).toFixed(0);
-  const prompt=`AI 자동매매로 방금 이 매수를 실행했습니다:
-종목: ${stk.nm} / 진입가: ${pr.toLocaleString()}원 / 수량: ${qty}주
-RSI: ${lrsi} / 5MA: ${lma5} / 20MA: ${lma20}
-자동손절: ${Math.round(pr*(1-autoState.cfg.stop/100)).toLocaleString()}원
 
-학습자에게 이 매수 결정의 근거를 커리큘럼 Phase 번호와 함께 2~3문장으로 설명해주세요. 한국어로.`;
-  try{
-    const data=await callClaude({model:"claude-sonnet-4-20250514",max_tokens:250,messages:[{role:"user",content:prompt}]},"자동매매 결정설명");const t=data.content?.[0]?.text||"";
-    if(t)addMsg("ai","📚 AI 결정 설명:\n"+t);
-  }catch(e){}
-}
 // ═══════════════════════════════
 // DART 공시 조회 (Phase 6-5, 웹 검색 활용)
 // ═══════════════════════════════
@@ -3273,8 +3473,12 @@ async function detectTechnique(cs, stk){
   else if(isFirstBar&&lc.c>lc.o&&volRatio>=1.5){technique="첫봉";score=3;}
   else if(isPullback){technique="눌림목";score=3;}
   else if(isMomentum&&volRatio>=2){technique="이슈테마";score=3;}
+  else if(parseFloat(lrsi)<=30&&lc.c>lc.o&&(lc.c-lc.l)>(lc.h-lc.c)*1.5){
+    // RSI 30이하 + 망치형(아래꼬리가 윗꼬리의 1.5배 이상) → 역추세
+    technique="역추세";score=2;
+  }
   else{technique="스캘핑";score=2;}
-  const t=TECHNIQUES[technique];
+  const t=TECHNIQUES[technique]||TECHNIQUES["스캘핑"];;
   const entryPr=lc.c;
   const stopPr=technique==="스캘핑"?Math.round(entryPr*0.997):Math.round(lma20*0.995);
   const rr=2;
