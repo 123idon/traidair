@@ -69,7 +69,7 @@ button{cursor:pointer;font-family:var(--sans);}
   flex:1;
   display:grid;
   grid-template-columns:162px 1fr 186px 232px;
-  grid-template-rows:1fr auto;
+  grid-template-rows:1fr 90px 76px;
   overflow:hidden;
   position:relative;
   background:var(--bg);
@@ -411,7 +411,10 @@ button{cursor:pointer;font-family:var(--sans);}
         </div>
         <div class="sec"><div class="sec-t">관심 종목</div><div id="wlList"></div></div>
         <div class="sec">
-          <div class="sec-t" style="color:var(--r);">🚫 매매금지</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+            <div class="sec-t" style="margin-bottom:0;color:var(--r);">🚫 매매금지</div>
+            <button onclick="addBanCurrent()" style="padding:1px 5px;border-radius:3px;border:none;background:var(--r);color:#fff;font-size:8px;cursor:pointer;">+추가</button>
+          </div>
           <div id="banList" style="font-size:9px;color:var(--tm);padding:3px 0;">없음</div>
         </div>
       </div>
@@ -598,6 +601,7 @@ button{cursor:pointer;font-family:var(--sans);}
         <div class="brpt on" onclick="brTab(this,'brpb-order')">주문</div>
         <div class="brpt" onclick="brTab(this,'brpb-port')">보유</div>
         <div class="brpt" onclick="brTab(this,'brpb-log')">거래</div>
+        <div class="brpt" onclick="brTab(this,'brpb-pending')">미체결</div>
         <div class="brpt" onclick="brTab(this,'brpb-ai')">AI</div>
       </div>
 
@@ -705,6 +709,14 @@ button{cursor:pointer;font-family:var(--sans);}
 
       <!-- 거래내역 -->
       <div class="brpb" id="brpb-log"><div id="tradeLog"></div></div>
+      <!-- 미체결 -->
+      <div class="brpb" id="brpb-pending">
+        <div style="padding:5px 8px;border-bottom:1px solid var(--br);display:flex;align-items:center;justify-content:space-between;">
+          <span style="font-size:10px;font-weight:700;">미체결 주문</span>
+          <button onclick="pendingOrders=[];renderPending();" style="font-size:8px;padding:1px 6px;border-radius:3px;border:1px solid var(--br);background:var(--bg);color:var(--ts);cursor:pointer;">전체취소</button>
+        </div>
+        <div id="pendingList"><div style="font-size:9px;color:var(--tm);padding:8px;">미체결 없음</div></div>
+      </div>
 
       <!-- AI 조언 -->
       <div class="brpb" id="brpb-ai" style="display:flex;flex-direction:column;height:100%;">
@@ -912,7 +924,6 @@ const STOCKS=[
   {tk:"009150",nm:"삼성전기",pr:155000,base:155000,sec:"전자부품",cap:"중형"},
   {tk:"010130",nm:"고려아연",pr:498000,base:498000,sec:"비철금속",cap:"중형"},
   {tk:"326030",nm:"SK바이오팜",pr:78500,base:78500,sec:"바이오",cap:"중형"},
-  {tk:"247540",nm:"에코프로비엠",pr:152000,base:152000,sec:"2차전지",cap:"중형"},
   {tk:"011200",nm:"HMM",pr:18250,base:18250,sec:"해운",cap:"중형"},
   {tk:"000120",nm:"CJ대한통운",pr:98500,base:98500,sec:"물류",cap:"중형"},
   {tk:"180640",nm:"한진칼",pr:62400,base:62400,sec:"항공",cap:"중형"},
@@ -920,7 +931,10 @@ const STOCKS=[
   {tk:"021240",nm:"코웨이",pr:52300,base:52300,sec:"가전",cap:"중형"},
   {tk:"259960",nm:"크래프톤",pr:218000,base:218000,sec:"게임",cap:"대형"},
 ];
-const WL=["005930","000660","373220","035420","207940"];
+let WL=JSON.parse(localStorage.getItem("htsWL")||'["005930","000660","373220","035420","207940"]');
+function saveWL(){localStorage.setItem("htsWL",JSON.stringify(WL));}
+function addToWL(tk){if(!WL.includes(tk)){WL.push(tk);saveWL();renderWL();showAlert("관심종목 추가",STOCKS.find(s=>s.tk===tk)?.nm+' 추가됨');}}
+function removeFromWL(tk){WL=WL.filter(w=>w!==tk);saveWL();renderWL();}
 const CANDS=[{tk:"373220",why:"기관 3일 연속 순매수"},{tk:"207940",why:"바이오 테마 강세"}];
 const FILTERS=[
   {nm:"수급폭발 300%+ (Phase7-7 필터1)",col:"var(--g)",desc:"전일대비 거래량 300% 이상, 시총 500억~5조",stocks:["373220","207940","068270"]},
@@ -951,6 +965,11 @@ let autoState={running:false,level:0,cfg:{rr:1.5,pos:15,stop:3,t1:3,t2:5,trail:"
 let priceAlerts=[]; // [{tk,price,dir:'above'|'below',memo,fired}]
 let autoTimer=null;
 let stopOrders={};
+let pendingOrders=[];
+function addPending(tk,nm,side,price,qty){const id=Date.now();pendingOrders.push({id,tk,nm,side,price,qty,time:new Date().toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"})});renderPending();return id;}
+function cancelPending(id){pendingOrders=pendingOrders.filter(o=>o.id!==id);renderPending();}
+function renderPending(){const el=document.getElementById("pendingList");if(!el)return;if(!pendingOrders.length){el.innerHTML="<div style='font-size:9px;color:var(--tm);padding:8px;'>미체결 없음</div>";return;}el.innerHTML=pendingOrders.map(o=>`<div style="padding:4px 8px;border-bottom:1px solid var(--br);display:flex;align-items:center;gap:4px;"><span style="font-size:9px;font-weight:700;color:${o.side==="buy"?"var(--g)":"var(--r)"};">${o.side==="buy"?"매수":"매도"}</span><span style="font-size:9px;flex:1;">${o.nm} ${o.price.toLocaleString()}×${o.qty}</span><span style="font-size:8px;color:var(--tm);">${o.time}</span><button onclick="cancelPending(${o.id})" style="background:var(--r);color:#fff;border:none;border-radius:3px;font-size:8px;padding:1px 4px;cursor:pointer;">취소</button></div>`).join("");}
+function checkPending(){pendingOrders.forEach((o,i)=>{const stk=STOCKS.find(s=>s.tk===o.tk);if(!stk)return;const hit=(o.side==="buy"&&stk.pr<=o.price)||(o.side==="sell"&&stk.pr>=o.price);if(hit){const prev=activeTk,prevSide=oSide,prevType=oType;activeTk=o.tk;oSide=o.side;oType="market";document.getElementById("ofQty").value=o.qty;submitOrder(true);activeTk=prev;oSide=prevSide;oType=prevType;pendingOrders.splice(i,1);addMsg("ai",`✅ 지정가 체결: ${o.nm} ${o.side==="buy"?"매수":"매도"} ${o.price.toLocaleString()}원 × ${o.qty}주`);renderPending();}});}
 
 function todayStr(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;}
 
@@ -992,7 +1011,13 @@ function saveMock(){
   // BUG15 FIX: stopOrders도 저장
   localStorage.setItem("htsStopOrders",JSON.stringify(stopOrders));
 }
-function renderAll(){renderWL();renderCands();renderFilters();renderNews();renderPort();renderTradeLog();updCash();updCredLim();}
+let BAN_LIST=JSON.parse(localStorage.getItem("htsBan")||'[]');
+function saveBan(){localStorage.setItem("htsBan",JSON.stringify(BAN_LIST));}
+function addBanCurrent(){const stk=STOCKS.find(s=>s.tk===activeTk)||STOCKS[0];if(!BAN_LIST.includes(activeTk)){BAN_LIST.push(activeTk);saveBan();renderBanList();showAlert("매매금지 추가",stk.nm+" 매매금지 등록됨");}}
+function removeBan(tk){BAN_LIST=BAN_LIST.filter(b=>b!==tk);saveBan();renderBanList();}
+function renderBanList(){const el=document.getElementById("banList");if(!el)return;if(!BAN_LIST.length){el.textContent="없음";return;}el.innerHTML=BAN_LIST.map(tk=>{const s=STOCKS.find(s=>s.tk===tk)||{nm:tk};return`<div style="display:flex;align-items:center;justify-content:space-between;padding:2px 0;border-bottom:1px solid var(--br);"><span style="color:var(--r);font-size:9px;">${s.nm}</span><button onclick="removeBan('${tk}')" style="background:none;border:none;color:var(--tm);font-size:10px;cursor:pointer;">×</button></div>`;}).join("");}
+function isBanned(tk){return BAN_LIST.includes(tk);}
+function renderAll(){renderWL();renderCands();renderFilters();renderNews();renderPort();renderTradeLog();updCash();updCredLim();renderBanList();}
 
 // ═══════════════════════════════
 // CANDLE ENGINE
@@ -1003,7 +1028,8 @@ function genCandles(tk,dt){
   let base=stk.base;
   const intervals=sim.tf==="D"?390:parseInt(sim.tf)||5;
   const perDay=sim.tf==="D"?1:Math.floor(390/intervals);
-  const seed=parseInt((dt||sim.date).replace(/-/g,"").slice(-6))||9999;
+  const tkSeed=stk.tk.split("").reduce((a,c)=>a+c.charCodeAt(0),0);
+  const seed=(parseInt((dt||sim.date).replace(/-/g,"").slice(-6))||9999)+tkSeed;
   const rnd=rng32(seed);
   const dash=getDashData(dt||sim.date);
   const bias=dash?(dash.score>=7?3e-4:dash.score>=4?0:-3e-4):0;
@@ -1078,7 +1104,7 @@ function initChart(){
   if(inds.vol)ds.push({label:"거래량",type:"bar",data:vls,backgroundColor:cs.map(c=>c.c>=c.o?"rgba(220,38,38,.75)":"rgba(37,99,235,.75)"),yAxisID:"y2",order:10});
   const ctx=document.getElementById("mainChart").getContext("2d");
   mChart=new Chart(ctx,{data:{labels:lbls,datasets:ds},plugins:[drawCandlePlugin()],options:{responsive:true,maintainAspectRatio:false,animation:false,
-    plugins:{legend:{display:false},tooltip:{mode:"index",intersect:false,backgroundColor:"#ffffff",borderColor:"rgba(0,0,0,.08)",titleColor:"#6b7684",bodyColor:"#191f28",borderWidth:1,titleColor:"#7a8090",bodyColor:"#e8eaf0",titleFont:{family:"JetBrains Mono",size:9},bodyFont:{family:"JetBrains Mono",size:10},padding:6,
+    plugins:{legend:{display:false},tooltip:{mode:"index",intersect:false,backgroundColor:"#ffffff",borderColor:"rgba(0,0,0,.1)",titleColor:"#6b7684",bodyColor:"#191f28",borderWidth:1,titleFont:{family:"JetBrains Mono",size:9},bodyFont:{family:"JetBrains Mono",size:10},padding:6,
       callbacks:{title:it=>it[0].label,label:it=>it.dataset.label==="거래량"?"거량:"+it.parsed.y.toLocaleString():it.dataset.label+":"+Math.round(it.parsed.y).toLocaleString()}}},
     scales:{x:{grid:{color:"rgba(0,0,0,.05)"},ticks:{color:"#8c9db5",font:{family:"JetBrains Mono",size:8},maxTicksLimit:10}},
       y:{position:"right",grid:{color:"rgba(255,255,255,.04)"},ticks:{color:"#8c9db5",font:{family:"JetBrains Mono",size:8},callback:v=>v.toLocaleString()}},
@@ -1339,18 +1365,32 @@ function quickSell(pct){
   if(!pos||pos.qty<=0){showAlert("보유 없음","보유 종목이 없습니다.");return;}
   const qty=pct===100?pos.qty:Math.max(1,Math.floor(pos.qty*(pct/100)));
   const stk=STOCKS.find(s=>s.tk===activeTk)||STOCKS[0];
-  if(pct===100&&!confirm(`⚠ 전량 시장가 매도\n${stk.nm} ${pos.qty}주\n현재가 ${stk.pr.toLocaleString()}원\n\n즉시 실행하시겠습니까?`))return;
+  if(pct===100&&!confirm(`⚠ 전량 시장가 매도
+${stk.nm} ${pos.qty}주
+현재가 ${stk.pr.toLocaleString()}원
+
+즉시 실행하시겠습니까?`))return;
+  // 상태 저장 후 매도 실행
+  const prevSide=oSide,prevType=oType,prevCred=credType;
   document.getElementById("ofQty").value=qty;
   oSide="sell";oType="market";credType="cash";
   document.getElementById("otSell").classList.add("on");
   document.getElementById("otBuy").classList.remove("on");
+  document.getElementById("subBtn").className="sub-btn sell";
   submitOrder(false);
-  oSide="buy";
+  // 상태 복원
+  oSide=prevSide;oType=prevType;credType=prevCred;
   document.getElementById("otBuy").classList.add("on");
   document.getElementById("otSell").classList.remove("on");
+  document.getElementById("subBtn").className="sub-btn buy";
 }
 function submitOrder(autoExec){
   const stk=STOCKS.find(s=>s.tk===activeTk)||STOCKS[0];
+  // 매매금지 종목 체크
+  if(!autoExec&&oSide==="buy"&&isBanned(activeTk)){
+    if(!confirm(`⚠ ${stk.nm}은(는) 매매금지 종목입니다.
+그래도 매수하시겠습니까?`))return false;
+  }
   const pr=oType==="market"?stk.pr:parseFloat(document.getElementById("ofPr").value)||stk.pr;
   const qty=parseInt(document.getElementById("ofQty").value)||0;
   if(qty<=0){if(!autoExec)showAlert("주문 오류","수량을 입력하세요.");return false;}
@@ -1421,10 +1461,10 @@ function checkStopOrders(){
     if(!so.t1done&&pr>=so.t1&&pos.qty>0){
       const q50=Math.max(1,Math.floor(so.origQty*0.5));
       const qty=Math.min(q50,pos.qty);
-      const saveTk=activeTk,saveSide=oSide,saveType=oType;
-      activeTk=tk;oSide="sell";oType="market";document.getElementById("ofQty").value=qty;
+      const saveTk=activeTk,saveSide=oSide,saveType=oType,saveCred2=credType;
+      activeTk=tk;oSide="sell";oType="market";credType="cash";document.getElementById("ofQty").value=qty;
       submitOrder(true);
-      activeTk=saveTk;oSide=saveSide;oType=saveType;
+      activeTk=saveTk;oSide=saveSide;oType=saveType;credType=saveCred2;
       so.t1done=true;so.stop=so.origStop+(pr-so.origStop)*0.5;// move stop to halfway
       addMsg("ai",`🟢 1차 익절! ${stk.nm} ${pr.toLocaleString()}원 (50% 청산)\n손절선 본전화 적용\n[Phase 9-2: 분할 익절]`);
       renderPort();
@@ -1433,10 +1473,10 @@ function checkStopOrders(){
     if(so.t1done&&!so.t2done&&pr>=so.t2&&pos.qty>0){
       const q30=Math.max(1,Math.floor(so.origQty*0.3));
       const qty=Math.min(q30,pos.qty);
-      const saveTk=activeTk,saveSide=oSide,saveType=oType;
-      activeTk=tk;oSide="sell";oType="market";document.getElementById("ofQty").value=qty;
+      const saveTk=activeTk,saveSide=oSide,saveType=oType,saveCred3=credType;
+      activeTk=tk;oSide="sell";oType="market";credType="cash";document.getElementById("ofQty").value=qty;
       submitOrder(true);
-      activeTk=saveTk;oSide=saveSide;oType=saveType;
+      activeTk=saveTk;oSide=saveSide;oType=saveType;credType=saveCred3;
       so.t2done=true;
       addMsg("ai",`🟢 2차 익절! ${stk.nm} ${pr.toLocaleString()}원 (30% 청산)\n잔여 20% 트레일링 스탑 유지\n[Phase 9-2]`);
       renderPort();
@@ -1444,6 +1484,8 @@ function checkStopOrders(){
   });
   // Phase 3-8: 가격 알림 체크
   checkPriceAlerts();
+  // 미체결 지정가 체결 체크
+  checkPending();
 }
 function checkPriceAlerts(){
   if(!priceAlerts.length)return;
@@ -2075,6 +2117,15 @@ JSON만 답해:
       </div>`).join("")+
       (p.bestPick?`<div style="margin-top:5px;padding:4px 6px;background:rgba(49,130,246,.08);border-radius:6px;font-size:9px;font-weight:700;color:var(--b);">⭐ 최우선: ${p.bestPick}</div>`:"");
       el.innerHTML=html;
+    // AI 스크리닝 결과를 '오늘 후보' 목록에 자동 반영
+    if(p.bestPick&&top3.length){
+      const bestStk=top3.find(r=>r.stk.nm===p.bestPick)||top3[0];
+      if(bestStk&&!CANDS.find(c=>c.tk===bestStk.stk.tk)){
+        CANDS.unshift({tk:bestStk.stk.tk,why:`AI스크리닝 최우선 (${bestStk.score}/10)`});
+        if(CANDS.length>3)CANDS.pop();
+        renderCands();
+      }
+    }
     } else el.innerHTML=raw.slice(0,200);
   }catch(e){el.innerHTML='<span style="color:var(--r);">API 오류</span>';}
 }
@@ -2323,7 +2374,7 @@ function renderTradeLog(){
 // ═══════════════════════════════
 // WATCHLIST / LEFT
 // ═══════════════════════════════
-function renderWL(){document.getElementById("wlList").innerHTML=WL.map(tk=>{const s=STOCKS.find(s=>s.tk===tk)||{tk,nm:tk,pr:0,base:1};const c=((s.pr-s.base)/s.base*100).toFixed(2),up=c>=0;return`<div class="wli ${tk===activeTk?"on":""}" onclick="selectStk('${tk}')"><div class="wl-tk">${tk.slice(-4)}</div><div class="wl-nm">${s.nm}</div><div class="wl-ch ${up?"cu":"cd"}">${up?"+":""}${c}%</div></div>`;}).join("");}
+function renderWL(){document.getElementById("wlList").innerHTML=WL.map(tk=>{const s=STOCKS.find(s=>s.tk===tk)||{tk,nm:tk,pr:0,base:1};const c=((s.pr-s.base)/s.base*100).toFixed(2),up=c>=0;return`<div class="wli ${tk===activeTk?"on":""}" style="display:flex;align-items:center;gap:4px;padding:4px 6px;"><div onclick="selectStk('${tk}')" style="display:flex;align-items:center;gap:6px;flex:1;cursor:pointer;"><div class="wl-tk">${tk.slice(-4)}</div><div class="wl-nm">${s.nm}</div><div class="wl-ch ${up?"cu":"cd"}">${up?"+":""}${c}%</div></div><button onclick="removeFromWL('${tk}')" style="background:none;border:none;color:var(--tm);font-size:11px;padding:0 2px;cursor:pointer;flex-shrink:0;" title="삭제">×</button></div>`;}).join("");}
 function renderCands(){
   const cc=document.getElementById("candCount");
   if(cc){cc.textContent=CANDS.length+"/3";cc.style.color=CANDS.length>=3?"var(--r)":"var(--ts)";}
@@ -2349,7 +2400,7 @@ function renderNews(){
     </div>`;
   }).join("");
 }
-function selectStk(tk){activeTk=tk;const s=STOCKS.find(s=>s.tk===tk)||STOCKS[0];document.getElementById("siNm").textContent=s.nm;
+function selectStk(tk){activeTk=tk;const s=STOCKS.find(s=>s.tk===tk)||STOCKS[0];document.getElementById("siNm").textContent=s.nm;if(!WL.includes(tk)&&confirm(`${s.nm}을(를) 관심종목에 추가할까요?`))addToWL(tk);
   const tkEl=document.getElementById("obTkName");if(tkEl)tkEl.textContent=s.nm;document.getElementById("srchIn").value="";hideSrch();renderWL();genCandles(tk,sim.date);initChart();renderOB();renderTH();
   const tkEl=document.getElementById("obTkName");if(tkEl)tkEl.textContent=s.nm;
   const atk=document.getElementById("analysisTk");if(atk)atk.textContent=s.nm;
@@ -2473,9 +2524,30 @@ function resetMock(){if(!confirm("모의투자를 초기화하시겠습니까?\n
 // ═══════════════════════════════
 // UI HELPERS
 // ═══════════════════════════════
+let overnightAlerted=false;
 function tick(){
   const n=new Date();
   document.getElementById("clk").textContent=[n.getHours(),n.getMinutes(),n.getSeconds()].map(v=>v.toString().padStart(2,"0")).join(":");
+  // 오버나잇 체크리스트 15:20 자동 팝업 (Phase 9-7)
+  const hm=n.getHours()*100+n.getMinutes();
+  if(hm===1520&&!overnightAlerted&&Object.keys(mock.positions).length>0){
+    overnightAlerted=true;
+    const posList=Object.entries(mock.positions).map(([tk,p])=>{const s=STOCKS.find(s=>s.tk===tk)||{nm:tk,pr:0};const pnl=(s.pr-p.avgPrice)*p.qty;return `${s.nm}: ${pnl>=0?"+":""}${Math.round(pnl).toLocaleString()}원 (${((s.pr-p.avgPrice)/p.avgPrice*100).toFixed(1)}%)`;}).join("
+");
+    showAlert("⏰ 오버나잇 체크리스트 (Phase 9-7)",
+      `15:20 마감 정리 시간입니다.
+
+보유 종목:
+${posList}
+
+✅ 오버나잇 허용 조건:
+1. 수급 지속 확인됐나요?
+2. 이슈 내일도 지속되나요?
+3. 뉴스 리스크 없나요?
+
+❌ 하나라도 NO → 오늘 청산`);
+  }
+  if(hm!==1520)overnightAlerted=false;
   // Phase 12-2: 시간대별 힌트
   const h=n.getHours()*60+n.getMinutes();
   const hint=document.getElementById("phaseHint");
