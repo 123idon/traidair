@@ -323,10 +323,30 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;heigh
     <div id="todayTrades" style="font-size:10px;color:var(--tm);">데이터 없음</div>
   </div>
 
-  <!-- 내일 준비 -->
+  <!-- 내일 준비 체크리스트 -->
   <div class="card">
     <div class="card-t">📅 내일 준비 <button onclick="runTomorrowPlan()">AI 계획수립</button></div>
     <div id="tomorrowPlan" style="font-size:10px;color:var(--tm);line-height:1.8;">분석 버튼을 눌러주세요.</div>
+    <div style="margin-top:10px;">
+      <div style="font-size:10px;font-weight:700;margin-bottom:6px;">📋 장후 체크리스트 (Phase 12-3)</div>
+      <div id="postCL"></div>
+    </div>
+  </div>
+
+  <!-- 자금관리 단계 (Phase 12-4) -->
+  <div class="card">
+    <div class="card-t">💰 자금관리 시스템 (Phase 12-4)</div>
+    <div style="font-size:10px;color:var(--ts);margin-bottom:8px;">단계별 투입 자금 기준</div>
+    <div id="capitalStage"></div>
+    <div style="margin-top:10px;padding:8px;background:var(--bg);border-radius:8px;">
+      <div style="font-size:10px;font-weight:700;margin-bottom:5px;">계좌 분리 원칙 (Phase 12-4)</div>
+      <div style="font-size:10px;color:var(--ts);line-height:1.8;">
+        🔴 단타 계좌: 총 자산의 20~30%<br>
+        🟡 스윙 계좌: 총 자산의 20~30%<br>
+        🟢 장기/적립: 총 자산의 40~60%<br>
+        <span style="color:var(--r);font-size:9px;">⚠ 단타 손실로 장기 계좌 사용 절대 금지</span>
+      </div>
+    </div>
   </div>
 
 </div>
@@ -591,6 +611,57 @@ function loadTodayStats(){
         </div>`).join('');
     } else document.getElementById('todayTrades').textContent='오늘 거래 없음';
   }catch(e){console.error(e);}
+  renderPostCL();
+  renderCapitalStage();
+}
+
+// 장후 체크리스트
+const POST_CL_ITEMS = [
+  '오늘 총 수익/손실 확인 및 기록',
+  '일일 손실 한도 대비 현재 위치 확인',
+  '오버나잇 포지션 최종 확인 (비중 50% 이하?)',
+  '복기 10분 (오늘 매매 전체)',
+  '매매 일지 작성 완료',
+  '내일 후보 종목 3개 이하 선정',
+  '내일 주요 이벤트 확인 (FOMC/실적 등)',
+  'HTS 종료 (물리적 차단)',
+];
+let postCLState = JSON.parse(localStorage.getItem('dashPostCL')||'[]');
+function renderPostCL(){
+  const el=document.getElementById('postCL'); if(!el)return;
+  if(!postCLState.length)postCLState=new Array(POST_CL_ITEMS.length).fill(false);
+  el.innerHTML=POST_CL_ITEMS.map((t,i)=>`
+    <div class="ck ${postCLState[i]?'on':''}" onclick="togPostCL(${i})">
+      <div class="ck-box">${postCLState[i]?'✓':''}</div>
+      <div class="ck-txt">${t}</div>
+    </div>`).join('');
+  localStorage.setItem('dashPostCL',JSON.stringify(postCLState));
+}
+function togPostCL(i){postCLState[i]=!postCLState[i];renderPostCL();}
+
+// 자금관리 단계 렌더링
+function renderCapitalStage(){
+  const el=document.getElementById('capitalStage'); if(!el)return;
+  // HTS에서 mock 데이터 읽기
+  const mock=JSON.parse(localStorage.getItem('htsMock')||'{}');
+  const trades=mock.trades||[];
+  const total=trades.length;
+  const wins=trades.filter(t=>t.pnl>0).length;
+  const wr=total>0?wins/total:0;
+  const stages=[
+    {period:'1개월 미만',max:'5~10만원',done:true},
+    {period:'1~3개월',max:'50만원 이하',done:total>=5},
+    {period:'3~6개월',max:'200만원 이하',done:total>=20},
+    {period:'6개월~1년',max:'500만원 이하',done:total>=100&&wr>=0.45},
+    {period:'1년+ 안정',max:'비중 확대 검토',done:total>=200&&wr>=0.5},
+  ];
+  const cur=stages.filter(s=>s.done).length-1;
+  el.innerHTML=stages.map((s,i)=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:7px;margin-bottom:4px;background:${i===cur?'rgba(49,130,246,.08)':'var(--bg)'};border:1.5px solid ${i===cur?'var(--b)':'var(--br)'};">
+      <div style="width:20px;height:20px;border-radius:50%;background:${i<cur?'var(--g)':i===cur?'var(--b)':'var(--bg)'};color:${i<=cur?'#fff':'var(--tm)'};display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0;">${i<cur?'✓':(i+1)}</div>
+      <div style="flex:1;font-size:10px;color:${i===cur?'var(--b)':'var(--ts)'};">${s.period} ${i===cur?'← 현재':''}</div>
+      <div style="font-family:var(--mono);font-size:10px;font-weight:600;">${s.max}</div>
+    </div>`).join('');
 }
 
 async function runPostReview(){
@@ -727,7 +798,7 @@ function tick(){
 }
 
 // ── INIT ──
-loadDash();renderMkt();calcScore();renderCk();updatePsy(7);tick();setInterval(tick,1000);
+loadDash();renderMkt();calcScore();renderCk();updatePsy(7);tick();setInterval(tick,1000);renderPostCL();renderCapitalStage();
 </script>
 </body>
 </html>

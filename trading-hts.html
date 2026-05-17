@@ -503,6 +503,34 @@ button{cursor:pointer;font-family:var(--sans);}
           </div>
         </div>
 
+        <!-- 매매신뢰도지수 (Phase 11-13) -->
+        <div class="sec" style="padding:6px 8px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
+            <span class="sec-t" style="margin-bottom:0;">🧠 매매신뢰도 지수</span>
+            <span style="font-family:var(--mono);font-size:10px;font-weight:700;" id="trustScoreVal">-/10</span>
+          </div>
+          <input type="range" min="0" max="10" value="7" id="trustSlider" oninput="updateTrustScore(this.value)"
+            style="width:100%;-webkit-appearance:none;height:4px;border-radius:2px;background:var(--bg);outline:none;margin-bottom:5px;">
+          <div id="trustScoreDesc" style="font-size:9px;padding:4px 6px;border-radius:5px;background:var(--bg);"></div>
+          <div id="trustAutoLimit" style="font-size:8px;color:var(--a);margin-top:3px;display:none;"></div>
+        </div>
+
+        <!-- 슬럼프 감지 (Phase 11-12) -->
+        <div class="sec" style="padding:6px 8px;">
+          <span class="sec-t" style="color:var(--p);">🌀 슬럼프 감지</span>
+          <div id="slumpPanel" style="font-size:9px;color:var(--ts);line-height:1.7;"></div>
+        </div>
+
+        <!-- 멘탈 리셋 루틴 (Phase 11-11) -->
+        <div class="sec" style="padding:6px 8px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+            <span class="sec-t" style="margin-bottom:0;color:var(--r);">🔄 멘탈 리셋 루틴</span>
+            <button onclick="showMentalReset()" style="padding:1px 6px;border-radius:4px;border:none;background:var(--r);color:#fff;font-size:8px;cursor:pointer;">실행</button>
+          </div>
+          <div style="font-size:9px;color:var(--tm);">연속손실 3회 이상 시 실행</div>
+          <div id="mentalResetStatus" style="font-size:9px;color:var(--ts);margin-top:3px;"></div>
+        </div>
+
         <!-- 시간대별 루틴 가이드 -->
         <div class="sec" style="padding:6px 8px;">
           <span class="sec-t">⏰ 지금 해야 할 것</span>
@@ -811,6 +839,22 @@ button{cursor:pointer;font-family:var(--sans);}
             <div id="alertList" style="margin-top:4px;font-size:9px;color:var(--tm);"></div>
           </div>
           <button class="sub-btn buy" id="subBtn" onclick="submitOrder()">매수 주문</button>
+          <!-- 피라미딩 계산기 (Phase 10-8) -->
+          <div style="margin-top:5px;padding:5px 6px;background:rgba(49,130,246,.05);border-radius:7px;border:1px solid rgba(49,130,246,.15);">
+            <div style="font-size:9px;color:var(--b);font-family:var(--mono);font-weight:700;margin-bottom:4px;">📐 피라미딩 계산기 (Phase 10-8)</div>
+            <div style="font-size:8px;color:var(--tm);margin-bottom:3px;">수익 중인 포지션에 추가매수 시에만 사용</div>
+            <div style="display:flex;gap:4px;margin-bottom:3px;">
+              <div style="flex:1;">
+                <div style="font-size:8px;color:var(--tm);">추가 금액</div>
+                <input id="pyAmt" type="number" placeholder="200만원" style="width:100%;background:var(--pan);border:1px solid var(--br);border-radius:5px;color:var(--tp);font-family:var(--mono);font-size:10px;padding:3px 5px;outline:none;" oninput="calcPyramid()">
+              </div>
+              <div style="flex:1;">
+                <div style="font-size:8px;color:var(--tm);">추가 가격</div>
+                <input id="pyPr" type="number" placeholder="추가매수가" style="width:100%;background:var(--pan);border:1px solid var(--br);border-radius:5px;color:var(--tp);font-family:var(--mono);font-size:10px;padding:3px 5px;outline:none;" oninput="calcPyramid()">
+              </div>
+            </div>
+            <div id="pyResult" style="font-size:9px;color:var(--ts);line-height:1.7;padding:4px 6px;background:var(--bg);border-radius:5px;min-height:28px;"></div>
+          </div>
           <!-- 빠른 청산 -->
           <div id="quickSellBtns" style="display:none;margin-top:6px;display:flex;gap:4px;flex-direction:column;">
             <button onclick="quickSell(50)" style="width:100%;padding:6px;border-radius:8px;border:1.5px solid var(--r);background:rgba(240,62,62,.07);color:var(--r);font-size:10px;font-weight:700;cursor:pointer;">⚡ 50% 시장가 매도</button>
@@ -823,6 +867,8 @@ button{cursor:pointer;font-family:var(--sans);}
       <div class="brpb" id="brpb-port">
         <div class="cash-row"><span class="cash-lbl">모의잔고</span><span class="cash-val" id="cashVal">10,000,000원</span></div>
         <div class="cash-row"><span class="cash-lbl">신용/미수한도</span><span style="font-family:var(--mono);font-size:9px;color:var(--a);" id="credLim">-</span></div>
+        <!-- 처분효과·과잉확신 경고 배너 -->
+        <div id="psychWarningBanner" style="display:none;margin:4px 8px;padding:5px 8px;border-radius:6px;font-size:9px;line-height:1.6;"></div>
         <div id="portItems" style="font-size:9px;color:var(--tm);text-align:center;padding:12px 0;">보유 종목 없음</div>
       </div>
 
@@ -932,17 +978,193 @@ button{cursor:pointer;font-family:var(--sans);}
       <div class="chart-card-t">⚠ 반복 실수 Top 3</div>
       <div id="mistakeList" style="font-size:11px;color:var(--tm);">거래 내역이 없습니다.</div>
     </div>
+
+    <!-- 주간/월간 통계 (Phase 12-7) -->
+    <div class="chart-card">
+      <div class="chart-card-t" style="display:flex;align-items:center;justify-content:space-between;">
+        <span>📅 주간/월간 통계 (Phase 12-7)</span>
+        <div style="display:flex;gap:5px;">
+          <button onclick="renderWeeklyStats()" style="padding:2px 7px;border-radius:4px;border:1px solid var(--br);background:var(--bg);color:var(--ts);font-size:9px;cursor:pointer;">주간</button>
+          <button onclick="renderMonthlyStats()" style="padding:2px 7px;border-radius:4px;border:1px solid var(--b);background:rgba(49,130,246,.08);color:var(--b);font-size:9px;cursor:pointer;">월간</button>
+        </div>
+      </div>
+      <div id="weeklyStatsPanel" style="font-size:10px;color:var(--tm);"></div>
+    </div>
+
+    <!-- 반복실수 제거 루틴 (Phase 12-8) -->
+    <div class="chart-card">
+      <div class="chart-card-t" style="display:flex;align-items:center;justify-content:space-between;">
+        <span>🔧 반복실수 제거 루틴 (Phase 12-8)</span>
+        <button onclick="runMistakeRemoval()" style="padding:2px 7px;border-radius:4px;border:none;background:var(--r);color:#fff;font-size:9px;cursor:pointer;">월간 분석</button>
+      </div>
+      <div id="mistakeRemovalPanel" style="font-size:10px;color:var(--tm);line-height:1.8;">월간 분석 버튼을 눌러주세요.</div>
+    </div>
+
+    <!-- 전략변경 판단 (Phase 12-10) -->
+    <div class="chart-card">
+      <div class="chart-card-t" style="display:flex;align-items:center;justify-content:space-between;">
+        <span>🔄 전략변경 시점 판단 (Phase 12-10)</span>
+        <button onclick="checkStrategyChange()" style="padding:2px 7px;border-radius:4px;border:none;background:var(--p);color:#fff;font-size:9px;cursor:pointer;">판단</button>
+      </div>
+      <div id="strategyChangePanel" style="font-size:10px;color:var(--tm);line-height:1.8;">판단 버튼을 눌러주세요.</div>
+    </div>
+
+    <!-- 성장단계 로드맵 (Phase 12-5) -->
+    <div class="chart-card">
+      <div class="chart-card-t">🗺 성장단계 로드맵 (Phase 12-5)</div>
+      <div id="growthRoadmap"></div>
+    </div>
   </div>
 </div>
 
 <!-- ── JOURNAL PAGE ── -->
 <div class="page" id="page-journal">
   <div class="jpage">
-    <div class="jpage-hdr">
-      <h2 style="font-size:15px;font-weight:700;">매매일지</h2>
-      <button class="ibtn pri" onclick="genAllJournals()">🤖 전체 AI 일지 생성</button>
+    <!-- 일지 탭 -->
+    <div style="display:flex;gap:0;border-bottom:1px solid var(--br);margin-bottom:14px;">
+      <div class="stab on" onclick="jTab(this,'jt-log')" style="font-size:11px;">📓 매매일지</div>
+      <div class="stab" onclick="jTab(this,'jt-form')" style="font-size:11px;">✏ 일지 작성</div>
+      <div class="stab" onclick="jTab(this,'jt-rule')" style="font-size:11px;">📋 개인 원칙</div>
+      <div class="stab" onclick="jTab(this,'jt-checklist')" style="font-size:11px;">✅ 통합 체크리스트</div>
+      <button class="ibtn pri" onclick="genAllJournals()" style="margin-left:auto;font-size:10px;">🤖 AI 일지 생성</button>
     </div>
-    <div id="journalList"><div style="font-size:12px;color:var(--tm);text-align:center;padding:40px;">거래 내역이 없습니다.</div></div>
+
+    <!-- 매매일지 목록 -->
+    <div id="jt-log">
+      <div id="journalList"><div style="font-size:12px;color:var(--tm);text-align:center;padding:40px;">거래 내역이 없습니다.</div></div>
+    </div>
+
+    <!-- 일지 작성 폼 (Phase 12-6 양식 자동입력) -->
+    <div id="jt-form" style="display:none;">
+      <div style="background:var(--pan);border-radius:14px;padding:16px;box-shadow:var(--sh0);margin-bottom:12px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <h3 style="font-size:13px;font-weight:700;">📓 매매 일지 작성 (Phase 12-6)</h3>
+          <button onclick="autoFillJournal()" style="padding:4px 10px;border-radius:6px;border:none;background:var(--b);color:#fff;font-size:10px;cursor:pointer;">⚡ 오늘 거래 자동입력</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+          <div>
+            <label style="font-size:9px;color:var(--tm);display:block;margin-bottom:3px;">날짜</label>
+            <input id="jf-date" type="date" style="width:100%;background:var(--bg);border:1.5px solid var(--br);border-radius:7px;color:var(--tp);font-family:var(--mono);font-size:11px;padding:5px 8px;outline:none;">
+          </div>
+          <div>
+            <label style="font-size:9px;color:var(--tm);display:block;margin-bottom:3px;">심리점수</label>
+            <input id="jf-psy" type="number" min="0" max="10" placeholder="0~10" style="width:100%;background:var(--bg);border:1.5px solid var(--br);border-radius:7px;color:var(--tp);font-family:var(--mono);font-size:11px;padding:5px 8px;outline:none;">
+          </div>
+          <div>
+            <label style="font-size:9px;color:var(--tm);display:block;margin-bottom:3px;">종목</label>
+            <input id="jf-nm" type="text" placeholder="삼성전자" style="width:100%;background:var(--bg);border:1.5px solid var(--br);border-radius:7px;color:var(--tp);font-family:var(--sans);font-size:11px;padding:5px 8px;outline:none;">
+          </div>
+          <div>
+            <label style="font-size:9px;color:var(--tm);display:block;margin-bottom:3px;">손익</label>
+            <input id="jf-pnl" type="number" placeholder="예: 150000" style="width:100%;background:var(--bg);border:1.5px solid var(--br);border-radius:7px;color:var(--tp);font-family:var(--mono);font-size:11px;padding:5px 8px;outline:none;">
+          </div>
+        </div>
+        <div style="margin-bottom:8px;">
+          <label style="font-size:9px;color:var(--tm);display:block;margin-bottom:3px;">진입 근거 (기술적/수급/재료)</label>
+          <textarea id="jf-reason" rows="2" placeholder="5분봉 눌림목 + 기관 순매수 + AI 수주 공시..." style="width:100%;background:var(--bg);border:1.5px solid var(--br);border-radius:7px;color:var(--tp);font-family:var(--sans);font-size:11px;padding:5px 8px;outline:none;resize:none;"></textarea>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+          <div>
+            <label style="font-size:9px;color:var(--g);display:block;margin-bottom:3px;">✅ 잘한 점</label>
+            <textarea id="jf-good" rows="2" placeholder="손절 원칙 준수..." style="width:100%;background:rgba(5,192,114,.05);border:1.5px solid rgba(5,192,114,.2);border-radius:7px;color:var(--tp);font-family:var(--sans);font-size:11px;padding:5px 8px;outline:none;resize:none;"></textarea>
+          </div>
+          <div>
+            <label style="font-size:9px;color:var(--r);display:block;margin-bottom:3px;">❌ 아쉬운 점</label>
+            <textarea id="jf-bad" rows="2" placeholder="조기 익절..." style="width:100%;background:rgba(240,62,62,.05);border:1.5px solid rgba(240,62,62,.2);border-radius:7px;color:var(--tp);font-family:var(--sans);font-size:11px;padding:5px 8px;outline:none;resize:none;"></textarea>
+          </div>
+        </div>
+        <div style="margin-bottom:10px;">
+          <label style="font-size:9px;color:var(--tm);display:block;margin-bottom:3px;">반복 실수 여부</label>
+          <select id="jf-repeat" style="background:var(--bg);border:1.5px solid var(--br);border-radius:7px;color:var(--tp);font-family:var(--sans);font-size:11px;padding:5px 8px;outline:none;width:100%;">
+            <option value="none">없음</option>
+            <option value="earlyExit">조기 익절 (처분효과)</option>
+            <option value="fomo">FOMO 추격매수</option>
+            <option value="noStop">손절 미실행</option>
+            <option value="revenge">복수심리 재진입</option>
+            <option value="oversize">비중 과다</option>
+            <option value="noCheck">체크리스트 스킵</option>
+            <option value="other">기타</option>
+          </select>
+        </div>
+        <button onclick="saveJournalForm()" style="width:100%;padding:8px;border-radius:8px;border:none;background:var(--b);color:#fff;font-size:11px;font-weight:700;cursor:pointer;">💾 일지 저장</button>
+      </div>
+    </div>
+
+    <!-- 개인 원칙 수립 (Phase 11-13) -->
+    <div id="jt-rule" style="display:none;">
+      <div style="background:var(--pan);border-radius:14px;padding:16px;box-shadow:var(--sh0);margin-bottom:12px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <h3 style="font-size:13px;font-weight:700;">📋 개인 매매 원칙 (Phase 11-13)</h3>
+          <button onclick="savePersonalRules()" style="padding:4px 10px;border-radius:6px;border:none;background:var(--b);color:#fff;font-size:10px;cursor:pointer;">💾 저장</button>
+        </div>
+        <div style="display:grid;gap:10px;">
+          <div>
+            <label style="font-size:10px;font-weight:700;color:var(--g);display:block;margin-bottom:4px;">✅ 강점 활용 — 가장 수익 잘 나는 패턴</label>
+            <textarea id="pr-strength" rows="2" placeholder="예: 10:00~11:30 눌림목 매매, 기관 순매수 동반 시..." style="width:100%;background:var(--bg);border:1.5px solid var(--br);border-radius:8px;color:var(--tp);font-family:var(--sans);font-size:11px;padding:7px 9px;outline:none;resize:none;"></textarea>
+          </div>
+          <div>
+            <label style="font-size:10px;font-weight:700;color:var(--r);display:block;margin-bottom:4px;">❌ 약점 방지 — 가장 자주 하는 실수</label>
+            <textarea id="pr-weakness" rows="2" placeholder="예: FOMO 추격매수, 손절 지연..." style="width:100%;background:var(--bg);border:1.5px solid var(--br);border-radius:8px;color:var(--tp);font-family:var(--sans);font-size:11px;padding:7px 9px;outline:none;resize:none;"></textarea>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <div>
+              <label style="font-size:10px;font-weight:700;color:var(--b);display:block;margin-bottom:4px;">⏰ 집중 매매 시간대</label>
+              <input id="pr-time" type="text" placeholder="예: 10:00~11:30" style="width:100%;background:var(--bg);border:1.5px solid var(--br);border-radius:8px;color:var(--tp);font-family:var(--sans);font-size:11px;padding:7px 9px;outline:none;">
+            </div>
+            <div>
+              <label style="font-size:10px;font-weight:700;color:var(--ts);display:block;margin-bottom:4px;">🚫 피하는 시간대</label>
+              <input id="pr-avoid" type="text" placeholder="예: 9:00~9:30, 점심" style="width:100%;background:var(--bg);border:1.5px solid var(--br);border-radius:8px;color:var(--tp);font-family:var(--sans);font-size:11px;padding:7px 9px;outline:none;">
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <div>
+              <label style="font-size:10px;font-weight:700;display:block;margin-bottom:4px;">💰 1회 최대 비중 (%)</label>
+              <input id="pr-size" type="number" placeholder="20" style="width:100%;background:var(--bg);border:1.5px solid var(--br);border-radius:8px;color:var(--tp);font-family:var(--mono);font-size:11px;padding:7px 9px;outline:none;">
+            </div>
+            <div>
+              <label style="font-size:10px;font-weight:700;display:block;margin-bottom:4px;">📊 동시 최대 종목 수</label>
+              <input id="pr-maxpos" type="number" placeholder="2" style="width:100%;background:var(--bg);border:1.5px solid var(--br);border-radius:8px;color:var(--tp);font-family:var(--mono);font-size:11px;padding:7px 9px;outline:none;">
+            </div>
+          </div>
+          <div>
+            <label style="font-size:10px;font-weight:700;color:var(--r);display:block;margin-bottom:4px;">🛑 매매 중단 신호</label>
+            <input id="pr-stop" type="text" placeholder="예: 연속손절 3회, 일손실한도 80% 초과" style="width:100%;background:var(--bg);border:1.5px solid var(--br);border-radius:8px;color:var(--tp);font-family:var(--sans);font-size:11px;padding:7px 9px;outline:none;">
+          </div>
+          <div>
+            <label style="font-size:10px;font-weight:700;display:block;margin-bottom:4px;">📅 주간 루틴</label>
+            <input id="pr-weekly" type="text" placeholder="예: 매주 일요일 복기, 다음주 후보 선정" style="width:100%;background:var(--bg);border:1.5px solid var(--br);border-radius:8px;color:var(--tp);font-family:var(--sans);font-size:11px;padding:7px 9px;outline:none;">
+          </div>
+        </div>
+        <div id="prSaved" style="margin-top:10px;font-size:10px;color:var(--tm);"></div>
+      </div>
+    </div>
+
+    <!-- 전체통합 체크리스트 1장 (Phase 12-11) -->
+    <div id="jt-checklist" style="display:none;">
+      <div style="background:var(--pan);border-radius:14px;padding:16px;box-shadow:var(--sh0);">
+        <h3 style="font-size:13px;font-weight:700;margin-bottom:14px;">✅ 전체 통합 체크리스트 (Phase 12-11)</h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div>
+            <div style="font-size:10px;font-weight:700;color:var(--b);margin-bottom:7px;">🌅 장 시작 전 (5분)</div>
+            <div id="mcl-pre"></div>
+          </div>
+          <div>
+            <div style="font-size:10px;font-weight:700;color:var(--g);margin-bottom:7px;">📈 진입 시 (1분)</div>
+            <div id="mcl-entry"></div>
+          </div>
+          <div>
+            <div style="font-size:10px;font-weight:700;color:var(--a);margin-bottom:7px;">👁 보유 중 (30초)</div>
+            <div id="mcl-hold"></div>
+          </div>
+          <div>
+            <div style="font-size:10px;font-weight:700;color:var(--ts);margin-bottom:7px;">🌙 장 후 (10분)</div>
+            <div id="mcl-post"></div>
+          </div>
+        </div>
+        <button onclick="resetMasterChecklist()" style="margin-top:12px;padding:6px 14px;border-radius:7px;border:1.5px solid var(--br);background:var(--bg);color:var(--ts);font-size:10px;cursor:pointer;">↺ 초기화</button>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -1407,6 +1629,11 @@ window.onload=()=>{
   // 30초마다 공시 갱신 (실시간 딜레이 최소화)
   setInterval(()=>fetchDartNews(), 30000);
   ensureToday(); updateUsageUI();
+  // 신뢰도지수 복원
+  const savedTrust=localStorage.getItem('trustScore');
+  if(savedTrust){trustScore=parseInt(savedTrust);const sl=document.getElementById('trustSlider');if(sl)sl.value=trustScore;updateTrustScore(trustScore);}
+  // 성장단계 렌더링
+  setTimeout(()=>{renderGrowthRoadmap();detectSlump();},500);
 };
 function loadState(){
   const c=localStorage.getItem("htsCfg");if(c)cfg={...cfg,...JSON.parse(c)};
@@ -1429,7 +1656,7 @@ function addBanCurrent(){const stk=STOCKS.find(s=>s.tk===activeTk)||STOCKS[0];if
 function removeBan(tk){BAN_LIST=BAN_LIST.filter(b=>b!==tk);saveBan();renderBanList();}
 function renderBanList(){const el=document.getElementById("banList");if(!el)return;if(!BAN_LIST.length){el.textContent="없음";return;}el.innerHTML=BAN_LIST.map(tk=>{const s=STOCKS.find(s=>s.tk===tk)||{nm:tk};return`<div style="display:flex;align-items:center;justify-content:space-between;padding:2px 0;border-bottom:1px solid var(--br);"><span style="color:var(--r);font-size:9px;">${s.nm}</span><button onclick="removeBan('${tk}')" style="background:none;border:none;color:var(--tm);font-size:10px;cursor:pointer;">×</button></div>`;}).join("");}
 function isBanned(tk){return BAN_LIST.includes(tk);}
-function renderAll(){renderWLGroup();renderCands();renderFilters();renderNews();renderPort();renderTradeLog();updCash();updCredLim();renderBanList();updateTrailPanel();}
+function renderAll(){renderWLGroup();renderCands();renderFilters();renderNews();renderPort();renderTradeLog();updCash();updCredLim();renderBanList();updateTrailPanel();checkPsychWarnings();detectSlump();renderGrowthRoadmap();}
 
 // ═══════════════════════════════
 // CANDLE ENGINE
@@ -1565,6 +1792,7 @@ function updChartToIdx(){
   if(inds.macd&&macdChart){const{ml,sig}=calcMACD(cls);macdChart.data.labels=lbls;macdChart.data.datasets[0].data=ml;macdChart.data.datasets[1].data=sig;macdChart.update("none");}
   if(autoState.running&&sim.idx>0&&sim.idx%5===0)runAutoStep(cs);
   updateTrailPanel();
+  setTimeout(checkPsychWarnings, 100);
 }
 
 // ═══════════════════════════════
@@ -2278,6 +2506,441 @@ function renderStatsEnhanced(){
 // ═══════════════════════════════
 // 주문창 수수료 포함 실질 수익 표시
 // ═══════════════════════════════
+
+
+// ══════════════════════════════════════════════════════════
+// 피라미딩 계산기 (Phase 10-8)
+// ══════════════════════════════════════════════════════════
+function calcPyramid(){
+  const amt = parseFloat(document.getElementById('pyAmt')?.value)||0;
+  const pr = parseFloat(document.getElementById('pyPr')?.value)||0;
+  const pos = mock.positions[activeTk];
+  const el = document.getElementById('pyResult'); if(!el)return;
+  if(!pos||pos.qty<=0){el.innerHTML='<span style="color:var(--r);">보유 포지션 없음 — 수익 중일 때만 사용</span>';return;}
+  const stk = STOCKS.find(s=>s.tk===activeTk)||STOCKS[0];
+  // 현재 수익 확인
+  const curPnl = (stk.pr - pos.avgPrice)/pos.avgPrice*100;
+  if(curPnl <= 0){el.innerHTML='<span style="color:var(--r);">⚠ 손실 중 피라미딩 금지 (물타기 아님) — Phase 10-8</span>';return;}
+  if(!amt||!pr){el.innerHTML='<span style="color:var(--tm);">금액과 추가매수가 입력 필요</span>';return;}
+  const addQty = Math.floor(amt/pr);
+  const totalQty = pos.qty + addQty;
+  const newAvg = (pos.avgPrice*pos.qty + pr*addQty)/totalQty;
+  const newPnlPct = (stk.pr-newAvg)/newAvg*100;
+  // 역피라미드 체크 (추가 금액이 기존보다 작아야 함)
+  const curAmt = pos.avgPrice*pos.qty;
+  const isReverse = amt <= curAmt*0.6; // 기존의 60% 이하
+  const fee = amt*(cfg.bf+cfg.sf)/100;
+  // R/R 재계산
+  const so = stopOrders[activeTk];
+  const stopDist = so?Math.abs(newAvg-so.stop)/newAvg*100:3;
+  const t1Dist = so?Math.abs(so.t1-newAvg)/newAvg*100:6;
+  const rr = stopDist>0?t1Dist/stopDist:0;
+  const rrOk = rr>=1.5;
+  el.innerHTML = `<div style="color:${isReverse?'var(--g)':'var(--a)'};">${isReverse?'✅ 역피라미드 적합':'⚠ 추가분이 큼 — 더 줄일 것'}</div>`+
+    `<div>새 평단: <b>${Math.round(newAvg).toLocaleString()}원</b> (현재수익 ${curPnl.toFixed(1)}%→${newPnlPct.toFixed(1)}%)</div>`+
+    `<div>추가 수량: ${addQty}주 | 수수료: ${Math.round(fee).toLocaleString()}원</div>`+
+    `<div style="color:${rrOk?'var(--g)':'var(--r)'};">R/R: 1:${rr.toFixed(1)} ${rrOk?'✅':'❌ 1.5 미달'}</div>`;
+}
+
+// ══════════════════════════════════════════════════════════
+// 매매신뢰도지수 (Phase 11-13)
+// ══════════════════════════════════════════════════════════
+let trustScore = 7;
+function updateTrustScore(v){
+  trustScore = parseInt(v);
+  const el = document.getElementById('trustScoreVal');
+  const desc = document.getElementById('trustScoreDesc');
+  const limit = document.getElementById('trustAutoLimit');
+  if(!el||!desc)return;
+  let c,d,l="";
+  if(trustScore>=9){c='var(--g)';d='최상 — 확신 매매 가능. 정상 비중';}
+  else if(trustScore>=7){c='var(--g)';d='양호 — 정상 비중으로 매매 가능';}
+  else if(trustScore>=5){c='var(--a)';d='보통 — 비중 50% 이하 유지 권장';l='⚠ 비중 50% 이하 권고';}
+  else if(trustScore>=3){c='var(--a)';d='주의 — 스캘핑 금지. 신중하게';l='⚠ 스캘핑 금지 | 비중 30% 이하';}
+  else{c='var(--r)';d='⚠ 매매 중단 권고 — 당일 관망';l='🚨 당일 매매 중단 권고';}
+  el.textContent=trustScore+'/10'; el.style.color=c;
+  desc.style.background=trustScore>=5?'rgba(5,192,114,.06)':'rgba(240,62,62,.06)';
+  desc.style.color=c; desc.textContent=d;
+  if(limit){limit.textContent=l;limit.style.display=l?'block':'none';}
+  localStorage.setItem('trustScore', trustScore);
+}
+
+// ══════════════════════════════════════════════════════════
+// 슬럼프 감지 (Phase 11-12)
+// ══════════════════════════════════════════════════════════
+function detectSlump(){
+  const el = document.getElementById('slumpPanel'); if(!el)return;
+  const trades = mock.trades||[];
+  if(trades.length < 10){el.innerHTML='<span style="color:var(--tm);">매매 10회 이상 필요</span>';return;}
+  // 최근 2주 분석
+  const recent = trades.slice(-20);
+  const wins = recent.filter(t=>t.pnl>0).length;
+  const total = recent.length;
+  const wr = total>0?wins/total:0.5;
+  const avgPnl = recent.reduce((a,t)=>a+(t.pnl||0),0)/total;
+  const lossSeries = mock.lossSeries||0;
+  let level=0, msg='', action='';
+  if(lossSeries>=7||(wr<0.3&&total>=15)){level=3;msg='🔴 심각한 슬럼프';action='즉시 실전 중단 → 모의투자 전환 (Phase 11-12 3단계)';}
+  else if(lossSeries>=5||(wr<0.35&&total>=10)){level=2;msg='🟠 슬럼프 경고';action='1주일 실전 중단 → 과거 100개 복기 (Phase 11-12 2단계)';}
+  else if(lossSeries>=3||(wr<0.4&&total>=8)){level=1;msg='🟡 주의';action='비중 50% 이하 제한 + 매매 횟수 줄임 (Phase 11-12 1단계)';}
+  else{msg='🟢 정상';action='현재 전략 유지';}
+  el.innerHTML=`<div style="font-weight:700;margin-bottom:3px;">${msg}</div>`+
+    `<div style="color:var(--tm);">최근 ${total}회 | 승률 ${(wr*100).toFixed(0)}% | 연속손실 ${lossSeries}회</div>`+
+    `<div style="margin-top:3px;padding:3px 5px;background:var(--bg);border-radius:4px;">${action}</div>`;
+}
+
+// ══════════════════════════════════════════════════════════
+// 멘탈 리셋 루틴 (Phase 11-11)
+// ══════════════════════════════════════════════════════════
+function showMentalReset(){
+  const steps = [
+    '1단계 (즉각): HTS 5분 종료 후 자리에서 일어나기',
+    '2단계 (30분내): 실외 이동 또는 다른 공간. 물 한 잔. 심호흡 10회',
+    '3단계 (복기): 오늘 손실 원인 3줄 작성. 내 실수? 시장? 전략?',
+    '4단계: 오늘 매매 완전 중단 선언',
+    '5단계 (내일): 실수 반복 방지를 위한 구체적 변경 1가지 확정'
+  ];
+  showAlert('🔄 멘탈 리셋 루틴 (Phase 11-11)',
+    '연속손실 3회 이상 → 즉시 실행:
+
+'+steps.join('
+')+
+    '
+
+⚠ 오늘 재진입 조건:
+• 손실 원인 분석 완료
+• 30분 이상 경과
+• 비중 50% 이하로 축소
+• 다른 종목 + 다른 셋업');
+  const el = document.getElementById('mentalResetStatus');
+  if(el){el.textContent='리셋 루틴 실행: '+new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'});el.style.color='var(--g)';}
+}
+
+// ══════════════════════════════════════════════════════════
+// 처분효과 + 과잉확신 경고 (Phase 11-4, 11-5)
+// ══════════════════════════════════════════════════════════
+function checkPsychWarnings(){
+  const el = document.getElementById('psychWarningBanner'); if(!el)return;
+  const warnings = [];
+  // 처분효과: 수익 중인데 목표가 미달인데 팔려고 하면
+  Object.entries(mock.positions).forEach(([tk,pos])=>{
+    const stk=STOCKS.find(s=>s.tk===tk); if(!stk)return;
+    const pnlPct=(stk.pr-pos.avgPrice)/pos.avgPrice*100;
+    const so=stopOrders[tk];
+    if(pnlPct>0&&pnlPct<1&&so&&stk.pr<so.t1){
+      warnings.push(`처분효과 주의: ${stk.nm} +${pnlPct.toFixed(1)}% — 목표가(${so.t1.toLocaleString()}) 미달. 조기청산 충동 = 처분효과`);
+    }
+    if(pnlPct>3&&so&&!so.t1done){
+      // 좋은 상태 — 홀딩 격려
+    }
+  });
+  // 과잉확신: 3일 연속 수익 후 경고
+  const recentTrades = mock.trades?.slice(-6)||[];
+  const recentWins = recentTrades.filter(t=>t.pnl>0).length;
+  if(recentWins>=5){
+    warnings.push('과잉확신 주의: 최근 6회 중 '+recentWins+'회 수익. 비중 확대 충동 억제. 원칙 유지');
+  }
+  if(warnings.length>0){
+    el.style.display='block';
+    el.style.background='rgba(255,153,0,.08)';
+    el.style.border='1px solid rgba(255,153,0,.25)';
+    el.style.color='var(--a)';
+    el.innerHTML='⚠ '+warnings.join('<br>⚠ ');
+  } else el.style.display='none';
+}
+
+// ══════════════════════════════════════════════════════════
+// 주간/월간 통계 (Phase 12-7)
+// ══════════════════════════════════════════════════════════
+function renderWeeklyStats(){
+  const el=document.getElementById('weeklyStatsPanel'); if(!el)return;
+  const trades=mock.trades||[];
+  const now=new Date();
+  const weekStart=new Date(now);weekStart.setDate(now.getDate()-now.getDay());
+  const weekly=trades.filter(t=>{
+    const d=new Date(t.date); return d>=weekStart;
+  });
+  if(!weekly.length){el.textContent='이번 주 거래 없음';return;}
+  const wins=weekly.filter(t=>t.pnl>0),losses=weekly.filter(t=>t.pnl<0);
+  const total=weekly.length,wr=total>0?(wins.length/total*100).toFixed(0):0;
+  const totalPnl=weekly.reduce((a,t)=>a+(t.pnl||0),0);
+  const avgWin=wins.length?wins.reduce((a,t)=>a+t.pnl,0)/wins.length:0;
+  const avgLoss=losses.length?losses.reduce((a,t)=>a+t.pnl,0)/losses.length:0;
+  const rr=avgLoss<0?Math.abs(avgWin/avgLoss):0;
+  el.innerHTML=`<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px;">
+    <div style="background:var(--bg);border-radius:8px;padding:8px;text-align:center;">
+      <div style="font-size:9px;color:var(--tm);">매매횟수</div>
+      <div style="font-family:var(--mono);font-size:14px;font-weight:700;">${total}회</div>
+    </div>
+    <div style="background:var(--bg);border-radius:8px;padding:8px;text-align:center;">
+      <div style="font-size:9px;color:var(--tm);">승률</div>
+      <div style="font-family:var(--mono);font-size:14px;font-weight:700;color:${wr>=45?'var(--g)':'var(--r)'};">${wr}%</div>
+    </div>
+    <div style="background:var(--bg);border-radius:8px;padding:8px;text-align:center;">
+      <div style="font-size:9px;color:var(--tm);">평균 R/R</div>
+      <div style="font-family:var(--mono);font-size:14px;font-weight:700;color:${rr>=1.5?'var(--g)':'var(--r)'};">1:${rr.toFixed(1)}</div>
+    </div>
+    <div style="background:var(--bg);border-radius:8px;padding:8px;text-align:center;">
+      <div style="font-size:9px;color:var(--tm);">주간 손익</div>
+      <div style="font-family:var(--mono);font-size:14px;font-weight:700;color:${totalPnl>=0?'var(--g)':'var(--r)'};">${totalPnl>=0?'+':''}${Math.round(totalPnl).toLocaleString()}</div>
+    </div>
+  </div>
+  <div style="font-size:10px;color:var(--ts);">
+    평균수익: +${Math.round(avgWin).toLocaleString()}원 | 평균손실: ${Math.round(avgLoss).toLocaleString()}원
+  </div>`;
+}
+
+function renderMonthlyStats(){
+  const el=document.getElementById('weeklyStatsPanel'); if(!el)return;
+  const trades=mock.trades||[];
+  const now=new Date();
+  const monthly=trades.filter(t=>{
+    const d=new Date(t.date); return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear();
+  });
+  if(!monthly.length){el.textContent='이번 달 거래 없음';return;}
+  const wins=monthly.filter(t=>t.pnl>0),losses=monthly.filter(t=>t.pnl<0);
+  const total=monthly.length,wr=total>0?(wins.length/total*100).toFixed(0):0;
+  const totalPnl=monthly.reduce((a,t)=>a+(t.pnl||0),0);
+  const avgRR=losses.length&&wins.length?Math.abs(wins.reduce((a,t)=>a+t.pnl,0)/wins.length/(losses.reduce((a,t)=>a+t.pnl,0)/losses.length)):0;
+  // 반복실수 집계
+  const repeats={};
+  mock.trades?.forEach(t=>{if(t.repeat&&t.repeat!=='none')repeats[t.repeat]=(repeats[t.repeat]||0)+1;});
+  const top3=Object.entries(repeats).sort((a,b)=>b[1]-a[1]).slice(0,3);
+  el.innerHTML=`<div style="font-weight:700;margin-bottom:8px;">이번 달 — ${total}회 | 승률 ${wr}% | R/R 1:${avgRR.toFixed(1)} | ${totalPnl>=0?'+':''}${Math.round(totalPnl).toLocaleString()}원</div>`+
+    `<div style="font-size:10px;color:var(--ts);">비중확대 허용 조건 (Phase 12-4):<br>`+
+    `${total>=20?'✅':'❌'} 매매 20회 이상 (${total}회) &nbsp; `+
+    `${parseFloat(wr)>=45?'✅':'❌'} 승률 45% 이상 (${wr}%) &nbsp; `+
+    `${avgRR>=1.5?'✅':'❌'} R/R 1.5 이상 (1:${avgRR.toFixed(1)})</div>`+
+    (top3.length?`<div style="margin-top:8px;font-size:10px;"><b>반복실수 Top ${top3.length}:</b> ${top3.map(([k,v])=>`${k}(${v}회)`).join(' · ')}</div>`:'');
+}
+
+// ══════════════════════════════════════════════════════════
+// 반복실수 제거 루틴 (Phase 12-8)
+// ══════════════════════════════════════════════════════════
+async function runMistakeRemoval(){
+  const el=document.getElementById('mistakeRemovalPanel'); if(!el)return;
+  el.innerHTML='<span style="color:var(--tm);font-style:italic;">분석 중...</span>';
+  const trades=mock.trades||[];
+  if(trades.length<5){el.textContent='거래 5회 이상 필요';return;}
+  const repeats={};
+  trades.forEach(t=>{if(t.repeat&&t.repeat!=='none')repeats[t.repeat]=(repeats[t.repeat]||0)+1;});
+  const top3=Object.entries(repeats).sort((a,b)=>b[1]-a[1]).slice(0,3);
+  if(!top3.length){el.textContent='반복 실수 없음. 현재 원칙 잘 지키고 있습니다.';return;}
+  const mistakeLabels={
+    earlyExit:'조기 익절(처분효과)',fomo:'FOMO 추격매수',noStop:'손절 미실행',
+    revenge:'복수심리 재진입',oversize:'비중 과다',noCheck:'체크리스트 스킵'
+  };
+  el.innerHTML=top3.map(([k,v],i)=>`<div style="padding:7px;background:var(--bg);border-radius:8px;margin-bottom:6px;">
+    <div style="font-weight:700;color:var(--r);">${i+1}위. ${mistakeLabels[k]||k} (${v}회)</div>
+    <div style="font-size:10px;color:var(--ts);margin-top:3px;">${getMistakeSolution(k)}</div>
+  </div>`).join('')+
+  `<div style="margin-top:8px;font-size:10px;color:var(--tm);">다음 달: 위 실수가 줄었는지 반드시 검증 (Phase 12-8 4단계)</div>`;
+}
+function getMistakeSolution(k){
+  const solutions={
+    earlyExit:'교정: 1차 익절 후 손절선 본전화 → 나머지는 트레일링 스탑으로 유지',
+    fomo:'교정: 첫 봉(9:00~9:10) 완성 확인 의무화 + 9:10 이전 신규진입 금지',
+    noStop:'교정: 진입 즉시 손절 예약주문 설정 (30초 이내)',
+    revenge:'교정: 손절 후 30분 HTS 강제 종료 + 복기 작성 전 재진입 금지',
+    oversize:'교정: 주문창 비중 자동계산 활용, 금액 직접입력 방식으로 변경',
+    noCheck:'교정: Phase 8 장중체크탭에서 GO 확인 후에만 주문 버튼 접근',
+  };
+  return solutions[k]||'구체적 차단 방법 수립 필요';
+}
+
+// ══════════════════════════════════════════════════════════
+// 전략변경 판단 (Phase 12-10)
+// ══════════════════════════════════════════════════════════
+function checkStrategyChange(){
+  const el=document.getElementById('strategyChangePanel'); if(!el)return;
+  const trades=mock.trades||[];
+  if(trades.length<10){el.textContent='판단을 위해 거래 10회 이상 필요';return;}
+  const recent=trades.slice(-30);
+  const wins=recent.filter(t=>t.pnl>0);
+  const wr=wins.length/recent.length;
+  const avgWin=wins.length?wins.reduce((a,t)=>a+t.pnl,0)/wins.length:0;
+  const losses=recent.filter(t=>t.pnl<0);
+  const avgLoss=losses.length?Math.abs(losses.reduce((a,t)=>a+t.pnl,0)/losses.length):1;
+  const rr=avgLoss>0?avgWin/avgLoss:0;
+  const signals=[];
+  if(wr<0.4)signals.push(`❌ 승률 ${(wr*100).toFixed(0)}% — 기준 45% 미달`);
+  if(rr<1.2)signals.push(`❌ R/R 1:${rr.toFixed(1)} — 기준 1.5 미달`);
+  if(mock.lossSeries>=5)signals.push(`❌ 연속손실 ${mock.lossSeries}회`);
+  const needChange=signals.length>=2;
+  el.innerHTML=`<div style="font-size:11px;font-weight:700;color:${needChange?'var(--r)':'var(--g)'};margin-bottom:8px;">${needChange?'⚠ 전략 재검토 필요':'✅ 현재 전략 유지'}</div>`+
+    (signals.length?`<div style="font-size:10px;margin-bottom:8px;">${signals.join('<br>')}</div>`:`<div style="font-size:10px;color:var(--g);margin-bottom:8px;">모든 지표 정상</div>`)+
+    (needChange?`<div style="font-size:10px;color:var(--ts);background:var(--bg);padding:8px;border-radius:7px;">
+      Phase 12-10 전략변경 절차:<br>
+      1단계: 실전 1주일 중단<br>
+      2단계: 최근 복기 전체 재검토<br>
+      3단계: 원인 분류 (시장/전략/심리)<br>
+      4단계: 백테스트 20~50회<br>
+      5단계: 소액 실전 (정상비중 10%)<br>
+      6단계: 10회 안정 → 점진적 비중 복구
+    </div>`:``);
+}
+
+// ══════════════════════════════════════════════════════════
+// 성장단계 로드맵 (Phase 12-5)
+// ══════════════════════════════════════════════════════════
+function renderGrowthRoadmap(){
+  const el=document.getElementById('growthRoadmap'); if(!el)return;
+  const trades=mock.trades||[];
+  const total=trades.length;
+  const wins=trades.filter(t=>t.pnl>0).length;
+  const wr=total>0?wins/total:0;
+  const months=total>=100?3:total>=20?1:0;
+  const stages=[
+    {name:'입문',cond:'Phase 0~3 완료',maxAmt:'실전 금지',done:true},
+    {name:'초보 실전',cond:'Phase 4~7 학습 중',maxAmt:'10만원 이하',done:total>=5},
+    {name:'중급 실전',cond:'Phase 0~12 완료 + 20회 이상',maxAmt:'200만원 이하',done:total>=20},
+    {name:'고급 실전',cond:'3개월 수익 + 승률 45%+',maxAmt:'500만원 이하',done:months>=3&&wr>=0.45},
+    {name:'프로',cond:'6개월 안정 + 나만의 셋업 3개',maxAmt:'제한 없음',done:months>=6&&wr>=0.5},
+  ];
+  const curStage=stages.filter(s=>s.done).length-1;
+  el.innerHTML=stages.map((s,i)=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:9px;margin-bottom:5px;background:${i===curStage?'rgba(49,130,246,.08)':i<curStage?'rgba(5,192,114,.05)':'var(--bg)'};border:1.5px solid ${i===curStage?'var(--b)':i<curStage?'rgba(5,192,114,.2)':'var(--br)'};">
+      <div style="width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;background:${i<curStage?'var(--g)':i===curStage?'var(--b)':'var(--bg)'};color:${i<=curStage?'#fff':'var(--tm)'};">${i<=curStage?'✓':(i+1)}</div>
+      <div style="flex:1;">
+        <div style="font-size:11px;font-weight:700;color:${i===curStage?'var(--b)':'var(--tp)'};">${s.name} ${i===curStage?'← 현재':''}</div>
+        <div style="font-size:9px;color:var(--tm);">${s.cond}</div>
+      </div>
+      <div style="font-family:var(--mono);font-size:9px;color:var(--ts);">${s.maxAmt}</div>
+    </div>`).join('');
+}
+
+// ══════════════════════════════════════════════════════════
+// 전체통합 체크리스트 1장 (Phase 12-11)
+// ══════════════════════════════════════════════════════════
+const MASTER_CL = {
+  pre:[
+    '야간선물 + 환율 확인',
+    '시장 방향 판단 (매수 우호/중립/비우호)',
+    '심리 상태 점검 (신뢰도 5 이상이어야 매매)',
+    '일일 손실 한도 잔여 확인',
+    '오늘 후보 종목 1~3개 최종 확정',
+    '각 종목 진입가/손절가/목표가/R/R 확인'
+  ],
+  entry:[
+    '셋업 완성 여부 (Phase 8 체크리스트)',
+    'R/R 1.5 이상 확인',
+    '손절가 사전 설정 완료',
+    'NO-GO 조건 없음 확인',
+    '즉시 손절 예약 주문 설정 (진입 후 30초 이내)'
+  ],
+  hold:[
+    '즉각 청산 신호 없음 확인',
+    '목표가 vs 현재가 확인',
+    '수급 이상 신호 없음',
+    '홀딩 조건 3개 충족 여부',
+    '15:20 마감 시간 확인'
+  ],
+  post:[
+    '오늘 손익 기록',
+    '복기 10분 작성',
+    '매매 일지 작성 완료',
+    '내일 후보 종목 선정',
+    '내일 주요 이벤트 확인',
+    'HTS 종료'
+  ]
+};
+let masterCLState = JSON.parse(localStorage.getItem('masterCL')||'{}');
+function renderMasterChecklist(){
+  const sections={pre:'mcl-pre',entry:'mcl-entry',hold:'mcl-hold',post:'mcl-post'};
+  Object.entries(sections).forEach(([key,id])=>{
+    const el=document.getElementById(id); if(!el)return;
+    const items=MASTER_CL[key]||[];
+    el.innerHTML=items.map((t,i)=>{
+      const k=key+i;
+      return`<div style="display:flex;align-items:center;gap:6px;padding:5px 7px;border-radius:6px;cursor:pointer;margin-bottom:2px;background:${masterCLState[k]?'rgba(5,192,114,.06)':'transparent'};" onclick="togMCL('${k}')">
+        <div style="width:14px;height:14px;border-radius:50%;border:1.5px solid ${masterCLState[k]?'var(--g)':'var(--br)'};background:${masterCLState[k]?'var(--g)':'transparent'};flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff;">${masterCLState[k]?'✓':''}</div>
+        <div style="font-size:10px;color:${masterCLState[k]?'var(--tp)':'var(--ts)'};">${t}</div>
+      </div>`;
+    }).join('');
+  });
+}
+function togMCL(k){masterCLState[k]=!masterCLState[k];localStorage.setItem('masterCL',JSON.stringify(masterCLState));renderMasterChecklist();}
+function resetMasterChecklist(){masterCLState={};localStorage.setItem('masterCL','{}');renderMasterChecklist();}
+
+// ══════════════════════════════════════════════════════════
+// 일지 탭 전환
+// ══════════════════════════════════════════════════════════
+function jTab(el,id){
+  document.querySelectorAll('#page-journal .stab').forEach(t=>t.classList.remove('on'));
+  el.classList.add('on');
+  ['jt-log','jt-form','jt-rule','jt-checklist'].forEach(tid=>{
+    const d=document.getElementById(tid);
+    if(d)d.style.display=tid===id?'block':'none';
+  });
+  if(id==='jt-checklist')renderMasterChecklist();
+  if(id==='jt-rule')loadPersonalRules();
+}
+
+// ══════════════════════════════════════════════════════════
+// 개인원칙 저장/로드 (Phase 11-13)
+// ══════════════════════════════════════════════════════════
+function savePersonalRules(){
+  const rules={
+    strength:document.getElementById('pr-strength')?.value||'',
+    weakness:document.getElementById('pr-weakness')?.value||'',
+    time:document.getElementById('pr-time')?.value||'',
+    avoid:document.getElementById('pr-avoid')?.value||'',
+    size:document.getElementById('pr-size')?.value||'',
+    maxpos:document.getElementById('pr-maxpos')?.value||'',
+    stop:document.getElementById('pr-stop')?.value||'',
+    weekly:document.getElementById('pr-weekly')?.value||''
+  };
+  localStorage.setItem('personalRules',JSON.stringify(rules));
+  const el=document.getElementById('prSaved');
+  if(el){el.textContent='✅ 저장됨: '+new Date().toLocaleTimeString('ko-KR');el.style.color='var(--g)';}
+}
+function loadPersonalRules(){
+  const r=JSON.parse(localStorage.getItem('personalRules')||'{}');
+  ['strength','weakness','time','avoid','size','maxpos','stop','weekly'].forEach(k=>{
+    const el=document.getElementById('pr-'+k);
+    if(el&&r[k])el.value=r[k];
+  });
+}
+
+// ══════════════════════════════════════════════════════════
+// 일지 작성 폼 — 오늘 거래 자동입력 (Phase 12-6)
+// ══════════════════════════════════════════════════════════
+function autoFillJournal(){
+  const today=new Date().toISOString().slice(0,10);
+  const el=document.getElementById('jf-date'); if(el)el.value=today;
+  // 오늘 마지막 거래 자동입력
+  const todayTrades=(mock.trades||[]).filter(t=>t.date===today);
+  if(todayTrades.length){
+    const last=todayTrades[todayTrades.length-1];
+    const nm=document.getElementById('jf-nm'); if(nm)nm.value=last.nm||'';
+    const pnl=document.getElementById('jf-pnl'); if(pnl)pnl.value=Math.round(last.pnl||0);
+    const psy=document.getElementById('jf-psy'); if(psy)psy.value=trustScore||7;
+  }
+  showAlert('자동입력','오늘 마지막 거래 데이터가 입력됐습니다.
+나머지 항목을 직접 입력해주세요.');
+}
+function saveJournalForm(){
+  const entry={
+    date:document.getElementById('jf-date')?.value||new Date().toISOString().slice(0,10),
+    nm:document.getElementById('jf-nm')?.value||'',
+    pnl:parseFloat(document.getElementById('jf-pnl')?.value)||0,
+    psy:parseInt(document.getElementById('jf-psy')?.value)||7,
+    reason:document.getElementById('jf-reason')?.value||'',
+    good:document.getElementById('jf-good')?.value||'',
+    bad:document.getElementById('jf-bad')?.value||'',
+    repeat:document.getElementById('jf-repeat')?.value||'none',
+    ts:Date.now()
+  };
+  const journals=JSON.parse(localStorage.getItem('manualJournals')||'[]');
+  journals.push(entry);
+  localStorage.setItem('manualJournals',JSON.stringify(journals));
+  // mock.trades에도 repeat 기록
+  if(entry.repeat!=='none'&&mock.trades?.length){
+    mock.trades[mock.trades.length-1].repeat=entry.repeat;
+    saveMock();
+  }
+  showAlert('저장 완료',`${entry.nm} 일지가 저장됐습니다.`);
+}
 
 function selLevel(n,el){autoLevel=n;document.querySelectorAll(".level-card").forEach(c=>c.classList.remove("on"));el.classList.add("on");}
 
