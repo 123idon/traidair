@@ -77,6 +77,9 @@ button{cursor:pointer;font-family:var(--sans);}
 .lp{grid-column:1;grid-row:1/4;background:var(--pan);border-right:1px solid var(--br);display:flex;flex-direction:column;overflow:hidden;}
 .lp-tabs{display:flex;border-bottom:1px solid var(--br);flex-shrink:0;}
 .lpt{flex:1;padding:8px 2px;text-align:center;font-size:10px;cursor:pointer;color:var(--ts);border-bottom:2px solid transparent;transition:all .12s;font-weight:500;}
+.wg-tab{flex:1;padding:5px 1px;text-align:center;font-size:9px;cursor:pointer;color:var(--ts);border-bottom:2px solid transparent;transition:all .1s;font-weight:500;}
+.wg-tab.on{color:var(--b);border-bottom-color:var(--b);font-weight:700;}
+.wg-body{flex:1;overflow-y:auto;}
 .lpt.on{color:var(--b);border-bottom-color:var(--b);font-weight:700;}
 .lpb{flex:1;overflow-y:auto;display:none;}
 .lpb.on{display:block;}
@@ -412,21 +415,34 @@ button{cursor:pointer;font-family:var(--sans);}
         <div class="lpt" onclick="lTab(this,'lpb-ai')">AI추천</div>
       </div>
       <div class="lpb on" id="lpb-w">
-        <div class="sec">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
-            <span class="sec-t" style="margin-bottom:0;">오늘 후보</span>
-            <span style="font-size:8px;color:var(--ts);font-family:var(--mono);" id="candCount">0/3</span>
-          </div>
-          <div id="candList"></div>
+        <!-- 그룹 선택 탭 (Phase 3-9: 5그룹) -->
+        <div style="display:flex;border-bottom:1px solid var(--br);flex-shrink:0;background:var(--bg);">
+          <div class="wg-tab on" onclick="selWG(this,'wg0')" title="오늘 진입 후보 (최대 3개)">후보</div>
+          <div class="wg-tab" onclick="selWG(this,'wg1')" title="계속 모니터링">모니터</div>
+          <div class="wg-tab" onclick="selWG(this,'wg2')" title="매매금지 목록" style="color:var(--r);">금지</div>
+          <div class="wg-tab" onclick="selWG(this,'wg3')" title="이슈/테마 관련">테마</div>
+          <div class="wg-tab" onclick="selWG(this,'wg4')" title="매매 후 복기">복기</div>
         </div>
-        <div class="sec"><div class="sec-t">관심 종목</div><div id="wlList"></div></div>
-        <div class="sec">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
-            <div class="sec-t" style="margin-bottom:0;color:var(--r);">🚫 매매금지</div>
-            <button onclick="addBanCurrent()" style="padding:1px 5px;border-radius:3px;border:none;background:var(--r);color:#fff;font-size:8px;cursor:pointer;">+추가</button>
+        <!-- 그룹 헤더 -->
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-bottom:1px solid var(--br);flex-shrink:0;">
+          <span style="font-size:9px;font-weight:700;color:var(--ts);" id="wgTitle">🎯 오늘 진입 후보</span>
+          <div style="display:flex;gap:4px;">
+            <span style="font-size:8px;color:var(--tm);font-family:var(--mono);" id="wgCount">0/3</span>
+            <button onclick="addCurrentToWG()" style="padding:1px 5px;border-radius:3px;border:none;background:var(--b);color:#fff;font-size:8px;cursor:pointer;">+추가</button>
           </div>
-          <div id="banList" style="font-size:9px;color:var(--tm);padding:3px 0;">없음</div>
         </div>
+        <!-- 오늘 후보 (AI추천 포함) -->
+        <div id="wg0" class="wg-body">
+          <div style="padding:4px 8px;border-bottom:1px solid var(--br);">
+            <div style="font-size:8px;color:var(--tm);margin-bottom:3px;">AI 추천 후보</div>
+            <div id="candList"></div>
+          </div>
+          <div id="wlList0"></div>
+        </div>
+        <div id="wg1" class="wg-body" style="display:none;"><div id="wlList1"></div></div>
+        <div id="wg2" class="wg-body" style="display:none;"><div id="banList" style="font-size:9px;color:var(--tm);padding:3px 0;">없음</div></div>
+        <div id="wg3" class="wg-body" style="display:none;"><div id="wlList3"></div></div>
+        <div id="wg4" class="wg-body" style="display:none;"><div id="wlList4"></div></div>
       </div>
       <div class="lpb" id="lpb-f">
         <div class="sec"><div class="sec-t">조건 검색</div><div id="filterList"></div></div>
@@ -507,30 +523,46 @@ button{cursor:pointer;font-family:var(--sans);}
       </div>
     </div>
 
-    <!-- AI 종합분석 패널 (col2 row2) -->
+    <!-- AI 종합분석 패널 (col2 row2) — Phase 8 통합 -->
     <div id="aiAnalysisPanel" style="grid-column:2;grid-row:2;background:var(--pan);border-top:2px solid rgba(49,130,246,.25);border-right:1px solid var(--br);overflow:hidden;display:flex;flex-direction:column;">
-      <div style="display:flex;align-items:center;gap:6px;padding:4px 10px;border-bottom:1px solid var(--br);flex-shrink:0;">
-        <div style="width:6px;height:6px;border-radius:50%;background:var(--b);animation:pu 2s infinite;flex-shrink:0;"></div>
-        <span style="font-size:10px;font-weight:700;">AI 종합분석</span>
-        <span style="font-size:8px;color:var(--tm);font-family:var(--mono);" id="analysisTk">종목선택시 자동분석</span>
-        <div style="margin-left:auto;display:flex;align-items:center;gap:4px;">
-          <span id="goNogoTag" style="font-size:9px;padding:1px 7px;border-radius:4px;font-weight:700;font-family:var(--mono);background:var(--bg);">-</span>
-          <button onclick="runFullAnalysis()" style="padding:2px 8px;border-radius:5px;border:none;background:var(--b);color:#fff;font-size:9px;cursor:pointer;font-weight:600;">🔍 분석</button>
+      <div style="display:flex;align-items:center;gap:5px;padding:3px 8px;border-bottom:1px solid var(--br);flex-shrink:0;">
+        <div style="width:5px;height:5px;border-radius:50%;background:var(--b);animation:pu 2s infinite;flex-shrink:0;"></div>
+        <span style="font-size:9px;font-weight:700;">AI 종합분석</span>
+        <span style="font-size:8px;color:var(--tm);font-family:var(--mono);" id="analysisTk">종목선택시</span>
+        <div style="margin-left:auto;display:flex;align-items:center;gap:3px;">
+          <span id="goNogoTag" style="font-size:8px;padding:1px 6px;border-radius:3px;font-weight:700;font-family:var(--mono);background:var(--bg);">-</span>
+          <button onclick="runFullAnalysis()" style="padding:1px 7px;border-radius:4px;border:none;background:var(--b);color:#fff;font-size:8px;cursor:pointer;font-weight:600;">🔍분석</button>
+          <!-- 돌발악재 즉각청산 버튼 (Phase 9-6) -->
+          <button onclick="emergencySell()" style="padding:1px 7px;border-radius:4px;border:none;background:var(--r);color:#fff;font-size:8px;cursor:pointer;font-weight:700;" title="돌발 악재 즉각 전량 청산 (Phase 9-6)">🚨긴급청산</button>
         </div>
       </div>
       <div style="display:flex;flex:1;min-height:0;overflow:hidden;">
-        <div style="flex:1;padding:4px 8px;border-right:1px solid var(--br);overflow-y:auto;min-width:0;">
-          <div style="font-size:8px;color:var(--tm);font-family:var(--mono);margin-bottom:2px;">🎯 매매기법 (AI선택)</div>
-          <div id="techniqueTag" style="font-size:12px;font-weight:700;color:var(--b);">-</div>
-          <div id="techniqueReason" style="font-size:9px;color:var(--ts);line-height:1.4;margin-top:1px;">분석 버튼 또는 종목 선택 시 자동</div>
+        <!-- 매매기법 -->
+        <div style="flex:1;padding:4px 7px;border-right:1px solid var(--br);overflow-y:auto;min-width:0;">
+          <div style="font-size:7px;color:var(--tm);font-family:var(--mono);margin-bottom:2px;">🎯 매매기법</div>
+          <div id="techniqueTag" style="font-size:11px;font-weight:700;color:var(--b);">-</div>
+          <div id="techniqueReason" style="font-size:8px;color:var(--ts);line-height:1.4;margin-top:1px;">분석 버튼 눌러주세요</div>
         </div>
-        <div style="flex:1.2;padding:4px 8px;border-right:1px solid var(--br);overflow-y:auto;min-width:0;">
-          <div style="font-size:8px;color:var(--tm);font-family:var(--mono);margin-bottom:2px;">📍 진입·청산 타점</div>
-          <div id="entryPoint" style="font-size:9px;color:var(--ts);line-height:1.7;">-</div>
+        <!-- 타점 -->
+        <div style="flex:1.1;padding:4px 7px;border-right:1px solid var(--br);overflow-y:auto;min-width:0;">
+          <div style="font-size:7px;color:var(--tm);font-family:var(--mono);margin-bottom:2px;">📍 진입·청산 타점</div>
+          <div id="entryPoint" style="font-size:8px;color:var(--ts);line-height:1.7;">-</div>
         </div>
-        <div style="flex:1.5;padding:4px 8px;overflow-y:auto;min-width:0;">
-          <div style="font-size:8px;color:var(--tm);font-family:var(--mono);margin-bottom:2px;">Phase 8 체크리스트</div>
-          <div id="phase8Check" style="font-size:8px;color:var(--ts);line-height:1.6;">-</div>
+        <!-- Phase 8 STEP 0~7 체크리스트 -->
+        <div style="flex:1.4;padding:4px 7px;border-right:1px solid var(--br);overflow-y:auto;min-width:0;">
+          <div style="font-size:7px;color:var(--tm);font-family:var(--mono);margin-bottom:2px;">Phase 8 STEP 0~7</div>
+          <div id="phase8Check" style="font-size:8px;color:var(--ts);line-height:1.65;">-</div>
+        </div>
+        <!-- 트레일링 스탑 현황 (Phase 9-3) -->
+        <div style="flex:1;padding:4px 7px;overflow-y:auto;min-width:0;">
+          <div style="font-size:7px;color:var(--tm);font-family:var(--mono);margin-bottom:2px;">📈 트레일링 스탑</div>
+          <div id="trailPanel" style="font-size:8px;color:var(--ts);line-height:1.7;">-</div>
+          <div style="margin-top:4px;display:flex;gap:2px;flex-wrap:wrap;" id="trailBtns">
+            <button onclick="setTrailPct(2)" style="padding:1px 4px;border-radius:3px;border:1px solid var(--br);background:var(--bg);font-size:7px;color:var(--ts);cursor:pointer;">-2%</button>
+            <button onclick="setTrailPct(3)" style="padding:1px 4px;border-radius:3px;border:1px solid var(--br);background:var(--bg);font-size:7px;color:var(--ts);cursor:pointer;">-3%</button>
+            <button onclick="setTrailPct(5)" style="padding:1px 4px;border-radius:3px;border:1px solid var(--br);background:var(--bg);font-size:7px;color:var(--ts);cursor:pointer;">-5%</button>
+            <button onclick="setTrailMA5()" style="padding:1px 4px;border-radius:3px;border:1px solid var(--b);background:rgba(49,130,246,.08);font-size:7px;color:var(--b);cursor:pointer;">5MA</button>
+          </div>
         </div>
       </div>
     </div>
@@ -941,10 +973,90 @@ const STOCKS=[
   {tk:"021240",nm:"코웨이",pr:52300,base:52300,sec:"가전",cap:"중형"},
   {tk:"259960",nm:"크래프톤",pr:218000,base:218000,sec:"게임",cap:"대형"},
 ];
-let WL=JSON.parse(localStorage.getItem("htsWL")||'["005930","000660","373220","035420","207940"]');
-function saveWL(){localStorage.setItem("htsWL",JSON.stringify(WL));}
-function addToWL(tk){if(!WL.includes(tk)){WL.push(tk);saveWL();renderWL();showAlert("관심종목 추가",STOCKS.find(s=>s.tk===tk)?.nm+' 추가됨');}}
-function removeFromWL(tk){WL=WL.filter(w=>w!==tk);saveWL();renderWL();}
+// Phase 3-9: 관심종목 5그룹
+const WG_LABELS = ['🎯 오늘 진입 후보','📊 모니터링','🚫 매매금지','🔥 테마/이슈','📝 복기 대상'];
+const WG_MAX = [3, 10, 999, 10, 5];
+let WGS = JSON.parse(localStorage.getItem("htsWGS")||JSON.stringify([
+  ["005930","000660"],["373220","035420"],[]  ,[],[]]));
+let curWG = 0;
+// 구버전 WL 호환
+let WL = WGS[0];
+function saveWL(){WGS[0]=WL;localStorage.setItem("htsWGS",JSON.stringify(WGS));}
+function saveWGS(){localStorage.setItem("htsWGS",JSON.stringify(WGS));}
+function addToWL(tk){if(!WL.includes(tk)){WL.push(tk);saveWL();renderWLGroup();}}
+function removeFromWL(tk){WL=WL.filter(w=>w!==tk);WGS[0]=WL;saveWGS();renderWLGroup();}
+
+function selWG(el,id){
+  document.querySelectorAll(".wg-tab").forEach(t=>t.classList.remove("on"));
+  el.classList.add("on");
+  curWG=parseInt(id.replace("wg",""));
+  document.querySelectorAll(".wg-body").forEach(b=>b.style.display="none");
+  document.getElementById(id).style.display="block";
+  const lbl=document.getElementById("wgTitle");
+  const cnt=document.getElementById("wgCount");
+  if(lbl)lbl.textContent=WG_LABELS[curWG];
+  const cur=WGS[curWG]||[];
+  const max=WG_MAX[curWG];
+  if(cnt)cnt.textContent=max===999?cur.length+"개":cur.length+"/"+max;
+  renderWLGroup();
+}
+function addCurrentToWG(){
+  const tk=activeTk;
+  const grp=WGS[curWG]||(WGS[curWG]=[]);
+  if(grp.includes(tk)){showAlert("중복","이미 이 그룹에 있습니다.");return;}
+  if(curWG===0&&grp.length>=3){showAlert("초과","진입 후보는 최대 3개입니다. (Phase 3-9)");return;}
+  grp.push(tk);saveWGS();renderWLGroup();
+  const stk=STOCKS.find(s=>s.tk===tk);
+  addDecisionLog("["+WG_LABELS[curWG]+"] "+stk?.nm+" 추가","","Phase 3-9");
+}
+function removeFromWG(gIdx,tk){
+  WGS[gIdx]=WGS[gIdx].filter(w=>w!==tk);
+  if(gIdx===0)WL=WGS[0];
+  saveWGS();renderWLGroup();
+}
+function moveToWG(fromG,tk,toG){
+  WGS[fromG]=WGS[fromG].filter(w=>w!==tk);
+  if(!WGS[toG])WGS[toG]=[];
+  if(!WGS[toG].includes(tk))WGS[toG].push(tk);
+  if(toG===0)WL=WGS[0];
+  saveWGS();renderWLGroup();
+}
+
+function renderWLGroup(){
+  // 각 그룹 렌더링
+  for(let g=0;g<5;g++){
+    const listId=g===2?"banList":"wlList"+g;
+    const el=document.getElementById(listId);
+    if(!el)continue;
+    const grp=WGS[g]||[];
+    if(g===2&&!grp.length){el.textContent="없음";continue;}
+    el.innerHTML=grp.map(tk=>{
+      const s=STOCKS.find(s=>s.tk===tk)||{tk,nm:tk,pr:0,base:1,sec:""};
+      const c=((s.pr-s.base)/s.base*100).toFixed(2),up=parseFloat(c)>=0;
+      const col=g===2?"var(--r)":g===0?"var(--b)":"var(--ts)";
+      return`<div style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:7px;cursor:pointer;transition:background .1s;margin-bottom:1px;" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''">
+        <div onclick="selectStk('${tk}')" style="display:flex;align-items:center;gap:5px;flex:1;min-width:0;">
+          <div style="font-family:var(--mono);font-size:9px;font-weight:600;color:${col};width:34px;flex-shrink:0;">${tk.slice(-4)}</div>
+          <div style="font-size:9px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${s.nm}</div>
+          <div style="font-family:var(--mono);font-size:9px;${up?"color:var(--g)":"color:var(--r);"};">${up?"+":""}${c}%</div>
+        </div>
+        <div style="display:flex;gap:2px;flex-shrink:0;">
+          ${g!==2?`<button onclick="moveToWG(${g},'${tk}',2)" title="매매금지로 이동" style="background:none;border:none;font-size:9px;cursor:pointer;color:var(--tm);padding:0 1px;">🚫</button>`:""}
+          <button onclick="removeFromWG(${g},'${tk}')" style="background:none;border:none;font-size:11px;cursor:pointer;color:var(--tm);padding:0 1px;">×</button>
+        </div>
+      </div>`;
+    }).join("");
+  }
+  // wgCount 업데이트
+  const cnt=document.getElementById("wgCount");
+  if(cnt){const cur=WGS[curWG]||[];const max=WG_MAX[curWG];cnt.textContent=max===999?cur.length+"개":cur.length+"/"+max;}
+  // 구버전 wlList 호환
+  const oldWl=document.getElementById("wlList");
+  if(oldWl)oldWl.innerHTML="";
+  renderBanList();
+  renderCands();
+}
+function renderWL(){renderWLGroup();}
 const CANDS=[{tk:"373220",why:"기관 3일 연속 순매수"},{tk:"207940",why:"바이오 테마 강세"}];
 const FILTERS=[
   {nm:"수급폭발 300%+ (Phase7-7 필터1)",col:"var(--g)",desc:"전일대비 거래량 300% 이상, 시총 500억~5조",stocks:["373220","207940","068270"]},
@@ -1027,7 +1139,7 @@ function addBanCurrent(){const stk=STOCKS.find(s=>s.tk===activeTk)||STOCKS[0];if
 function removeBan(tk){BAN_LIST=BAN_LIST.filter(b=>b!==tk);saveBan();renderBanList();}
 function renderBanList(){const el=document.getElementById("banList");if(!el)return;if(!BAN_LIST.length){el.textContent="없음";return;}el.innerHTML=BAN_LIST.map(tk=>{const s=STOCKS.find(s=>s.tk===tk)||{nm:tk};return`<div style="display:flex;align-items:center;justify-content:space-between;padding:2px 0;border-bottom:1px solid var(--br);"><span style="color:var(--r);font-size:9px;">${s.nm}</span><button onclick="removeBan('${tk}')" style="background:none;border:none;color:var(--tm);font-size:10px;cursor:pointer;">×</button></div>`;}).join("");}
 function isBanned(tk){return BAN_LIST.includes(tk);}
-function renderAll(){renderWL();renderCands();renderFilters();renderNews();renderPort();renderTradeLog();updCash();updCredLim();renderBanList();}
+function renderAll(){renderWLGroup();renderCands();renderFilters();renderNews();renderPort();renderTradeLog();updCash();updCredLim();renderBanList();updateTrailPanel();}
 
 // ═══════════════════════════════
 // CANDLE ENGINE
@@ -1162,6 +1274,7 @@ function updChartToIdx(){
   if(inds.rsi&&rsiChart){const r=calcRSI(cls,14);rsiChart.data.labels=lbls;rsiChart.data.datasets[0].data=r;rsiChart.data.datasets[1].data=lbls.map(()=>70);rsiChart.data.datasets[2].data=lbls.map(()=>30);rsiChart.update("none");}
   if(inds.macd&&macdChart){const{ml,sig}=calcMACD(cls);macdChart.data.labels=lbls;macdChart.data.datasets[0].data=ml;macdChart.data.datasets[1].data=sig;macdChart.update("none");}
   if(autoState.running&&sim.idx>0&&sim.idx%5===0)runAutoStep(cs);
+  updateTrailPanel();
 }
 
 // ═══════════════════════════════
@@ -1520,6 +1633,52 @@ function checkPriceAlerts(){
 // ═══════════════════════════════
 let autoLevel=0;
 function selLevel(n,el){autoLevel=n;document.querySelectorAll(".level-card").forEach(c=>c.classList.remove("on"));el.classList.add("on");}
+
+// Phase 9-6: 돌발 악재 즉각 전량 청산
+function emergencySell(){
+  const positions=Object.entries(mock.positions);
+  if(!positions.length){showAlert("보유 없음","보유 중인 종목이 없습니다.");return;}
+  const posStr=positions.map(([tk,p])=>{const s=STOCKS.find(x=>x.tk===tk);return`${s?.nm||tk} ${p.qty}주`;}).join(", ");
+  if(!confirm(`🚨 돌발 악재 긴급 청산\n\n전체 보유 종목 시장가 전량 청산:\n${posStr}\n\n즉시 실행하시겠습니까? (Phase 9-6 원칙)`))return;
+  const prev=activeTk,prevSide=oSide,prevType=oType,prevCred=credType;
+  positions.forEach(([tk,p])=>{
+    activeTk=tk;oSide="sell";oType="market";credType="cash";
+    document.getElementById("ofQty").value=p.qty;
+    submitOrder(true);
+    addDecisionLog(`[${STOCKS.find(s=>s.tk===tk)?.nm||tk}] 긴급 청산 실행`,"돌발 악재 대응 — 판단 전 청산 우선","Phase 9-6: 즉각 청산 후 내용 확인");
+  });
+  activeTk=prev;oSide=prevSide;oType=prevType;credType=prevCred;
+  addMsg("ai","🚨 긴급 청산 완료\n\n원칙: 악재 확인 전에 먼저 청산\n→ 잘못 팔았으면 다시 사면 됨\n→ 버티다 손실 확대가 더 위험\n\n지금 바로 공시/뉴스 확인하세요. (Phase 9-6)");
+}
+
+// Phase 9-3: 트레일링 스탑 패널 업데이트
+function updateTrailPanel(){
+  const el=document.getElementById("trailPanel");if(!el)return;
+  const stk=STOCKS.find(s=>s.tk===activeTk)||STOCKS[0];
+  const so=stopOrders[activeTk];
+  const pos=mock.positions[activeTk];
+  if(!pos||!so){el.textContent="보유 없음";return;}
+  const pnlPct=((stk.pr-pos.avgPrice)/pos.avgPrice*100).toFixed(2);
+  const up=parseFloat(pnlPct)>=0;
+  el.innerHTML=`<div style="color:${up?"var(--g)":"var(--r)"};font-weight:700;">${up?"+":""}${pnlPct}%</div>`+
+    `<div>평단 ${Math.round(pos.avgPrice).toLocaleString()}</div>`+
+    `<div style="color:var(--r);">손절 ${so.stop.toLocaleString()}</div>`+
+    (so.t1?`<div style="color:var(--g);">1차 ${so.t1.toLocaleString()} ${so.t1done?"✅":""}</div>`:``)+ 
+    (so.t2?`<div style="color:var(--g);">2차 ${so.t2.toLocaleString()} ${so.t2done?"✅":""}</div>`:``)+
+    `<div style="font-size:7px;color:var(--tm);">트레일: ${so.trail==="off"?"끔":so.trail==="pct"?"% 추적":"5MA추적"}</div>`;
+}
+function setTrailPct(pct){
+  const stk=STOCKS.find(s=>s.tk===activeTk)||STOCKS[0];
+  const so=stopOrders[activeTk];if(!so)return;
+  so.trail="pct";so.trailHigh=stk.pr;so.stop=Math.round(stk.pr*(1-pct/100));
+  updateTrailPanel();
+  addDecisionLog(`트레일링 스탑 -${pct}% 설정`,`현재가 ${stk.pr.toLocaleString()} → 손절 ${so.stop.toLocaleString()}`,"Phase 9-3");
+}
+function setTrailMA5(){
+  const so=stopOrders[activeTk];if(!so)return;
+  so.trail="ma5";updateTrailPanel();
+  addDecisionLog("트레일링 스탑 5MA 설정","5MA 이탈 시 자동 손절","Phase 9-3");
+}
 function startAuto(){
   autoState.running=true;autoState.level=autoLevel;
   autoState.cfg={rr:parseFloat(document.getElementById("auto-rr").value)||1.5,pos:parseFloat(document.getElementById("auto-pos").value)||15,stop:parseFloat(document.getElementById("auto-stop").value)||3,t1:parseFloat(document.getElementById("auto-t1").value)||3,t2:parseFloat(document.getElementById("auto-t2").value)||5,trail:document.getElementById("auto-trail").value,brk:document.getElementById("auto-brk").checked,explain:document.getElementById("auto-explain").checked};
@@ -2410,7 +2569,7 @@ function renderNews(){
     </div>`;
   }).join("");
 }
-function selectStk(tk){activeTk=tk;const s=STOCKS.find(s=>s.tk===tk)||STOCKS[0];document.getElementById("siNm").textContent=s.nm;if(!WL.includes(tk)&&confirm(`${s.nm}을(를) 관심종목에 추가할까요?`))addToWL(tk);
+function selectStk(tk){activeTk=tk;const s=STOCKS.find(s=>s.tk===tk)||STOCKS[0];document.getElementById("siNm").textContent=s.nm;// 관심종목 자동 추가 제거 (수동으로 그룹 선택 후 추가)
   const tkEl=document.getElementById("obTkName");if(tkEl)tkEl.textContent=s.nm;document.getElementById("srchIn").value="";hideSrch();renderWL();genCandles(tk,sim.date);initChart();renderOB();renderTH();
   const tkEl=document.getElementById("obTkName");if(tkEl)tkEl.textContent=s.nm;
   const atk=document.getElementById("analysisTk");if(atk)atk.textContent=s.nm;
@@ -2560,6 +2719,18 @@ ${posList}
 ❌ 하나라도 NO → 오늘 청산`);
   }
   if(hm!==1520)overnightAlerted=false;
+  // Phase 8-10 + Phase 12: 시간대별 루틴 힌트
+  const phHint=document.getElementById("phaseHint");
+  if(phHint){
+    if(hm<900)phHint.textContent="장 전 — 후보 3종목 확정 (Phase 8-10)";
+    else if(hm<930)phHint.textContent="9:00~9:30 — 관망 권장 (초보자 진입 금지)";
+    else if(hm<1000)phHint.textContent="9:30~10:00 — 시장 방향 확인 후 진입 검토";
+    else if(hm<1130)phHint.textContent="10:00~11:30 — 적극 매매 구간 ★";
+    else if(hm<1300)phHint.textContent="11:30~13:00 — 점심 | 신규 진입 자제";
+    else if(hm<1430)phHint.textContent="13:00~14:30 — 오후 매매 구간";
+    else if(hm<1520)phHint.textContent="14:30~15:20 — 마감 준비 | 포지션 정리";
+    else phHint.textContent="15:20 이후 — 오버나잇 결정 후 청산";
+  }
   // Phase 12-2: 시간대별 힌트
   const h=n.getHours()*60+n.getMinutes();
   const hint=document.getElementById("phaseHint");
