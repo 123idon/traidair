@@ -410,9 +410,10 @@ button{cursor:pointer;font-family:var(--sans);}
     <div class="lp">
       <div class="lp-tabs">
         <div class="lpt on" onclick="lTab(this,'lpb-w')">관심</div>
+        <div class="lpt" onclick="lTab(this,'lpb-ck')">체크</div>
         <div class="lpt" onclick="lTab(this,'lpb-f')">조건</div>
-        <div class="lpt" onclick="lTab(this,'lpb-n')">뉴스</div>
-        <div class="lpt" onclick="lTab(this,'lpb-ai')">AI추천</div>
+        <div class="lpt" onclick="lTab(this,'lpb-n')">공시</div>
+        <div class="lpt" onclick="lTab(this,'lpb-ai')">AI</div>
       </div>
       <div class="lpb on" id="lpb-w">
         <!-- 그룹 선택 탭 (Phase 3-9: 5그룹) -->
@@ -444,15 +445,87 @@ button{cursor:pointer;font-family:var(--sans);}
         <div id="wg3" class="wg-body" style="display:none;"><div id="wlList3"></div></div>
         <div id="wg4" class="wg-body" style="display:none;"><div id="wlList4"></div></div>
       </div>
+      <!-- 장중 체크 탭 (Phase 8 실시간) -->
+      <div class="lpb" id="lpb-ck">
+
+        <!-- AI 시장 체력 지수 -->
+        <div class="sec" style="padding:6px 8px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
+            <span class="sec-t" style="margin-bottom:0;">📡 AI 시장 체력</span>
+            <button onclick="calcMarketStrength()" style="padding:1px 6px;border-radius:4px;border:none;background:var(--b);color:#fff;font-size:8px;cursor:pointer;">계산</button>
+          </div>
+          <div id="mktStrengthGauge" style="margin-bottom:5px;">
+            <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:9px;margin-bottom:3px;">
+              <span>체력 지수</span><span id="mktStrScore" style="font-weight:700;">-</span>
+            </div>
+            <div style="height:6px;background:var(--bg);border-radius:3px;overflow:hidden;">
+              <div id="mktStrBar" style="height:100%;width:0%;background:var(--b);border-radius:3px;transition:width .5s;"></div>
+            </div>
+          </div>
+          <div id="mktStrDetail" style="font-size:9px;color:var(--tm);line-height:1.6;">계산 버튼 눌러주세요</div>
+        </div>
+
+        <!-- Phase 8 장중 STEP 체크 -->
+        <div class="sec" style="padding:6px 8px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
+            <span class="sec-t" style="margin-bottom:0;">✅ Phase 8 장중 체크</span>
+            <button onclick="resetIntraCheck()" style="padding:1px 6px;border-radius:4px;border:none;background:var(--bg);color:var(--ts);font-size:8px;cursor:pointer;border:1px solid var(--br);">초기화</button>
+          </div>
+          <div id="intraCheckList"></div>
+          <div style="margin-top:5px;padding:4px 7px;border-radius:6px;font-size:9px;font-weight:700;text-align:center;" id="intraGoNogo" style="background:var(--bg);">체크 완료 후 GO/NO-GO</div>
+        </div>
+
+        <!-- 뇌동매매 감지 패널 (Phase 11) -->
+        <div class="sec" style="padding:6px 8px;">
+          <span class="sec-t" style="color:var(--r);">⚡ 뇌동매매 감지 (Phase 11)</span>
+          <div id="brainDongPanel" style="font-size:9px;line-height:1.7;">
+            <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid var(--br);">
+              <span style="color:var(--ts);">연속 손절</span>
+              <span id="bd_loss" style="font-family:var(--mono);font-weight:700;">0회</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid var(--br);">
+              <span style="color:var(--ts);">30분내 매매</span>
+              <span id="bd_freq" style="font-family:var(--mono);font-weight:700;">0회</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid var(--br);">
+              <span style="color:var(--ts);">단일비중 최고</span>
+              <span id="bd_size" style="font-family:var(--mono);font-weight:700;">0%</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid var(--br);">
+              <span style="color:var(--ts);">손절후재진입</span>
+              <span id="bd_reentry" style="font-family:var(--mono);font-weight:700;">0회</span>
+            </div>
+            <div id="bd_warning" style="margin-top:4px;padding:4px 6px;border-radius:5px;font-size:9px;display:none;"></div>
+          </div>
+        </div>
+
+        <!-- 시간대별 루틴 가이드 -->
+        <div class="sec" style="padding:6px 8px;">
+          <span class="sec-t">⏰ 지금 해야 할 것</span>
+          <div id="timeGuide" style="font-size:9px;color:var(--ts);line-height:1.7;padding:4px 6px;background:var(--bg);border-radius:6px;"></div>
+        </div>
+
+      </div>
+
       <div class="lpb" id="lpb-f">
         <div class="sec"><div class="sec-t">조건 검색</div><div id="filterList"></div></div>
         <div class="sec"><div class="sec-t">결과</div><div id="filterResult" style="font-size:9px;color:var(--tm);padding:3px 0;">조건을 선택하세요</div></div>
       </div>
       <div class="lpb" id="lpb-n">
+        <!-- 뉴스 → 섹터 AI 분석 -->
+        <div class="sec" style="padding:5px 8px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+            <span class="sec-t" style="margin-bottom:0;">🔥 뉴스→섹터 영향</span>
+            <button onclick="runNewsImpact()" style="padding:1px 6px;border-radius:4px;border:none;background:var(--p);color:#fff;font-size:8px;cursor:pointer;">AI분석</button>
+          </div>
+          <textarea id="newsInputTa" style="width:100%;height:42px;background:var(--bg);border:1px solid var(--br);border-radius:5px;color:var(--tp);font-family:var(--sans);font-size:9px;padding:3px 5px;resize:none;outline:none;" placeholder="뉴스 텍스트 붙여넣기 또는 공시 클릭시 자동입력..."></textarea>
+          <div id="newsImpactResult" style="font-size:9px;color:var(--tm);margin-top:3px;line-height:1.6;"></div>
+        </div>
+        <!-- 공시 -->
         <div class="sec" style="padding:5px 8px;">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
             <span class="sec-t" style="margin-bottom:0;">📢 공시 (DART)</span>
-            <button onclick="fetchDartNews()" style="padding:1px 6px;border-radius:4px;border:none;background:var(--b);color:#fff;font-size:8px;cursor:pointer;">새로고침</button>
+            <button onclick="fetchDartNews()" style="padding:1px 6px;border-radius:4px;border:none;background:var(--b);color:#fff;font-size:8px;cursor:pointer;">↺</button>
           </div>
           <div id="dartList" style="font-size:9px;color:var(--tm);">로딩 중...</div>
         </div>
@@ -810,11 +883,51 @@ button{cursor:pointer;font-family:var(--sans);}
   <div class="stats-page">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
       <h2 style="font-size:15px;font-weight:700;">복기 통계</h2>
-      <button class="ibtn pri" onclick="renderStats()">↺ 새로고침</button>
+      <div style="display:flex;gap:6px;">
+        <button class="ibtn" onclick="renderStats()">↺ 새로고침</button>
+        <button class="ibtn pri" onclick="runAIPatternAnalysis()">🤖 AI 패턴 분석</button>
+      </div>
     </div>
+
+    <!-- 핵심 지표 -->
     <div class="stats-grid" id="statsGrid"></div>
-    <div class="chart-card"><div class="chart-card-t">누적 손익 곡선</div><div class="pnl-chart-wrap"><canvas id="pnlChart"></canvas></div></div>
-    <div class="chart-card"><div class="chart-card-t">반복 실수 패턴 Top 3</div><div id="mistakeList" style="font-size:11px;color:var(--tm);">거래 내역이 없습니다.</div></div>
+
+    <!-- 누적 손익 곡선 -->
+    <div class="chart-card">
+      <div class="chart-card-t">📈 누적 손익 곡선</div>
+      <div class="pnl-chart-wrap"><canvas id="pnlChart"></canvas></div>
+    </div>
+
+    <!-- 2단 분석 -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+      <!-- 수익/손실 패턴 -->
+      <div class="chart-card" style="margin-bottom:0;">
+        <div class="chart-card-t">✅ 수익 나는 패턴</div>
+        <div id="winPatterns" style="font-size:11px;color:var(--tm);">데이터 없음</div>
+      </div>
+      <div class="chart-card" style="margin-bottom:0;">
+        <div class="chart-card-t">❌ 손실 나는 패턴</div>
+        <div id="lossPatterns" style="font-size:11px;color:var(--tm);">데이터 없음</div>
+      </div>
+    </div>
+
+    <!-- 시간대별 성과 -->
+    <div class="chart-card">
+      <div class="chart-card-t">⏰ 시간대별 매매 성과</div>
+      <div id="timeStats" style="display:grid;grid-template-columns:repeat(6,1fr);gap:6px;"></div>
+    </div>
+
+    <!-- AI 패턴 분석 -->
+    <div class="chart-card">
+      <div class="chart-card-t">🤖 AI 복기 분석 (Phase 12)</div>
+      <div id="aiPatternResult" style="font-size:11px;color:var(--tm);line-height:1.8;">AI 패턴 분석 버튼을 눌러주세요.</div>
+    </div>
+
+    <!-- 반복 실수 -->
+    <div class="chart-card">
+      <div class="chart-card-t">⚠ 반복 실수 Top 3</div>
+      <div id="mistakeList" style="font-size:11px;color:var(--tm);">거래 내역이 없습니다.</div>
+    </div>
   </div>
 </div>
 
@@ -1114,7 +1227,11 @@ window.onload=()=>{
     updateAIAdvisor();
     fetchDartNews();
     runFullAnalysis();
+    renderIntraCheck();
+    updateTimeGuide();
+    calcMarketStrength();
   }, 800);
+  setInterval(()=>{updateTimeGuide();}, 30000);
   // 30초마다 공시 갱신 (실시간 딜레이 최소화)
   setInterval(()=>fetchDartNews(), 30000);
 };
@@ -1481,6 +1598,14 @@ function updOSum(){
   let rr="";
   if(stop&&t1&&pr&&oSide==="buy"){const risk=Math.abs(pr-stop),rew=Math.abs(t1-pr);if(risk>0)rr=` | R/R 1:${(rew/risk).toFixed(2)}`;}
   document.getElementById("ofSum").innerHTML=`예상: <b>${tot.toLocaleString()}</b>원 | 비용 ${Math.round(fee+tax).toLocaleString()}원${rr}${credType!=="cash"?` | <span style="color:var(--a)">${credType==="credit"?"신용":"미수"}</span>`:""}`;
+  // 실질 수익 추가 표시 (보유 중 매도 시)
+  if(oSide==="sell"&&mock.positions[activeTk]&&pr&&qty){
+    const avgPr=mock.positions[activeTk].avgPrice;
+    const grossPnl=(pr-avgPr)*qty;
+    const netPnl=grossPnl-Math.round(fee+tax);
+    const pnlEl=document.getElementById("ofSum");
+    if(pnlEl)pnlEl.innerHTML+=` | 실질 <b style="color:${netPnl>=0?"var(--g)":"var(--r)"}">${netPnl>=0?"+":""}${netPnl.toLocaleString()}원</b>`;
+  }
 }
 
 function quickSell(pct){
@@ -1541,7 +1666,8 @@ function submitOrder(autoExec){
     const prevSO=stopOrders[activeTk];
     const newOrigQty=prevSO?(prevSO.origQty||0)+qty:qty;
     stopOrders[activeTk]={stop:stopPr,t1:t1Pr,t2:t2Pr,t1done:prevSO?prevSO.t1done:false,t2done:prevSO?prevSO.t2done:false,trail:trailMode,trailHigh:Math.max(pr,prevSO?.trailHigh||0),origQty:newOrigQty,origStop:stopPr};
-    mock.trades.push({date:sim.date,tk:activeTk,nm:stk.nm,side:"buy",price:pr,qty,fee:Math.round(fee),pnl:0,creditType:credType,auto:autoExec||false});
+    mock.trades.push({date:sim.date,tk:activeTk,nm:stk.nm,side:"buy",price:pr,qty,fee:Math.round(fee),pnl:0,creditType:credType,auto:autoExec||false,time:new Date().toLocaleTimeString("ko-KR",{hour:"2-digit"})});
+  checkBrainDong("buy",pr,qty,stk);
   } else {
     const pos=mock.positions[activeTk];
     if(!pos||pos.qty<qty){if(!autoExec)showAlert("보유 부족",`보유 ${pos?.qty||0}주 주문 ${qty}주`);return false;}
@@ -1552,7 +1678,8 @@ function submitOrder(autoExec){
     mock.todayPnl+=pnl;mock.todayTrades++;
     if(pnl<0){mock.lossSeries++;if(cfg.bd&&mock.lossSeries>=3)showAlert("🚨 뇌동매매 경고",`연속 손절 ${mock.lossSeries}회!\n잠시 휴식 후 복기하세요. (Phase 11)`);}
     else mock.lossSeries=0;
-    mock.trades.push({date:sim.date,tk:activeTk,nm:stk.nm,side:"sell",price:pr,qty,fee:Math.round(fee+tax),pnl:Math.round(pnl),creditType:credType,auto:autoExec||false});
+    mock.trades.push({date:sim.date,tk:activeTk,nm:stk.nm,side:"sell",price:pr,qty,fee:Math.round(fee+tax),pnl:Math.round(pnl),creditType:credType,auto:autoExec||false,time:new Date().toLocaleTimeString("ko-KR",{hour:"2-digit"})});
+  bdMetrics.lastSellTime=Date.now();checkBrainDong("sell",pr,qty,stk);
     if(cfg.al){const lr=-mock.todayPnl/cfg.capital*100;if(lr>=cfg.dayloss)showAlert("⚠ 일일 손실 한도",`한도 ${cfg.dayloss}% 도달\n매매 중단 권고.`);}
   }
   saveMock(); renderPort(); renderTradeLog(); updCash(); updPnl(); updCredLim();
@@ -1632,6 +1759,353 @@ function checkPriceAlerts(){
 // AI AUTO-TRADE ENGINE
 // ═══════════════════════════════
 let autoLevel=0;
+
+// ═══════════════════════════════
+// 장중 체크리스트 (Phase 8 실시간)
+// ═══════════════════════════════
+const INTRA_CHECKS = [
+  {id:"ic0", txt:"STEP0: 심리 정상 (흥분/공포/복수심 없음)", phase:"8-2"},
+  {id:"ic1", txt:"STEP1: 시장 선물 방향 우호적", phase:"8-3"},
+  {id:"ic2", txt:"STEP2: 오늘 강한 섹터 파악 완료", phase:"8-4"},
+  {id:"ic3", txt:"STEP3: 종목 스크리닝 통과 (시총/거래대금)", phase:"8-5"},
+  {id:"ic4", txt:"STEP4: 차트 3단계 일치 (일봉/60분/5분)", phase:"8-6"},
+  {id:"ic5", txt:"STEP5: 수급 확인 (체결강도 100+)", phase:"8-7"},
+  {id:"ic6", txt:"STEP6: R/R 1.5 이상 계산 완료", phase:"8-8"},
+  {id:"ic7", txt:"STEP7: 손절가 사전 확정", phase:"8-9"},
+  {id:"ic8", txt:"매매금지 목록 확인 완료", phase:"3-9"},
+  {id:"ic9", txt:"일일 손실 한도 80% 미만", phase:"0-3"},
+];
+let intraState = JSON.parse(localStorage.getItem("htsIntra")||"{}");
+
+function renderIntraCheck(){
+  const el=document.getElementById("intraCheckList"); if(!el)return;
+  el.innerHTML=INTRA_CHECKS.map((c,i)=>`
+    <div style="display:flex;align-items:center;gap:6px;padding:4px 6px;border-radius:6px;cursor:pointer;margin-bottom:2px;background:${intraState[c.id]?"rgba(5,192,114,.07)":"transparent"};"
+      onclick="togIntra('${c.id}')">
+      <div style="width:14px;height:14px;border-radius:50%;border:1.5px solid ${intraState[c.id]?"var(--g)":"var(--br)"};background:${intraState[c.id]?"var(--g)":"transparent"};display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff;flex-shrink:0;">
+        ${intraState[c.id]?"✓":""}
+      </div>
+      <div style="font-size:9px;color:${intraState[c.id]?"var(--tp)":"var(--ts)"};flex:1;line-height:1.3;">${c.txt}</div>
+      <span style="font-size:7px;color:var(--tm);font-family:var(--mono);">${c.phase}</span>
+    </div>`).join("");
+  const done=INTRA_CHECKS.filter(c=>intraState[c.id]).length;
+  const total=INTRA_CHECKS.length;
+  const goEl=document.getElementById("intraGoNogo"); if(!goEl)return;
+  const isGo=done>=8;
+  goEl.style.background=isGo?"rgba(5,192,114,.12)":done>=6?"rgba(255,153,0,.12)":"rgba(240,62,62,.08)";
+  goEl.style.color=isGo?"var(--g)":done>=6?"var(--a)":"var(--r)";
+  goEl.textContent=isGo?`✅ GO 가능 (${done}/${total})`:done>=6?`△ 추가 확인 필요 (${done}/${total})`:`❌ NO-GO (${done}/${total})`;
+}
+function togIntra(id){
+  intraState[id]=!intraState[id];
+  localStorage.setItem("htsIntra",JSON.stringify(intraState));
+  renderIntraCheck();
+}
+function resetIntraCheck(){
+  intraState={};localStorage.setItem("htsIntra","{}");renderIntraCheck();
+}
+
+// ═══════════════════════════════
+// AI 시장 체력 지수
+// ═══════════════════════════════
+async function calcMarketStrength(){
+  const el=document.getElementById("mktStrDetail"); if(!el)return;
+  el.textContent="계산 중...";
+  const cs=sim.candles.slice(0,Math.max(sim.idx+1,20));
+  if(cs.length<5){el.textContent="데이터 부족";return;}
+  const cls=cs.map(c=>c.c),vls=cs.map(c=>c.v);
+  const rsi=(calcRSI(cls,14).slice(-1)[0]||50).toFixed(0);
+  const ma5=calcMA(cls,5).slice(-1)[0]||0;
+  const ma20=calcMA(cls,20).slice(-1)[0]||0;
+  const lc=cs[cs.length-1];
+  const volR=vls.length>=2?(vls[vls.length-1]/vls[vls.length-2]).toFixed(1):"1.0";
+  // 로컬 계산 (0~100)
+  let score=50;
+  if(lc.c>ma5)score+=8; else score-=8;
+  if(lc.c>ma20)score+=8; else score-=8;
+  if(parseFloat(rsi)>=50&&parseFloat(rsi)<=70)score+=10;
+  else if(parseFloat(rsi)>70)score-=5;
+  else score-=10;
+  if(parseFloat(volR)>=1.5)score+=10;
+  else if(parseFloat(volR)<0.8)score-=10;
+  if(lc.c>lc.o)score+=7; else score-=7;
+  score=Math.min(100,Math.max(0,Math.round(score)));
+  const bar=document.getElementById("mktStrBar");
+  const scoreEl=document.getElementById("mktStrScore");
+  if(bar)bar.style.width=score+"%";
+  if(bar)bar.style.background=score>=65?"var(--g)":score>=45?"var(--b)":"var(--r)";
+  if(scoreEl){
+    scoreEl.textContent=score+"점";
+    scoreEl.style.color=score>=65?"var(--g)":score>=45?"var(--b)":"var(--r)";
+  }
+  const label=score>=65?"강한 매수 우호":"강한 매수 비우호";
+  const stk=STOCKS.find(s=>s.tk===activeTk)||STOCKS[0];
+  el.innerHTML=`<div style="font-family:var(--mono);font-size:10px;font-weight:700;color:${score>=65?"var(--g)":score>=45?"var(--b)":"var(--r)"};">${score>=65?"🟢 매수 우호":score>=45?"🟡 중립":"🔴 매수 비우호"}</div>
+<div>RSI ${rsi} | MA${lc.c>ma5?"위":"아래"} | 거량×${volR}</div>
+<div style="color:var(--tm);">${score>=65?"적극 진입 가능":score>=45?"신중 선별":"비중 축소 권장"}</div>`;
+  addDecisionLog(`시장체력 ${score}점`,`RSI${rsi} | ${lc.c>ma20?"20MA 위":"20MA 아래"} | 거래량×${volR}`,"Phase 8-3");
+}
+
+// ═══════════════════════════════
+// 시간대별 가이드 (장중 탭)
+// ═══════════════════════════════
+function updateTimeGuide(){
+  const el=document.getElementById("timeGuide"); if(!el)return;
+  const n=new Date(),hm=n.getHours()*100+n.getMinutes();
+  let guide="",color="var(--ts)";
+  if(hm<800){guide="📋 장 전 준비
+시장 데이터 확인
+후보 종목 선정 (최대 3개)";color="var(--tm)";}
+  else if(hm<900){guide="📊 장 전 루틴 (Phase 8-10)
+• 매크로 확인 STEP 1
+• 섹터/종목 선정 STEP 2~3
+• 진입계획 확정 STEP 4~6";color="var(--b)";}
+  else if(hm<930){guide="⏸ 9:00~9:30 관망
+첫 봉 방향 확인
+돌발 이슈 체크
+신규 진입 금지";color="var(--a)";}
+  else if(hm<1000){guide="👀 시장 방향 재확인
+선물 방향, VWAP 위치
+준비 종목 셋업 확인";color="var(--b)";}
+  else if(hm<1130){guide="⭐ 적극 매매 구간
+10:00~11:30
+준비한 종목 진입 검토
+Phase 8 GO 조건 확인";color="var(--g)";}
+  else if(hm<1300){guide="🍽 점심 (11:30~13:00)
+신규 진입 자제
+보유 포지션 관리만
+오후 계획 재검토";color="var(--tm)";}
+  else if(hm<1430){guide="🔄 오후 매매 (13~14:30)
+프로그램 방향 확인
+오전 종목 지속 여부 판단";color="var(--b)";}
+  else if(hm<1520){guide="⚠ 마감 준비 (14:30~15:20)
+당일매매 포지션 정리
+오버나잇 여부 결정";color="var(--a)";}
+  else{guide="🔒 15:20 이후
+오버나잇 결정
+Phase 9-7 체크리스트
+미청산 = 오버나잇 허용 시만";color="var(--r)";}
+  el.textContent=guide;el.style.color=color;
+}
+
+// ═══════════════════════════════
+// 뇌동매매 실시간 감지 강화 (Phase 11)
+// ═══════════════════════════════
+let bdMetrics={lossSeries:0,last30min:[],reentryCount:0,lastSellTime:null};
+
+function checkBrainDong(side,price,qty,stk){
+  const now=Date.now();
+  // 30분 내 매매 횟수
+  bdMetrics.last30min=bdMetrics.last30min.filter(t=>now-t<1800000);
+  bdMetrics.last30min.push(now);
+  const freq=bdMetrics.last30min.length;
+  // 손절 후 재진입 감지
+  if(side==="buy"&&bdMetrics.lastSellTime&&now-bdMetrics.lastSellTime<1800000){
+    bdMetrics.reentryCount++;
+  }
+  // 비중 계산
+  const inv=(qty||0)*(price||0);
+  const sizePct=mock.cash>0?(inv/cfg.capital*100).toFixed(1):0;
+  // UI 업데이트
+  const lossEl=document.getElementById("bd_loss"),freqEl=document.getElementById("bd_freq");
+  const sizeEl=document.getElementById("bd_size"),reEl=document.getElementById("bd_reentry");
+  if(lossEl){lossEl.textContent=mock.lossSeries+"회";lossEl.style.color=mock.lossSeries>=3?"var(--r)":"var(--ts)";}
+  if(freqEl){freqEl.textContent=freq+"회";freqEl.style.color=freq>=3?"var(--r)":"var(--ts)";}
+  if(sizeEl){sizeEl.textContent=sizePct+"%";sizeEl.style.color=parseFloat(sizePct)>30?"var(--r)":"var(--ts)";}
+  if(reEl){reEl.textContent=bdMetrics.reentryCount+"회";reEl.style.color=bdMetrics.reentryCount>=2?"var(--r)":"var(--ts)";}
+  // 경고 조건
+  const warnings=[];
+  if(mock.lossSeries>=3)warnings.push("연속 손절 "+mock.lossSeries+"회 — 즉시 중단");
+  if(freq>=4)warnings.push("30분 내 "+freq+"회 매매 — 과매매");
+  if(parseFloat(sizePct)>30)warnings.push("비중 "+sizePct+"% 과다");
+  if(bdMetrics.reentryCount>=2)warnings.push("손절 후 재진입 "+bdMetrics.reentryCount+"회");
+  // 추격매수 감지
+  if(side==="buy"&&cs){
+    const cs2=sim.candles.slice(0,Math.max(sim.idx+1,3));
+    const prev=cs2[cs2.length-2];
+    if(prev&&price>prev.c*1.02)warnings.push("추격매수 감지 (+2% 이상에서 진입)");
+  }
+  const warnEl=document.getElementById("bd_warning");
+  if(warnEl&&warnings.length>0){
+    warnEl.style.display="block";
+    warnEl.style.background="rgba(240,62,62,.08)";
+    warnEl.style.border="1px solid rgba(240,62,62,.2)";
+    warnEl.style.color="var(--r)";
+    warnEl.innerHTML="🚨 "+warnings.join("<br>🚨 ");
+    if(warnings.length>=2)showAlert("🚨 뇌동매매 경고 (Phase 11)","감지된 신호:
+"+warnings.map(w=>"• "+w).join("
+")+"
+
+지금 해야 할 것:
+1. 즉시 매매 중단
+2. HTS 5분 종료
+3. 냉각 후 복기");
+  } else if(warnEl){warnEl.style.display="none";}
+}
+// 매도 시 lastSellTime 기록
+const _origSubmit=typeof submitOrder!=="undefined"?null:null;
+
+// ═══════════════════════════════
+// 뉴스 → 섹터 영향 AI 분석
+// ═══════════════════════════════
+async function runNewsImpact(){
+  const text=(document.getElementById("newsInputTa")||{}).value?.trim();
+  const el=document.getElementById("newsImpactResult"); if(!el)return;
+  if(!text){el.textContent="뉴스 텍스트를 입력해주세요.";return;}
+  el.innerHTML='<span style="color:var(--tm);font-style:italic;">AI 분석 중...</span>';
+  try{
+    const res=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:500,
+        messages:[{role:"user",content:`단타 트레이딩 멘토. 아래 뉴스/공시가 어떤 섹터에 어떻게 영향 미치는지 분석해줘.
+
+뉴스: ${text}
+
+JSON만 답해:
+{
+  "mainSector": "주영향 섹터명",
+  "impact": "긍정/부정/중립",
+  "strength": "강/보통/약",
+  "duration": "당일/수일/수주",
+  "relatedStocks": ["종목명1","종목명2","종목명3"],
+  "strategy": "매매 전략 1~2줄",
+  "caution": "주의사항 1줄",
+  "grade": "S/A/B/C"
+}`}]})});
+    const data=await res.json();
+    const raw=data.content?.[0]?.text||"{}";
+    let p;try{const m=raw.match(/\{[\s\S]*\}/);p=JSON.parse(m?m[0]:"{}"); }catch(e){p={};}
+    if(p.mainSector){
+      const ic={"긍정":"var(--g)","부정":"var(--r)","중립":"var(--ts)"}[p.impact]||"var(--ts)";
+      const gc={"S":"var(--p)","A":"var(--b)","B":"var(--a)","C":"var(--r)"}[p.grade]||"var(--ts)";
+      el.innerHTML=`<div style="padding:5px 7px;background:var(--bg);border-radius:7px;border-left:3px solid ${ic};">
+        <div style="display:flex;align-items:center;gap:5px;margin-bottom:3px;">
+          <span style="font-weight:700;font-size:10px;">${p.mainSector}</span>
+          <span style="color:${ic};font-size:9px;font-weight:700;">${p.impact} ${p.strength}</span>
+          <span style="font-family:var(--mono);font-size:9px;padding:0 4px;border-radius:3px;background:${gc}18;color:${gc};">${p.grade}급</span>
+        </div>
+        <div style="font-size:9px;color:var(--ts);margin-bottom:2px;">⏱ ${p.duration} | 관련: ${(p.relatedStocks||[]).join(", ")}</div>
+        <div style="font-size:9px;color:var(--tp);">${p.strategy||""}</div>
+        ${p.caution?`<div style="font-size:9px;color:var(--r);margin-top:2px;">⚠ ${p.caution}</div>`:""}
+      </div>`;
+      // 재료 강도도 업데이트
+      document.getElementById("materialInput").value=text;
+      addDecisionLog(`뉴스분석: ${p.mainSector}`,`${p.impact} ${p.strength} | ${p.duration}`,`Phase 6-1 재료강도 ${p.grade}급`);
+    } else el.textContent=raw.slice(0,150);
+  }catch(e){el.textContent="API 오류";}
+}
+
+// ═══════════════════════════════
+// 통계 강화 — 수익/손실 패턴, 시간대별, AI 분석
+// ═══════════════════════════════
+async function runAIPatternAnalysis(){
+  const el=document.getElementById("aiPatternResult"); if(!el)return;
+  const trades=mock.trades||[];
+  if(trades.length<3){el.textContent="거래 내역이 3개 이상 있어야 분석 가능합니다.";return;}
+  el.innerHTML='<span style="color:var(--tm);font-style:italic;">AI 패턴 분석 중...</span>';
+  const wins=trades.filter(t=>t.pnl>0);
+  const losses=trades.filter(t=>t.pnl<0);
+  const summary=`총 ${trades.length}회 | 수익 ${wins.length}회 | 손실 ${losses.length}회
+승률 ${(wins.length/trades.length*100).toFixed(0)}%
+평균 수익: ${wins.length?Math.round(wins.reduce((a,t)=>a+t.pnl,0)/wins.length).toLocaleString():"0"}원
+평균 손실: ${losses.length?Math.round(losses.reduce((a,t)=>a+t.pnl,0)/losses.length).toLocaleString():"0"}원
+최대 연속 손실: ${mock.lossSeries}회`;
+  try{
+    const res=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:600,
+        messages:[{role:"user",content:`단타 트레이딩 멘토. Phase 12 복기 분석을 해줘.
+
+매매 통계:
+${summary}
+
+최근 거래:
+${trades.slice(-10).map(t=>`${t.side==="buy"?"매수":"매도"} ${t.nm} ${t.price?.toLocaleString()}원 ${t.pnl>=0?"+":""}${t.pnl?.toLocaleString()}원`).join("
+")}
+
+분석해줘:
+1. 수익 나는 패턴 Top 2 (구체적으로)
+2. 손실 나는 패턴 Top 2 (구체적으로)
+3. 강점 매매 스타일 (한줄)
+4. 개선 우선순위 1가지
+5. 개인화 원칙 제안 (진입/손절/익절 각 1줄)
+
+각 항목에 Phase 번호 포함. 200자 이내.`}]})});
+    const data=await res.json();
+    const text=data.content?.[0]?.text||"분석 실패";
+    el.style.whiteSpace="pre-wrap";
+    el.style.color="var(--ts)";
+    el.textContent=text;
+  }catch(e){el.textContent="API 오류";}
+}
+
+function renderStatsEnhanced(){
+  const trades=mock.trades||[];
+  // 수익/손실 패턴
+  const wins=trades.filter(t=>t.pnl>0);
+  const losses=trades.filter(t=>t.pnl<0);
+  const wEl=document.getElementById("winPatterns");
+  const lEl=document.getElementById("lossPatterns");
+  if(wEl){
+    if(!wins.length){wEl.innerHTML="<span style='color:var(--tm);'>수익 거래 없음</span>";}
+    else{
+      const avgWin=Math.round(wins.reduce((a,t)=>a+t.pnl,0)/wins.length);
+      const maxWin=Math.max(...wins.map(t=>t.pnl));
+      const winNms=[...new Set(wins.map(t=>t.nm))].slice(0,3);
+      wEl.innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px;">
+        <div style="background:rgba(5,192,114,.06);border-radius:8px;padding:8px;text-align:center;">
+          <div style="font-size:9px;color:var(--tm);">평균 수익</div>
+          <div style="font-family:var(--mono);font-size:13px;font-weight:700;color:var(--g);">+${avgWin.toLocaleString()}원</div>
+        </div>
+        <div style="background:rgba(5,192,114,.06);border-radius:8px;padding:8px;text-align:center;">
+          <div style="font-size:9px;color:var(--tm);">최대 수익</div>
+          <div style="font-family:var(--mono);font-size:13px;font-weight:700;color:var(--g);">+${maxWin.toLocaleString()}원</div>
+        </div>
+      </div>
+      <div style="font-size:10px;color:var(--ts);">수익 종목: ${winNms.join(", ")}</div>`;
+    }
+  }
+  if(lEl){
+    if(!losses.length){lEl.innerHTML="<span style='color:var(--tm);'>손실 거래 없음</span>";}
+    else{
+      const avgLoss=Math.round(losses.reduce((a,t)=>a+t.pnl,0)/losses.length);
+      const maxLoss=Math.min(...losses.map(t=>t.pnl));
+      lEl.innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px;">
+        <div style="background:rgba(240,62,62,.06);border-radius:8px;padding:8px;text-align:center;">
+          <div style="font-size:9px;color:var(--tm);">평균 손실</div>
+          <div style="font-family:var(--mono);font-size:13px;font-weight:700;color:var(--r);">${avgLoss.toLocaleString()}원</div>
+        </div>
+        <div style="background:rgba(240,62,62,.06);border-radius:8px;padding:8px;text-align:center;">
+          <div style="font-size:9px;color:var(--tm);">최대 손실</div>
+          <div style="font-family:var(--mono);font-size:13px;font-weight:700;color:var(--r);">${maxLoss.toLocaleString()}원</div>
+        </div>
+      </div>`;
+    }
+  }
+  // 시간대별 성과
+  const tEl=document.getElementById("timeStats");
+  if(tEl&&trades.length){
+    const slots={"09":0,"10":0,"11":0,"13":0,"14":0,"기타":0};
+    const counts={"09":0,"10":0,"11":0,"13":0,"14":0,"기타":0};
+    trades.forEach(t=>{
+      const h=t.time?t.time.slice(0,2):"기타";
+      const k=slots[h]!==undefined?h:"기타";
+      slots[k]+=(t.pnl||0);counts[k]++;
+    });
+    tEl.innerHTML=Object.entries(slots).map(([h,pnl])=>{
+      const cnt=counts[h]||0;
+      const up=pnl>=0;
+      return`<div style="text-align:center;background:${up?"rgba(5,192,114,.07)":"rgba(240,62,62,.07)"};border-radius:7px;padding:6px 4px;">
+        <div style="font-size:9px;color:var(--tm);">${h}시</div>
+        <div style="font-family:var(--mono);font-size:10px;font-weight:700;color:${up?"var(--g)":"var(--r)"};">${up?"+":""}${Math.round(pnl/1000)}K</div>
+        <div style="font-size:8px;color:var(--tm);">${cnt}회</div>
+      </div>`;
+    }).join("");
+  }
+}
+
+// ═══════════════════════════════
+// 주문창 수수료 포함 실질 수익 표시
+// ═══════════════════════════════
+
 function selLevel(n,el){autoLevel=n;document.querySelectorAll(".level-card").forEach(c=>c.classList.remove("on"));el.classList.add("on");}
 
 // Phase 9-6: 돌발 악재 즉각 전량 청산
