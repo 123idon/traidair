@@ -81,6 +81,10 @@ button{cursor:pointer;font-family:var(--sans);}
 .wg-tab.on{color:var(--b);border-bottom-color:var(--b);font-weight:700;}
 .wg-body{flex:1;overflow-y:auto;}
 .lpt.on{color:var(--b);border-bottom-color:var(--b);font-weight:700;}
+.stab{padding:8px 14px;font-size:11px;cursor:pointer;color:var(--ts);border-bottom:2px solid transparent;transition:all .12s;font-weight:500;white-space:nowrap;}
+.stab.on{color:var(--b);border-bottom-color:var(--b);font-weight:700;}
+.stb{display:none;}
+.stb.on{display:block;}
 .lpb{flex:1;overflow-y:auto;display:none;}
 .lpb.on{display:block;}
 .sec{padding:7px 9px;border-bottom:1px solid var(--br);}
@@ -981,32 +985,200 @@ button{cursor:pointer;font-family:var(--sans);}
 
 <!-- ── SETTINGS MODAL ── -->
 <div class="modal-bg" id="modal-settings">
-  <div class="modal">
-    <div class="modal-hdr"><span class="modal-ttl">모의투자 설정</span><button class="modal-x" onclick="closeModal('settings')">×</button></div>
-    <div class="modal-body">
-      <div class="sg"><div class="sg-title">💰 자금</div>
-        <div class="sg-r"><div><div class="sg-l">초기 자본금</div></div><input class="sg-i" type="number" id="cfg-capital" value="10000000"></div>
-        <div class="sg-r"><div><div class="sg-l">일일 손실 한도 (%)</div></div><input class="sg-i" type="number" id="cfg-dayloss" value="2.0" step="0.1"></div>
-        <div class="sg-r"><div><div class="sg-l">1회 최대 비중 (%)</div></div><input class="sg-i" type="number" id="cfg-maxpos" value="20"></div>
+  <div class="modal wide" style="width:680px;max-width:96vw;">
+    <div class="modal-hdr">
+      <span class="modal-ttl">⚙ 설정</span>
+      <button class="modal-x" onclick="closeModal('settings')">×</button>
+    </div>
+    <!-- 설정 탭 -->
+    <div style="display:flex;gap:0;border-bottom:1px solid var(--br);flex-shrink:0;">
+      <div class="stab on" onclick="sTab(this,'st-api')">🔑 API 키</div>
+      <div class="stab" onclick="sTab(this,'st-trade')">💰 매매 설정</div>
+      <div class="stab" onclick="sTab(this,'st-usage')">📊 사용량</div>
+    </div>
+    <div class="modal-body" style="padding:0;">
+
+      <!-- API 키 탭 -->
+      <div class="stb on" id="st-api">
+        <!-- Claude API -->
+        <div class="sg" style="margin:0;border-bottom:1px solid var(--br);padding:14px 16px;">
+          <div class="sg-title" style="margin-bottom:10px;">🤖 Claude API (Anthropic)</div>
+          <div style="background:rgba(49,130,246,.06);border:1px solid rgba(49,130,246,.15);border-radius:8px;padding:9px 12px;margin-bottom:10px;font-size:10px;color:var(--ts);line-height:1.7;">
+            <b style="color:var(--b);">현재 상태:</b> Railway 서버 환경변수로 설정됨<br>
+            Railway 대시보드 → Variables → <code style="background:var(--bg);padding:1px 4px;border-radius:3px;font-family:var(--mono);">ANTHROPIC_API_KEY</code> 에서 변경<br>
+            <span style="color:var(--tm);">보안상 브라우저에서 직접 API 키 입력/저장은 지원하지 않습니다.</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <div style="background:var(--bg);border-radius:8px;padding:10px;">
+              <div style="font-size:9px;color:var(--tm);font-family:var(--mono);">사용 모델</div>
+              <div style="font-family:var(--mono);font-size:11px;font-weight:600;margin-top:2px;">claude-sonnet-4-20250514</div>
+            </div>
+            <div style="background:var(--bg);border-radius:8px;padding:10px;">
+              <div style="font-size:9px;color:var(--tm);font-family:var(--mono);">오늘 호출 횟수</div>
+              <div style="font-family:var(--mono);font-size:14px;font-weight:700;color:var(--b);margin-top:2px;" id="apiCallCount">0회</div>
+            </div>
+            <div style="background:var(--bg);border-radius:8px;padding:10px;">
+              <div style="font-size:9px;color:var(--tm);font-family:var(--mono);">오늘 입력 토큰</div>
+              <div style="font-family:var(--mono);font-size:14px;font-weight:700;margin-top:2px;" id="apiInTokens">0</div>
+            </div>
+            <div style="background:var(--bg);border-radius:8px;padding:10px;">
+              <div style="font-size:9px;color:var(--tm);font-family:var(--mono);">오늘 출력 토큰</div>
+              <div style="font-family:var(--mono);font-size:14px;font-weight:700;margin-top:2px;" id="apiOutTokens">0</div>
+            </div>
+          </div>
+          <div style="margin-top:8px;background:var(--bg);border-radius:8px;padding:10px;">
+            <div style="font-size:9px;color:var(--tm);font-family:var(--mono);margin-bottom:4px;">예상 요금 (오늘)</div>
+            <div style="display:flex;align-items:baseline;gap:6px;">
+              <span style="font-family:var(--mono);font-size:18px;font-weight:800;color:var(--b);" id="apiCost">$0.000</span>
+              <span style="font-size:9px;color:var(--tm);">Sonnet 4: 입력 $3/1M · 출력 $15/1M</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- KIS API -->
+        <div class="sg" style="margin:0;padding:14px 16px;">
+          <div class="sg-title" style="margin-bottom:10px;">📈 KIS API (한국투자증권)</div>
+          <div style="background:rgba(255,153,0,.06);border:1px solid rgba(255,153,0,.15);border-radius:8px;padding:9px 12px;margin-bottom:10px;font-size:10px;line-height:1.7;">
+            <b style="color:var(--a);">발급 방법:</b>
+            <ol style="margin-left:14px;margin-top:4px;color:var(--ts);">
+              <li>한국투자증권 계좌 개설 (비대면 가능)</li>
+              <li>앱 → 인증/보안 → HTS ID 등록</li>
+              <li><b>1544-5000</b> 전화 → "카카오뱅크 계좌 HTS ID 연결"</li>
+              <li><a href="https://apiportal.koreainvestment.com" target="_blank" style="color:var(--b);">apiportal.koreainvestment.com</a> → API 신청</li>
+              <li>APP_KEY + APP_SECRET 발급 → 아래에 입력</li>
+            </ol>
+          </div>
+          <div class="sg-r">
+            <div><div class="sg-l">APP_KEY (36자)</div></div>
+            <input class="sg-i" type="password" id="kis-appkey" placeholder="PSed321z... (36자리)" style="font-family:var(--mono);">
+          </div>
+          <div class="sg-r">
+            <div><div class="sg-l">APP_SECRET (180자)</div></div>
+            <input class="sg-i" type="password" id="kis-appsecret" placeholder="RR0sFMVB... (180자리)" style="font-family:var(--mono);">
+          </div>
+          <div class="sg-r">
+            <div><div class="sg-l">계좌번호</div></div>
+            <input class="sg-i" type="text" id="kis-account" placeholder="12345678-01" style="font-family:var(--mono);">
+          </div>
+          <div class="sg-r">
+            <div><div class="sg-l">모드</div></div>
+            <div style="display:flex;gap:6px;align-items:center;">
+              <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer;">
+                <input type="radio" name="kis-mode" value="mock" id="kis-mock" checked> 모의투자
+              </label>
+              <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer;color:var(--r);">
+                <input type="radio" name="kis-mode" value="real" id="kis-real"> 실거래 ⚠
+              </label>
+            </div>
+          </div>
+          <!-- DART API -->
+          <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--br);">
+            <div style="font-size:10px;font-weight:700;color:var(--ts);margin-bottom:6px;">📢 DART API (공시, 선택)</div>
+            <div class="sg-r">
+              <div><div class="sg-l">DART API 키 (40자)</div></div>
+              <input class="sg-i" type="password" id="dart-key" placeholder="abc123... (40자리)" style="font-family:var(--mono);">
+            </div>
+            <div style="font-size:9px;color:var(--tm);margin-top:4px;">
+              <a href="https://opendart.fss.or.kr" target="_blank" style="color:var(--b);">opendart.fss.or.kr</a> → 인증키 신청 → 이메일 인증 즉시 발급
+            </div>
+          </div>
+          <div style="margin-top:10px;padding:8px 10px;background:var(--bg);border-radius:7px;">
+            <div style="font-size:9px;color:var(--tm);margin-bottom:4px;">API 연결 상태</div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <div id="kis-status" style="font-size:10px;color:var(--tm);">⬜ KIS — 미설정</div>
+              <div id="dart-status" style="font-size:10px;color:var(--tm);">⬜ DART — 미설정</div>
+            </div>
+          </div>
+        </div>
       </div>
-      <div class="sg"><div class="sg-title">💳 신용/미수</div>
-        <div class="sg-r"><div><div class="sg-l">신용 한도율 (%)</div><div class="sg-s">현금 대비</div></div><input class="sg-i" type="number" id="cfg-clim" value="140"></div>
-        <div class="sg-r"><div><div class="sg-l">미수 한도율 (%)</div></div><input class="sg-i" type="number" id="cfg-mlim" value="40"></div>
-        <div class="sg-r"><div><div class="sg-l">신용 이자 (%/연)</div></div><input class="sg-i" type="number" id="cfg-crate" value="8.5" step="0.5"></div>
-        <div class="sg-r"><div><div class="sg-l">미수 이자 (%/연)</div></div><input class="sg-i" type="number" id="cfg-mrate" value="12.0" step="0.5"></div>
+
+      <!-- 매매 설정 탭 -->
+      <div class="stb" id="st-trade" style="padding:14px 16px;">
+        <div class="sg"><div class="sg-title">💰 자금</div>
+          <div class="sg-r"><div><div class="sg-l">초기 자본금</div></div><input class="sg-i" type="number" id="cfg-capital" value="10000000"></div>
+          <div class="sg-r"><div><div class="sg-l">일일 손실 한도 (%)</div></div><input class="sg-i" type="number" id="cfg-dayloss" value="2.0" step="0.1"></div>
+          <div class="sg-r"><div><div class="sg-l">1회 최대 비중 (%)</div></div><input class="sg-i" type="number" id="cfg-maxpos" value="20"></div>
+        </div>
+        <div class="sg"><div class="sg-title">💳 신용/미수</div>
+          <div class="sg-r"><div><div class="sg-l">신용 한도율 (%)</div><div class="sg-s">현금 대비</div></div><input class="sg-i" type="number" id="cfg-clim" value="140"></div>
+          <div class="sg-r"><div><div class="sg-l">미수 한도율 (%)</div></div><input class="sg-i" type="number" id="cfg-mlim" value="40"></div>
+          <div class="sg-r"><div><div class="sg-l">신용 이자 (%/연)</div></div><input class="sg-i" type="number" id="cfg-crate" value="8.5" step="0.5"></div>
+          <div class="sg-r"><div><div class="sg-l">미수 이자 (%/연)</div></div><input class="sg-i" type="number" id="cfg-mrate" value="12.0" step="0.5"></div>
+        </div>
+        <div class="sg"><div class="sg-title">📊 수수료</div>
+          <div class="sg-r"><div><div class="sg-l">매수 수수료 (%)</div></div><input class="sg-i" type="number" id="cfg-bf" value="0.015" step="0.001"></div>
+          <div class="sg-r"><div><div class="sg-l">매도 수수료 (%)</div></div><input class="sg-i" type="number" id="cfg-sf" value="0.015" step="0.001"></div>
+          <div class="sg-r"><div><div class="sg-l">거래세 (%)</div></div><input class="sg-i" type="number" id="cfg-tx" value="0.18" step="0.01"></div>
+        </div>
+        <div class="sg"><div class="sg-title">⚠ 알림</div>
+          <div class="sg-r"><div><div class="sg-l">뇌동매매 감지</div></div><label class="toggle"><input type="checkbox" id="cfg-bd" checked><span class="tsl"></span></label></div>
+          <div class="sg-r"><div><div class="sg-l">일손실 한도 경고</div></div><label class="toggle"><input type="checkbox" id="cfg-al" checked><span class="tsl"></span></label></div>
+        </div>
       </div>
-      <div class="sg"><div class="sg-title">📊 수수료</div>
-        <div class="sg-r"><div><div class="sg-l">매수 수수료 (%)</div></div><input class="sg-i" type="number" id="cfg-bf" value="0.015" step="0.001"></div>
-        <div class="sg-r"><div><div class="sg-l">매도 수수료 (%)</div></div><input class="sg-i" type="number" id="cfg-sf" value="0.015" step="0.001"></div>
-        <div class="sg-r"><div><div class="sg-l">거래세 (%)</div></div><input class="sg-i" type="number" id="cfg-tx" value="0.18" step="0.01"></div>
+
+      <!-- 사용량 탭 -->
+      <div class="stb" id="st-usage" style="padding:14px 16px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <div style="font-size:11px;font-weight:700;">Claude API 사용량 추적</div>
+          <button onclick="resetUsage()" style="padding:2px 8px;border-radius:5px;border:1px solid var(--br);background:var(--bg);color:var(--ts);font-size:9px;cursor:pointer;">초기화</button>
+        </div>
+        <!-- 오늘 요약 -->
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;">
+          <div style="background:rgba(49,130,246,.06);border-radius:10px;padding:10px;text-align:center;">
+            <div style="font-size:9px;color:var(--tm);font-family:var(--mono);">오늘 호출</div>
+            <div style="font-family:var(--mono);font-size:18px;font-weight:800;color:var(--b);" id="u_calls">0</div>
+            <div style="font-size:8px;color:var(--tm);">회</div>
+          </div>
+          <div style="background:rgba(5,192,114,.06);border-radius:10px;padding:10px;text-align:center;">
+            <div style="font-size:9px;color:var(--tm);font-family:var(--mono);">오늘 토큰</div>
+            <div style="font-family:var(--mono);font-size:18px;font-weight:800;color:var(--g);" id="u_tokens">0</div>
+            <div style="font-size:8px;color:var(--tm);">tokens</div>
+          </div>
+          <div style="background:rgba(124,58,237,.06);border-radius:10px;padding:10px;text-align:center;">
+            <div style="font-size:9px;color:var(--tm);font-family:var(--mono);">오늘 요금</div>
+            <div style="font-family:var(--mono);font-size:18px;font-weight:800;color:var(--p);" id="u_cost">$0.000</div>
+            <div style="font-size:8px;color:var(--tm);">USD</div>
+          </div>
+        </div>
+        <!-- 누적 -->
+        <div style="background:var(--bg);border-radius:10px;padding:12px;margin-bottom:12px;">
+          <div style="font-size:10px;font-weight:700;margin-bottom:8px;">📅 누적 통계</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:10px;">
+            <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--br);">
+              <span style="color:var(--tm);">총 호출 횟수</span>
+              <span style="font-family:var(--mono);font-weight:700;" id="u_total_calls">0회</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--br);">
+              <span style="color:var(--tm);">총 입력 토큰</span>
+              <span style="font-family:var(--mono);font-weight:700;" id="u_total_in">0</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--br);">
+              <span style="color:var(--tm);">총 출력 토큰</span>
+              <span style="font-family:var(--mono);font-weight:700;" id="u_total_out">0</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--br);">
+              <span style="color:var(--tm);">총 요금</span>
+              <span style="font-family:var(--mono);font-weight:700;color:var(--p);" id="u_total_cost">$0.000</span>
+            </div>
+          </div>
+        </div>
+        <!-- 기능별 사용량 -->
+        <div style="background:var(--bg);border-radius:10px;padding:12px;">
+          <div style="font-size:10px;font-weight:700;margin-bottom:8px;">🔍 기능별 호출 횟수</div>
+          <div id="u_breakdown" style="font-size:10px;"></div>
+        </div>
+        <!-- 요금 계산 기준 -->
+        <div style="margin-top:10px;padding:8px 10px;background:rgba(49,130,246,.05);border-radius:8px;font-size:9px;color:var(--tm);line-height:1.6;">
+          💡 요금 기준 (claude-sonnet-4-20250514)<br>
+          입력: $3.00 / 1M tokens · 출력: $15.00 / 1M tokens<br>
+          실제 청구는 Anthropic 콘솔에서 확인 → <a href="https://console.anthropic.com" target="_blank" style="color:var(--b);">console.anthropic.com</a>
+        </div>
       </div>
-      <div class="sg"><div class="sg-title">⚠ 알림</div>
-        <div class="sg-r"><div><div class="sg-l">뇌동매매 감지</div></div><label class="toggle"><input type="checkbox" id="cfg-bd" checked><span class="tsl"></span></label></div>
-        <div class="sg-r"><div><div class="sg-l">일손실 한도 경고</div></div><label class="toggle"><input type="checkbox" id="cfg-al" checked><span class="tsl"></span></label></div>
-      </div>
+
     </div>
     <div class="modal-ft">
-      <button class="ibtn" onclick="resetMock()">초기화</button>
+      <button class="ibtn" onclick="resetMock()">모의투자 초기화</button>
+      <button class="ibtn" onclick="closeModal('settings')">닫기</button>
       <button class="ibtn pri" onclick="saveSettings()">저장</button>
     </div>
   </div>
@@ -1234,6 +1406,7 @@ window.onload=()=>{
   setInterval(()=>{updateTimeGuide();}, 30000);
   // 30초마다 공시 갱신 (실시간 딜레이 최소화)
   setInterval(()=>fetchDartNews(), 30000);
+  ensureToday(); updateUsageUI();
 };
 function loadState(){
   const c=localStorage.getItem("htsCfg");if(c)cfg={...cfg,...JSON.parse(c)};
@@ -2259,8 +2432,7 @@ RSI: ${lrsi} / 5MA: ${lma5} / 20MA: ${lma20}
 
 학습자에게 이 매수 결정의 근거를 커리큘럼 Phase 번호와 함께 2~3문장으로 설명해주세요. 한국어로.`;
   try{
-    const res=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:250,messages:[{role:"user",content:prompt}]})});
-    const data=await res.json();const t=data.content?.[0]?.text||"";
+    const data=await callClaude({model:"claude-sonnet-4-20250514",max_tokens:250,messages:[{role:"user",content:prompt}]},"자동매매 결정설명");const t=data.content?.[0]?.text||"";
     if(t)addMsg("ai","📚 AI 결정 설명:\n"+t);
   }catch(e){}
 }
@@ -2518,8 +2690,7 @@ Phase 8 STEP 0~7 간략 점검 결과를 JSON으로 답해:
 }`;
 
   try{
-    const res=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:700,messages:[{role:"user",content:prompt}]})});
-    const data=await res.json();
+    const data=await callClaude({model:"claude-sonnet-4-20250514",max_tokens:700,messages:[{role:"user",content:prompt}]},"Phase8 종합분석");
     const raw=data.content?.[0]?.text||"{}";
     let p;try{const m=raw.match(/\{[\s\S]*\}/);p=JSON.parse(m?m[0]:"{}"); }catch(e){p={};}
 
@@ -2884,6 +3055,191 @@ function updAdvBoxes(now,action){
 // ═══════════════════════════════
 // AI CHAT
 // ═══════════════════════════════
+
+// ═══════════════════════════════
+// API 사용량 추적
+// ═══════════════════════════════
+const CLAUDE_IN_PRICE = 3.0 / 1_000_000;   // $3 per 1M input tokens
+const CLAUDE_OUT_PRICE = 15.0 / 1_000_000;  // $15 per 1M output tokens
+
+let apiUsage = JSON.parse(localStorage.getItem('apiUsage') || JSON.stringify({
+  today: {date:'', calls:0, inTokens:0, outTokens:0, cost:0, breakdown:{}},
+  total: {calls:0, inTokens:0, outTokens:0, cost:0}
+}));
+
+function ensureToday(){
+  const today = new Date().toISOString().slice(0,10);
+  if(apiUsage.today.date !== today){
+    apiUsage.today = {date:today, calls:0, inTokens:0, outTokens:0, cost:0, breakdown:{}};
+    saveUsage();
+  }
+}
+function saveUsage(){localStorage.setItem('apiUsage', JSON.stringify(apiUsage));}
+
+function trackApiCall(feature, inTokens, outTokens){
+  ensureToday();
+  const cost = inTokens * CLAUDE_IN_PRICE + outTokens * CLAUDE_OUT_PRICE;
+  // 오늘
+  apiUsage.today.calls++;
+  apiUsage.today.inTokens += inTokens;
+  apiUsage.today.outTokens += outTokens;
+  apiUsage.today.cost += cost;
+  if(!apiUsage.today.breakdown[feature]) apiUsage.today.breakdown[feature] = 0;
+  apiUsage.today.breakdown[feature]++;
+  // 누적
+  apiUsage.total.calls++;
+  apiUsage.total.inTokens += inTokens;
+  apiUsage.total.outTokens += outTokens;
+  apiUsage.total.cost += cost;
+  saveUsage();
+  updateUsageUI();
+}
+
+function updateUsageUI(){
+  ensureToday();
+  const t = apiUsage.today;
+  const total = apiUsage.total;
+  // 설정창 API 탭
+  const f = id => document.getElementById(id);
+  if(f('apiCallCount')) f('apiCallCount').textContent = t.calls + '회';
+  if(f('apiInTokens')) f('apiInTokens').textContent = t.inTokens.toLocaleString();
+  if(f('apiOutTokens')) f('apiOutTokens').textContent = t.outTokens.toLocaleString();
+  if(f('apiCost')) f('apiCost').textContent = '$' + t.cost.toFixed(4);
+  // 사용량 탭
+  if(f('u_calls')) f('u_calls').textContent = t.calls;
+  if(f('u_tokens')) f('u_tokens').textContent = (t.inTokens + t.outTokens).toLocaleString();
+  if(f('u_cost')) f('u_cost').textContent = '$' + t.cost.toFixed(4);
+  if(f('u_total_calls')) f('u_total_calls').textContent = total.calls + '회';
+  if(f('u_total_in')) f('u_total_in').textContent = total.inTokens.toLocaleString();
+  if(f('u_total_out')) f('u_total_out').textContent = total.outTokens.toLocaleString();
+  if(f('u_total_cost')) f('u_total_cost').textContent = '$' + total.cost.toFixed(4);
+  // 기능별
+  const bd = f('u_breakdown');
+  if(bd && t.breakdown){
+    bd.innerHTML = Object.entries(t.breakdown).sort((a,b)=>b[1]-a[1]).map(([k,v])=>
+      `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--br);">
+        <span style="color:var(--ts);">${k}</span>
+        <span style="font-family:var(--mono);font-weight:700;">${v}회</span>
+      </div>`
+    ).join('') || '<span style="color:var(--tm);">호출 없음</span>';
+  }
+}
+function resetUsage(){
+  if(!confirm('사용량 통계를 초기화하시겠습니까?')) return;
+  apiUsage = {
+    today:{date:'',calls:0,inTokens:0,outTokens:0,cost:0,breakdown:{}},
+    total:{calls:0,inTokens:0,outTokens:0,cost:0}
+  };
+  saveUsage(); updateUsageUI();
+}
+
+// Claude API 래퍼 — 모든 fetch("/api/claude") 호출을 이것으로 교체
+async function callClaude(payload, feature){
+  feature = feature || 'AI 기타';
+  const res = await fetch("/api/claude", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+  // 사용량 추적 (응답에서 토큰 수 추출)
+  const usage = data.usage || {};
+  const inTok = usage.input_tokens || estimateTokens(JSON.stringify(payload));
+  const outTok = usage.output_tokens || estimateTokens(data.content?.[0]?.text || '');
+  trackApiCall(feature, inTok, outTok);
+  return data;
+}
+function estimateTokens(text){
+  // 토큰 수 추정 (응답에 usage 없을 때): 영문 4자/토큰, 한글 2자/토큰
+  const korean = (text.match(/[가-힣]/g)||[]).length;
+  const other = text.length - korean;
+  return Math.round(korean / 2 + other / 4);
+}
+
+// ═══════════════════════════════
+// KIS API 설정 저장/로드
+// ═══════════════════════════════
+let kisConfig = JSON.parse(localStorage.getItem('kisConfig') || JSON.stringify({
+  appKey: '', appSecret: '', account: '', mode: 'mock', dartKey: ''
+}));
+
+function saveKisConfig(){
+  const ak = document.getElementById('kis-appkey')?.value?.trim() || '';
+  const as = document.getElementById('kis-appsecret')?.value?.trim() || '';
+  const ac = document.getElementById('kis-account')?.value?.trim() || '';
+  const dk = document.getElementById('dart-key')?.value?.trim() || '';
+  const mode = document.getElementById('kis-real')?.checked ? 'real' : 'mock';
+  // 실거래 전환 시 경고
+  if(mode === 'real' && kisConfig.mode !== 'real'){
+    if(!confirm('⚠ 실거래 모드로 전환합니다.
+실제 자금이 사용됩니다.
+계속하시겠습니까?')){
+      document.getElementById('kis-mock').checked = true; return;
+    }
+  }
+  kisConfig = {appKey:ak, appSecret:as, account:ac, mode, dartKey:dk};
+  localStorage.setItem('kisConfig', JSON.stringify(kisConfig));
+  updateKisStatus();
+  showAlert('설정 저장', 'API 설정이 저장되었습니다.');
+}
+function loadKisConfig(){
+  const ki = document.getElementById('kis-appkey');
+  const ks = document.getElementById('kis-appsecret');
+  const ka = document.getElementById('kis-account');
+  const kd = document.getElementById('dart-key');
+  if(ki && kisConfig.appKey) ki.value = kisConfig.appKey;
+  if(ks && kisConfig.appSecret) ks.value = kisConfig.appSecret;
+  if(ka && kisConfig.account) ka.value = kisConfig.account;
+  if(kd && kisConfig.dartKey) kd.value = kisConfig.dartKey;
+  if(kisConfig.mode === 'real'){
+    const kr = document.getElementById('kis-real');
+    if(kr) kr.checked = true;
+  }
+  updateKisStatus();
+}
+function updateKisStatus(){
+  const ks = document.getElementById('kis-status');
+  const ds = document.getElementById('dart-status');
+  if(ks){
+    if(kisConfig.appKey && kisConfig.account){
+      ks.textContent = `✅ KIS — ${kisConfig.mode === 'real' ? '실거래' : '모의투자'} (${kisConfig.account})`;
+      ks.style.color = kisConfig.mode === 'real' ? 'var(--r)' : 'var(--g)';
+    } else {
+      ks.textContent = '⬜ KIS — 미설정';
+      ks.style.color = 'var(--tm)';
+    }
+  }
+  if(ds){
+    if(kisConfig.dartKey){
+      ds.textContent = '✅ DART — 연결됨';
+      ds.style.color = 'var(--g)';
+    } else {
+      ds.textContent = '⬜ DART — 미설정';
+      ds.style.color = 'var(--tm)';
+    }
+  }
+}
+
+// 설정 탭 전환
+function sTab(el, id){
+  document.querySelectorAll('.stab').forEach(t=>t.classList.remove('on'));
+  el.classList.add('on');
+  document.querySelectorAll('.stb').forEach(b=>b.classList.remove('on'));
+  document.getElementById(id).classList.add('on');
+  if(id==='st-api') loadKisConfig();
+  if(id==='st-usage') updateUsageUI();
+}
+
+// 설정창 열 때 로드
+const _origOpenModal = openModal;
+function openModal(id){
+  _origOpenModal(id);
+  if(id==='settings'){
+    loadKisConfig();
+    updateUsageUI();
+  }
+}
+
 function buildSys(){
   const stk=STOCKS.find(s=>s.tk===activeTk)||STOCKS[0];
   const cs=sim.candles.slice(0,Math.max(sim.idx+1,20));
