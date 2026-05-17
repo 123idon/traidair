@@ -981,6 +981,21 @@ button{cursor:pointer;font-family:var(--sans);}
       </div>
     </div>
 
+    <!-- 종목별 누적 손익 -->
+    <div class="chart-card">
+      <div class="chart-card-t">📊 종목별 누적 손익</div>
+      <div id="symbolPnl" style="font-size:11px;color:var(--tm);">거래 내역 없음</div>
+    </div>
+
+    <!-- 당일 매매 타임라인 -->
+    <div class="chart-card">
+      <div class="chart-card-t" style="display:flex;align-items:center;justify-content:space-between;">
+        <span>⏱ 당일 매매 타임라인</span>
+        <button onclick="renderTimeline()" style="padding:2px 7px;border-radius:4px;border:1px solid var(--br);background:var(--bg);color:var(--ts);font-size:9px;cursor:pointer;">↺</button>
+      </div>
+      <div id="tradeTimeline" style="font-size:10px;color:var(--tm);"></div>
+    </div>
+
     <!-- 시간대별 성과 -->
     <div class="chart-card">
       <div class="chart-card-t">⏰ 시간대별 매매 성과</div>
@@ -1108,6 +1123,29 @@ button{cursor:pointer;font-family:var(--sans);}
         </div>
         <button onclick="saveJournalForm()" style="width:100%;padding:8px;border-radius:8px;border:none;background:var(--b);color:#fff;font-size:11px;font-weight:700;cursor:pointer;">💾 일지 저장</button>
       </div>
+      <!-- AI 복기 프롬프트 4종 (Phase 12-9) -->
+      <div style="background:var(--pan);border-radius:14px;padding:16px;box-shadow:var(--sh0);">
+        <div style="font-size:13px;font-weight:700;margin-bottom:12px;">🤖 AI 복기 프롬프트 (Phase 12-9)</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+          <button onclick="useReviewPrompt(1)" style="padding:10px;border-radius:10px;border:1.5px solid var(--b);background:rgba(49,130,246,.06);color:var(--b);font-size:10px;font-weight:600;cursor:pointer;text-align:left;">
+            📝 프롬프트 1<br><span style="font-size:9px;color:var(--ts);font-weight:400;">단일 매매 복기</span>
+          </button>
+          <button onclick="useReviewPrompt(2)" style="padding:10px;border-radius:10px;border:1.5px solid var(--g);background:rgba(5,192,114,.06);color:var(--g);font-size:10px;font-weight:600;cursor:pointer;text-align:left;">
+            📊 프롬프트 2<br><span style="font-size:9px;color:var(--ts);font-weight:400;">주간 패턴 분석</span>
+          </button>
+          <button onclick="useReviewPrompt(3)" style="padding:10px;border-radius:10px;border:1.5px solid var(--r);background:rgba(240,62,62,.06);color:var(--r);font-size:10px;font-weight:600;cursor:pointer;text-align:left;">
+            ⚠ 프롬프트 3<br><span style="font-size:9px;color:var(--ts);font-weight:400;">연속 손실 분석</span>
+          </button>
+          <button onclick="useReviewPrompt(4)" style="padding:10px;border-radius:10px;border:1.5px solid var(--p);background:rgba(124,58,237,.06);color:var(--p);font-size:10px;font-weight:600;cursor:pointer;text-align:left;">
+            🌀 프롬프트 4<br><span style="font-size:9px;color:var(--ts);font-weight:400;">슬럼프 감지</span>
+          </button>
+        </div>
+        <div id="reviewPromptBox" style="display:none;">
+          <textarea id="reviewPromptText" rows="7" readonly
+            style="width:100%;background:var(--bg);border:1.5px solid var(--br);border-radius:9px;color:var(--ts);font-family:var(--mono);font-size:9px;padding:8px;resize:none;outline:none;line-height:1.7;"></textarea>
+          <button onclick="copyPrompt()" style="margin-top:6px;width:100%;padding:7px;border-radius:8px;border:1.5px solid var(--b);background:var(--bg);color:var(--b);font-size:10px;font-weight:600;cursor:pointer;">📋 복사 → AI 채팅에 붙여넣기</button>
+        </div>
+      </div>
     </div>
 
     <!-- 개인 원칙 수립 (Phase 11-13) -->
@@ -1156,6 +1194,11 @@ button{cursor:pointer;font-family:var(--sans);}
           </div>
         </div>
         <div id="prSaved" style="margin-top:10px;font-size:10px;color:var(--tm);"></div>
+        <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--br);">
+          <div style="font-size:11px;font-weight:700;margin-bottom:8px;">🚦 실전전환 준비도 (Phase 12-5)</div>
+          <div id="realReadiness" style="font-size:10px;"></div>
+          <button onclick="checkRealReadiness()" style="margin-top:8px;width:100%;padding:7px;border-radius:8px;border:none;background:var(--b);color:#fff;font-size:11px;font-weight:700;cursor:pointer;">준비도 확인</button>
+        </div>
       </div>
     </div>
 
@@ -3490,8 +3533,16 @@ async function detectTechnique(cs, stk){
 // AI 종합분석 + Phase 8 체크리스트
 // ═══════════════════════════════
 let analysisRunning=false;
+let analysisCache={};
 async function runFullAnalysis(){
   if(analysisRunning)return;
+  // 5분 캐시 (같은 봉에서 중복 호출 방지)
+  const cacheKey=activeTk+'_'+sim.idx;
+  if(analysisCache[cacheKey]&&Date.now()-analysisCache[cacheKey].ts<300000){
+    const p=analysisCache[cacheKey].result;
+    if(p){applyAnalysisResult(p);document.getElementById('analysisTk').textContent='캐시됨(5분)';}
+    return;
+  }
   analysisRunning=true;
   const stk=STOCKS.find(s=>s.tk===activeTk)||STOCKS[0];
   const cs=sim.candles.slice(0,Math.max(sim.idx+1,20));
@@ -3614,6 +3665,8 @@ Phase 8 STEP 0~7 간략 점검 결과를 JSON으로 답해:
       `Phase ${TECHNIQUES[p.technique]?.phase||"10"} · Phase 8`
     );
 
+    // 캐시 저장
+    if(p)analysisCache[activeTk+'_'+sim.idx]={ts:Date.now(),result:p};
     // 채팅에도 알림
     if(p.goNogo){
       addMsg("ai",
@@ -3647,6 +3700,23 @@ Phase 8 STEP 0~7 간략 점검 결과를 JSON으로 답해:
     document.getElementById("phase8Check").textContent="API 오류";
   }
   analysisRunning=false;
+}
+function applyAnalysisResult(p){
+  if(!p)return;
+  if(p.technique){
+    const el=document.getElementById('techniqueTag');
+    if(el){el.textContent=p.technique;el.style.color='var(--b)';}
+    const re=document.getElementById('techniqueReason');
+    if(re)re.textContent=p.techniqueReason||'';
+  }
+  if(p.entry){
+    const ep=document.getElementById('entryPoint');
+    if(ep)ep.innerHTML='<span style="color:var(--b);font-weight:700;">진입 '+(p.entry||0).toLocaleString()+'원</span><br><span style="color:var(--r);">✂ 손절 '+(p.stop||0).toLocaleString()+'원</span><br><span style="color:var(--g);">🎯 1차 '+(p.target1||0).toLocaleString()+' | 2차 '+(p.target2||0).toLocaleString()+'원</span><br><span style="font-size:8px;color:var(--ts);">R/R 1:'+(p.rr||'-')+'</span>';
+  }
+  const tag=document.getElementById('goNogoTag');
+  if(tag&&p.goNogo){const isGo=p.goNogo==='GO';tag.textContent=isGo?'✅ GO ('+(p.goScore||0)+'/8)':'❌ NO-GO ('+(p.goScore||0)+'/8)';tag.style.background=isGo?'rgba(5,192,114,.15)':'rgba(240,62,62,.15)';tag.style.color=isGo?'var(--g)':'var(--r)';}
+  const p8=document.getElementById('phase8Check');
+  if(p8&&p.checkList)p8.innerHTML=p.checkList;
 }
 
 // ═══════════════════════════════
