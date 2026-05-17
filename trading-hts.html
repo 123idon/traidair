@@ -4403,6 +4403,9 @@ function renderStats(){
   const mt={"FOMO 추격 진입":0,"손절 지연":0,"목표가 조기 익절":0,"재진입 손실":0};
   mis.forEach((_,i)=>{const k=Object.keys(mt)[i%4];mt[k]++;});
   document.getElementById("mistakeList").innerHTML=Object.entries(mt).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([k,v],i)=>`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--br);"><span style="font-size:11px;font-weight:700;color:var(--tm);">${i+1}</span><span style="flex:1;font-size:11px;">${k}</span><span style="font-family:var(--mono);font-size:11px;color:var(--r);">${v}회</span></div>`).join("")||"<div style='font-size:11px;color:var(--tm);'>데이터 없음</div>";
+  renderStatsEnhanced();
+  renderSymbolPnl();
+  renderTimeline();
 }
 
 // ═══════════════════════════════
