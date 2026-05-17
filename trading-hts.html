@@ -336,10 +336,10 @@ button{cursor:pointer;font-family:var(--sans);}
 <header class="bar">
   <a class="logo" href="#">Trad<em>AI</em>r</a>
   <div class="tabs">
-    <button class="tab" onclick="goPage('dash',this)">대시보드</button>
-    <button class="tab on" onclick="goPage('hts',this)">HTS</button>
-    <button class="tab" onclick="goPage('stats',this)">통계</button>
-    <button class="tab" onclick="goPage('journal',this)">일지</button>
+    <button class="tab" id="tab-dash" onclick="goPage('dash',this)">📊 대시보드</button>
+    <button class="tab on" id="tab-hts" onclick="goPage('hts',this)">📈 HTS</button>
+    <button class="tab" id="tab-stats" onclick="goPage('stats',this)">📉 통계</button>
+    <button class="tab" id="tab-journal" onclick="goPage('journal',this)">📓 일지</button>
   </div>
   <div class="srch-wrap">
     <div class="srch-box">
@@ -356,6 +356,10 @@ button{cursor:pointer;font-family:var(--sans);}
   <div class="bar-r">
     <div class="badge mock" id="modeBadge"><div class="bdot"></div><span id="modeText">모의투자</span></div>
     <div class="clk" id="clk">--:--:--</div>
+    <!-- 빠른 전환 버튼 -->
+    <button class="ibtn" id="quickSwitchBtn" onclick="quickSwitch()" title="대시보드 ↔ HTS 전환 (단축키: D)">
+      <span id="quickSwitchIcon">📊</span> <span id="quickSwitchTxt">대시보드</span>
+    </button>
     <button class="ibtn" onclick="openModal('settings')">⚙</button>
     <button class="ibtn red" onclick="endMock()">■ 종료</button>
     <button class="ibtn pri" onclick="openModal('journal')">📓</button>
@@ -364,8 +368,14 @@ button{cursor:pointer;font-family:var(--sans);}
 </header>
 
 <!-- ── DASHBOARD PAGE ── -->
-<div class="page" id="page-dash">
-  <iframe src="trading-dashboard.html" style="flex:1;border:none;width:100%;height:100%;"></iframe>
+<div class="page" id="page-dash" style="overflow:hidden;">
+  <iframe 
+    id="dashFrame"
+    src="trading-dashboard.html" 
+    style="flex:1;border:none;width:100%;height:100%;display:block;"
+    loading="lazy"
+    title="TraidAIr 대시보드">
+  </iframe>
 </div>
 
 <!-- ── HTS PAGE ── -->
@@ -2525,6 +2535,8 @@ function resetMock(){if(!confirm("모의투자를 초기화하시겠습니까?\n
 // UI HELPERS
 // ═══════════════════════════════
 let overnightAlerted=false;
+// 초기 페이지 상태
+window._curPage = "hts";
 function tick(){
   const n=new Date();
   document.getElementById("clk").textContent=[n.getHours(),n.getMinutes(),n.getSeconds()].map(v=>v.toString().padStart(2,"0")).join(":");
