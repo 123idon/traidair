@@ -1852,7 +1852,7 @@ function genCandles(tk,dt){
     res.push({t:`${String(Math.floor(hm/60)).padStart(2,"0")}:${String(hm%60).padStart(2,"0")}`,o:Math.round(o),h:Math.round(Math.max(o,c,h)),l:Math.round(Math.min(o,c,l)),c:Math.round(c),v});
     base=c;
   }
-  sim.candles=res; sim.idx=0; if(res.length>0)updPrice(res[0]); return res;
+  sim.candles=res; sim.idx=res.length-1; if(res.length>0)updPrice(res[res.length-1]); return res;
 }
 
 // ── 추가 전역 변수/함수 ──
@@ -1887,7 +1887,13 @@ let chartViewStart=0,chartViewCount=80;
 let _chartRaf=null;
 
 // 뷰 상태
-function _cvAll(){return sim.candles.slice(0,Math.max(sim.idx+1,10));}
+function _cvAll(){
+  // 시뮬 재생 중이면 idx까지만, 아니면 전체
+  if(sim.playing){
+    return sim.candles.slice(0,Math.max(sim.idx+1,10));
+  }
+  return sim.candles.length?sim.candles:[];
+}
 function _cvCs(){
   const a=_cvAll();
   chartViewCount=Math.max(10,Math.min(chartViewCount,a.length));
@@ -2297,28 +2303,19 @@ function _initResizeObserver(){
   const wrap=document.querySelector('.chart-main');
   if(!wrap||wrap._roOk)return;
   wrap._roOk=true;
+  let rafPending=false;
+  const schedDraw=()=>{
+    if(rafPending)return;
+    rafPending=true;
+    requestAnimationFrame(()=>{rafPending=false;drawChart();});
+  };
   if(typeof ResizeObserver!=='undefined'){
-    const ro=new ResizeObserver(entries=>{
-      for(const entry of entries){
-        const w=Math.round(entry.contentRect.width);
-        const h=Math.round(entry.contentRect.height);
-        if(w>20&&h>20){
-          const cv=document.getElementById('mainChart');
-          if(cv){cv.width=w;cv.height=h;}
-          drawChart();
-        }
-      }
-    });
+    // canvas.width 변경은 drawChart 내부에서만 — observer에선 drawChart만 호출
+    const ro=new ResizeObserver(()=>schedDraw());
     ro.observe(wrap);
   }
-  // ResizeObserver 없거나 초기 렌더용 fallback
-  requestAnimationFrame(()=>requestAnimationFrame(()=>{
-    const cv=document.getElementById('mainChart');
-    if(!cv)return;
-    const w=Math.round(wrap.getBoundingClientRect().width||wrap.offsetWidth||600);
-    const h=Math.round(wrap.getBoundingClientRect().height||wrap.offsetHeight||400);
-    if(w>20&&h>20){cv.width=w;cv.height=h;drawChart();}
-  }));
+  // 초기 렌더 (rAF 두 번 — 레이아웃 완성 보장)
+  requestAnimationFrame(()=>requestAnimationFrame(()=>drawChart()));
 }
 
 
@@ -5134,6 +5131,7 @@ function mobTab(name,btn){
 // ── 화면 크기 변경 시 처리 ──
 window.addEventListener('resize',()=>{
   if(!isMobile())closeMobPanels();
+  requestAnimationFrame(()=>drawChart());
 },false);
 
 function lTab(el,id){document.querySelectorAll(".lpt").forEach(t=>t.classList.remove("on"));el.classList.add("on");document.querySelectorAll(".lpb").forEach(b=>{b.classList.remove("on");b.style.display="none";});const t=document.getElementById(id);if(t){t.style.display="block";t.classList.add("on");}}
