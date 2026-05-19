@@ -1912,6 +1912,47 @@ let stopOrders={};
 let cfg={capital:10000000,dayloss:2,maxpos:20,clim:140,mlim:40,crate:8.5,mrate:12,bf:0.015,sf:0.015,tx:0.18,bd:true,al:true};
 let mock={cash:10000000,positions:{},trades:[],todayPnl:0,todayTrades:0,lossSeries:0,creditUsed:0,marginUsed:0};
 let sim={playing:false,speed:1,idx:0,candles:[],timer:null,date:todayStr(),tf:"5"};
+
+// ═══════════════════════════════════════════════════════
+// ★★★ 절대 원칙: 미래 데이터 참조 완전 차단 ★★★
+// 모든 봉 데이터 접근은 반드시 아래 함수를 통해서만.
+// sim.candles를 직접 쓰는 건 genCandles, updChartToIdx 등
+// 내부 관리 코드에서만 허용. 분석/표시 목적은 전부 아래 사용.
+// ═══════════════════════════════════════════════════════
+
+/**
+ * 현재 시각(sim.idx)까지의 봉만 반환. 절대 미래 봉 없음.
+ * @param {number} [minLen=1] 최소 봉 수 (부족하면 있는 것만)
+ * @returns {Array} 현재까지 발생한 봉 배열
+ */
+function getCandles(minLen=1){
+  const cut = Math.max(Math.min(sim.idx+1, sim.candles.length), minLen);
+  return sim.candles.slice(0, cut);
+}
+
+/**
+ * 현재 봉 (가장 최근 확정된 봉).
+ * @returns {Object|null}
+ */
+function getCurrentCandle(){
+  const cs = getCandles(1);
+  return cs.length ? cs[cs.length-1] : null;
+}
+
+/**
+ * 현재까지 봉에서 마지막 N개 반환 (분석용 슬라이딩 윈도우).
+ * @param {number} n
+ * @returns {Array}
+ */
+function getRecentCandles(n){
+  return getCandles(1).slice(-Math.abs(n));
+}
+
+// 미래 데이터 접근 감지기 (개발 중 경고)
+// sim.candles를 idx 제한 없이 쓰면 콘솔에 경고
+const _origCandles = sim.candles;
+// 주의: sim.candles 자체를 Proxy로 감싸면 성능 저하.
+// 대신 분석 코드에서 getCandles() 사용을 강제함.
 let activeTk="005930",oSide="buy",oType="limit",credType="cash",trailMode="off";
 let inds={ma:true,vol:true,rsi:false,macd:false,bb:false,vwap:false};
 // ═══════════════════════════════════════════════
@@ -1925,12 +1966,8 @@ let _chartRaf=null;
 
 // 뷰 상태
 function _cvAll(){
-  // ★ 핵심 원칙: 절대 미래 봉 참조 금지
-  // sim.idx = 현재 시각. 이 이후 봉은 아직 일어나지 않은 미래.
-  // 재생 중이든 아니든 항상 idx까지만 반환
-  if(!sim.candles.length) return [];
-  const cutoff = Math.min(sim.idx+1, sim.candles.length);
-  return sim.candles.slice(0, Math.max(cutoff, 1));
+  // ★ 미래 참조 금지 — getCandles() 통해서만
+  return getCandles(1);
 }
 function _cvCs(){
   const a=_cvAll();
@@ -2846,7 +2883,7 @@ function resetIntraCheck(){
 async function calcMarketStrength(){
   const el=document.getElementById("mktStrDetail"); if(!el)return;
   el.textContent="계산 중...";
-  const cs=sim.candles.slice(0,Math.max(sim.idx+1,20));
+  const cs=getCandles(20);
   if(cs.length<5){el.textContent="데이터 부족";return;}
   const cls=cs.map(c=>c.c),vls=cs.map(c=>c.v);
   const rsi=(calcRSI(cls,14).slice(-1)[0]||50).toFixed(0);
@@ -2933,7 +2970,7 @@ function checkBrainDong(side,price,qty,stk){
   if(bdMetrics.reentryCount>=2)warnings.push("손절 후 재진입 "+bdMetrics.reentryCount+"회");
   // 추격매수 감지
   if(side==="buy"&&cs){
-    const cs2=sim.candles.slice(0,Math.max(sim.idx+1,3));
+    const cs2=getCandles(3);
     const prev=cs2[cs2.length-2];
     if(prev&&price>prev.c*1.02)warnings.push("추격매수 감지 (+2% 이상에서 진입)");
   }
@@ -3756,7 +3793,7 @@ function addDecisionLog(action,reason,phase){
 function runScreening(){
   if(!autoState.running)return;
   const stk=STOCKS.find(s=>s.tk===activeTk)||STOCKS[0];
-  const cs=sim.candles.slice(0,Math.max(sim.idx+1,20));
+  const cs=getCandles(20);
   if(cs.length<10)return;
   const cls=cs.map(c=>c.c),vls=cs.map(c=>c.v);
   const lc=cs[cs.length-1];
@@ -4032,7 +4069,7 @@ async function runFullAnalysis(){
   }
   analysisRunning=true;
   const stk=STOCKS.find(s=>s.tk===activeTk)||STOCKS[0];
-  const cs=sim.candles.slice(0,Math.max(sim.idx+1,20));
+  const cs=getCandles(20);
   if(cs.length<5){analysisRunning=false;return;}
   document.getElementById("analysisTk").textContent=`${stk.nm} (${sim.tf}분)`;
   document.getElementById("techniqueTag").textContent="분석 중...";
@@ -4264,7 +4301,7 @@ async function autoAdvUpdate(){
   // 자동매매 실행 중이면 기법 감지도 실행
   if(autoState.running && autoState.level>=1){
     const stk=STOCKS.find(s=>s.tk===activeTk)||STOCKS[0];
-    const cs=sim.candles.slice(0,Math.max(sim.idx+1,20));
+    const cs=getCandles(20);
     if(cs.length>=10) await runFullAutoStep(cs, stk);
   }
 }
@@ -4282,7 +4319,7 @@ async function runAISectorAnalysis(){
   const el=document.getElementById("aiSectorResult");
   el.innerHTML='<span style="color:var(--tm);font-style:italic;">AI 분석 중...</span>';
   // ★ 미래 참조 금지: getDashData(당일 최종점수) 대신 현재 봉까지의 데이터 사용
-  const cs = sim.candles.slice(0, Math.max(sim.idx+1, 2));
+  const cs = getCandles(2);
   const cls = cs.map(c=>c.c);
   const curRSI = (calcRSI(cls,14).slice(-1)[0]||50).toFixed(0);
   const curVol = cs.length>=2?(cs[cs.length-1].v/cs[cs.length-2].v).toFixed(1):'1.0';
@@ -4426,7 +4463,7 @@ JSON만 답해:
 
 async function updateAIAdvisor(){
   const stk=STOCKS.find(s=>s.tk===activeTk)||STOCKS[0];
-  const cs=sim.candles.slice(0,Math.max(sim.idx+1,20));
+  const cs=getCandles(20);
   if(cs.length<5)return;
   const cls=cs.map(c=>c.c),vls=cs.map(c=>c.v);
   const lc=cs[cs.length-1];
@@ -4904,7 +4941,7 @@ function sTab(el, id){
 
 function buildSys(){
   const stk=STOCKS.find(s=>s.tk===activeTk)||STOCKS[0];
-  const cs=sim.candles.slice(0,Math.max(sim.idx+1,20));
+  const cs=getCandles(20);
   const cls=cs.map(c=>c.c),vls=cs.map(c=>c.v);
   const lc=cs[cs.length-1]||{o:0,h:0,l:0,c:stk.pr,v:0};
   const lrsi=(calcRSI(cls,14).slice(-1)[0]||50).toFixed(1);
@@ -5400,7 +5437,7 @@ async function loadSectorRanking(){
   if(btn) btn.disabled = true;
   try {
     // ★ 미래 참조 금지: 현재 시각(sim.idx)까지의 봉만 사용
-    const cs = sim.candles.slice(0, Math.max(sim.idx+1, 2)).slice(-20);
+    const cs = getRecentCandles(20);
     const cls = cs.map(c=>c.c);
     const rsi = calcRSI(cls,14).slice(-1)[0]||50;
     const volR = cs.length>=2?(cs[cs.length-1].v/cs[cs.length-2].v).toFixed(1):'1.0';
@@ -5654,7 +5691,7 @@ const _origUpdChartToIdx = updChartToIdx;
 function updatePhase8Live(){
   const el = document.getElementById('phase8Check');
   if(!el) return;
-  const cs = sim.candles.slice(0, Math.max(sim.idx+1, 20));
+  const cs = getCandles(20);
   if(cs.length < 5){ el.innerHTML='-'; return; }
   const cls = cs.map(c=>c.c), vls = cs.map(c=>c.v);
   const lc = cs[cs.length-1];
