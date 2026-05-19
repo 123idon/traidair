@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=1280,initial-scale=1,minimum-scale=0.5,maximum-scale=2,user-scalable=yes,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=5,user-scalable=yes,viewport-fit=cover">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -84,6 +84,7 @@ button{cursor:pointer;font-family:var(--sans);}
   overflow:hidden;
   position:relative;
   background:var(--bg);
+  min-width:0;
 }
 .lp{grid-column:1;grid-row:1/4;background:var(--pan);border-right:1px solid var(--br);display:flex;flex-direction:column;overflow:hidden;}
 .lp-tabs{display:flex;border-bottom:1px solid var(--br);flex-shrink:0;}
@@ -404,6 +405,14 @@ input,select,textarea{-webkit-appearance:none;appearance:none;}
   .logo{font-size:12px;}
   .tabs{gap:1px;padding:2px;}
   .tab{padding:2px 5px;font-size:9px;}
+}
+/* ── 초소형 (320px 이하, 폴드 접힌 상태 등) ── */
+@media(max-width:320px){
+  .bar{padding:0 4px;gap:2px;}
+  .logo{display:none;}
+  .tab{padding:2px 4px;font-size:9px;}
+  .ibtn{padding:2px 5px;font-size:9px;}
+  .mob-tabbar button{font-size:9px;}
 }
 </style>
 </head>
@@ -5437,6 +5446,16 @@ function quickSwitch(){
 
 // ── 모바일 패널 제어 ──
 function isMobile(){return window.innerWidth<=860;}
+// 화면 크기 변경 시 자동 레이아웃 업데이트
+let _lastMobile=isMobile();
+window.addEventListener('resize',()=>{
+  const nowMobile=isMobile();
+  if(nowMobile!==_lastMobile){
+    _lastMobile=nowMobile;
+    if(!nowMobile) closeMobPanels(); // PC로 전환 시 패널 닫기
+    drawChart(); // 차트 크기 재조정
+  }
+});
 function openMobPanel(panel){
   // panel: 'lp' | 'rp' | 'brp'
   closeMobPanels();
