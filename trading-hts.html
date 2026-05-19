@@ -4052,6 +4052,7 @@ function getDartReaction(title){
   return "";
 }
 async function analyzeDart(title, type, corp){
+  try{
   // 공시 클릭 시 재료 강도 자동 분석
   document.getElementById("materialInput").value=`[${corp}] ${title} (${type})`;
   // AI 추천 탭으로 이동해서 분석
@@ -4063,6 +4064,7 @@ ${title}
 
 공시 유형: ${type}
 → 재료 분석 패널에서 결과를 확인하세요. (Phase 6-5)`);
+  }catch(e){console.error("analyzeDart:",e);}
 }
 
 // ═══════════════════════════════
@@ -4128,6 +4130,7 @@ async function detectTechnique(cs, stk){
 let analysisRunning=false;
 let analysisCache={};
 async function runFullAnalysis(){
+  try{
   const _cacheKey='analysis_'+activeTk+'_'+sim.idx;
   const _cached=_getCachedAnalysis(_cacheKey);
   if(_cached){const box=document.getElementById('aiAdvBox');if(box)box.innerHTML=_cached;finishProgress('캐시된 분석');return;}
@@ -4323,6 +4326,7 @@ Phase 8 STEP 0~7 간략 점검 결과를 JSON으로 답해:
   }
   analysisRunning=false;
   finishProgress('AI 분석 완료');
+  }catch(e){failProgress("AI 분석 실패");console.error("runFullAnalysis:",e);}
 }
 function applyAnalysisResult(p){
   if(!p)return;
@@ -4346,6 +4350,7 @@ function applyAnalysisResult(p){
 // AI 자동매매 — 결정 이유 실시간 표시 강화
 // ═══════════════════════════════
 async function runFullAutoStep(cs, stk){
+  try{
   if(!autoState.running) return;
   const tech=await detectTechnique(cs, stk);
   if(!tech) return;
@@ -4367,9 +4372,11 @@ ${TECHNIQUES[tech.technique]?.cond||""}`
       await execAutoBuy(tech.entry, stk);
     }
   }
+  }catch(e){console.error("runFullAutoStep:",e);}
 }
 
 async function autoAdvUpdate(){
+  try{
   // 자동매매 레벨 무관하게 항상 차트 분석 업데이트
   await updateAIAdvisor();
   // 자동매매 실행 중이면 기법 감지도 실행
@@ -4378,6 +4385,7 @@ async function autoAdvUpdate(){
     const cs=getCandles(20);
     if(cs.length>=10) await runFullAutoStep(cs, stk);
   }
+  }catch(e){console.error("autoAdvUpdate:",e);}
 }
 // ═══════════════════════════════
 // AI SECTOR & STOCK RECOMMENDATION (Phase 6, 7)
