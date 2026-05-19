@@ -404,6 +404,16 @@ input,select,textarea{-webkit-appearance:none;appearance:none;}
   <div class="bar-r">
     <div class="badge mock" id="modeBadge"><div class="bdot"></div><span id="modeText">모의투자</span></div>
     <div class="clk" id="clk">--:--:--</div>
+    <!-- 실시간 지수 표시 -->
+    <div id="idxBar" style="display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:10px;padding:0 8px;border-left:1px solid var(--br);border-right:1px solid var(--br);">
+      <span style="color:var(--tm);">KOSPI</span>
+      <span id="idx-kospi" style="font-weight:700;">--</span>
+      <span id="idx-kospi-chg" style="font-size:9px;">--</span>
+      <span style="color:var(--tm);margin-left:4px;">KOSDQ</span>
+      <span id="idx-kosdq" style="font-weight:700;">--</span>
+      <span id="idx-kosdq-chg" style="font-size:9px;">--</span>
+      <span id="idx-pred" style="font-size:9px;padding:1px 6px;border-radius:4px;margin-left:2px;font-weight:700;display:none;"></span>
+    </div>
     <!-- 빠른 전환 버튼 -->
     <button class="ibtn" id="quickSwitchBtn" onclick="quickSwitch()" title="대시보드 ↔ HTS 전환 (단축키: D)">
       <span id="quickSwitchIcon">📊</span> <span id="quickSwitchTxt">대시보드</span>
@@ -791,13 +801,13 @@ input,select,textarea{-webkit-appearance:none;appearance:none;}
       <button class="play-btn" id="playBtn" onclick="togPlay()" style="font-size:14px;line-height:1;">▶</button>
       <div class="spd-wrap">
         <span class="spd-l">배속</span>
-        <button class="spd-btn on" onclick="setSpd(this,1)">x1</button>
-        <button class="spd-btn" onclick="setSpd(this,2)">x2</button>
-        <button class="spd-btn" onclick="setSpd(this,4)">x4</button>
-        <button class="spd-btn" onclick="setSpd(this,8)">x8</button>
-        <button class="spd-btn" onclick="setSpd(this,16)">x16</button>
-        <button class="spd-btn" onclick="setSpd(this,32)">x32</button>
-        <button class="spd-btn" onclick="setSpd(this,64)">x64</button>
+        <button class="spd-btn" onclick="setSpd(this,1)">실시간</button>
+        <button class="spd-btn" onclick="setSpd(this,10)">x10</button>
+        <button class="spd-btn" onclick="setSpd(this,30)">x30</button>
+        <button class="spd-btn on" onclick="setSpd(this,60)">x60</button>
+        <button class="spd-btn" onclick="setSpd(this,120)">x120</button>
+        <button class="spd-btn" onclick="setSpd(this,300)">x300</button>
+        <button class="spd-btn" onclick="setSpd(this,600)">x600</button>
       </div>
       <div class="prog" style="flex:1;position:relative;cursor:pointer;" onclick="seekToPos(event,this)" title="클릭으로 이동">
         <div class="prog-f" id="progF" style="width:0%;pointer-events:none;"></div>
@@ -1986,7 +1996,7 @@ let stopOrders={};
 // ═══════════════════════════════
 let cfg={capital:10000000,dayloss:2,maxpos:20,clim:140,mlim:40,crate:8.5,mrate:12,bf:0.015,sf:0.015,tx:0.18,bd:true,al:true};
 let mock={cash:10000000,positions:{},trades:[],todayPnl:0,todayTrades:0,lossSeries:0,creditUsed:0,marginUsed:0};
-let sim={playing:false,speed:1,idx:0,candles:[],timer:null,date:todayStr(),tf:"5"};
+let sim={playing:false,speed:60,idx:0,candles:[],timer:null,date:todayStr(),tf:"5"};
 
 // ═══════════════════════════════════════════════════════
 // ★★★ 절대 원칙: 미래 데이터 참조 완전 차단 ★★★
@@ -2512,7 +2522,13 @@ function runStep(){
     _syncPlayBtn();
     return;
   }
-  sim.timer=setTimeout(runStep,Math.max(25,1000/sim.speed));
+  // ★ 1배속 = 실제 시간 기준
+  // 1분봉: 60초/봉, 5분봉: 300초/봉, 15분봉: 900초/봉
+  // sim.speed로 나눠서 단축 (x2=절반, x60=1분당 1초)
+  const tfMin = sim.tf==='D' ? 390 : (parseInt(sim.tf)||5);
+  const realMs = tfMin * 60 * 1000; // 실제 봉 하나의 ms
+  const delay = Math.max(100, realMs / sim.speed);
+  sim.timer=setTimeout(runStep, delay);
 }
 function setSpd(el,v){sim.speed=v;document.querySelectorAll(".spd-btn").forEach(b=>b.classList.remove("on"));el.classList.add("on");}
 function setTF(el,tf){
