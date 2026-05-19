@@ -1473,9 +1473,13 @@ input,select,textarea{-webkit-appearance:none;appearance:none;font-size:16px;} /
           </div>
           <div style="margin-top:10px;padding:8px 10px;background:var(--bg);border-radius:7px;">
             <div style="font-size:9px;color:var(--tm);margin-bottom:4px;">API 연결 상태</div>
-            <div style="display:flex;gap:8px;align-items:center;">
-              <div id="kis-status" style="font-size:10px;color:var(--tm);">⬜ KIS — 미설정</div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+              <div id="kis-status" style="font-size:10px;color:var(--tm);flex:1;">⬜ KIS — 미설정</div>
               <div id="dart-status" style="font-size:10px;color:var(--tm);">⬜ DART — 미설정</div>
+            </div>
+            <div style="display:flex;gap:6px;margin-top:8px;">
+              <button onclick="kisConnectBtn()" style="flex:1;padding:6px 0;background:var(--b);color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;touch-action:manipulation;">🔌 KIS 연결 테스트</button>
+              <button onclick="syncKisBalance()" style="flex:1;padding:6px 0;background:var(--card);color:var(--ts);border:1px solid var(--br);border-radius:6px;font-size:11px;cursor:pointer;touch-action:manipulation;">📊 잔고 동기화</button>
             </div>
           </div>
         </div>
@@ -2301,6 +2305,19 @@ function submitOrder(autoExec){
     if(cfg.al){const lr=-mock.todayPnl/cfg.capital*100;if(lr>=cfg.dayloss)showAlert("⚠ 일일 손실 한도",`한도 ${cfg.dayloss}% 도달\n매매 중단 권고.`);}
   }
   saveMock(); renderPort(); renderTradeLog(); updCash(); updPnl(); updCredLim();
+
+  // ── KIS 실계좌/모의투자 실제 주문 전송
+  if (kisConfig.appKey && kisConfig.account) {
+    const orderType = oType === 'market' ? 'market' : 'limit';
+    sendKisOrder(oSide, activeTk, qty, pr, orderType).then(result => {
+      if (result.ok) {
+        addMsg('ai', `✅ KIS ${kisConfig.mode === 'real' ? '실거래' : '모의투자'} 주문 접수\n${stk.nm} ${oSide === 'buy' ? '매수' : '매도'} ${qty}주 | 주문번호: ${result.ordNo || '-'}`);
+      } else {
+        addMsg('ai', `⚠ KIS 주문 오류: ${result.error}\n(시뮬레이션은 정상 처리됨)`);
+      }
+    }).catch(() => {});
+  }
+
   return true;
 }
 
@@ -4250,6 +4267,108 @@ function updateKisStatus(){
   }
 }
 
+// ═══════════════════════════════
+// KIS API 실제 연동
+// ═══════════════════════════════
+
+// KIS API 호출 공통 헬퍼 (server.js 프록시 경유)
+async function kisCall(endpoint, payload) {
+  const res = await fetch('/api/kis/' + endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...payload, appKey: kisConfig.appKey, appSecret: kisConfig.appSecret, mode: kisConfig.mode, account: kisConfig.account }),
+  });
+  return res.json();
+}
+
+// KIS 연결 테스트 (토큰 발급 확인)
+async function kisConnect() {
+  const ks = document.getElementById('kis-status');
+  if (!kisConfig.appKey || !kisConfig.appSecret) {
+    showAlert('KIS 연결 실패', 'App Key와 App Secret을 먼저 저장하세요.');
+    return;
+  }
+  if (ks) { ks.textContent = '⏳ KIS — 연결 중...'; ks.style.color = 'var(--a)'; }
+  try {
+    const result = await kisCall('token', {});
+    if (result.ok) {
+      if (ks) { ks.textContent = `✅ KIS — ${kisConfig.mode === 'real' ? '실거래' : '모의투자'} 연결됨`; ks.style.color = 'var(--g)'; }
+      showAlert('KIS 연결 성공', `${kisConfig.mode === 'real' ? '실거래' : '모의투자'} 서버에 연결되었습니다.\n\n이제 실제 시세와 주문이 동작합니다.`);
+      // 연결 후 잔고 동기화
+      if (kisConfig.account) syncKisBalance();
+    } else {
+      throw new Error(result.error || '연결 실패');
+    }
+  } catch(e) {
+    if (ks) { ks.textContent = '❌ KIS — 연결 실패'; ks.style.color = 'var(--r)'; }
+    showAlert('KIS 연결 실패', e.message + '\n\nApp Key/Secret과 모의투자 신청 여부를 확인하세요.');
+  }
+}
+
+// KIS 현재가 조회 및 HTS 가격 업데이트
+async function kisRefreshPrice(code) {
+  if (!kisConfig.appKey) return null;
+  try {
+    const result = await kisCall('price', { code });
+    if (result.ok && result.price > 0) {
+      // STOCKS 배열 업데이트
+      const stk = STOCKS.find(s => s.tk === code);
+      if (stk) {
+        stk.pr = result.price;
+        stk.nm = result.name || stk.nm;
+      }
+      if (code === activeTk) updPrice({ c: result.price });
+      return result;
+    }
+  } catch(e) { /* 조용히 실패 */ }
+  return null;
+}
+
+// KIS 잔고 조회 및 mock 동기화
+async function syncKisBalance() {
+  if (!kisConfig.appKey || !kisConfig.account) return;
+  try {
+    const result = await kisCall('balance', {});
+    if (!result.ok) return;
+    // 예수금 동기화
+    if (result.cash > 0) {
+      mock.cash = result.cash;
+    }
+    // 보유 종목 동기화 (실제 계좌 기준으로 덮어씌움)
+    if (result.positions && result.positions.length > 0) {
+      mock.positions = {};
+      result.positions.forEach(p => {
+        if (p.qty > 0) {
+          mock.positions[p.code] = {
+            qty: p.qty,
+            avgPrice: p.avgPrice,
+            creditType: 'cash',
+            creditAmt: 0,
+          };
+          // STOCKS에 없으면 추가
+          if (!STOCKS.find(s => s.tk === p.code)) {
+            STOCKS.push({ tk: p.code, nm: p.name, pr: p.currentPrice, base: p.avgPrice });
+          } else {
+            const s = STOCKS.find(s => s.tk === p.code);
+            if (s) s.pr = p.currentPrice;
+          }
+        }
+      });
+    }
+    saveMock(); renderPort(); updCash(); updPnl();
+    addMsg('ai', `📊 KIS 잔고 동기화 완료\n예수금: ${result.cash.toLocaleString()}원 | 총평가: ${result.totalEval.toLocaleString()}원`);
+  } catch(e) { /* 조용히 실패 */ }
+}
+
+// KIS 실제 주문 전송
+async function sendKisOrder(side, code, qty, price, orderType) {
+  if (!kisConfig.appKey || !kisConfig.account) return { ok: false, error: 'KIS 미설정' };
+  return kisCall('order', { side, code, qty, price, orderType });
+}
+
+// 설정창에 KIS 연결 버튼 동작
+function kisConnectBtn() { kisConnect(); }
+
 // 설정 탭 전환
 function sTab(el, id){
   document.querySelectorAll('.stab').forEach(t=>t.classList.remove('on'));
@@ -4460,9 +4579,15 @@ function togInd(nm,el){inds[nm]=!inds[nm];el.classList.toggle("on",inds[nm]);if(
 function liveUpdate(){
   if(document.hidden)return; // 탭 비활성 시 스킵
   if(sim.playing)return;
-  STOCKS.forEach(s=>{const c=(Math.random()-.499)*.002;s.pr=Math.max(s.base*.7,Math.round(s.pr*(1+c)));});
-  const stk=STOCKS.find(s=>s.tk===activeTk)||STOCKS[0];
-  updPrice({c:stk.pr});renderWL();renderOB();updPnl();
+  // KIS 연결 시 실제 시세 조회, 미연결 시 시뮬레이션
+  if(kisConfig.appKey && kisConfig.account){
+    kisRefreshPrice(activeTk); // 현재 선택 종목만 조회 (API 호출 최소화)
+  } else {
+    STOCKS.forEach(s=>{const c=(Math.random()-.499)*.002;s.pr=Math.max(s.base*.7,Math.round(s.pr*(1+c)));});
+    const stk=STOCKS.find(s=>s.tk===activeTk)||STOCKS[0];
+    updPrice({c:stk.pr});
+  }
+  renderWL();renderOB();updPnl();
 }
 
 // ═══════════════════════════════

@@ -6,6 +6,54 @@ const path = require('path');
 const PORT = process.env.PORT || 3000;
 const DART_KEY = process.env.DART_API_KEY || '';
 
+// ── KIS 토큰 캐시 (appKey 별로 저장)
+const kisTokenCache = {}; // { [appKey]: { token, expires } }
+
+// KIS API 호스트 (모의투자 vs 실거래)
+function kisHost(mode) {
+  return mode === 'real'
+    ? 'openapi.koreainvestment.com'
+    : 'openapivts.koreainvestment.com'; // 모의투자
+}
+
+// KIS REST 요청 헬퍼
+function kisRequest(opts, body) {
+  return new Promise((resolve, reject) => {
+    const req = https.request(opts, res => {
+      let d = '';
+      res.on('data', c => d += c);
+      res.on('end', () => {
+        try { resolve({ status: res.statusCode, data: JSON.parse(d) }); }
+        catch(e) { resolve({ status: res.statusCode, data: {} }); }
+      });
+    });
+    req.on('error', reject);
+    if (body) req.write(typeof body === 'string' ? body : JSON.stringify(body));
+    req.end();
+  });
+}
+
+// KIS 액세스 토큰 발급 (캐시 30분)
+async function getKisToken(appKey, appSecret, mode) {
+  const cacheKey = appKey + mode;
+  const cached = kisTokenCache[cacheKey];
+  if (cached && cached.expires > Date.now()) return cached.token;
+
+  const body = JSON.stringify({ grant_type: 'client_credentials', appkey: appKey, appsecret: appSecret });
+  const result = await kisRequest({
+    hostname: kisHost(mode),
+    path: '/oauth2/tokenP',
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
+  }, body);
+
+  const token = result.data.access_token;
+  if (token) {
+    kisTokenCache[cacheKey] = { token, expires: Date.now() + 29 * 60 * 1000 }; // 29분 캐시
+  }
+  return token || null;
+}
+
 const MIME = {
   '.html': 'text/html; charset=utf-8',
   '.js':   'text/javascript',
@@ -83,6 +131,197 @@ const server = http.createServer(async (req, res) => {
       });
       pr.on('error', e => { res.writeHead(500, CORS); res.end(JSON.stringify({ error: e.message })); });
       pr.write(body); pr.end();
+    });
+    return;
+  }
+
+  // ── KIS 토큰 발급 (/api/kis/token)
+  if (url === '/api/kis/token' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        const { appKey, appSecret, mode } = JSON.parse(body);
+        if (!appKey || !appSecret) throw new Error('appKey/appSecret 필요');
+        const token = await getKisToken(appKey, appSecret, mode || 'mock');
+        if (!token) throw new Error('토큰 발급 실패 — App Key/Secret 확인');
+        res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+        res.end(JSON.stringify({ ok: true, token: token.slice(0, 10) + '...' })); // 보안: 일부만 반환
+      } catch(e) {
+        res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+        res.end(JSON.stringify({ ok: false, error: e.message }));
+      }
+    });
+    return;
+  }
+
+  // ── KIS 현재가 조회 (/api/kis/price?code=005930)
+  if (url === '/api/kis/price' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        const { appKey, appSecret, mode, code } = JSON.parse(body);
+        const token = await getKisToken(appKey, appSecret, mode || 'mock');
+        if (!token) throw new Error('토큰 없음');
+
+        const result = await kisRequest({
+          hostname: kisHost(mode || 'mock'),
+          path: `/uapi/domestic-stock/v1/quotations/inquire-price?fid_cond_mrkt_div_code=J&fid_input_iscd=${code}`,
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'authorization': `Bearer ${token}`,
+            'appkey': appKey,
+            'appsecret': appSecret,
+            'tr_id': 'FHKST01010100',
+          },
+        });
+
+        const out = result.data.output || {};
+        res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+        res.end(JSON.stringify({
+          ok: true,
+          code,
+          price: parseInt(out.stck_prpr || 0),       // 현재가
+          open: parseInt(out.stck_oprc || 0),         // 시가
+          high: parseInt(out.stck_hgpr || 0),         // 고가
+          low: parseInt(out.stck_lwpr || 0),          // 저가
+          volume: parseInt(out.acml_vol || 0),        // 누적거래량
+          change: parseInt(out.prdy_vrss || 0),       // 전일대비
+          changePct: out.prdy_ctrt || '0.00',         // 등락률
+          name: out.hts_kor_isnm || code,             // 종목명
+        }));
+      } catch(e) {
+        res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+        res.end(JSON.stringify({ ok: false, error: e.message }));
+      }
+    });
+    return;
+  }
+
+  // ── KIS 주문 (/api/kis/order)
+  if (url === '/api/kis/order' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        const { appKey, appSecret, mode, account, side, code, qty, price, orderType } = JSON.parse(body);
+        if (!appKey || !appSecret || !account) throw new Error('필수 정보 누락');
+
+        const token = await getKisToken(appKey, appSecret, mode || 'mock');
+        if (!token) throw new Error('토큰 없음');
+
+        // tr_id: 모의투자 매수=VTTC0802U, 매도=VTTC0801U / 실거래 매수=TTTC0802U, 매도=TTTC0801U
+        const isMock = (mode || 'mock') === 'mock';
+        const trId = side === 'buy'
+          ? (isMock ? 'VTTC0802U' : 'TTTC0802U')
+          : (isMock ? 'VTTC0801U' : 'TTTC0801U');
+
+        // 주문구분: 00=지정가, 01=시장가
+        const ordDvsn = (orderType === 'market') ? '01' : '00';
+        const ordPrc = ordDvsn === '01' ? '0' : String(price);
+
+        // 계좌번호 분리 (12345678-01 → prefix=12345678, suffix=01)
+        const [acntPfx, acntSfx] = account.includes('-') ? account.split('-') : [account.slice(0, 8), account.slice(8)];
+
+        const orderBody = {
+          CANO: acntPfx,
+          ACNT_PRDT_CD: acntSfx || '01',
+          PDNO: code,
+          ORD_DVSN: ordDvsn,
+          ORD_QTY: String(qty),
+          ORD_UNPR: ordPrc,
+        };
+        const bodyStr = JSON.stringify(orderBody);
+
+        const result = await kisRequest({
+          hostname: kisHost(mode || 'mock'),
+          path: '/uapi/domestic-stock/v1/trading/order-cash',
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(bodyStr),
+            'authorization': `Bearer ${token}`,
+            'appkey': appKey,
+            'appsecret': appSecret,
+            'tr_id': trId,
+            'custtype': 'P',
+            'hashkey': '',
+          },
+        }, bodyStr);
+
+        const d = result.data;
+        if (d.rt_cd === '0') {
+          res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+          res.end(JSON.stringify({
+            ok: true,
+            ordNo: d.output?.odno,
+            msg: d.msg1 || '주문 완료',
+          }));
+        } else {
+          throw new Error(d.msg1 || `주문 실패 (rt_cd: ${d.rt_cd})`);
+        }
+      } catch(e) {
+        res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+        res.end(JSON.stringify({ ok: false, error: e.message }));
+      }
+    });
+    return;
+  }
+
+  // ── KIS 잔고 조회 (/api/kis/balance)
+  if (url === '/api/kis/balance' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        const { appKey, appSecret, mode, account } = JSON.parse(body);
+        const token = await getKisToken(appKey, appSecret, mode || 'mock');
+        if (!token) throw new Error('토큰 없음');
+
+        const [acntPfx, acntSfx] = account.includes('-') ? account.split('-') : [account.slice(0, 8), account.slice(8)];
+        const isMock = (mode || 'mock') === 'mock';
+        const trId = isMock ? 'VTTC8434R' : 'TTTC8434R';
+
+        const result = await kisRequest({
+          hostname: kisHost(mode || 'mock'),
+          path: `/uapi/domestic-stock/v1/trading/inquire-balance?CANO=${acntPfx}&ACNT_PRDT_CD=${acntSfx||'01'}&AFHR_FLPR_YN=N&OFL_YN=&INQR_DVSN=02&UNPR_DVSN=01&FUND_STTL_ICLD_YN=N&FNCG_AMT_AUTO_RDPT_YN=N&PRCS_DVSN=01&CTX_AREA_FK100=&CTX_AREA_NK100=`,
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'authorization': `Bearer ${token}`,
+            'appkey': appKey,
+            'appsecret': appSecret,
+            'tr_id': trId,
+          },
+        });
+
+        const d = result.data;
+        const output1 = d.output1 || []; // 보유 종목
+        const output2 = d.output2?.[0] || {}; // 계좌 요약
+
+        res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+        res.end(JSON.stringify({
+          ok: true,
+          cash: parseInt(output2.dnca_tot_amt || 0),         // 예수금 총액
+          totalEval: parseInt(output2.tot_evlu_amt || 0),    // 총평가금액
+          totalPnl: parseInt(output2.evlu_pfls_smtl_amt || 0), // 평가손익
+          positions: output1.map(p => ({
+            code: p.pdno,
+            name: p.prdt_name,
+            qty: parseInt(p.hldg_qty || 0),
+            avgPrice: parseInt(p.pchs_avg_pric || 0),
+            currentPrice: parseInt(p.prpr || 0),
+            evalAmt: parseInt(p.evlu_amt || 0),
+            pnl: parseInt(p.evlu_pfls_amt || 0),
+            pnlPct: p.evlu_pfls_rt || '0.00',
+          })),
+        }));
+      } catch(e) {
+        res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+        res.end(JSON.stringify({ ok: false, error: e.message }));
+      }
     });
     return;
   }
