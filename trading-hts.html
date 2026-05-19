@@ -345,7 +345,7 @@ button,a{touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
 input,select,textarea{-webkit-appearance:none;appearance:none;}
 .wg-body,.lpb,.brpb,.jpage,.stats-page{-webkit-overflow-scrolling:touch;overscroll-behavior:contain;}
 /* ── 태블릿/모바일 (860px 이하) ── */
-@media(max-width:860px){
+@media(max-width:700px){
   :root{--mob-nav:56px;}
   .hts{grid-template-columns:0 1fr 0 0;grid-template-rows:1fr;}
   .lp,.rp,.brp{position:fixed;z-index:300;top:0;bottom:calc(var(--mob-nav) + var(--sab));background:var(--pan);box-shadow:var(--sh2);transition:transform .25s cubic-bezier(.4,0,.2,1);will-change:transform;}
@@ -361,7 +361,7 @@ input,select,textarea{-webkit-appearance:none;appearance:none;}
   .page{padding-bottom:calc(var(--mob-nav) + var(--sab));}
 }
 /* ── 모바일 (520px 이하) ── */
-@media(max-width:520px){
+@media(max-width:480px){
   .bar{gap:4px;padding:0 7px;}
   .tab{padding:3px 7px;font-size:10px;min-height:32px;}
   .ibtn{font-size:10px;padding:3px 7px;min-height:32px;}
@@ -371,7 +371,7 @@ input,select,textarea{-webkit-appearance:none;appearance:none;}
   .brp{width:90vw;max-width:320px;}
 }
 /* ── 소형 모바일 (380px 이하) ── */
-@media(max-width:380px){
+@media(max-width:360px){
   .bar{padding:0 6px;height:44px;}
   .logo{font-size:12px;}
   .tabs{gap:1px;padding:2px;}
@@ -5431,7 +5431,7 @@ function quickSwitch(){
 }
 
 // ── 모바일 패널 제어 ──
-function isMobile(){return window.innerWidth<=860;}
+function isMobile(){return window.innerWidth<=700;}
 function openMobPanel(panel){
   // panel: 'lp' | 'rp' | 'brp'
   closeMobPanels();
