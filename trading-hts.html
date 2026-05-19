@@ -5432,17 +5432,7 @@ function quickSwitch(){
 // ── 모바일 패널 제어 ──
 function isMobile(){return window.innerWidth<=860;}
 
-function applyLayout(){
-  const hts = document.querySelector('.hts');
-  if(!hts) return;
-  if(isMobile()){
-    hts.style.gridTemplateColumns = '0 1fr 0 0';
-    hts.style.gridTemplateRows = '1fr';
-  } else {
-    hts.style.gridTemplateColumns = '';
-    hts.style.gridTemplateRows = '';
-  }
-}
+// applyLayout 제거됨 — CSS 미디어쿼리로만 처리
 function openMobPanel(panel){
   // panel: 'lp' | 'rp' | 'brp'
   closeMobPanels();
@@ -5525,7 +5515,6 @@ function mobTab(name,btn){
 
 // ── 화면 크기 변경 시 처리 ──
 window.addEventListener('resize',()=>{
-  applyLayout();
   if(!isMobile())closeMobPanels();
   requestAnimationFrame(()=>drawChart());
 },false);
@@ -6424,7 +6413,6 @@ window.onload=()=>{
   initChartEvents();
   _initResizeObserver();
   initChartRightClick();
-  applyLayout();
   // 장중 체크 자동 실행
   setTimeout(runIntraCheck, 1500);
   // ★ 서버에서 저장된 API 설정 로드 (재배포 후에도 유지)
