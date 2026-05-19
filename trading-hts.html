@@ -1979,6 +1979,7 @@ function initChart(){
 
   const canvas=document.getElementById("mainChart");
   mChart=new Chart(canvas.getContext("2d"),{
+    type:"bar",
     data:{labels:lbls,datasets:ds},
     plugins:[drawCandlePlugin(),crosshairPlugin()],
     options:{
