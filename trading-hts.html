@@ -5447,10 +5447,27 @@ async function genJModal(){
   const body=document.getElementById("jModalBody");
   const tt=mock.trades.filter(t=>t.date===sim.date);
   if(!tt.length){body.innerHTML="<div style='font-size:11px;color:var(--tm);'>오늘 거래 내역이 없습니다.</div>";return;}
-  body.innerHTML="<div style='font-size:11px;color:var(--tm);font-style:italic;'>AI 분석 중...</div>";
   const pnl=tt.filter(t=>t.side==="sell").reduce((a,t)=>a+t.pnl,0);
   const wins=tt.filter(t=>t.side==="sell"&&t.pnl>0).length,total=tt.filter(t=>t.side==="sell").length;
   const str=tt.map(t=>`${t.side==="buy"?"매수":"매도"} ${t.nm} ${t.qty}주 @${t.price.toLocaleString()}${t.pnl?` 손익${t.pnl>=0?"+":""}${t.pnl.toLocaleString()}원`:""} ${t.auto?"[AI매매]":""}`).join("\n");
+
+  // ── 1. AI 없이도 즉시 기본 저장 ──
+  const baseEntry = {
+    summary: `${sim.date} 매매 (${total}건, ${pnl>=0?'+':''}${pnl.toLocaleString()}원)`,
+    why_bought: '기록 없음',
+    why_sold: '기록 없음',
+    mistakes: '-',
+    psychology: '-',
+    phase_check: '-',
+    improvement: '-',
+    score_total: null,
+    aiGenerated: false,
+    trades: str,
+  };
+  saveJEntry(sim.date, baseEntry, pnl, wins, total, str);
+
+  body.innerHTML="<div style='font-size:11px;color:var(--tm);font-style:italic;'>AI 분석 중... (이미 저장됨)</div>";
+
   try{
     const res=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-5",max_tokens:600,messages:[{role:"user",content:`당신은 20년 경력 단타 트레이딩 멘토입니다. Phase 0~12 강의 기준으로 아래 매매를 완전 분석하세요.
 
@@ -5462,20 +5479,38 @@ JSON만 출력 (다른 텍스트 없이):
 {"summary":"오늘 매매 한줄 총평","market_context":"오늘 시장 환경 평가(코스피/나스닥 방향 등)","why_bought":"진입 이유 분석 - Phase 8 STEP 기준 충족 여부","why_sold":"청산 이유 분석 - 손절/익절 원칙 준수 여부","mistakes":"가장 심각한 실수 2~3가지(구체적 수치와 함께)","psychology":"심리 상태 평가(FOMO/복수매매/조기익절 등 오류)","phase_check":"Phase 8 체크리스트 중 건너뛴 항목","improvement":"다음에 같은 상황에서 다르게 할 행동(구체적으로)","score_principle":8,"score_timing":7,"score_psychology":7,"score_total":7,"score_reason":"점수 이유"}`}]})});
     const data=await res.json();
     let p;try{const m=(data.content?.[0]?.text||"{}").match(/\{[\s\S]*\}/);p=JSON.parse(m?m[0]:"{}"); }catch(e){p={};}
-    body.innerHTML=`<div class="jday" style="margin-bottom:0;"><div class="jd-hdr"><span class="jd-dt">${sim.date}</span><span class="jd-pnl ${pnl>=0?"cu":"cd"}">${pnl>=0?"+":""}${pnl.toLocaleString()}원</span></div><div class="jd-sub">${tt.length}건 · 승률${total?Math.round(wins/total*100):0}% · AI평가${p.score||"-"}/10</div><b style="font-size:12px;">${p.summary||""}</b>
-<div class="jd-ai" style="margin-top:8px;line-height:1.7;">
-  ${p.market_context?`<div class="jd-note" style="border-left:3px solid var(--b);padding-left:6px;margin-bottom:4px;">📊 시장: ${p.market_context}</div>`:""}
-  ${p.why_bought?`<div style="margin-bottom:4px;"><span style="color:var(--r);font-weight:700;">진입이유:</span> ${p.why_bought}</div>`:""}
-  ${p.why_sold?`<div style="margin-bottom:4px;"><span style="color:var(--b);font-weight:700;">청산이유:</span> ${p.why_sold}</div>`:""}
-  ${p.psychology?`<div class="jd-note" style="border-left:3px solid var(--a);padding-left:6px;margin-bottom:4px;">🧠 심리: ${p.psychology}</div>`:""}
-</div>
-${p.mistakes?`<div class="jd-note err" style="margin-top:4px;">🔴 실수: ${p.mistakes}</div>`:""}
-${p.phase_check?`<div class="jd-note err">⚠ 건너뛴 Phase: ${p.phase_check}</div>`:""}
-${p.improvement?`<div class="jd-note tip">💡 개선: ${p.improvement}</div>`:""}
-${(p.score_total||p.score)?`<div style="text-align:right;margin-top:4px;font-size:9px;color:var(--tm);">원칙:${p.score_principle||"-"} 타점:${p.score_timing||"-"} 심리:${p.score_psychology||"-"} <b>종합:${p.score_total||p.score}</b>/10</div>`:""}</div>`;
+    p.aiGenerated=true; p.trades=str;
+    // ── 2. AI 성공 시 덮어쓰기 저장 ──
     saveJEntry(sim.date,p,pnl,wins,total,str);
-  }catch(e){body.innerHTML="<div style='color:var(--r);font-size:11px;'>⚠ API 오류 — /api/claude 확인</div>";}
+    body.innerHTML=_renderJEntry({...p,date:sim.date,pnl,wins,total,tradeCount:tt.length});
+  }catch(e){
+    // ── 3. AI 실패해도 기본 저장은 이미 됨 ──
+    body.innerHTML=`<div class='jday'><div class='jd-hdr'><span class='jd-dt'>${sim.date}</span><span class='jd-pnl ${pnl>=0?"cu":"cd"}'>${pnl>=0?"+":""}${pnl.toLocaleString()}원</span></div>
+      <div class='jd-sub'>${tt.length}건 · 승률${total?Math.round(wins/total*100):0}%</div>
+      <div class='jd-note' style='color:var(--a);'>⚠ AI 분석 실패 — 기본 일지로 저장됨. Claude API 키 확인.</div>
+      <div style='font-size:10px;color:var(--ts);margin-top:6px;white-space:pre-wrap;'>${str}</div></div>`;
+  }
 }
+
+function _renderJEntry(e){
+  return `<div class="jday" style="margin-bottom:0;">
+    <div class="jd-hdr"><span class="jd-dt">${e.date||''}</span><span class="jd-pnl ${(e.pnl||0)>=0?"cu":"cd"}">${(e.pnl||0)>=0?"+":""}${(e.pnl||0).toLocaleString()}원</span></div>
+    <div class="jd-sub">${e.tradeCount||e.total||0}건 · 승률${e.total?Math.round(e.wins/e.total*100):0}%${e.aiGenerated?' · <span style="color:var(--p);">🤖AI분석완료</span>':' · <span style="color:var(--tm);">수동저장</span>'}</div>
+    ${e.summary?`<b style="font-size:12px;">${e.summary}</b>`:''}
+    <div class="jd-ai" style="margin-top:8px;line-height:1.7;">
+      ${e.market_context?`<div class="jd-note" style="border-left:3px solid var(--b);padding-left:6px;margin-bottom:4px;">📊 시장: ${e.market_context}</div>`:""}
+      ${e.why_bought&&e.why_bought!=='기록 없음'?`<div style="margin-bottom:4px;"><span style="color:var(--r);font-weight:700;">진입이유:</span> ${e.why_bought}</div>`:""}
+      ${e.why_sold&&e.why_sold!=='기록 없음'?`<div style="margin-bottom:4px;"><span style="color:var(--b);font-weight:700;">청산이유:</span> ${e.why_sold}</div>`:""}
+      ${e.psychology&&e.psychology!=='-'?`<div class="jd-note" style="border-left:3px solid var(--a);padding-left:6px;margin-bottom:4px;">🧠 심리: ${e.psychology}</div>`:""}
+    </div>
+    ${e.mistakes&&e.mistakes!=='-'?`<div class="jd-note err" style="margin-top:4px;">🔴 실수: ${e.mistakes}</div>`:""}
+    ${e.phase_check&&e.phase_check!=='-'?`<div class="jd-note err">⚠ 건너뛴 Phase: ${e.phase_check}</div>`:""}
+    ${e.improvement&&e.improvement!=='-'?`<div class="jd-note tip">💡 개선: ${e.improvement}</div>`:""}
+    ${e.score_total?`<div style="text-align:right;margin-top:4px;font-size:9px;color:var(--tm);">원칙:${e.score_principle||"-"} 타점:${e.score_timing||"-"} 심리:${e.score_psychology||"-"} <b>종합:${e.score_total}</b>/10</div>`:""}
+    ${e.trades&&!e.aiGenerated?`<details style="margin-top:6px;"><summary style="font-size:9px;color:var(--tm);cursor:pointer;">매매내역 보기</summary><pre style="font-size:9px;color:var(--ts);white-space:pre-wrap;margin-top:4px;">${e.trades}</pre></details>`:''}
+  </div>`;
+}
+
 function renderJPage(){
   const js=safeParseJSON(localStorage.getItem("htsJournals"), "{}");
   const entries=Object.values(js).sort((a,b)=>b.date.localeCompare(a.date));
@@ -5483,16 +5518,24 @@ function renderJPage(){
   document.getElementById("journalList").innerHTML=entries.map(e=>{
     const aiTag = e.aiTradeCount ? `<span style="font-size:9px;background:rgba(139,92,246,.15);color:var(--p);padding:1px 5px;border-radius:3px;font-weight:700;margin-left:4px;">🤖 AI ${e.aiTradeCount}건</span>` : '';
     const manTag = e.manualTradeCount ? `<span style="font-size:9px;background:rgba(49,130,246,.12);color:var(--b);padding:1px 5px;border-radius:3px;margin-left:2px;">${e.manualTradeCount}건</span>` : '';
-    const aiPnlStr = e.aiTradeCount && e.aiPnl!==undefined ? `<span style="font-size:9px;color:var(--tm);">AI손익: <span class="${e.aiPnl>=0?'cu':'cd'}">${e.aiPnl>=0?'+':''}${(e.aiPnl||0).toLocaleString()}원</span></span>` : '';
+    const savedTag = e.aiGenerated ? '<span style="font-size:8px;color:var(--p);">🤖</span>' : '<span style="font-size:8px;color:var(--tm);">📝</span>';
     return `<div class="jday">
       <div class="jd-hdr">
-        <span class="jd-dt">${e.date}</span>
-        <span class="jd-pnl ${e.pnl>=0?"cu":"cd"}">${e.pnl>=0?"+":""}${e.pnl.toLocaleString()}원</span>
+        <span class="jd-dt">${e.date} ${savedTag}</span>
+        <span class="jd-pnl ${(e.pnl||0)>=0?"cu":"cd"}">${(e.pnl||0)>=0?"+":""}${(e.pnl||0).toLocaleString()}원</span>
       </div>
-      <div class="jd-sub">${e.total||0}건 ${aiTag}${manTag} · 승률${e.total?Math.round(e.wins/e.total*100):0}% ${aiPnlStr}</div>
-      ${e.summary?`<b style="font-size:12px;">${e.summary}</b>`:''}
-      ${e.analysis?`<div class="jd-ai" style="margin-top:5px;">${e.analysis.replace(/\n/g,"<br>")}</div>`:"<div class='jd-ai ld'>AI 일지 미생성</div>"}
-      ${e.tomorrow?`<div class="jd-note tip">▶ ${e.tomorrow}</div>`:''}
+      <div class="jd-sub">${e.total||0}건 ${aiTag}${manTag} · 승률${e.total?Math.round(e.wins/e.total*100):0}%</div>
+      ${e.summary?`<b style="font-size:12px;">${e.summary}</b>`:e.trades?`<div style="font-size:10px;color:var(--tm);">매매 ${e.total||0}건 기록됨</div>`:''}
+      <div class="jd-ai" style="margin-top:5px;line-height:1.7;">
+        ${e.market_context?`<div class="jd-note" style="border-left:3px solid var(--b);padding-left:6px;margin-bottom:3px;font-size:10px;">📊 ${e.market_context}</div>`:""}
+        ${e.why_bought&&e.why_bought!=='기록 없음'?`<div style="font-size:10px;margin-bottom:3px;"><span style="color:var(--r);font-weight:700;">진입:</span> ${e.why_bought}</div>`:""}
+        ${e.why_sold&&e.why_sold!=='기록 없음'?`<div style="font-size:10px;margin-bottom:3px;"><span style="color:var(--b);font-weight:700;">청산:</span> ${e.why_sold}</div>`:""}
+        ${e.psychology&&e.psychology!=='-'?`<div class="jd-note" style="border-left:3px solid var(--a);padding-left:6px;margin-bottom:3px;font-size:10px;">🧠 ${e.psychology}</div>`:""}
+        ${!e.aiGenerated&&!e.summary?`<div style="font-size:9px;color:var(--tm);font-style:italic;">AI 일지 미생성 — 상단 🤖 버튼으로 생성하세요</div>`:""}
+      </div>
+      ${e.mistakes&&e.mistakes!=='-'?`<div class="jd-note err" style="font-size:10px;">🔴 ${e.mistakes}</div>`:""}
+      ${e.improvement&&e.improvement!=='-'?`<div class="jd-note tip" style="font-size:10px;">💡 ${e.improvement}</div>`:""}
+      ${e.score_total?`<div style="text-align:right;font-size:8px;color:var(--tm);">원칙:${e.score_principle||"-"} 타점:${e.score_timing||"-"} 심리:${e.score_psychology||"-"} <b>종합:${e.score_total}</b>/10</div>`:""}
     </div>`;
   }).join("");
 }
@@ -6293,16 +6336,46 @@ function saveJEntry(date,p,pnl,wins,total,str){
   const todayTrades=mock.trades.filter(t=>t.date===date);
   const aiTrades=todayTrades.filter(t=>t.auto);
   const manualTrades=todayTrades.filter(t=>!t.auto);
-  js2[date]={date,pnl,wins,total,str,...p,
-    aiTradeCount:aiTrades.length,
-    manualTradeCount:manualTrades.length,
-    aiPnl:aiTrades.filter(t=>t.side==='sell').reduce((a,t)=>a+t.pnl,0),
-    manualPnl:manualTrades.filter(t=>t.side==='sell').reduce((a,t)=>a+t.pnl,0),
-  };
+  // 기존 항목 있으면 aiGenerated 여부 보존 (AI 분석 완료된 거 덮어쓰지 않음)
+  const existing=js2[date];
+  if(existing&&existing.aiGenerated&&!p.aiGenerated){
+    // 기존에 AI 분석 완료된 항목이 있고 새 것이 기본 저장이면 → 거래내역/통계만 업데이트
+    js2[date]={...existing,pnl,wins,total,str,
+      aiTradeCount:aiTrades.length,
+      manualTradeCount:manualTrades.length,
+      aiPnl:aiTrades.filter(t=>t.side==='sell').reduce((a,t)=>a+t.pnl,0),
+      manualPnl:manualTrades.filter(t=>t.side==='sell').reduce((a,t)=>a+t.pnl,0),
+    };
+  } else {
+    js2[date]={date,pnl,wins,total,str,...p,
+      aiTradeCount:aiTrades.length,
+      manualTradeCount:manualTrades.length,
+      aiPnl:aiTrades.filter(t=>t.side==='sell').reduce((a,t)=>a+t.pnl,0),
+      manualPnl:manualTrades.filter(t=>t.side==='sell').reduce((a,t)=>a+t.pnl,0),
+    };
+  }
   const jv=JSON.stringify(js2);
   localStorage.setItem("htsJournals",jv);
   saveToServer("htsJournals",jv);
   renderJPage();
+}
+
+// 거래 발생 시 즉시 기본 일지 저장 (AI 없이도 항상 기록)
+function autoSaveJournalOnTrade(){
+  const date=sim.date;
+  const tt=mock.trades.filter(t=>t.date===date);
+  if(!tt.length) return;
+  const pnl=tt.filter(t=>t.side==="sell").reduce((a,t)=>a+t.pnl,0);
+  const wins=tt.filter(t=>t.side==="sell"&&t.pnl>0).length;
+  const total=tt.filter(t=>t.side==="sell").length;
+  const str=tt.map(t=>`${t.side==="buy"?"매수":"매도"} ${t.nm} ${t.qty}주 @${t.price.toLocaleString()}${t.pnl?` 손익${t.pnl>=0?"+":""}${t.pnl.toLocaleString()}원`:""} [${t.time||''}] ${t.auto?"[AI]":""}`).join("\n");
+  const baseEntry={
+    summary:`${date} 매매 ${tt.length}건 / ${pnl>=0?'+':''}${pnl.toLocaleString()}원`,
+    why_bought:'매매 기록됨 (AI 일지 버튼으로 상세 분석 가능)',
+    why_sold:'-', mistakes:'-', psychology:'-', phase_check:'-', improvement:'-',
+    aiGenerated:false, trades:str,
+  };
+  saveJEntry(date, baseEntry, pnl, wins, total, str);
 }
 
 // ═══════════════════════════════════════════════════
