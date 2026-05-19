@@ -113,7 +113,7 @@ body{display:flex;flex-direction:column;overflow:hidden;}
   <input type="date" id="dashDate" class="date-pick" onchange="onDateChange()">
   <div id="marketScore" class="score-badge" style="background:rgba(255,147,0,.1);color:var(--a);">시장 --/10</div>
   <div style="margin-left:auto;display:flex;gap:6px;">
-    <button class="hdr-btn sec" onclick="refreshAll()">↺ 새로고침</button>
+    <button class="hdr-btn sec" onclick="autoLoadMarketData()">↺ 새로고침</button>
     <button class="hdr-btn" onclick="runFullAIAnalysis()">🤖 AI 전체 분석</button>
   </div>
 </div>
@@ -201,6 +201,7 @@ document.getElementById('dashDate').value = curDate;
 function onDateChange(){
   curDate = document.getElementById('dashDate').value;
   loadDashData();
+  autoLoadMarketData(); // 날짜 바꾸면 해당 날짜 데이터 자동 로드
 }
 
 // ── HTS kisConfig 공유 (iframe 부모에서 받기) ──
@@ -497,9 +498,77 @@ function loadDashData(){
   }catch(e){}
 }
 
+// ── 시장 데이터 자동 로드 (페이지 열릴 때 자동 실행) ──
+async function autoLoadMarketData(){
+  // 웹 검색 API 없으므로 Claude에게 시장 데이터 요청
+  const dateStr = curDate;
+  const today = new Date().toISOString().slice(0,10);
+  
+  try {
+    const prompt = `오늘 날짜 ${dateStr} 기준 한국 주식 시장 데이터를 알려줘.
+장이 열리기 전(또는 전일 마감) 기준으로 알 수 있는 실제 수치를 JSON으로만 답해줘.
+
+{
+  "kospi": {"val": "2,650", "chg": "+12.3", "dir": 1},
+  "kosdq": {"val": "850", "chg": "+5.2", "dir": 1},
+  "usd": {"val": "1,380", "chg": "+2", "dir": -1},
+  "nasdaq": {"val": "19,200", "chg": "+85", "dir": 1},
+  "sp500": {"val": "5,300", "chg": "+15", "dir": 1},
+  "vix": {"val": "18.5", "chg": "-0.3", "dir": 1},
+  "bond": {"val": "4.45", "chg": "+0.02", "dir": -1},
+  "night": {"val": "2,648", "chg": "+8", "dir": 1},
+  "summary": "시장 한줄 요약",
+  "score": 6
+}
+
+dir: 1=상승(매수우호), -1=하락(매수비우호), 0=보합
+val/chg는 실제 수치로. 모르면 추정값으로.`;
+
+    const text = await callClaude(prompt, 400);
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return;
+    const d = JSON.parse(jsonMatch[0]);
+
+    // 시장 현황 채우기
+    const fields = ['kospi','kosdq','usd','nasdaq','sp500','vix','bond','night'];
+    fields.forEach(id => {
+      const item = d[id];
+      if (!item) return;
+      setMkt(id, item.val, (item.dir>0?'+':'')+item.chg, item.dir);
+    });
+
+    // 시장 점수 & verdict
+    const score = d.score || 5;
+    const badge = document.getElementById('marketScore');
+    if (badge) {
+      badge.textContent = `시장 ${score}/10`;
+      badge.style.background = score>=7?'rgba(5,192,114,.15)':score>=5?'rgba(255,147,0,.15)':'rgba(240,64,64,.15)';
+      badge.style.color = score>=7?'#059669':score>=5?'#d97706':'#dc2626';
+    }
+    const vd = document.getElementById('marketVerdict');
+    if (vd && d.summary) {
+      const isUp = score >= 7, isDown = score <= 4;
+      vd.className = 'verdict '+(isUp?'buy':isDown?'sell':'neutral');
+      vd.textContent = d.summary;
+    }
+
+    document.getElementById('mktUpdated').textContent =
+      new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'})+' 기준';
+
+    // HTS에 점수 전달
+    try { if(window.parent.setDashData) window.parent.setDashData({score, date:curDate}); } catch(e){}
+
+  } catch(e) {
+    console.log('시장 데이터 로드 실패:', e.message);
+    document.getElementById('marketVerdict').textContent = '📡 시장 데이터 로드 실패 — AI 전체 분석을 눌러주세요';
+  }
+}
+
 // 오늘 날짜 기본값
 document.getElementById('dashDate').value = new Date().toISOString().slice(0,10);
 loadDashData();
+// ★ 페이지 열리면 시장 데이터 자동 로드
+autoLoadMarketData();
 </script>
 </body>
 </html>
