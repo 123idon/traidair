@@ -1924,7 +1924,7 @@ function drawChart(){
 
   // 패딩
   const PR=54,PL=4,PT=8,PB=22;
-  const SB=8; // 스크롤바 높이
+  const SB=12; // 스크롤바 높이
   const volH=inds.vol?Math.floor(H*0.20):0;
   const mainH=H-PT-PB-volH-SB;
   const cw=W-PL-PR;
@@ -2023,12 +2023,13 @@ function drawChart(){
   const all=_cvAll();
   if(all.length>chartViewCount){
     const sbY=H-SB;
-    ctx.fillStyle='rgba(0,0,0,.06)';
-    ctx.beginPath();ctx.roundRect(PL,sbY+1,cw,SB-2,3);ctx.fill();
-    const tw=cw*(chartViewCount/all.length);
+    // roundRect 미지원 브라우저 대비 fillRect 사용
+    ctx.fillStyle='rgba(0,0,0,.08)';
+    ctx.fillRect(PL,sbY+1,cw,SB-2);
+    const tw=Math.max(20,cw*(chartViewCount/all.length));
     const tx=PL+cw*(chartViewStart/all.length);
-    ctx.fillStyle='rgba(0,0,0,.25)';
-    ctx.beginPath();ctx.roundRect(tx,sbY+1,tw,SB-2,3);ctx.fill();
+    ctx.fillStyle='rgba(0,0,0,.3)';
+    ctx.fillRect(tx,sbY+1,tw,SB-2);
   }
 
   // 십자선
@@ -2198,21 +2199,53 @@ function initChartEvents(){
   });
   window.addEventListener('mouseup',()=>{sbDrag=false;});
 
-  // 터치 (스와이프+핀치)
-  let tx=null,txBase=0,tDist=null;
+  // 터치 (스와이프+핀치+스크롤바)
+  let tx=null,txBase=0,tDist=null,txStartY=0;
+  let sbTouch=false,sbTouchX=0,sbTouchBase=0;
+
   wrap.addEventListener('touchstart',e=>{
-    if(e.touches.length===1){tx=e.touches[0].clientX;txBase=chartViewStart;}
-    if(e.touches.length===2){tDist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);}
+    const a=_cvAll();
+    if(e.touches.length===1){
+      const cv=document.getElementById('mainChart');
+      const r=wrap.getBoundingClientRect();
+      const ly=e.touches[0].clientY-r.top;
+      const cvH=cv?cv.height||wrap.clientHeight||400:400;
+      const SB=8;
+      if(ly>=cvH-SB-4){
+        // 스크롤바 영역 터치
+        sbTouch=true; sbTouchX=e.touches[0].clientX; sbTouchBase=chartViewStart;
+      } else {
+        sbTouch=false;
+        tx=e.touches[0].clientX; txBase=chartViewStart; txStartY=e.touches[0].clientY;
+      }
+    }
+    if(e.touches.length===2){
+      tDist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+      tx=null; sbTouch=false;
+    }
   },{passive:true});
+
   wrap.addEventListener('touchmove',e=>{
     e.preventDefault();
     const a=_cvAll();if(!a.length)return;
     const w=wrap.clientWidth||800;
-    if(e.touches.length===1&&tx!==null){
-      const shift=Math.round(-(e.touches[0].clientX-tx)/(w/Math.max(chartViewCount,1)));
-      chartViewStart=Math.max(0,Math.min(txBase+shift,a.length-chartViewCount));
-      drawChart();
+
+    if(e.touches.length===1){
+      if(sbTouch){
+        // 스크롤바 드래그
+        const cv=document.getElementById('mainChart');
+        const cw=w-4-54;
+        const shift=Math.round((e.touches[0].clientX-sbTouchX)/(cw/a.length));
+        chartViewStart=Math.max(0,Math.min(sbTouchBase+shift,a.length-chartViewCount));
+        drawChart();
+      } else if(tx!==null){
+        // 일반 팬
+        const shift=Math.round(-(e.touches[0].clientX-tx)/(w/Math.max(chartViewCount,1)));
+        chartViewStart=Math.max(0,Math.min(txBase+shift,a.length-chartViewCount));
+        drawChart();
+      }
     }
+
     if(e.touches.length===2&&tDist){
       const nd=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
       const factor=tDist/nd; tDist=nd;
@@ -2222,7 +2255,8 @@ function initChartEvents(){
       drawChart();
     }
   },{passive:false});
-  wrap.addEventListener('touchend',()=>{tx=null;tDist=null;});
+
+  wrap.addEventListener('touchend',()=>{tx=null;tDist=null;sbTouch=false;});
 }
 
 // ── 줌 버튼 ──
@@ -2309,7 +2343,23 @@ function runStep(){
   sim.timer=setTimeout(runStep,Math.max(25,1000/sim.speed));
 }
 function setSpd(el,v){sim.speed=v;document.querySelectorAll(".spd-btn").forEach(b=>b.classList.remove("on"));el.classList.add("on");}
-function setTF(el,tf){try{sim.tf=tf;document.querySelectorAll(".tf-btn").forEach(b=>b.classList.remove("on"));el.classList.add("on");genCandles(activeTk,sim.date);initChart();}catch(e){document.getElementById("cinfo").textContent="TF오류:"+e.message;throw e;}}
+function setTF(el,tf){
+  try{
+    sim.tf=tf;
+    document.querySelectorAll(".tf-btn").forEach(b=>b.classList.remove("on"));
+    el.classList.add("on");
+    genCandles(activeTk,sim.date);
+    // TF 변경 시 뷰 리셋 — 전체 봉 보이도록
+    const total=sim.candles.length;
+    chartViewCount=Math.min(total,80);
+    chartViewStart=Math.max(0,total-chartViewCount);
+    drawChart();
+  }catch(e){
+    const ci=document.getElementById("cinfo");
+    if(ci)ci.textContent="TF오류:"+e.message;
+    console.error("setTF error:",e);
+  }
+}
 function onDateChange(){
   sim.date=document.getElementById("mockDate").value;
   mock.todayPnl=0;mock.todayTrades=0;mock.lossSeries=0;
