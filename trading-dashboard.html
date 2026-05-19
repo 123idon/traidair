@@ -171,6 +171,15 @@ body{display:flex;flex-direction:column;overflow:hidden;}
     </div>
   </div>
 
+  <!-- HTS 차트 미니뷰 -->
+  <div class="card" style="grid-column:1/3;padding:10px 14px;">
+    <div class="card-t">📊 차트 <span id="chartTkName">— HTS에서 종목 선택 시 표시</span>
+      <button onclick="refreshChartFromHTS()" style="padding:2px 8px;border-radius:5px;border:none;background:var(--b);color:#fff;font-size:9px;cursor:pointer;">↺ 새로고침</button>
+    </div>
+    <canvas id="dashChart" style="width:100%;height:160px;display:block;border-radius:6px;background:var(--bg);"></canvas>
+    <div id="dashChartEmpty" style="text-align:center;padding:40px;color:var(--tm);font-size:11px;">HTS에서 종목을 선택하면 차트가 표시됩니다</div>
+  </div>
+
   <!-- AI 채팅 -->
   <div class="card chat-wrap">
     <div class="card-t">💬 AI 트레이딩 멘토</div>
@@ -616,6 +625,69 @@ val/chg는 실제 수치로. 모르면 추정값으로.`;
   }
   finishDashProgress('시장 데이터 업데이트 완료');
 }
+
+// ── 대시보드 미니 차트 ──
+function refreshChartFromHTS(){
+  try {
+    const parent = window.parent;
+    if(!parent.sim || !parent.sim.candles || !parent.sim.candles.length) return;
+    const cs = parent.sim.candles.slice(0, parent.sim.idx+1);
+    const stk = parent.STOCKS?.find(s=>s.tk===parent.activeTk);
+    renderDashChart(cs, stk?.nm||'차트');
+  } catch(e) { console.log('차트 로드 실패:', e.message); }
+}
+
+function renderDashChart(cs, name){
+  const canvas = document.getElementById('dashChart');
+  const empty = document.getElementById('dashChartEmpty');
+  const nameEl = document.getElementById('chartTkName');
+  if(!canvas || !cs || cs.length < 2) return;
+  if(nameEl) nameEl.textContent = name || '';
+  if(empty) empty.style.display = 'none';
+  canvas.style.display = 'block';
+
+  const W = canvas.offsetWidth || 600, H = 160;
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+
+  const prices = cs.flatMap(c=>[c.h,c.l]).filter(v=>v>0);
+  if(!prices.length) return;
+  const yMin = Math.min(...prices)*0.999, yMax = Math.max(...prices)*1.001;
+  const yR = yMax-yMin||1;
+  const PL=2,PR=50,PT=8,PB=18;
+  const cw=W-PL-PR, ch=H-PT-PB;
+  const toX=i=>PL+(i+0.5)*(cw/cs.length);
+  const toY=v=>PT+ch*(1-(v-yMin)/yR);
+  const bw=Math.max(1,Math.min(10,cw/cs.length*0.7));
+
+  // 배경
+  ctx.fillStyle='#f8f9fa'; ctx.fillRect(0,0,W,H);
+
+  // 봉
+  cs.forEach((c,i)=>{
+    const x=toX(i), up=c.c>=c.o;
+    const col=up?'#f04040':'#3182f6';
+    ctx.strokeStyle=col; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(x,toY(c.h)); ctx.lineTo(x,toY(c.l)); ctx.stroke();
+    ctx.fillStyle=col;
+    const oy=toY(Math.max(c.o,c.c)), cy=toY(Math.min(c.o,c.c));
+    ctx.fillRect(x-bw/2, oy, bw, Math.max(1,cy-oy));
+  });
+
+  // Y축 레이블
+  ctx.fillStyle='#9ca3af'; ctx.font='9px monospace'; ctx.textAlign='left';
+  [yMax,yMin].forEach(v=>ctx.fillText(v.toLocaleString(), W-PR+4, toY(v)+3));
+
+  // 현재가 라인
+  const last=cs[cs.length-1];
+  ctx.strokeStyle='rgba(49,130,246,.5)'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
+  ctx.beginPath(); ctx.moveTo(PL,toY(last.c)); ctx.lineTo(W-PR,toY(last.c)); ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+// 3초마다 자동 갱신
+setInterval(refreshChartFromHTS, 3000);
 
 // 오늘 날짜 기본값
 document.getElementById('dashDate').value = new Date().toISOString().slice(0,10);
