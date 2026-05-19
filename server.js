@@ -96,8 +96,44 @@ function httpsGet(url) {
   });
 }
 
-// ── 세션 Claude 키 (클라이언트가 설정창에서 입력)
-let sessionClaudeKey = '';
+// ── 영구 설정 저장 (/data/config.json)
+const CONFIG_PATH = path.join(__dirname, 'data', 'config.json');
+
+function loadConfig() {
+  try {
+    if (fs.existsSync(CONFIG_PATH)) {
+      return JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
+    }
+  } catch(e) {}
+  return {};
+}
+
+function saveConfig(data) {
+  try {
+    const dir = path.dirname(CONFIG_PATH);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    const current = loadConfig();
+    const merged = { ...current, ...data, updatedAt: new Date().toISOString() };
+    fs.writeFileSync(CONFIG_PATH, JSON.stringify(merged, null, 2), 'utf8');
+    return true;
+  } catch(e) {
+    console.error('config 저장 실패:', e.message);
+    return false;
+  }
+}
+
+// 서버 시작 시 저장된 설정 로드
+const savedConfig = loadConfig();
+let sessionClaudeKey = savedConfig.claudeKey || process.env.ANTHROPIC_API_KEY || '';
+let savedKisConfig = {
+  appKey: savedConfig.kisAppKey || '',
+  appSecret: savedConfig.kisAppSecret || '',
+  account: savedConfig.kisAccount || '',
+  mode: savedConfig.kisMode || 'mock',
+  dartKey: savedConfig.dartKey || process.env.DART_API_KEY || '',
+};
+if (sessionClaudeKey) console.log('✅ 저장된 Claude 키 로드:', sessionClaudeKey.slice(0,10)+'...');
+if (savedKisConfig.appKey) console.log('✅ 저장된 KIS 설정 로드');
 
 const server = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') {
@@ -114,7 +150,10 @@ const server = http.createServer(async (req, res) => {
     req.on('end', () => {
       try {
         const { key } = JSON.parse(body);
-        if (key && key.startsWith('sk-ant-')) sessionClaudeKey = key;
+        if (key && key.startsWith('sk-ant-')) {
+          sessionClaudeKey = key;
+          saveConfig({ claudeKey: key });
+        }
         res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
         res.end(JSON.stringify({ ok: true }));
       } catch(e) {
@@ -153,6 +192,54 @@ const server = http.createServer(async (req, res) => {
       pr.on('error', e => { res.writeHead(500, CORS); res.end(JSON.stringify({ error: e.message })); });
       pr.write(body); pr.end();
     });
+    return;
+  }
+
+  // ── 전체 API 설정 저장 (/api/save-config)
+  if (url === '/api/save-config' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const cfg = JSON.parse(body);
+        const toSave = {};
+        if (cfg.claudeKey && cfg.claudeKey.startsWith('sk-ant-')) {
+          toSave.claudeKey = cfg.claudeKey;
+          sessionClaudeKey = cfg.claudeKey;
+        }
+        if (cfg.kisAppKey) { toSave.kisAppKey = cfg.kisAppKey; savedKisConfig.appKey = cfg.kisAppKey; }
+        if (cfg.kisAppSecret) { toSave.kisAppSecret = cfg.kisAppSecret; savedKisConfig.appSecret = cfg.kisAppSecret; }
+        if (cfg.kisAccount) { toSave.kisAccount = cfg.kisAccount; savedKisConfig.account = cfg.kisAccount; }
+        if (cfg.kisMode) { toSave.kisMode = cfg.kisMode; savedKisConfig.mode = cfg.kisMode; }
+        if (cfg.dartKey) { toSave.dartKey = cfg.dartKey; savedKisConfig.dartKey = cfg.dartKey; }
+        const ok = saveConfig(toSave);
+        console.log('✅ API 설정 저장됨:', Object.keys(toSave).join(', '));
+        res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+        res.end(JSON.stringify({ ok, saved: Object.keys(toSave) }));
+      } catch(e) {
+        res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+        res.end(JSON.stringify({ ok: false, error: e.message }));
+      }
+    });
+    return;
+  }
+
+  // ── 저장된 설정 조회 (/api/get-config)
+  if (url === '/api/get-config' && req.method === 'GET') {
+    const cfg = loadConfig();
+    // 키는 힌트만 반환 (보안)
+    res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+    res.end(JSON.stringify({
+      ok: true,
+      claudeKey: cfg.claudeKey ? cfg.claudeKey.slice(0,10)+'...' : '',
+      claudeKeyFull: cfg.claudeKey || '',
+      kisAppKey: cfg.kisAppKey || '',
+      kisAppSecret: cfg.kisAppSecret || '',
+      kisAccount: cfg.kisAccount || '',
+      kisMode: cfg.kisMode || 'mock',
+      dartKey: cfg.dartKey || '',
+      updatedAt: cfg.updatedAt || '',
+    }));
     return;
   }
 

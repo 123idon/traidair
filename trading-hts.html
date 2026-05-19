@@ -4508,44 +4508,81 @@ function loadKisCfgFromStorage(){
 }
 let kisConfig = loadKisCfgFromStorage();
 
-function saveKisConfig(){
+async function saveKisConfig(){
   const ak = document.getElementById('kis-appkey')?.value?.trim() || '';
   const as = document.getElementById('kis-appsecret')?.value?.trim() || '';
   const ac = document.getElementById('kis-account')?.value?.trim() || '';
   const dk = document.getElementById('dart-key')?.value?.trim() || '';
   const ck = document.getElementById('claude-apikey')?.value?.trim() || '';
   const mode = document.getElementById('kis-real')?.checked ? 'real' : 'mock';
-  // 실거래 전환 시 경고
   if(mode === 'real' && kisConfig.mode !== 'real'){
     if(!confirm('⚠ 실거래 모드로 전환합니다.\n실제 자금이 사용됩니다.\n계속하시겠습니까?')){
       document.getElementById('kis-mock').checked = true; return;
     }
   }
   kisConfig = { appKey:ak, appSecret:as, account:ac, mode, dartKey:dk, claudeKey:ck };
-  // 두 키에 모두 저장 (하위 호환)
+  // localStorage 저장 (로컬 빠른 복원용)
   const serialized = JSON.stringify(kisConfig);
   localStorage.setItem(KIS_CFG_KEY, serialized);
   localStorage.setItem('kisConfig', serialized);
-  // Claude API Key를 서버 세션으로 전송
-  if(ck) fetch('/api/set-claude-key', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({key:ck})}).catch(()=>{});
-  updateKisStatus();
-  showAlert('✅ 저장 완료', 'API 설정이 저장되었습니다.\n브라우저를 닫아도 유지됩니다.');
-}
-function loadKisConfig(){
-  const ki = document.getElementById('kis-appkey');
-  const ks = document.getElementById('kis-appsecret');
-  const ka = document.getElementById('kis-account');
-  const kd = document.getElementById('dart-key');
-  const kc = document.getElementById('claude-apikey');
-  if(ki && kisConfig.appKey) ki.value = kisConfig.appKey;
-  if(ks && kisConfig.appSecret) ks.value = kisConfig.appSecret;
-  if(ka && kisConfig.account) ka.value = kisConfig.account;
-  if(kd && kisConfig.dartKey) kd.value = kisConfig.dartKey;
-  if(kc && kisConfig.claudeKey) kc.value = kisConfig.claudeKey;
-  if(kisConfig.mode === 'real'){
-    const kr = document.getElementById('kis-real');
-    if(kr) kr.checked = true;
+  // ★ 서버에 영구 저장 (Railway 재배포 후에도 유지)
+  try {
+    const r = await fetch('/api/save-config', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        claudeKey: ck,
+        kisAppKey: ak,
+        kisAppSecret: as,
+        kisAccount: ac,
+        kisMode: mode,
+        dartKey: dk,
+      })
+    });
+    const d = await r.json();
+    if(d.ok){
+      updateKisStatus();
+      showAlert('✅ 저장 완료', '서버에 영구 저장되었습니다.\n재배포 후에도 유지됩니다.');
+    } else {
+      throw new Error(d.error || '저장 실패');
+    }
+  } catch(e) {
+    // 서버 저장 실패해도 localStorage는 저장됨
+    updateKisStatus();
+    showAlert('⚠ 부분 저장', `서버 저장 실패: ${e.message}\n브라우저 로컬에는 저장되었습니다.`);
   }
+}
+
+async function loadKisConfig(){
+  // 1) 서버에서 저장된 설정 먼저 로드
+  try {
+    const r = await fetch('/api/get-config');
+    const d = await r.json();
+    if(d.ok && (d.kisAppKey || d.claudeKeyFull)) {
+      kisConfig = {
+        appKey: d.kisAppKey || kisConfig.appKey || '',
+        appSecret: d.kisAppSecret || kisConfig.appSecret || '',
+        account: d.kisAccount || kisConfig.account || '',
+        mode: d.kisMode || kisConfig.mode || 'mock',
+        dartKey: d.dartKey || kisConfig.dartKey || '',
+        claudeKey: d.claudeKeyFull || kisConfig.claudeKey || '',
+      };
+      // localStorage도 동기화
+      localStorage.setItem(KIS_CFG_KEY, JSON.stringify(kisConfig));
+    }
+  } catch(e) {}
+  // 2) UI에 반영
+  const ki=document.getElementById('kis-appkey');
+  const ks=document.getElementById('kis-appsecret');
+  const ka=document.getElementById('kis-account');
+  const kd=document.getElementById('dart-key');
+  const kc=document.getElementById('claude-apikey');
+  if(ki && kisConfig.appKey) ki.value=kisConfig.appKey;
+  if(ks && kisConfig.appSecret) ks.value=kisConfig.appSecret;
+  if(ka && kisConfig.account) ka.value=kisConfig.account;
+  if(kd && kisConfig.dartKey) kd.value=kisConfig.dartKey;
+  if(kc && kisConfig.claudeKey) kc.value=kisConfig.claudeKey;
+  if(kisConfig.mode==='real'){const kr=document.getElementById('kis-real');if(kr)kr.checked=true;}
   updateKisStatus();
 }
 function updateKisStatus(){
@@ -5152,7 +5189,23 @@ window.onload=()=>{
   document.getElementById("mockDate").value=sim.date;
   initChartEvents();
   _initResizeObserver();
-  if(kisConfig.claudeKey){fetch('/api/set-claude-key',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:kisConfig.claudeKey})}).catch(()=>{});}
+  // ★ 서버에서 저장된 API 설정 로드 (재배포 후에도 유지)
+  fetch('/api/get-config').then(r=>r.json()).then(d=>{
+    if(d.ok && (d.kisAppKey || d.claudeKeyFull)){
+      kisConfig={
+        appKey: d.kisAppKey||kisConfig.appKey||'',
+        appSecret: d.kisAppSecret||kisConfig.appSecret||'',
+        account: d.kisAccount||kisConfig.account||'',
+        mode: d.kisMode||kisConfig.mode||'mock',
+        dartKey: d.dartKey||kisConfig.dartKey||'',
+        claudeKey: d.claudeKeyFull||kisConfig.claudeKey||'',
+      };
+      localStorage.setItem(KIS_CFG_KEY, JSON.stringify(kisConfig));
+      if(kisConfig.claudeKey) fetch('/api/set-claude-key',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:kisConfig.claudeKey})}).catch(()=>{});
+      updateKisStatus();
+      console.log('✅ 서버에서 설정 로드됨');
+    }
+  }).catch(()=>{});
   updateKisStatus();
   renderAll();
   genCandles();
