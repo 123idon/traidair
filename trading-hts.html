@@ -347,27 +347,56 @@ input,select,textarea{-webkit-appearance:none;appearance:none;}
 /* ── 태블릿/모바일 (860px 이하) ── */
 @media(max-width:860px){
   :root{--mob-nav:56px;}
+  /* 그리드: 사이드패널 0 → 중앙만 */
   .hts{grid-template-columns:0 1fr 0 0;grid-template-rows:1fr;}
-  .lp,.rp,.brp{position:fixed;z-index:300;top:0;bottom:calc(var(--mob-nav) + var(--sab));background:var(--pan);box-shadow:var(--sh2);transition:transform .25s cubic-bezier(.4,0,.2,1);will-change:transform;}
-  .lp{left:0;width:220px;transform:translateX(-100%);}
-  .rp{right:0;width:200px;transform:translateX(100%);}
-  .brp{right:0;width:240px;transform:translateX(100%);}
+  /* 슬라이드 패널 */
+  .lp,.rp,.brp{
+    position:fixed;z-index:300;
+    top:0;bottom:calc(var(--mob-nav) + var(--sab));
+    background:var(--pan);box-shadow:var(--sh2);
+    transition:transform .25s cubic-bezier(.4,0,.2,1);
+    will-change:transform;
+    overflow-y:auto;-webkit-overflow-scrolling:touch;
+  }
+  .lp{left:0;width:min(80vw,260px);transform:translateX(-100%);}
+  .rp{right:0;width:min(80vw,240px);transform:translateX(100%);}
+  .brp{right:0;width:min(85vw,280px);transform:translateX(100%);}
   .lp.mob-open,.rp.mob-open,.brp.mob-open{transform:translateX(0);}
+  /* 하단 탭바 */
   .mob-tabbar{display:flex;}
-  .mock-bar{flex-wrap:wrap;height:auto;gap:4px;}
+  /* 시뮬 바 줄바꿈 허용 */
+  .mock-bar{flex-wrap:wrap;height:auto;gap:4px;padding:4px 8px;}
+  /* 불필요 요소 숨김 */
   .si,.clk{display:none;}
+  /* 배속 버튼 앞 4개만 */
   .spd-btn:nth-child(n+5){display:none;}
+  /* 하단 여백 (홈바) */
   .page{padding-bottom:calc(var(--mob-nav) + var(--sab));}
+  /* 터치 최적화 */
+  button,a,[role=button]{min-height:36px;min-width:36px;}
+  /* 차트 헤더 스크롤 */
+  .cp-head{overflow-x:auto;overflow-y:hidden;flex-wrap:nowrap;-webkit-overflow-scrolling:touch;}
+  .cp-head::-webkit-scrollbar{display:none;}
+  /* 인디케이터 버튼 숨김 (모바일 공간 부족) */
+  .ind-btn:nth-child(n+5){display:none;}
+  /* 주문창 폰트 키우기 */
+  #ofPr,#ofQty,#ofAmt{font-size:16px !important;}/* iOS zoom 방지 */
+  /* 설정창 full-width */
+  .modal-content{width:94vw !important;max-width:none !important;}
 }
 /* ── 모바일 (520px 이하) ── */
 @media(max-width:520px){
-  .bar{gap:4px;padding:0 7px;}
-  .tab{padding:3px 7px;font-size:10px;min-height:32px;}
-  .ibtn{font-size:10px;padding:3px 7px;min-height:32px;}
+  .bar{gap:3px;padding:0 6px;}
+  .tab{padding:2px 6px;font-size:10px;min-height:34px;}
+  .ibtn{font-size:10px;padding:3px 7px;min-height:34px;}
   .stats-grid{grid-template-columns:1fr 1fr;}
-  .lp{width:85vw;max-width:300px;}
-  .rp{width:85vw;max-width:280px;}
-  .brp{width:90vw;max-width:320px;}
+  .lp{width:90vw;max-width:300px;}
+  .rp{width:90vw;max-width:280px;}
+  .brp{width:92vw;max-width:320px;}
+  /* 진입후보 카드 간소화 */
+  .cand-card{padding:5px 4px;}
+  /* 상단 지수바 숨김 */
+  #idxBar{display:none;}
 }
 /* ── 소형 모바일 (380px 이하) ── */
 @media(max-width:380px){
@@ -595,7 +624,6 @@ input,select,textarea{-webkit-appearance:none;appearance:none;}
           <button onclick="runMaterialAnalysis()" style="width:100%;margin-top:3px;padding:4px;border-radius:5px;border:none;background:var(--a);color:#000;font-size:9px;font-weight:700;cursor:pointer;">S/A/B/C 재료강도 분석</button>
           <div id="materialResult" style="font-size:9px;margin-top:4px;line-height:1.6;"></div>
         </div>
-      </div>
       </div>
     </div>
 
@@ -1794,7 +1822,7 @@ function calcVWAP(cs){let pv=0,tv=0;return cs.map(c=>{pv+=((c.h+c.l+c.c)/3)*c.v;
 
 function rng32(seed){let a=seed|0;return()=>{a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
 
-function getDashData(dt){try{const r=localStorage.getItem("dashMarket_"+dt);return r?JSON.parse(r):null;}catch(e){return null;}}
+
 
 // ── 서버 데이터 저장/로드 (모의투자 계좌, 매매일지, 통계 영구 보존) ──
 let _saveTimer = null;
@@ -1958,6 +1986,7 @@ let cfg={capital:10000000,dayloss:2,maxpos:20,clim:140,mlim:40,crate:8.5,mrate:1
 let mock={cash:10000000,positions:{},trades:[],todayPnl:0,todayTrades:0,lossSeries:0,creditUsed:0,marginUsed:0};
 let sim={playing:false,speed:60,idx:0,candles:[],timer:null,date:todayStr(),tf:"5"};
 
+function openSettings(){openModal('settings');}
 // ═══════════════════════════════════════════════════════
 // ★★★ 절대 원칙: 미래 데이터 참조 완전 차단 ★★★
 // 모든 봉 데이터 접근은 반드시 아래 함수를 통해서만.
@@ -2406,22 +2435,7 @@ function chartSetCount(val){
 }
 
 // ── 시뮬레이션 업데이트 (Chart.js 없이) ──
-function updChartToIdx(){
-  const cs=sim.candles.slice(0,sim.idx+1);
-  if(!cs.length)return;
-  drawChart();
-  const cur=cs[cs.length-1]; updPrice(cur);
-  const msBar=document.getElementById('msBar');if(msBar)msBar.textContent=sim.idx+1;
-  const msTime=document.getElementById('msTime');if(msTime)msTime.textContent=cur.t;
-  const pct=(sim.candles.length>1?sim.idx/(sim.candles.length-1):0)*100;
-  const pf=document.getElementById('progF');if(pf)pf.style.width=pct+'%';
-  const sl=document.getElementById('simSlider');if(sl)sl.value=pct;
-  updPnl(); renderOB();
-  updatePhase8Live(); // 실시간 Phase 8 수치 업데이트
-  if(autoState.running&&sim.idx>0&&sim.idx%5===0)runAutoStep(cs);
-  updateTrailPanel();
-  setTimeout(checkPsychWarnings,100);
-}
+
 
 // resize observer (캔버스 크기 변경 시 재렌더)
 function _initResizeObserver(){
@@ -2496,7 +2510,7 @@ function setTF(el,tf){
   try{
     sim.tf=tf;
     document.querySelectorAll(".tf-btn").forEach(b=>b.classList.remove("on"));
-    el.classList.add("on");
+    if(el)el.classList.add("on");
     genCandles(activeTk,sim.date);
     // 일봉 계열은 genCandles에서 idx/view 설정함, 분봉은 0부터
     const isDaily = tf==='D'||tf.startsWith('D');
@@ -4114,6 +4128,9 @@ async function detectTechnique(cs, stk){
 let analysisRunning=false;
 let analysisCache={};
 async function runFullAnalysis(){
+  const _cacheKey='analysis_'+activeTk+'_'+sim.idx;
+  const _cached=_getCachedAnalysis(_cacheKey);
+  if(_cached){const box=document.getElementById('aiAdvBox');if(box)box.innerHTML=_cached;finishProgress('캐시된 분석');return;}
   if(analysisRunning)return;
   const cacheKey=activeTk+'_'+sim.idx;
   if(analysisCache[cacheKey]&&Date.now()-analysisCache[cacheKey].ts<300000){
@@ -5128,27 +5145,6 @@ function renderTradeLog(){
 // ═══════════════════════════════
 // WATCHLIST / LEFT
 // ═══════════════════════════════
-function renderCands(){
-  const cc=document.getElementById("candCount");
-  const sorted=[...CANDS].sort((a,b)=>(b.score||0)-(a.score||0));
-  if(cc){cc.textContent=sorted.length+"/3";cc.style.color=sorted.length>=3?"var(--r)":"var(--ts)";}
-  document.getElementById("candList").innerHTML=sorted.map((c,i)=>{
-    const s=STOCKS.find(s=>s.tk===c.tk)||{nm:c.tk,pr:0,base:1};
-    const sc=c.score||0;
-    const scoreCol=sc>=80?"var(--g)":sc>=65?"var(--a)":"var(--r)";
-    const chg=((s.pr-s.base)/s.base*100).toFixed(2);
-    const up=parseFloat(chg)>=0;
-    return`<div class="wli" onclick="selectStk('${c.tk}')" style="position:relative;">
-      <div style="position:absolute;top:4px;right:6px;font-family:var(--mono);font-size:9px;font-weight:800;color:${scoreCol};">${sc}점</div>
-      <div class="wl-tk" style="font-size:9px;font-weight:700;color:var(--b);">${i+1}</div>
-      <div style="flex:2;min-width:0;">
-        <div class="wl-nm">${s.nm}</div>
-        <div style="font-size:8px;color:var(--b);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${c.why}</div>
-      </div>
-      <div class="wl-ch ${up?"cu":"cd"}" style="font-size:9px;">${up?"+":""}${chg}%</div>
-    </div>`;
-  }).join("");
-}
 
 // 다중 선택된 필터 인덱스
 let selectedFilters=new Set();
@@ -5202,13 +5198,6 @@ function applySelectedFilters(){
       <div class="wl-ch ${up?"cu":"cd"}">${up?"+":""}${c}%</div>
     </div>`;
   }).join("");
-}
-
-function addCandFromFilter(tk, why){
-  if(CANDS.find(c=>c.tk===tk))return;
-  if(CANDS.length>=3){CANDS.shift();}
-  CANDS.push({tk, why, score:70});
-  renderCands();
 }
 
 // 기존 applyFil 호환
@@ -5325,7 +5314,6 @@ async function genJModal(){
     saveJEntry(sim.date,p,pnl,wins,total,str);
   }catch(e){body.innerHTML="<div style='color:var(--r);font-size:11px;'>⚠ API 오류 — /api/claude 확인</div>";}
 }
-function saveJEntry(date,p,pnl,wins,total,str){const js=JSON.parse(localStorage.getItem("htsJournals")||"{}");js[date]={date,pnl,wins,total,str,...p};const jv=JSON.stringify(js);localStorage.setItem("htsJournals",jv);saveToServer("htsJournals",jv);renderJPage();}
 function renderJPage(){
   const js=JSON.parse(localStorage.getItem("htsJournals")||"{}");
   const entries=Object.values(js).sort((a,b)=>b.date.localeCompare(a.date));
@@ -5575,86 +5563,7 @@ const SECTOR_STOCKS = {
   '철강·소재': ['005490','004020','002810','006360','011790'],
 };
 
-async function loadSectorRanking(){
-  const el = document.getElementById('sectorRankList');
-  const btn = document.getElementById('sectorRankBtn');
-  if(!el) return;
-  el.innerHTML = '<span style="color:var(--tm);font-style:italic;">AI 분석 중...</span>';
-  if(btn) btn.disabled = true;
-  try {
-    // ★ 미래 참조 금지: 현재 시각(sim.idx)까지의 봉만 사용
-    const cs = getRecentCandles(20);
-    const cls = cs.map(c=>c.c);
-    const rsi = calcRSI(cls,14).slice(-1)[0]||50;
-    const volR = cs.length>=2?(cs[cs.length-1].v/cs[cs.length-2].v).toFixed(1):'1.0';
-    const prompt = `단타 트레이더를 위한 오늘 강세 섹터 순위 분석이야.
 
-현재 시장 상황:
-- 종목: ${STOCKS.find(s=>s.tk===activeTk)?.nm||activeTk}
-- RSI: ${rsi.toFixed(0)} | 거래량비율: ${volR}배
-
-다음 섹터들의 오늘 강세 순위를 매겨줘:
-반도체, 2차전지, 바이오, 자동차, 인터넷·플랫폼, 방산·우주, 조선, 철강·소재
-
-응답 형식 (JSON만, 다른 텍스트 없이):
-{"sectors":[{"rank":1,"name":"섹터명","reason":"한줄이유","signal":"🔥강세/🟡중립/⚪약세"},...]}`;
-
-    const data = await callClaude({model:'claude-sonnet-4-5',max_tokens:600,messages:[{role:'user',content:prompt}]},'섹터순위');
-    const text = data.content?.[0]?.text||'';
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if(!jsonMatch) throw new Error('파싱 실패');
-    const result = JSON.parse(jsonMatch[0]);
-    const sectors = result.sectors||[];
-    el.innerHTML = sectors.slice(0,6).map((s,i)=>`
-      <div onclick="loadSectorStocks('${s.name}')" style="display:flex;align-items:center;gap:6px;padding:5px 4px;border-radius:6px;cursor:pointer;transition:background .1s;" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='none'">
-        <span style="font-size:11px;font-weight:800;color:${i<3?'var(--b)':'var(--tm)'};min-width:14px;">${i+1}</span>
-        <span style="font-size:10px;">${s.signal}</span>
-        <div style="flex:1;min-width:0;">
-          <div style="font-size:10px;font-weight:700;color:var(--tp);">${s.name}</div>
-          <div style="font-size:8px;color:var(--tm);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${s.reason}</div>
-        </div>
-        <span style="font-size:8px;color:var(--tm);">›</span>
-      </div>`).join('');
-  } catch(e) {
-    el.innerHTML = `<span style="color:var(--r);">분석 실패: ${e.message}</span>`;
-  }
-  if(btn) btn.disabled = false;
-}
-
-async function loadSectorStocks(sectorName){
-  const el = document.getElementById('sectorRankList');
-  el.innerHTML = `<div style="color:var(--tm);font-size:9px;margin-bottom:6px;">← <span onclick="loadSectorRanking()" style="cursor:pointer;color:var(--b);">섹터 순위로</span></div><span style="color:var(--tm);font-style:italic;">🔍 ${sectorName} 주도주 분석 중...</span>`;
-  const stocks = SECTOR_STOCKS[sectorName]||[];
-  const stockNames = stocks.map(tk=>{const s=STOCKS.find(x=>x.tk===tk);return s?`${s.nm}(${tk})`:`(${tk})`;}).join(', ');
-  try{
-    const prompt = `오늘 ${sectorName} 섹터 주도주 순위를 알려줘. 분석 대상: ${stockNames||sectorName+' 대표 종목들'}
-
-단타 트레이더 관점에서 오늘 가장 강한 종목 순서로 알려줘.
-
-응답 형식 (JSON만):
-{"stocks":[{"rank":1,"name":"종목명","code":"코드","reason":"한줄이유(쉽게)","action":"매수관심/관망/주의"},...]}`;
-    const data = await callClaude({model:'claude-sonnet-4-5',max_tokens:500,messages:[{role:'user',content:prompt}]},'주도주');
-    const text = data.content?.[0]?.text||'';
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if(!jsonMatch) throw new Error('파싱 실패');
-    const result = JSON.parse(jsonMatch[0]);
-    const stks = result.stocks||[];
-    const colors = {'매수관심':'var(--g)','관망':'var(--a)','주의':'var(--r)'};
-    el.innerHTML = `<div style="color:var(--tm);font-size:9px;margin-bottom:6px;cursor:pointer;" onclick="loadSectorRanking()">← 섹터 순위로</div>
-<div style="font-size:10px;font-weight:700;color:var(--tp);margin-bottom:5px;">🏆 ${sectorName} 주도주</div>`+
-    stks.slice(0,5).map((s,i)=>`
-      <div onclick="if('${s.code}')selectStk('${s.code}')" style="display:flex;align-items:center;gap:6px;padding:5px 4px;border-radius:6px;cursor:pointer;" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='none'">
-        <span style="font-size:11px;font-weight:800;color:${i<2?'var(--b)':'var(--tm)'};min-width:14px;">${i+1}</span>
-        <div style="flex:1;min-width:0;">
-          <div style="font-size:10px;font-weight:700;">${s.name}</div>
-          <div style="font-size:8px;color:var(--tm);">${s.reason}</div>
-        </div>
-        <span style="font-size:8px;font-weight:700;color:${colors[s.action]||'var(--b)'};">${s.action}</span>
-      </div>`).join('');
-  }catch(e){
-    el.innerHTML = `<div onclick="loadSectorRanking()" style="cursor:pointer;color:var(--b);font-size:9px;margin-bottom:4px;">← 섹터 순위로</div><span style="color:var(--r);">분석 실패</span>`;
-  }
-}
 
 // ═══════════════════════════════
 // 차트 우클릭 AI 분석
@@ -5767,49 +5676,6 @@ async function analyzeChartSignals(){
   // 너무 많으면 최근 것만
   _aiSignals = signals.slice(-10);
   drawSignalOverlay();
-}
-
-function drawSignalOverlay(){
-  const canvas = document.getElementById('signalChart');
-  const mainCv = document.getElementById('mainChart');
-  if(!canvas||!mainCv) return;
-  const W = mainCv.width||700, H = mainCv.height||400;
-  if(canvas.width!==W||canvas.height!==H){canvas.width=W;canvas.height=H;}
-  const ctx = canvas.getContext('2d');
-  ctx.clearRect(0,0,W,H);
-  if(!_aiSignals.length) return;
-  const cs = _cvCs();
-  if(!cs.length) return;
-  const PL=4,PR=54,PT=8,PB=22,SB=12;
-  const volH = inds.vol?Math.floor(H*0.20):0;
-  const mainH = H-PT-PB-volH-SB;
-  const cw = W-PL-PR;
-  const prices = cs.flatMap(c=>[c.h,c.l]).filter(v=>v>0);
-  const yMin = Math.min(...prices)*(1-0.06);
-  const yMax = Math.max(...prices)*(1+0.06);
-  const yR = yMax-yMin||1;
-  const toX = i => PL+(i+0.5)*(cw/cs.length);
-  const toY = v => PT+mainH*(1-(v-yMin)/yR);
-  const bw = Math.max(2,Math.min(14,cw/cs.length*0.6));
-  _aiSignals.forEach(sig=>{
-    if(sig.idx<0||sig.idx>=cs.length) return;
-    const x = toX(sig.idx);
-    const y = toY(sig.price);
-    const isBuy = sig.type==='buy';
-    ctx.save();
-    // 삼각형 표시
-    ctx.fillStyle = isBuy?'rgba(16,185,129,.9)':'rgba(239,68,68,.9)';
-    ctx.beginPath();
-    if(isBuy){ctx.moveTo(x,y+16);ctx.lineTo(x-7,y+28);ctx.lineTo(x+7,y+28);}
-    else{ctx.moveTo(x,y-16);ctx.lineTo(x-7,y-28);ctx.lineTo(x+7,y-28);}
-    ctx.fill();
-    // 텍스트
-    ctx.fillStyle = isBuy?'#10b981':'#ef4444';
-    ctx.font = 'bold 8px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(isBuy?'B':'S', x, isBuy?y+38:y-32);
-    ctx.restore();
-  });
 }
 
 // ── 시뮬 슬라이더 이동 ──
@@ -6421,6 +6287,13 @@ function refreshAllData(){
   setTimeout(()=>finishProgress('새로고침 완료'),800);
 }
 
+const _analysisCache={};
+function _getCachedAnalysis(key){
+  const c=_analysisCache[key];
+  if(c&&Date.now()-c.ts<5*60*1000) return c.data;
+  return null;
+}
+function _setCachedAnalysis(key,data){_analysisCache[key]={ts:Date.now(),data};}
 window.onload=()=>{
   loadState();
   goPage('hts',document.getElementById('tab-hts'));
