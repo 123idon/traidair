@@ -638,31 +638,32 @@ input,select,textarea{-webkit-appearance:none;appearance:none;}
 
       <!-- AI 섹터/종목 추천 패널 (Phase 6, 7 기반) -->
       <div class="lpb" id="lpb-ai">
+        <!-- 오늘의 강세 섹터 순위 -->
         <div class="sec" style="padding:6px 8px;">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
-            <span class="sec-t" style="margin-bottom:0;color:var(--p);">🤖 AI 섹터 분석</span>
-            <button onclick="runAISectorAnalysis()" style="padding:2px 7px;border-radius:5px;border:none;background:var(--p);color:#fff;font-size:9px;font-weight:600;cursor:pointer;">분석</button>
+            <span class="sec-t" style="margin-bottom:0;color:var(--p);">🏆 오늘 강세 섹터</span>
+            <button onclick="loadSectorRanking()" id="sectorRankBtn" style="padding:2px 8px;border-radius:5px;border:none;background:var(--p);color:#fff;font-size:9px;font-weight:600;cursor:pointer;">순위 보기</button>
           </div>
-          <div id="aiSectorResult" style="font-size:9px;color:var(--tm);line-height:1.6;">
-            분석 버튼을 눌러주세요.<br>오늘 강한 섹터와 재료 강도를 분석합니다.
-          </div>
-        </div>
-        <div class="sec" style="padding:6px 8px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
-            <span class="sec-t" style="margin-bottom:0;color:var(--b);">🔍 AI 종목 스크리닝</span>
-            <button onclick="runAIStockScreening()" style="padding:2px 7px;border-radius:5px;border:none;background:var(--b);color:#fff;font-size:9px;font-weight:600;cursor:pointer;">스크리닝</button>
-          </div>
-          <div style="font-size:8px;color:var(--tm);margin-bottom:4px;">Phase 7-7 기준: 수급폭발·기관연속·모멘텀·눌림목</div>
-          <div id="aiScreenResult" style="font-size:9px;color:var(--tm);line-height:1.6;">
-            스크리닝 버튼을 눌러주세요.
+          <div id="sectorRankList" style="font-size:9px;color:var(--tm);line-height:1.5;">
+            버튼을 눌러 오늘 주도 섹터를 확인하세요.
           </div>
         </div>
+        <!-- 재료 강도 판별 -->
         <div class="sec" style="padding:6px 8px;">
           <div class="sec-t" style="color:var(--a);">📋 재료 강도 판별</div>
           <div style="font-size:8px;color:var(--tm);margin-bottom:4px;">뉴스/공시 텍스트 붙여넣기</div>
           <textarea id="materialInput" style="width:100%;height:50px;background:var(--bg);border:1px solid var(--br);border-radius:6px;color:var(--tp);font-family:var(--sans);font-size:9px;padding:4px;resize:none;outline:none;" placeholder="예: 삼성전자 HBM4 수주 1조원..."></textarea>
           <button onclick="runMaterialAnalysis()" style="width:100%;margin-top:3px;padding:4px;border-radius:5px;border:none;background:var(--a);color:#000;font-size:9px;font-weight:700;cursor:pointer;">재료 강도 분석 (S/A/B/C)</button>
           <div id="materialResult" style="font-size:9px;margin-top:4px;line-height:1.6;"></div>
+        </div>
+        <!-- AI 종목 스크리닝 -->
+        <div class="sec" style="padding:6px 8px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
+            <span class="sec-t" style="margin-bottom:0;color:var(--b);">🔍 AI 종목 스크리닝</span>
+            <button onclick="runAIStockScreening()" style="padding:2px 7px;border-radius:5px;border:none;background:var(--b);color:#fff;font-size:9px;font-weight:600;cursor:pointer;">스크리닝</button>
+          </div>
+          <div style="font-size:8px;color:var(--tm);margin-bottom:4px;">수급폭발·모멘텀·눌림목 기준</div>
+          <div id="aiScreenResult" style="font-size:9px;color:var(--tm);line-height:1.6;">스크리닝 버튼을 눌러주세요.</div>
         </div>
       </div>
     </div>
@@ -702,10 +703,26 @@ input,select,textarea{-webkit-appearance:none;appearance:none;}
         </select>
       </div>
       <div class="chart-area">
-        <div class="chart-main"><canvas id="mainChart"></canvas></div>
+        <div class="chart-main"><canvas id="mainChart"></canvas><canvas id="signalChart" style="position:absolute;top:0;left:0;pointer-events:none;"></canvas></div>
         <div class="subc hide" id="rsiSub"><div class="slbl">RSI(14)</div><canvas id="rsiCanvas"></canvas></div>
         <div class="subc hide" id="macdSub"><div class="slbl">MACD(12,26,9)</div><canvas id="macdCanvas"></canvas></div>
       </div>
+    </div>
+    <!-- 차트 우클릭 AI 분석 메뉴 -->
+    <div id="chartCtxMenu" style="display:none;position:fixed;z-index:999;background:var(--pan);border:1px solid var(--br);border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,.15);padding:4px;min-width:160px;">
+      <div style="font-size:9px;font-weight:700;padding:4px 8px;color:var(--tm);border-bottom:1px solid var(--br);margin-bottom:2px;" id="ctxCandleInfo">-</div>
+      <button onclick="ctxAskAI('buy')" style="width:100%;text-align:left;padding:5px 8px;border:none;background:none;color:var(--g);font-size:10px;font-weight:600;cursor:pointer;border-radius:4px;">🟢 여기서 매수하면?</button>
+      <button onclick="ctxAskAI('sell')" style="width:100%;text-align:left;padding:5px 8px;border:none;background:none;color:var(--r);font-size:10px;font-weight:600;cursor:pointer;border-radius:4px;">🔴 여기서 매도하면?</button>
+      <button onclick="ctxAskAI('analysis')" style="width:100%;text-align:left;padding:5px 8px;border:none;background:none;color:var(--b);font-size:10px;font-weight:600;cursor:pointer;border-radius:4px;">🔍 이 구간 AI 분석</button>
+      <button onclick="closeChartCtx()" style="width:100%;text-align:left;padding:4px 8px;border:none;background:none;color:var(--tm);font-size:9px;cursor:pointer;">닫기</button>
+    </div>
+    <!-- AI 분석 결과 팝업 -->
+    <div id="chartAiPopup" style="display:none;position:fixed;z-index:998;background:var(--pan);border:1px solid var(--br);border-radius:10px;box-shadow:0 4px 24px rgba(0,0,0,.2);padding:12px 14px;max-width:280px;font-size:11px;line-height:1.6;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <span style="font-weight:700;font-size:12px;" id="aiPopupTitle">AI 분석</span>
+        <button onclick="document.getElementById('chartAiPopup').style.display='none'" style="border:none;background:none;font-size:14px;cursor:pointer;color:var(--tm);">✕</button>
+      </div>
+      <div id="aiPopupBody" style="color:var(--ts);">분석 중...</div>
     </div>
 
     <!-- AI 종합분석 패널 (col2 row2) — Phase 8 통합 -->
@@ -722,10 +739,20 @@ input,select,textarea{-webkit-appearance:none;appearance:none;}
         </div>
       </div>
       <div style="display:flex;flex:1;min-height:0;overflow:hidden;">
-        <!-- 매매기법 -->
+        <!-- 매매기법 선택 -->
         <div style="flex:1;padding:4px 7px;border-right:1px solid var(--br);overflow-y:auto;min-width:0;">
-          <div style="font-size:7px;color:var(--tm);font-family:var(--mono);margin-bottom:2px;">🎯 매매기법</div>
-          <div id="techniqueTag" style="font-size:11px;font-weight:700;color:var(--b);">-</div>
+          <div style="font-size:7px;color:var(--tm);font-family:var(--mono);margin-bottom:3px;">🎯 매매기법</div>
+          <select id="techniqueSelect" onchange="setUserTechnique(this.value)" style="width:100%;font-size:9px;padding:2px 3px;border:1px solid var(--br);border-radius:4px;background:var(--inp);color:var(--tp);margin-bottom:3px;cursor:pointer;">
+            <option value="auto">🤖 AI 자동 감지</option>
+            <option value="눌림목">📉 눌림목</option>
+            <option value="돌파">🚀 돌파</option>
+            <option value="첫봉">🕯 첫봉</option>
+            <option value="갭상승">📈 갭상승</option>
+            <option value="이슈테마">🔥 이슈테마</option>
+            <option value="역추세">↩ 역추세</option>
+            <option value="스캘핑">⚡ 스캘핑</option>
+          </select>
+          <div id="techniqueTag" style="font-size:10px;font-weight:700;color:var(--b);display:none;">-</div>
           <div id="techniqueReason" style="font-size:8px;color:var(--ts);line-height:1.4;margin-top:1px;">분석 버튼 눌러주세요</div>
         </div>
         <!-- 타점 -->
@@ -2059,6 +2086,8 @@ function drawChart(){
   _drawMACD(cs,cls);
 
   mChart={_ok:true};
+  // AI 타점 오버레이
+  drawSignalOverlay();
 }
 
 function _drawRSI(cs,cls){
@@ -3906,6 +3935,17 @@ const TECHNIQUES = {
 
 async function detectTechnique(cs, stk){
   if(!cs||cs.length<10) return null;
+  // 사용자가 매매기법 직접 선택한 경우 그대로 사용
+  if(userTechnique && userTechnique !== 'auto'){
+    const t = TECHNIQUES[userTechnique]||TECHNIQUES["스캘핑"];
+    const cls=cs.map(c=>c.c);
+    const lc=cs[cs.length-1];
+    const ma20=(calcMA(cls,20).slice(-1)[0]||lc.c);
+    const entryPr=lc.c;
+    const stopPr=Math.round(entryPr*(1-0.03));
+    const targetPr=Math.round(entryPr+(entryPr-stopPr)*2);
+    return {technique:userTechnique,score:3,phase:t.phase,cond:t.cond,entry:entryPr,stop:stopPr,target:targetPr,rr:2,ma5:Math.round(calcMA(cls,5).slice(-1)[0]||lc.c),ma20:Math.round(ma20),rsi:(calcRSI(cls,14).slice(-1)[0]||50).toFixed(0),volRatio:'1.0'};
+  }
   const cls=cs.map(c=>c.c), vls=cs.map(c=>c.v);
   const lc=cs[cs.length-1], pc=cs[cs.length-2]||lc;
   const ma5=calcMA(cls,5), ma20=calcMA(cls,20);
@@ -4324,60 +4364,68 @@ async function updateAIAdvisor(){
   const lc=cs[cs.length-1];
   const ma5=calcMA(cls,5),ma20=calcMA(cls,20),ma60=calcMA(cls,60),rsi=calcRSI(cls,14);
   const lma5=ma5[ma5.length-1]||0,lma20=ma20[ma20.length-1]||0,lma60=ma60[ma60.length-1]||0;
-  const lrsi=(rsi[rsi.length-1]||50).toFixed(0);
-  const volR=vls.length>=2?(vls[vls.length-1]/vls[vls.length-2]).toFixed(1):"1.0";
-  // MA 배열 판단
-  const maArr=lma5>lma20&&lma20>lma60?"정배열 ✅":lma5<lma20&&lma20<lma60?"역배열 ⚠️":"혼합";
-  // 스코어
+  const lrsi=parseFloat((rsi[rsi.length-1]||50).toFixed(0));
+  const volR=vls.length>=2?(vls[vls.length-1]/vls[vls.length-2]):'1';
+  const maArr=lma5>lma20&&lma20>lma60?"정배열":lma5<lma20&&lma20<lma60?"역배열":"혼합";
   let score=0,signals=[];
-  if(lc.c>lma5){score++;signals.push("5MA↑");}
-  if(lc.c>lma20){score++;signals.push("20MA↑");}
-  if(parseFloat(lrsi)>=50&&parseFloat(lrsi)<=70){score++;signals.push(`RSI${lrsi}`);}
-  if(parseFloat(volR)>=1.3){score++;signals.push(`거량×${volR}`);}
+  if(lc.c>lma5){score++;signals.push("5MA위");}
+  if(lc.c>lma20){score++;signals.push("20MA위");}
+  if(lrsi>=45&&lrsi<=70){score++;signals.push(`RSI${lrsi}`);}
+  if(parseFloat(volR)>=1.3){score++;signals.push(`거래량${parseFloat(volR).toFixed(1)}배`);}
   if(lc.c>lc.o){score++;signals.push("양봉");}
   const so=stopOrders[activeTk];
   const pos=mock.positions[activeTk];
-  // Phase 8 STEP 7: GO/NOGO 체크
-  const goNogo=score>=4?"🟢 GO 가능":score>=2?"🟡 추가 확인":"🔴 NO-GO";
-  // 현재 상황 텍스트
-  const situationText=`${stk.nm} ${stk.pr.toLocaleString()}원
-MA ${maArr} | RSI ${lrsi}
-거래량 ${volR}배 | 셋업 ${score}/5점
-${signals.length?signals.join(" · "):"신호 없음"}${pos?`
-보유 ${pos.qty}주 평단 ${Math.round(pos.avgPrice).toLocaleString()}원`:""}`;
-  // 진입/청산 조언 (API 호출 없이 로컬 로직으로)
-  let actionText=`${goNogo} (${score}/5점)\n`;
+
+  // ── 토스체 상황 설명 ──
+  const priceKr = stk.pr.toLocaleString();
+  const maEmoji = maArr==='정배열'?'📈':maArr==='역배열'?'📉':'🔀';
+  const rsiComment = lrsi>=70?'과열 구간이에요':lrsi<=30?'과매도 구간이에요':lrsi>=50?'모멘텀 살아있어요':'중립이에요';
+  const volComment = parseFloat(volR)>=2?'거래량 폭발 🔥':parseFloat(volR)>=1.3?'거래량 증가 중':'거래량 보통';
+
+  // ── 현재 종목명 표시 ──
+  const tkEl = document.getElementById('analysisTk');
+  if(tkEl) tkEl.textContent = `${stk.nm} (${sim.tf}분)`;
+
+  // ── 토스체 상황 텍스트 ──
+  const situationText = `${stk.nm} ${priceKr}원\n${maEmoji} ${maArr} · RSI ${lrsi} (${rsiComment})\n${volComment} · 강도 ${score}/5점`;
+
+  // ── 토스체 행동 가이드 ──
+  let actionText='';
   if(pos){
     const pnlPct=((stk.pr-pos.avgPrice)/pos.avgPrice*100).toFixed(2);
     const up=stk.pr>=pos.avgPrice;
-    if(so&&stk.pr<=so.stop*1.01)actionText=`🔴 손절선 근접! ${so.stop.toLocaleString()}원
-즉시 손절 고려 (Phase 9-4)`;
-    else if(so&&!so.t1done&&stk.pr>=so.t1*0.99)actionText=`🟢 1차 목표 근접 ${so.t1.toLocaleString()}원
-50% 분할 익절 준비 (Phase 9-2)`;
-    else actionText=`보유중 ${up?"+":""}${pnlPct}%
-${up?"홀딩 유지":"손절선 재확인"}`;
+    if(so&&stk.pr<=so.stop*1.01){
+      actionText=`⚠️ 손절선 근처예요\n지금 ${so.stop.toLocaleString()}원이 손절 기준\n감정 빼고 원칙대로 해요`;
+    } else if(so&&!so.t1done&&stk.pr>=so.t1*0.99){
+      actionText=`🎯 1차 목표가 왔어요!\n${so.t1.toLocaleString()}원 근처\n절반은 팔고 나머지는 홀딩해요`;
+    } else {
+      actionText=`${up?'✅':'⚠️'} 보유 중 ${up?'+':''}${pnlPct}%\n${up?'흐름 좋아요. 목표가까지 홀딩':'손절선 다시 확인해요'}`;
+    }
   } else {
-    if(score>=4)actionText=`📊 진입 검토 (${score}/5)
-${signals.slice(0,2).join(", ")}
-R/R 계산 후 진입 결정`;
-    else if(score>=2)actionText=`🟡 관망 (${score}/5)
-셋업 미완성 — 추가 확인 필요`;
-    else actionText=`⚪ 매수 비추천 (${score}/5)
-신호 부족 — 다른 종목 탐색`;
+    if(score>=4){
+      actionText=`🟢 지금 괜찮아 보여요 (${score}/5)\n${signals.slice(0,3).join(' · ')}\n진입 전 반드시 손절가 설정하고요`;
+    } else if(score>=2){
+      actionText=`🟡 아직 기다리는 게 나아요 (${score}/5)\n신호가 좀 더 모여야 해요\n서두르지 마세요`;
+    } else {
+      actionText=`⚪ 지금은 관망이에요 (${score}/5)\n좋은 종목 다시 찾아봐요`;
+    }
   }
-  // HTML 형식으로 렌더링 (더 보기 좋게)
+
   const nowEl=document.getElementById("advNow");
   const actEl=document.getElementById("advAction");
   if(nowEl){
-    nowEl.innerHTML=situationText.replace(/\n/g,"<br>").replace(/(정배열)/g,"<span style='color:var(--g);font-weight:700;'>$1</span>").replace(/(역배열)/g,"<span style='color:var(--r);font-weight:700;'>$1</span>");
+    nowEl.innerHTML=situationText.replace(/\n/g,"<br>");
     nowEl.className="adv-txt";
   }
   if(actEl){
-    actEl.innerHTML=actionText.replace(/\n/g,"<br>").replace(/(🔴)/g,"<span style='color:var(--r);'>🔴</span>").replace(/(🟢)/g,"<span style='color:var(--g);'>🟢</span>");
+    actEl.innerHTML=actionText.replace(/\n/g,"<br>");
     actEl.className="adv-txt";
   }
-  document.getElementById("aiModeBadge").textContent=score>=4?"📊 분석완료":"⚪ 관망";
-  // 자동매매도 실행
+  document.getElementById("aiModeBadge").textContent=score>=4?"🟢 진입검토":score>=2?"🟡 관망":"⚪ 대기";
+
+  // 차트 신호 업데이트
+  analyzeChartSignals();
+
   if(autoState.running&&autoState.level>=2)runScreening();
 }
 function updAdvBoxes(now,action){
@@ -5232,12 +5280,278 @@ function closeModal(id){document.getElementById("modal-"+id).classList.remove("s
 function showAlert(t,m){document.getElementById("alertTtl").textContent=t;document.getElementById("alertMsg").textContent=m;openModal("alert");}
 document.querySelectorAll(".modal-bg").forEach(el=>{el.addEventListener("click",e=>{if(e.target===el){const id=el.id.replace("modal-","");closeModal(id);}});});
 
+// ═══════════════════════════════
+// 매매기법 선택
+// ═══════════════════════════════
+let userTechnique = 'auto'; // 'auto' = AI 자동, 나머지는 고정
+function setUserTechnique(val){
+  userTechnique = val;
+  const tag = document.getElementById('techniqueTag');
+  const sel = document.getElementById('techniqueSelect');
+  if(val === 'auto'){
+    if(tag) tag.style.display = 'none';
+  } else {
+    if(tag){ tag.textContent = val; tag.style.display = 'block'; }
+  }
+}
+
+// ═══════════════════════════════
+// 강세 섹터 순위
+// ═══════════════════════════════
+const SECTOR_STOCKS = {
+  '반도체': ['005930','000660','042700','058470','357780'],
+  '2차전지': ['051910','006400','373220','247540','003670'],
+  '바이오': ['068270','207940','128940','009540','326030'],
+  '자동차': ['005380','000270','012330','241560','304000'],
+  '인터넷·플랫폼': ['035420','035720','259960','293490','252010'],
+  '방산·우주': ['012450','047810','006280','064350','272210'],
+  '조선': ['010140','009540','042660','00970','267250'],
+  '철강·소재': ['005490','004020','002810','006360','011790'],
+};
+
+async function loadSectorRanking(){
+  const el = document.getElementById('sectorRankList');
+  const btn = document.getElementById('sectorRankBtn');
+  if(!el) return;
+  el.innerHTML = '<span style="color:var(--tm);font-style:italic;">AI 분석 중...</span>';
+  if(btn) btn.disabled = true;
+  try {
+    const cs = sim.candles.slice(-20);
+    const cls = cs.map(c=>c.c);
+    const rsi = calcRSI(cls,14).slice(-1)[0]||50;
+    const volR = cs.length>=2?(cs[cs.length-1].v/cs[cs.length-2].v).toFixed(1):'1.0';
+    const prompt = `단타 트레이더를 위한 오늘 강세 섹터 순위 분석이야.
+
+현재 시장 상황:
+- 종목: ${STOCKS.find(s=>s.tk===activeTk)?.nm||activeTk}
+- RSI: ${rsi.toFixed(0)} | 거래량비율: ${volR}배
+
+다음 섹터들의 오늘 강세 순위를 매겨줘:
+반도체, 2차전지, 바이오, 자동차, 인터넷·플랫폼, 방산·우주, 조선, 철강·소재
+
+응답 형식 (JSON만, 다른 텍스트 없이):
+{"sectors":[{"rank":1,"name":"섹터명","reason":"한줄이유","signal":"🔥강세/🟡중립/⚪약세"},...]}`;
+
+    const data = await callClaude({model:'claude-sonnet-4-20250514',max_tokens:600,messages:[{role:'user',content:prompt}]},'섹터순위');
+    const text = data.content?.[0]?.text||'';
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if(!jsonMatch) throw new Error('파싱 실패');
+    const result = JSON.parse(jsonMatch[0]);
+    const sectors = result.sectors||[];
+    el.innerHTML = sectors.slice(0,6).map((s,i)=>`
+      <div onclick="loadSectorStocks('${s.name}')" style="display:flex;align-items:center;gap:6px;padding:5px 4px;border-radius:6px;cursor:pointer;transition:background .1s;" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='none'">
+        <span style="font-size:11px;font-weight:800;color:${i<3?'var(--b)':'var(--tm)'};min-width:14px;">${i+1}</span>
+        <span style="font-size:10px;">${s.signal}</span>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:10px;font-weight:700;color:var(--tp);">${s.name}</div>
+          <div style="font-size:8px;color:var(--tm);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${s.reason}</div>
+        </div>
+        <span style="font-size:8px;color:var(--tm);">›</span>
+      </div>`).join('');
+  } catch(e) {
+    el.innerHTML = `<span style="color:var(--r);">분석 실패: ${e.message}</span>`;
+  }
+  if(btn) btn.disabled = false;
+}
+
+async function loadSectorStocks(sectorName){
+  const el = document.getElementById('sectorRankList');
+  el.innerHTML = `<div style="color:var(--tm);font-size:9px;margin-bottom:6px;">← <span onclick="loadSectorRanking()" style="cursor:pointer;color:var(--b);">섹터 순위로</span></div><span style="color:var(--tm);font-style:italic;">🔍 ${sectorName} 주도주 분석 중...</span>`;
+  const stocks = SECTOR_STOCKS[sectorName]||[];
+  const stockNames = stocks.map(tk=>{const s=STOCKS.find(x=>x.tk===tk);return s?`${s.nm}(${tk})`:`(${tk})`;}).join(', ');
+  try{
+    const prompt = `오늘 ${sectorName} 섹터 주도주 순위를 알려줘. 분석 대상: ${stockNames||sectorName+' 대표 종목들'}
+
+단타 트레이더 관점에서 오늘 가장 강한 종목 순서로 알려줘.
+
+응답 형식 (JSON만):
+{"stocks":[{"rank":1,"name":"종목명","code":"코드","reason":"한줄이유(쉽게)","action":"매수관심/관망/주의"},...]}`;
+    const data = await callClaude({model:'claude-sonnet-4-20250514',max_tokens:500,messages:[{role:'user',content:prompt}]},'주도주');
+    const text = data.content?.[0]?.text||'';
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if(!jsonMatch) throw new Error('파싱 실패');
+    const result = JSON.parse(jsonMatch[0]);
+    const stks = result.stocks||[];
+    const colors = {'매수관심':'var(--g)','관망':'var(--a)','주의':'var(--r)'};
+    el.innerHTML = `<div style="color:var(--tm);font-size:9px;margin-bottom:6px;cursor:pointer;" onclick="loadSectorRanking()">← 섹터 순위로</div>
+<div style="font-size:10px;font-weight:700;color:var(--tp);margin-bottom:5px;">🏆 ${sectorName} 주도주</div>`+
+    stks.slice(0,5).map((s,i)=>`
+      <div onclick="if('${s.code}')selectStk('${s.code}')" style="display:flex;align-items:center;gap:6px;padding:5px 4px;border-radius:6px;cursor:pointer;" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='none'">
+        <span style="font-size:11px;font-weight:800;color:${i<2?'var(--b)':'var(--tm)'};min-width:14px;">${i+1}</span>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:10px;font-weight:700;">${s.name}</div>
+          <div style="font-size:8px;color:var(--tm);">${s.reason}</div>
+        </div>
+        <span style="font-size:8px;font-weight:700;color:${colors[s.action]||'var(--b)'};">${s.action}</span>
+      </div>`).join('');
+  }catch(e){
+    el.innerHTML = `<div onclick="loadSectorRanking()" style="cursor:pointer;color:var(--b);font-size:9px;margin-bottom:4px;">← 섹터 순위로</div><span style="color:var(--r);">분석 실패</span>`;
+  }
+}
+
+// ═══════════════════════════════
+// 차트 우클릭 AI 분석
+// ═══════════════════════════════
+let _ctxCandle = null;
+function initChartRightClick(){
+  const wrap = document.querySelector('.chart-main');
+  if(!wrap||wrap._rcOk) return;
+  wrap._rcOk = true;
+  wrap.addEventListener('contextmenu', e=>{
+    e.preventDefault();
+    const canvas = document.getElementById('mainChart');
+    if(!canvas) return;
+    const r = wrap.getBoundingClientRect();
+    const x = e.clientX - r.left;
+    const cs = _cvCs();
+    if(!cs.length) return;
+    const PL=4, PR=54, cw=(canvas.width||700)-PL-PR;
+    const idx = Math.floor((x-PL)/(cw/cs.length));
+    const c = cs[Math.max(0,Math.min(idx,cs.length-1))];
+    _ctxCandle = c;
+    const menu = document.getElementById('chartCtxMenu');
+    const info = document.getElementById('ctxCandleInfo');
+    if(info && c) info.textContent = `${c.t} | O${c.o.toLocaleString()} H${c.h.toLocaleString()} L${c.l.toLocaleString()} C${c.c.toLocaleString()}`;
+    if(menu){
+      menu.style.display='block';
+      menu.style.left = Math.min(e.clientX, window.innerWidth-180)+'px';
+      menu.style.top = Math.min(e.clientY, window.innerHeight-160)+'px';
+    }
+  });
+  document.addEventListener('click', ()=>closeChartCtx());
+  document.addEventListener('touchstart', ()=>closeChartCtx(), {passive:true});
+}
+function closeChartCtx(){
+  const m = document.getElementById('chartCtxMenu');
+  if(m) m.style.display='none';
+}
+async function ctxAskAI(type){
+  closeChartCtx();
+  const c = _ctxCandle;
+  const stk = STOCKS.find(s=>s.tk===activeTk)||STOCKS[0];
+  const cs = _cvCs();
+  const cls = cs.map(x=>x.c);
+  const rsi = (calcRSI(cls,14).slice(-1)[0]||50).toFixed(0);
+  const ma5 = (calcMA(cls,5).slice(-1)[0]||0).toFixed(0);
+  const ma20 = (calcMA(cls,20).slice(-1)[0]||0).toFixed(0);
+  const popup = document.getElementById('chartAiPopup');
+  const body = document.getElementById('aiPopupBody');
+  const title = document.getElementById('aiPopupTitle');
+  if(popup){
+    popup.style.display='block';
+    popup.style.left='50%'; popup.style.top='50%';
+    popup.style.transform='translate(-50%,-50%)';
+  }
+  if(title) title.textContent = type==='buy'?'🟢 매수 판단':type==='sell'?'🔴 매도 판단':'🔍 구간 분석';
+  if(body) body.textContent='분석 중...';
+
+  const prompts = {
+    buy: `단타 트레이더야. 솔직하게 쉽게 말해줘 (토스 알림처럼).
+종목: ${stk.nm} | 현재가: ${c?.c?.toLocaleString()||'-'}원
+RSI: ${rsi} | 5MA: ${ma5} | 20MA: ${ma20}
+이 가격에서 지금 매수하면 어때? 3줄로.`,
+    sell: `단타 트레이더야. 솔직하게 쉽게 말해줘 (토스 알림처럼).
+종목: ${stk.nm} | 현재가: ${c?.c?.toLocaleString()||'-'}원
+RSI: ${rsi} | 5MA: ${ma5} | 20MA: ${ma20}
+이 가격에서 지금 매도하면 어때? 3줄로.`,
+    analysis: `단타 트레이더야. 쉽고 직관적으로 말해줘.
+종목: ${stk.nm} | TF: ${sim.tf}분
+이 시간대 캔들 (${c?.t||'-'}): O${c?.o||'-'} H${c?.h||'-'} L${c?.l||'-'} C${c?.c||'-'}
+RSI: ${rsi} | 5MA: ${ma5} | 20MA: ${ma20}
+이 구간 차트 상황 한마디로 요약하고 대응 알려줘. 4줄 이내.`,
+  };
+  try{
+    const data = await callClaude({model:'claude-sonnet-4-20250514',max_tokens:200,messages:[{role:'user',content:prompts[type]}]},'차트클릭AI');
+    const text = data.content?.[0]?.text||'분석 실패';
+    if(body) body.innerHTML = text.replace(/\n/g,'<br>');
+  }catch(e){
+    if(body) body.textContent = '분석 실패: '+e.message;
+  }
+}
+
+// ═══════════════════════════════
+// 차트 AI 타점 오버레이
+// ═══════════════════════════════
+let _aiSignals = []; // [{idx, type:'buy'|'sell', price, reason}]
+async function analyzeChartSignals(){
+  const cs = _cvCs();
+  if(cs.length < 10) return;
+  const cls = cs.map(c=>c.c);
+  const rsi = calcRSI(cls,14);
+  const ma5 = calcMA(cls,5);
+  const ma20 = calcMA(cls,20);
+  const signals = [];
+  // 간단한 로컬 신호 생성 (API 호출 없이)
+  cs.forEach((c,i)=>{
+    if(i<20) return;
+    const r = rsi[i]||50;
+    const m5 = ma5[i]||0;
+    const m20 = ma20[i]||0;
+    const prev = cs[i-1];
+    // 매수 신호: RSI 30~50, 5MA > 20MA, 양봉 전환
+    if(r>=30&&r<=55&&m5>m20&&c.c>c.o&&prev.c<prev.o){
+      signals.push({idx:i,type:'buy',price:c.c,reason:'RSI반등+5MA상향'});
+    }
+    // 매도 신호: RSI 70이상 또는 음봉 + MA하향
+    if((r>=70||( m5<m20&&c.c<c.o&&prev.c>prev.o))){
+      signals.push({idx:i,type:'sell',price:c.c,reason:r>=70?'RSI과매수':'MA데드크로스'});
+    }
+  });
+  // 너무 많으면 최근 것만
+  _aiSignals = signals.slice(-10);
+  drawSignalOverlay();
+}
+
+function drawSignalOverlay(){
+  const canvas = document.getElementById('signalChart');
+  const mainCv = document.getElementById('mainChart');
+  if(!canvas||!mainCv) return;
+  const W = mainCv.width||700, H = mainCv.height||400;
+  if(canvas.width!==W||canvas.height!==H){canvas.width=W;canvas.height=H;}
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+  if(!_aiSignals.length) return;
+  const cs = _cvCs();
+  if(!cs.length) return;
+  const PL=4,PR=54,PT=8,PB=22,SB=12;
+  const volH = inds.vol?Math.floor(H*0.20):0;
+  const mainH = H-PT-PB-volH-SB;
+  const cw = W-PL-PR;
+  const prices = cs.flatMap(c=>[c.h,c.l]).filter(v=>v>0);
+  const yMin = Math.min(...prices)*(1-0.06);
+  const yMax = Math.max(...prices)*(1+0.06);
+  const yR = yMax-yMin||1;
+  const toX = i => PL+(i+0.5)*(cw/cs.length);
+  const toY = v => PT+mainH*(1-(v-yMin)/yR);
+  const bw = Math.max(2,Math.min(14,cw/cs.length*0.6));
+  _aiSignals.forEach(sig=>{
+    if(sig.idx<0||sig.idx>=cs.length) return;
+    const x = toX(sig.idx);
+    const y = toY(sig.price);
+    const isBuy = sig.type==='buy';
+    ctx.save();
+    // 삼각형 표시
+    ctx.fillStyle = isBuy?'rgba(16,185,129,.9)':'rgba(239,68,68,.9)';
+    ctx.beginPath();
+    if(isBuy){ctx.moveTo(x,y+16);ctx.lineTo(x-7,y+28);ctx.lineTo(x+7,y+28);}
+    else{ctx.moveTo(x,y-16);ctx.lineTo(x-7,y-28);ctx.lineTo(x+7,y-28);}
+    ctx.fill();
+    // 텍스트
+    ctx.fillStyle = isBuy?'#10b981':'#ef4444';
+    ctx.font = 'bold 8px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(isBuy?'B':'S', x, isBuy?y+38:y-32);
+    ctx.restore();
+  });
+}
+
 window.onload=()=>{
   loadState();
   goPage('hts',document.getElementById('tab-hts'));
   document.getElementById("mockDate").value=sim.date;
   initChartEvents();
   _initResizeObserver();
+  initChartRightClick();
   // ★ 서버에서 저장된 API 설정 로드 (재배포 후에도 유지)
   fetch('/api/get-config').then(r=>r.json()).then(d=>{
     if(d.ok && (d.kisAppKey || d.claudeKeyFull)){
