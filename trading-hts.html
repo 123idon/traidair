@@ -5767,6 +5767,16 @@ function checkApiKeyExpiry(errorMsg){
   }
 }
 
+// ── 대시보드 데이터 브릿지 ──
+let _dashCache = {};
+function setDashData(d){ if(d && d.date) _dashCache[d.date]=d; }
+function getDashData(date){
+  if(_dashCache[date]) return _dashCache[date];
+  // 기본 시장 점수 계산
+  const score = 5;
+  return { score, date };
+}
+
 window.onload=()=>{
   loadState();
   goPage('hts',document.getElementById('tab-hts'));
