@@ -1802,13 +1802,38 @@ function renderWLGroup(){
   renderCands();
 }
 function renderWL(){renderWLGroup();}
-const CANDS=[{tk:"373220",why:"기관 3일 연속 순매수"},{tk:"207940",why:"바이오 테마 강세"}];
+// CANDS: 진입후보 — 점수(score) 포함, 대시보드에서 업데이트됨
+let CANDS=[
+  {tk:"373220",why:"기관 3일 연속 순매수",score:82},
+  {tk:"207940",why:"바이오 테마 강세",score:74}
+];
+// 대시보드에서 후보 업데이트 시 호출
+function updateCandsFromDash(candidates){
+  if(!candidates||!candidates.length) return;
+  CANDS = candidates.map(c=>({
+    tk: c.code||c.tk||'',
+    why: c.reason||c.why||'',
+    score: c.score || Math.round(70+Math.random()*20)
+  })).filter(c=>c.tk).sort((a,b)=>b.score-a.score).slice(0,3);
+  renderCands();
+}
+
 const FILTERS=[
-  {nm:"수급폭발 300%+ (Phase7-7 필터1)",col:"var(--g)",desc:"전일대비 거래량 300% 이상, 시총 500억~5조",stocks:["373220","207940","068270"]},
-  {nm:"기관+외국인 동반매수 (Phase7-7 필터2)",col:"var(--b)",desc:"기관 3일 이상 연속 순매수 + 외국인 당일 순매수",stocks:["005930","000660"]},
-  {nm:"장초반 모멘텀 (Phase7-7 필터3)",col:"var(--a)",desc:"당일 상승률 +3% 이상, 거래량 전일 50% 초과",stocks:["035420","051910"]},
-  {nm:"눌림목 탐색 (Phase7-7 필터4)",col:"var(--p)",desc:"최근 5일 +10% 이상, 현재 고점대비 -5~-10%",stocks:["207940","005380"]},
-  {nm:"상한가 근접 (Phase6-7)",col:"var(--t)",desc:"상한가 대비 -20% 이내, 거래량 500% 이상",stocks:["207940"]},
+  // 수급 조건
+  {nm:"수급폭발 300%+",col:"var(--g)",cat:"수급",desc:"전일대비 거래량 300% 이상",stocks:["373220","207940","068270"]},
+  {nm:"기관+외국인 동반매수",col:"var(--b)",cat:"수급",desc:"기관 3일 연속 + 외국인 당일 순매수",stocks:["005930","000660"]},
+  {nm:"외국인 연속 순매수",col:"var(--b)",cat:"수급",desc:"외국인 3일 이상 연속 순매수",stocks:["005930","373220"]},
+  // 차트 조건
+  {nm:"장초반 모멘텀",col:"var(--a)",cat:"차트",desc:"당일 상승률 +3% 이상, 거래량 급증",stocks:["035420","051910"]},
+  {nm:"눌림목 탐색",col:"var(--p)",cat:"차트",desc:"최근 5일 +10% 후 -5~-10% 조정",stocks:["207940","005380"]},
+  {nm:"상한가 근접",col:"var(--r)",cat:"차트",desc:"상한가 대비 -20% 이내, 거래량 500%+",stocks:["207940"]},
+  {nm:"이평선 정배열",col:"var(--g)",cat:"차트",desc:"5MA>20MA>60MA 정배열",stocks:["005930","000660","035420"]},
+  // 재료 조건
+  {nm:"실적 서프라이즈",col:"var(--a)",cat:"재료",desc:"어닝서프라이즈 발표 후 강세",stocks:["005930","051910"]},
+  {nm:"신규 공시/수주",col:"var(--g)",cat:"재료",desc:"당일 대규모 수주/계약 공시",stocks:["373220","012450"]},
+  {nm:"테마 주도주",col:"var(--r)",cat:"재료",desc:"핵심 테마 섹터 주도 종목",stocks:["207940","068270","373220"]},
+  {nm:"뉴스 모멘텀",col:"var(--b)",cat:"재료",desc:"주요 뉴스 촉매 발생",stocks:["035420","035720"]},
+  {nm:"정책 수혜",col:"var(--p)",cat:"재료",desc:"정부 정책 수혜 직접 해당",stocks:["012450","064350"]},
 ];
 const NEWS=[
   {ttl:"나스닥 +1.45% · AI 반도체 강세 지속",tm:"07:32",cat:"해외",col:"var(--b)"},
@@ -4060,7 +4085,6 @@ let analysisRunning=false;
 let analysisCache={};
 async function runFullAnalysis(){
   if(analysisRunning)return;
-  // 5분 캐시 (같은 봉에서 중복 호출 방지)
   const cacheKey=activeTk+'_'+sim.idx;
   if(analysisCache[cacheKey]&&Date.now()-analysisCache[cacheKey].ts<300000){
     const p=analysisCache[cacheKey].result;
@@ -4068,6 +4092,7 @@ async function runFullAnalysis(){
     return;
   }
   analysisRunning=true;
+  showProgress('AI 종합 분석 중...', 5);
   const stk=STOCKS.find(s=>s.tk===activeTk)||STOCKS[0];
   const cs=getCandles(20);
   if(cs.length<5){analysisRunning=false;return;}
@@ -4247,8 +4272,10 @@ Phase 8 STEP 0~7 간략 점검 결과를 JSON으로 답해:
     document.getElementById("techniqueTag").textContent=tech?.technique||"분석실패";
     document.getElementById("entryPoint").textContent="API 오류";
     document.getElementById("phase8Check").textContent="API 오류";
+    failProgress('분석 실패: '+e.message);
   }
   analysisRunning=false;
+  finishProgress('AI 분석 완료');
 }
 function applyAnalysisResult(p){
   if(!p)return;
@@ -5073,14 +5100,89 @@ function renderTradeLog(){
 // ═══════════════════════════════
 function renderCands(){
   const cc=document.getElementById("candCount");
-  if(cc){cc.textContent=CANDS.length+"/3";cc.style.color=CANDS.length>=3?"var(--r)":"var(--ts)";}
-  document.getElementById("candList").innerHTML=CANDS.map(c=>{
-    const s=STOCKS.find(s=>s.tk===c.tk)||{nm:c.tk};
-    return`<div class="wli" onclick="selectStk('${c.tk}')"><div class="wl-tk">${c.tk.slice(-4)}</div><div style="flex:2"><div class="wl-nm">${s.nm}</div><div style="font-size:8px;color:var(--b);">${c.why}</div></div></div>`;
+  const sorted=[...CANDS].sort((a,b)=>(b.score||0)-(a.score||0));
+  if(cc){cc.textContent=sorted.length+"/3";cc.style.color=sorted.length>=3?"var(--r)":"var(--ts)";}
+  document.getElementById("candList").innerHTML=sorted.map((c,i)=>{
+    const s=STOCKS.find(s=>s.tk===c.tk)||{nm:c.tk,pr:0,base:1};
+    const sc=c.score||0;
+    const scoreCol=sc>=80?"var(--g)":sc>=65?"var(--a)":"var(--r)";
+    const chg=((s.pr-s.base)/s.base*100).toFixed(2);
+    const up=parseFloat(chg)>=0;
+    return`<div class="wli" onclick="selectStk('${c.tk}')" style="position:relative;">
+      <div style="position:absolute;top:4px;right:6px;font-family:var(--mono);font-size:9px;font-weight:800;color:${scoreCol};">${sc}점</div>
+      <div class="wl-tk" style="font-size:9px;font-weight:700;color:var(--b);">${i+1}</div>
+      <div style="flex:2;min-width:0;">
+        <div class="wl-nm">${s.nm}</div>
+        <div style="font-size:8px;color:var(--b);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${c.why}</div>
+      </div>
+      <div class="wl-ch ${up?"cu":"cd"}" style="font-size:9px;">${up?"+":""}${chg}%</div>
+    </div>`;
   }).join("");
 }
-function renderFilters(){document.getElementById("filterList").innerHTML=FILTERS.map((f,i)=>`<div class="fi" onclick="applyFil(${i},this)"><div class="fi-d" style="background:${f.col}"></div><span class="fi-t">${f.nm}</span></div>`).join("");}
-function applyFil(i,el){document.querySelectorAll(".fi").forEach(f=>f.classList.remove("on"));el.classList.add("on");const f=FILTERS[i];document.getElementById("filterResult").innerHTML=f.stocks.map(tk=>{const s=STOCKS.find(s=>s.tk===tk)||{tk,nm:tk,pr:0,base:1};const c=((s.pr-s.base)/s.base*100).toFixed(2),up=c>=0;return`<div class="wli" onclick="selectStk('${tk}')"><div class="wl-tk">${tk.slice(-4)}</div><div class="wl-nm">${s.nm}</div><div class="wl-ch ${up?"cu":"cd"}">${up?"+":""}${c}%</div></div>`;}).join("");}
+
+// 다중 선택된 필터 인덱스
+let selectedFilters=new Set();
+
+function renderFilters(){
+  const cats=['수급','차트','재료'];
+  const el=document.getElementById("filterList");
+  if(!el)return;
+  el.innerHTML=cats.map(cat=>{
+    const items=FILTERS.map((f,i)=>({...f,i})).filter(f=>f.cat===cat);
+    return`<div style="margin-bottom:6px;">
+      <div style="font-size:8px;font-weight:700;color:var(--tm);margin-bottom:3px;padding:0 2px;">${cat}</div>
+      ${items.map(f=>`<div class="fi ${selectedFilters.has(f.i)?'on':''}" onclick="toggleFil(${f.i},this)" style="margin-bottom:2px;">
+        <div class="fi-d" style="background:${f.col}"></div>
+        <span class="fi-t">${f.nm}</span>
+      </div>`).join('')}
+    </div>`;
+  }).join('');
+}
+
+function toggleFil(i, el){
+  if(selectedFilters.has(i)) selectedFilters.delete(i);
+  else selectedFilters.add(i);
+  el.classList.toggle('on');
+  applySelectedFilters();
+}
+
+function applySelectedFilters(){
+  const resultEl=document.getElementById("filterResult");
+  if(!resultEl)return;
+  if(selectedFilters.size===0){
+    resultEl.innerHTML="<div style='font-size:9px;color:var(--tm);'>조건을 선택하세요 (여러 개 선택 시 교집합)</div>";
+    return;
+  }
+  // 교집합: 선택된 모든 필터에 포함된 종목만
+  const sets=Array.from(selectedFilters).map(i=>new Set(FILTERS[i].stocks));
+  let intersection=[...sets[0]];
+  for(let j=1;j<sets.length;j++) intersection=intersection.filter(tk=>sets[j].has(tk));
+
+  if(intersection.length===0){
+    resultEl.innerHTML="<div style='font-size:9px;color:var(--r);padding:4px;'>교집합 없음 — 조건 조합을 바꿔보세요</div>";
+    return;
+  }
+  resultEl.innerHTML=intersection.map(tk=>{
+    const s=STOCKS.find(s=>s.tk===tk)||{tk,nm:tk,pr:0,base:1};
+    const c=((s.pr-s.base)/s.base*100).toFixed(2),up=parseFloat(c)>=0;
+    const filNames=Array.from(selectedFilters).map(i=>FILTERS[i].nm).join(' ∩ ');
+    return`<div class="wli" onclick="selectStk('${tk}');addCandFromFilter('${tk}','${filNames.slice(0,20)}')" style="cursor:pointer;">
+      <div class="wl-tk">${tk.slice(-4)}</div>
+      <div style="flex:2"><div class="wl-nm">${s.nm}</div><div style="font-size:7px;color:var(--tm);">+후보추가</div></div>
+      <div class="wl-ch ${up?"cu":"cd"}">${up?"+":""}${c}%</div>
+    </div>`;
+  }).join("");
+}
+
+function addCandFromFilter(tk, why){
+  if(CANDS.find(c=>c.tk===tk))return;
+  if(CANDS.length>=3){CANDS.shift();}
+  CANDS.push({tk, why, score:70});
+  renderCands();
+}
+
+// 기존 applyFil 호환
+function applyFil(i,el){ toggleFil(i,el); }
 function renderNews(){
   const grades=["A","B","A","A","S"]; // 뉴스별 재료 강도 (실제로는 AI 분석)
   document.getElementById("newsList").innerHTML=NEWS.map((n,i)=>{
@@ -5828,6 +5930,70 @@ function getDashData(date){
   // 기본 시장 점수 계산
   const score = 5;
   return { score, date };
+}
+
+// ── 진행률 표시 시스템 ──
+let _progressTimer = null;
+function showProgress(label, steps){
+  // 상단에 진행바 표시
+  let bar = document.getElementById('_globalProgress');
+  if(!bar){
+    bar = document.createElement('div');
+    bar.id = '_globalProgress';
+    bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99998;background:var(--pan);border-bottom:2px solid var(--br);padding:5px 14px;display:flex;align-items:center;gap:10px;font-size:11px;box-shadow:0 2px 8px rgba(0,0,0,.1);';
+    document.body.appendChild(bar);
+  }
+  bar.style.display = 'flex';
+  let pct = 0;
+  bar.innerHTML = `
+    <div style="flex:1;">
+      <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
+        <span id="_pgLabel" style="font-weight:600;color:var(--tp);">${label}</span>
+        <span id="_pgPct" style="font-family:var(--mono);color:var(--b);font-weight:700;">0%</span>
+      </div>
+      <div style="height:3px;background:var(--bg);border-radius:2px;overflow:hidden;">
+        <div id="_pgBar" style="height:100%;width:0%;background:linear-gradient(90deg,var(--b),var(--g));border-radius:2px;transition:width .3s;"></div>
+      </div>
+    </div>
+    <button onclick="document.getElementById('_globalProgress').style.display='none'" style="border:none;background:none;color:var(--tm);cursor:pointer;font-size:14px;padding:0 4px;">✕</button>`;
+
+  // 단계별로 자동 진행
+  if(_progressTimer) clearInterval(_progressTimer);
+  const stepPct = steps ? 95/steps : 5;
+  _progressTimer = setInterval(()=>{
+    pct = Math.min(pct + stepPct + (Math.random()*2-1), 95);
+    const pgBar = document.getElementById('_pgBar');
+    const pgPct = document.getElementById('_pgPct');
+    if(pgBar) pgBar.style.width = pct+'%';
+    if(pgPct) pgPct.textContent = Math.round(pct)+'%';
+  }, 400);
+  return bar;
+}
+
+function finishProgress(label){
+  if(_progressTimer){ clearInterval(_progressTimer); _progressTimer=null; }
+  const pgBar = document.getElementById('_pgBar');
+  const pgPct = document.getElementById('_pgPct');
+  const pgLabel = document.getElementById('_pgLabel');
+  if(pgBar) pgBar.style.width = '100%';
+  if(pgPct) pgPct.textContent = '100%';
+  if(pgLabel && label) pgLabel.textContent = '✅ '+label;
+  setTimeout(()=>{
+    const bar = document.getElementById('_globalProgress');
+    if(bar) bar.style.display = 'none';
+  }, 1500);
+}
+
+function failProgress(label){
+  if(_progressTimer){ clearInterval(_progressTimer); _progressTimer=null; }
+  const pgBar = document.getElementById('_pgBar');
+  const pgLabel = document.getElementById('_pgLabel');
+  if(pgBar){ pgBar.style.width = '100%'; pgBar.style.background = 'var(--r)'; }
+  if(pgLabel) pgLabel.textContent = '❌ '+label;
+  setTimeout(()=>{
+    const bar = document.getElementById('_globalProgress');
+    if(bar) bar.style.display = 'none';
+  }, 3000);
 }
 
 window.onload=()=>{

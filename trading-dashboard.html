@@ -193,6 +193,46 @@ body{display:flex;flex-direction:column;overflow:hidden;}
 </div>
 
 <script>
+
+// ── 대시보드 진행률 표시 ──
+let _dpTimer=null;
+function showDashProgress(label, steps){
+  let bar=document.getElementById('_dp');
+  if(!bar){
+    bar=document.createElement('div');
+    bar.id='_dp';
+    bar.style.cssText='position:fixed;bottom:0;left:0;right:0;z-index:9999;background:var(--pan);border-top:1px solid var(--br);padding:6px 16px;display:flex;align-items:center;gap:10px;font-size:11px;';
+    document.body.appendChild(bar);
+  }
+  bar.style.display='flex';
+  let pct=0;
+  bar.innerHTML=`<span id="_dpLabel" style="font-weight:600;min-width:160px;">${label}</span>
+    <div style="flex:1;height:4px;background:#e5e7eb;border-radius:2px;overflow:hidden;">
+      <div id="_dpBar" style="height:100%;width:0%;background:linear-gradient(90deg,#3182f6,#05c072);border-radius:2px;transition:width .3s;"></div>
+    </div>
+    <span id="_dpPct" style="font-family:monospace;font-weight:700;color:#3182f6;min-width:35px;">0%</span>
+    <button onclick="document.getElementById('_dp').style.display='none'" style="border:none;background:none;cursor:pointer;color:#9ca3af;">✕</button>`;
+  if(_dpTimer)clearInterval(_dpTimer);
+  const step=steps?90/steps:5;
+  _dpTimer=setInterval(()=>{
+    pct=Math.min(pct+step+(Math.random()*2-1),95);
+    const b=document.getElementById('_dpBar');const p=document.getElementById('_dpPct');
+    if(b)b.style.width=pct+'%';if(p)p.textContent=Math.round(pct)+'%';
+  },400);
+}
+function finishDashProgress(label){
+  if(_dpTimer){clearInterval(_dpTimer);_dpTimer=null;}
+  const b=document.getElementById('_dpBar');const p=document.getElementById('_dpPct');const l=document.getElementById('_dpLabel');
+  if(b)b.style.width='100%';if(p)p.textContent='100%';if(l&&label)l.textContent='✅ '+label;
+  setTimeout(()=>{const d=document.getElementById('_dp');if(d)d.style.display='none';},1500);
+}
+function failDashProgress(label){
+  if(_dpTimer){clearInterval(_dpTimer);_dpTimer=null;}
+  const b=document.getElementById('_dpBar');const l=document.getElementById('_dpLabel');
+  if(b){b.style.width='100%';b.style.background='#ef4444';}if(l)l.textContent='❌ '+label;
+  setTimeout(()=>{const d=document.getElementById('_dp');if(d)d.style.display='none';},3000);
+}
+
 // ── 날짜 설정 ──
 const today = new Date();
 let curDate = today.toISOString().slice(0,10);
@@ -285,6 +325,8 @@ async function runFullAIAnalysis(){
   const btn = document.querySelector('.hdr-btn:not(.sec)');
   if(btn){ btn.disabled=true; btn.textContent='분석 중...'; }
   
+  // 진행률 표시
+  showDashProgress('AI 시장 전체 분석 중...', 8);
   addMsg('ai', '📊 오늘 시장 전체 분석을 시작할게요. 잠깐만요...');
 
   const dateStr = curDate;
@@ -382,10 +424,17 @@ async function runFullAIAnalysis(){
   }
 
   if(btn){ btn.disabled=false; btn.textContent='🤖 AI 전체 분석'; }
+  finishDashProgress('분석 완료');
 }
 
 // ── 진입 후보 렌더 ──
 function renderCandidates(candidates){
+  // HTS 진입후보 연동
+  try{
+    if(window.parent && window.parent.updateCandsFromDash){
+      window.parent.updateCandsFromDash(candidates);
+    }
+  }catch(e){}
   const el = document.getElementById('candList');
   if(!el) return;
   document.getElementById('candUpdated').textContent = `${new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'})} 기준`;
@@ -500,6 +549,7 @@ function loadDashData(){
 
 // ── 시장 데이터 자동 로드 (페이지 열릴 때 자동 실행) ──
 async function autoLoadMarketData(){
+  showDashProgress('시장 데이터 로드 중...', 3);
   // 웹 검색 API 없으므로 Claude에게 시장 데이터 요청
   const dateStr = curDate;
   const today = new Date().toISOString().slice(0,10);
@@ -561,7 +611,10 @@ val/chg는 실제 수치로. 모르면 추정값으로.`;
   } catch(e) {
     console.log('시장 데이터 로드 실패:', e.message);
     document.getElementById('marketVerdict').textContent = '📡 시장 데이터 로드 실패 — AI 전체 분석을 눌러주세요';
+    failDashProgress('로드 실패');
+    return;
   }
+  finishDashProgress('시장 데이터 업데이트 완료');
 }
 
 // 오늘 날짜 기본값
