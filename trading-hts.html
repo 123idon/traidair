@@ -39,7 +39,7 @@ body{background:var(--bg);color:var(--tp);font-family:var(--sans);font-size:12px
 ::-webkit-scrollbar-thumb{background:var(--brb);border-radius:4px;}
 .cu{color:var(--g);}.cd{color:var(--r);}.cn{color:var(--ts);}
 button{cursor:pointer;font-family:var(--sans);}
-.bar{display:flex;align-items:center;gap:7px;padding:0 14px;height:48px;background:var(--pan);border-bottom:1px solid var(--br);flex-shrink:0;min-width:0;box-shadow:var(--sh0);}
+.bar{display:flex;align-items:center;gap:7px;padding:0 14px;height:48px;background:var(--pan);border-bottom:1px solid var(--br);flex-shrink:0;min-width:0;box-shadow:var(--sh0);overflow:hidden;flex-wrap:nowrap;}
 .logo{font-family:var(--mono);font-size:14px;font-weight:700;color:var(--b);white-space:nowrap;flex-shrink:0;text-decoration:none;letter-spacing:-.02em;}
 .logo em{color:var(--ts);font-style:normal;font-weight:400;}
 .tabs{display:flex;gap:2px;background:var(--bg);border-radius:8px;padding:3px;flex-shrink:0;}
@@ -59,7 +59,7 @@ button{cursor:pointer;font-family:var(--sans);}
 .si-nm{font-size:12px;font-weight:700;white-space:nowrap;}
 .si-pr{font-family:var(--mono);font-size:15px;font-weight:600;}
 .si-ch{font-family:var(--mono);font-size:11px;}
-.bar-r{display:flex;align-items:center;gap:5px;margin-left:auto;flex-shrink:0;}
+.bar-r{display:flex;align-items:center;gap:5px;margin-left:auto;flex-shrink:1;min-width:0;overflow:hidden;}
 .badge{display:flex;align-items:center;gap:4px;padding:2px 7px;border-radius:4px;font-family:var(--mono);font-size:10px;white-space:nowrap;}
 .badge.mock{border:none;background:rgba(255,153,0,.12);color:#cc7700;}
 .badge.live{border:none;background:rgba(5,192,114,.12);color:#048a52;}
@@ -356,6 +356,7 @@ input,select,textarea{-webkit-appearance:none;appearance:none;}
   .mob-tabbar{display:flex;}
   .mock-bar{flex-wrap:wrap;height:auto;gap:4px;}
   .si,.clk{display:none;}
+  #idxBar{display:none !important;}
   .spd-btn:nth-child(n+5){display:none;}
   .page{padding-bottom:calc(var(--mob-nav) + var(--sab));}
 }
@@ -404,15 +405,15 @@ input,select,textarea{-webkit-appearance:none;appearance:none;}
   <div class="bar-r">
     <div class="badge mock" id="modeBadge"><div class="bdot"></div><span id="modeText">모의투자</span></div>
     <div class="clk" id="clk">--:--:--</div>
-    <!-- 실시간 지수 표시 -->
-    <div id="idxBar" style="display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:10px;padding:0 8px;border-left:1px solid var(--br);border-right:1px solid var(--br);">
-      <span style="color:var(--tm);">KOSPI</span>
-      <span id="idx-kospi" style="font-weight:700;">--</span>
-      <span id="idx-kospi-chg" style="font-size:9px;">--</span>
-      <span style="color:var(--tm);margin-left:4px;">KOSDQ</span>
-      <span id="idx-kosdq" style="font-weight:700;">--</span>
-      <span id="idx-kosdq-chg" style="font-size:9px;">--</span>
-      <span id="idx-pred" style="font-size:9px;padding:1px 6px;border-radius:4px;margin-left:2px;font-weight:700;display:none;"></span>
+    <!-- 실시간 지수 표시 (PC에서만, 충분한 공간 있을 때) -->
+    <div id="idxBar" style="display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10px;padding:0 8px;border-left:1px solid var(--br);border-right:1px solid var(--br);flex-shrink:1;min-width:0;overflow:hidden;">
+      <span style="color:var(--tm);white-space:nowrap;">KOSPI</span>
+      <span id="idx-kospi" style="font-weight:700;white-space:nowrap;">--</span>
+      <span id="idx-kospi-chg" style="font-size:9px;white-space:nowrap;">--</span>
+      <span style="color:var(--tm);margin-left:2px;white-space:nowrap;">KOSDQ</span>
+      <span id="idx-kosdq" style="font-weight:700;white-space:nowrap;">--</span>
+      <span id="idx-kosdq-chg" style="font-size:9px;white-space:nowrap;">--</span>
+      <span id="idx-pred" style="font-size:9px;padding:1px 5px;border-radius:4px;margin-left:2px;font-weight:700;display:none;white-space:nowrap;"></span>
     </div>
     <!-- 빠른 전환 버튼 -->
     <button class="ibtn" id="quickSwitchBtn" onclick="quickSwitch()" title="대시보드 ↔ HTS 전환 (단축키: D)">
@@ -423,7 +424,7 @@ input,select,textarea{-webkit-appearance:none;appearance:none;}
     <button class="ibtn red" onclick="endMock()">■ 종료</button>
     <button class="ibtn pri" onclick="openModal('journal')">📓</button>
     <button class="ibtn pur" onclick="openModal('autotrade')" id="autoBtn">🤖 자동매매</button>
-    <button class="ibtn" onclick="refreshAll();runIntraCheck();showProgress('새로고침 완료',1);setTimeout(()=>finishProgress('완료'),800);" title="전체 새로고침" style="background:var(--g);color:#fff;border-color:var(--g);">↺ 새로고침</button>
+    <button class="ibtn" onclick="refreshAll();runIntraCheck();showProgress('새로고침',1);setTimeout(()=>finishProgress('완료'),800);" title="전체 새로고침" style="background:var(--g);color:#fff;border-color:var(--g);">↺</button>
   </div>
 </header>
 
