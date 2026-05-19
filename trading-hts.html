@@ -2360,6 +2360,11 @@ function _initResizeObserver(){
 // SIMULATION
 // ═══════════════════════════════
 function togPlay(){
+  // 끝에 있으면 처음부터 시작
+  if(!sim.playing && sim.idx >= sim.candles.length-1){
+    sim.idx=0;
+    updChartToIdx();
+  }
   sim.playing=!sim.playing;
   _syncPlayBtn();
   if(sim.playing){runStep();}
