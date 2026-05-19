@@ -4281,8 +4281,13 @@ const MATERIAL_GRADES = {
 async function runAISectorAnalysis(){
   const el=document.getElementById("aiSectorResult");
   el.innerHTML='<span style="color:var(--tm);font-style:italic;">AI 분석 중...</span>';
-  const dash=getDashData(sim.date);
-  const marketCtx=dash?`시장점수:${dash.score}/10 방향:${dash.score>=7?"매수우호":dash.score>=4?"중립":"비우호"}`:"시장 데이터 없음";
+  // ★ 미래 참조 금지: getDashData(당일 최종점수) 대신 현재 봉까지의 데이터 사용
+  const cs = sim.candles.slice(0, Math.max(sim.idx+1, 2));
+  const cls = cs.map(c=>c.c);
+  const curRSI = (calcRSI(cls,14).slice(-1)[0]||50).toFixed(0);
+  const curVol = cs.length>=2?(cs[cs.length-1].v/cs[cs.length-2].v).toFixed(1):'1.0';
+  const lc = cs[cs.length-1]||{};
+  const marketCtx = `현재시각 ${lc.t||'--'} | RSI ${curRSI} | 거래량비율 ${curVol}배 | 종가 ${(lc.c||0).toLocaleString()}원`;
   const prompt=`단타 트레이딩 멘토. 오늘 섹터 분석을 해줘. (Phase 6-1,6-4 기준)
 
 시장: ${marketCtx}
@@ -5394,7 +5399,8 @@ async function loadSectorRanking(){
   el.innerHTML = '<span style="color:var(--tm);font-style:italic;">AI 분석 중...</span>';
   if(btn) btn.disabled = true;
   try {
-    const cs = sim.candles.slice(-20);
+    // ★ 미래 참조 금지: 현재 시각(sim.idx)까지의 봉만 사용
+    const cs = sim.candles.slice(0, Math.max(sim.idx+1, 2)).slice(-20);
     const cls = cs.map(c=>c.c);
     const rsi = calcRSI(cls,14).slice(-1)[0]||50;
     const volR = cs.length>=2?(cs[cs.length-1].v/cs[cs.length-2].v).toFixed(1):'1.0';
@@ -5664,9 +5670,13 @@ function updatePhase8Live(){
       <span style="font-weight:700;font-size:9px;font-family:var(--mono);color:${ok===true?'#16a34a':ok===false?'#dc2626':'var(--ts)'};">${val}</span>
     </div>`;
 
-  // STEP1: 시장 방향
-  const dashScore = (getDashData(sim.date)||{}).score||5;
-  const mktOk = dashScore >= 6;
+  // STEP1: 시장 방향 — 당일 최종점수 참조 금지, 현재 봉 기준으로 계산
+  // getDashData(sim.date) 사용 금지 (미래 데이터). 현재까지 봉으로 추정
+  const maScore = lma5 > lma20 ? 1 : 0;
+  const rsiScore = rsi>=45 && rsi<=70 ? 1 : 0;
+  const volScore = parseFloat(volR)>=1.3 ? 1 : 0;
+  const mktEstScore = 5 + maScore + rsiScore + volScore; // 5~8 추정
+  const mktOk = mktEstScore >= 6;
   // STEP2: 강세 섹터 (현재 섹터)
   const secOk = stk.sec ? true : null;
   // STEP3: 종목 수급 (거래량)
@@ -5682,7 +5692,7 @@ function updatePhase8Live(){
   const stopOk = !!so;
 
   el.innerHTML =
-    row('STEP1 시장', `${dashScore>=7?'우호적':'보통'} (${dashScore}/10)`, mktOk) +
+    row('STEP1 시장', `${mktEstScore>=7?'우호적':mktEstScore>=6?'보통':'비우호'} (현재봉 기준 ~${mktEstScore}/10)`, mktOk) +
     row('STEP2 섹터', stk.sec||'미지정', secOk) +
     row('STEP3 수급', `거래량 ×${volR.toFixed(1)}`, volOk) +
     row('STEP4 차트', `5MA ${Math.round(lma5).toLocaleString()} / 20MA ${Math.round(lma20).toLocaleString()}`, chartOk) +
