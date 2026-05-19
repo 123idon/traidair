@@ -10,8 +10,6 @@
 <title>TraidAIr HTS</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/hammerjs/2.0.8/hammer.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-zoom/2.0.1/chartjs-plugin-zoom.min.js"></script>
 <style>
 :root{
   /* ── Toss-style Light Color System ── */
@@ -1896,12 +1894,13 @@ function drawCandlePlugin(){
     id:"candlePlugin",
     afterDatasetsDraw(chart){
       const ctx=chart.ctx;
-      const ds=chart.data.datasets;
-      const cs=sim.candles.slice(0,Math.max(sim.idx+1,10));
+      const allCs=sim.candles.slice(0,Math.max(sim.idx+1,10));
+      const viewEnd=Math.min(chartViewStart+chartViewCount,allCs.length);
+      const cs=allCs.slice(chartViewStart,viewEnd);
       if(!cs.length)return;
       const xScale=chart.scales.x,yScale=chart.scales.y;
       if(!xScale||!yScale)return;
-      const barWidth=Math.max(2,Math.min(8,(xScale.right-xScale.left)/cs.length*0.6));
+      const barWidth=Math.max(2,Math.min(12,(xScale.right-xScale.left)/cs.length*0.6));
       ctx.save();
       cs.forEach((c,i)=>{
         const x=xScale.getPixelForValue(i);
@@ -1915,7 +1914,7 @@ function drawCandlePlugin(){
         ctx.fillStyle=col;
         const top=Math.min(yO,yC),height=Math.max(1,Math.abs(yO-yC));
         ctx.fillRect(x-barWidth/2,top,barWidth,height);
-        // 꼬리 (위아래)
+        // 꼬리
         ctx.beginPath();ctx.strokeStyle=col;ctx.lineWidth=1;
         ctx.moveTo(x,yH);ctx.lineTo(x,top);
         ctx.moveTo(x,top+height);ctx.lineTo(x,yL);
@@ -1931,14 +1930,15 @@ let chartViewCount = 100; // 보여줄 캔들 수
 
 function initChart(){
   const allCs = sim.candles.slice(0, Math.max(sim.idx+1, 10));
+  if(!allCs.length) return;
+
   // 뷰 범위 보정
-  chartViewStart = Math.max(0, Math.min(chartViewStart, allCs.length - 10));
   chartViewCount = Math.max(10, Math.min(chartViewCount, allCs.length));
-  const viewEnd = Math.min(chartViewStart + chartViewCount, allCs.length);
-  const cs = allCs.slice(chartViewStart, viewEnd);
+  chartViewStart = Math.max(0, Math.min(chartViewStart, allCs.length - chartViewCount));
+  const cs = allCs.slice(chartViewStart, chartViewStart + chartViewCount);
 
   const lbls = cs.map(c=>c.t), cls = cs.map(c=>c.c), vls = cs.map(c=>c.v);
-  if(mChart) mChart.destroy();
+  if(mChart){ mChart.destroy(); mChart=null; }
 
   const ds = [{label:"종가",type:"line",data:cls,borderColor:"#dc2626",borderWidth:1.5,pointRadius:0,fill:false,yAxisID:"y",tension:.08}];
   if(inds.ma){[["MA5","#ffb800",5],["MA20","#00d97e",20],["MA60","#ff4757",60]].forEach(([l,c,n])=>ds.push({label:l,type:"line",data:calcMA(cls,n),borderColor:c,borderWidth:1,pointRadius:0,fill:false,yAxisID:"y",tension:.08}));}
@@ -1946,7 +1946,8 @@ function initChart(){
   if(inds.vwap) ds.push({label:"VWAP",type:"line",data:calcVWAP(cs),borderColor:"#2dd4bf",borderWidth:1.5,borderDash:[4,2],pointRadius:0,fill:false,yAxisID:"y"});
   if(inds.vol)  ds.push({label:"거래량",type:"bar",data:vls,backgroundColor:cs.map(c=>c.c>=c.o?"rgba(220,38,38,.75)":"rgba(37,99,235,.75)"),yAxisID:"y2",order:10});
 
-  const ctx = document.getElementById("mainChart").getContext("2d");
+  const canvas = document.getElementById("mainChart");
+  const ctx = canvas.getContext("2d");
 
   // 십자선 플러그인
   const crosshairPlugin = {
@@ -1954,13 +1955,8 @@ function initChart(){
     afterDraw(chart){
       if(chart._crossX==null) return;
       const {ctx:c, chartArea:{top,bottom,left,right}} = chart;
-      c.save();
-      c.strokeStyle = "rgba(107,118,132,.5)";
-      c.lineWidth = 1;
-      c.setLineDash([4,4]);
-      // 수직선
+      c.save(); c.strokeStyle="rgba(107,118,132,.45)"; c.lineWidth=1; c.setLineDash([4,4]);
       c.beginPath(); c.moveTo(chart._crossX,top); c.lineTo(chart._crossX,bottom); c.stroke();
-      // 수평선
       c.beginPath(); c.moveTo(left,chart._crossY); c.lineTo(right,chart._crossY); c.stroke();
       c.restore();
     }
@@ -1973,50 +1969,92 @@ function initChart(){
       responsive:true, maintainAspectRatio:false, animation:false,
       plugins:{
         legend:{display:false},
-        tooltip:{mode:"index",intersect:false,backgroundColor:"#fff",borderColor:"rgba(0,0,0,.1)",titleColor:"#6b7684",bodyColor:"#191f28",borderWidth:1,titleFont:{family:"JetBrains Mono",size:9},bodyFont:{family:"JetBrains Mono",size:10},padding:6,
-          callbacks:{title:it=>it[0].label, label:it=>it.dataset.label==="거래량"?"거량:"+it.parsed.y.toLocaleString():it.dataset.label+":"+Math.round(it.parsed.y).toLocaleString()}},
-        zoom:{
-          pan:{enabled:true, mode:"x",
-            onPan({chart:ch}){
-              // 팬 후 뷰 동기화
-              const xScale = ch.scales.x;
-              chartViewStart = Math.max(0, Math.round(xScale.min));
-            }
-          },
-          zoom:{wheel:{enabled:true, speed:0.1}, pinch:{enabled:true}, mode:"x",
-            onZoom({chart:ch}){
-              const xScale = ch.scales.x;
-              chartViewStart = Math.max(0, Math.round(xScale.min));
-              chartViewCount = Math.max(10, Math.round(xScale.max - xScale.min));
-            }
-          }
-        }
+        tooltip:{mode:"index",intersect:false,backgroundColor:"#fff",borderColor:"rgba(0,0,0,.1)",titleColor:"#6b7684",bodyColor:"#191f28",borderWidth:1,
+          titleFont:{family:"JetBrains Mono",size:9},bodyFont:{family:"JetBrains Mono",size:10},padding:6,
+          callbacks:{title:it=>it[0].label, label:it=>it.dataset.label==="거래량"?"거량:"+it.parsed.y.toLocaleString():it.dataset.label+":"+Math.round(it.parsed.y).toLocaleString()}}
       },
       scales:{
         x:{grid:{color:"rgba(0,0,0,.05)"}, ticks:{color:"#8c9db5",font:{family:"JetBrains Mono",size:8},maxTicksLimit:10}},
         y:{position:"right", grid:{color:"rgba(255,255,255,.04)"}, ticks:{color:"#8c9db5",font:{family:"JetBrains Mono",size:8},callback:v=>v.toLocaleString()}},
         y2:{position:"left", display:inds.vol, grid:{display:false}, ticks:{display:false}, max:vls.length?Math.max(...vls)*5:100000}
       },
-      onHover:(e,items,chart)=>{
-        if(e.native){
-          const rect = chart.canvas.getBoundingClientRect();
-          chart._crossX = e.native.clientX - rect.left;
-          chart._crossY = e.native.clientY - rect.top;
-          chart.draw();
+      onHover:(e,items)=>{
+        if(e.native && mChart){
+          const rect=canvas.getBoundingClientRect();
+          mChart._crossX=e.native.clientX-rect.left;
+          mChart._crossY=e.native.clientY-rect.top;
+          mChart.draw();
         }
         if(items.length){
-          const c = cs[items[0].dataIndex];
+          const c=cs[items[0].dataIndex];
           if(c) document.getElementById("cinfo").textContent=`O${c.o.toLocaleString()} H${c.h.toLocaleString()} L${c.l.toLocaleString()} C${c.c.toLocaleString()} V${c.v.toLocaleString()}`;
         }
       }
     }
   });
 
-  // 마우스가 캔버스를 벗어나면 십자선 제거
-  ctx.canvas.addEventListener("mouseleave", ()=>{ if(mChart){mChart._crossX=null;mChart.draw();} });
+  // ── 네이티브 줌/팬 이벤트 바인딩 ──
+  canvas._chartEventsAttached = canvas._chartEventsAttached || false;
+  if(!canvas._chartEventsAttached){
+    canvas._chartEventsAttached = true;
+
+    // 마우스 휠 줌
+    canvas.addEventListener("wheel", e=>{
+      e.preventDefault();
+      const factor = e.deltaY > 0 ? 1.25 : 0.8;
+      const allC = sim.candles.slice(0, Math.max(sim.idx+1,10));
+      const center = chartViewStart + chartViewCount/2;
+      chartViewCount = Math.max(10, Math.min(Math.round(chartViewCount*factor), allC.length));
+      chartViewStart = Math.max(0, Math.min(Math.round(center-chartViewCount/2), allC.length-chartViewCount));
+      initChart();
+    },{passive:false});
+
+    // 드래그 팬
+    let dragStart=null, dragStartView=0;
+    canvas.addEventListener("mousedown", e=>{ dragStart=e.clientX; dragStartView=chartViewStart; });
+    canvas.addEventListener("mousemove", e=>{
+      if(dragStart===null) return;
+      const dx = e.clientX - dragStart;
+      const allC = sim.candles.slice(0, Math.max(sim.idx+1,10));
+      const pixPerCandle = canvas.clientWidth / chartViewCount;
+      const candleShift = Math.round(-dx / pixPerCandle);
+      chartViewStart = Math.max(0, Math.min(dragStartView+candleShift, allC.length-chartViewCount));
+      initChart();
+    });
+    canvas.addEventListener("mouseup", ()=>{ dragStart=null; });
+    canvas.addEventListener("mouseleave", ()=>{ dragStart=null; if(mChart){mChart._crossX=null;mChart.draw();} });
+
+    // 터치 핀치 줌 & 스와이프 팬
+    let touchStart=null, touchDist=null, touchStartView=0;
+    canvas.addEventListener("touchstart", e=>{
+      if(e.touches.length===1){ touchStart=e.touches[0].clientX; touchStartView=chartViewStart; }
+      if(e.touches.length===2){ touchDist=Math.abs(e.touches[0].clientX-e.touches[1].clientX); touchStartView=chartViewStart; }
+    },{passive:true});
+    canvas.addEventListener("touchmove", e=>{
+      e.preventDefault();
+      const allC = sim.candles.slice(0, Math.max(sim.idx+1,10));
+      if(e.touches.length===1 && touchStart!==null){
+        const dx=e.touches[0].clientX-touchStart;
+        const pixPerCandle=canvas.clientWidth/chartViewCount;
+        const shift=Math.round(-dx/pixPerCandle);
+        chartViewStart=Math.max(0,Math.min(touchStartView+shift,allC.length-chartViewCount));
+        initChart();
+      }
+      if(e.touches.length===2 && touchDist!==null){
+        const newDist=Math.abs(e.touches[0].clientX-e.touches[1].clientX);
+        const factor=touchDist/newDist;
+        touchDist=newDist;
+        const center=chartViewStart+chartViewCount/2;
+        chartViewCount=Math.max(10,Math.min(Math.round(chartViewCount*factor),allC.length));
+        chartViewStart=Math.max(0,Math.min(Math.round(center-chartViewCount/2),allC.length-chartViewCount));
+        initChart();
+      }
+    },{passive:false});
+    canvas.addEventListener("touchend", ()=>{ touchStart=null; touchDist=null; });
+  }
 
   if(inds.rsi)  initSub("rsi", calcRSI(cls,14), "#a78bfa", lbls);
-  if(inds.macd) {const{ml,sig}=calcMACD(cls); initSubMACD(lbls,ml,sig);}
+  if(inds.macd) { const{ml,sig}=calcMACD(cls); initSubMACD(lbls,ml,sig); }
 }
 
 // 줌 컨트롤 함수
