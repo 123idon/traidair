@@ -256,6 +256,7 @@ button{cursor:pointer;font-family:var(--sans);}
 .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:300;display:none;align-items:center;justify-content:center;backdrop-filter:blur(8px);}
 .modal-bg.show{display:flex;}
 .modal{background:var(--pan);border:none;border-radius:16px;width:560px;max-width:95vw;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:var(--sh2);}
+.modal.wide{width:680px;max-width:98vw;}
 .modal.wide{width:720px;}
 .modal-hdr{padding:12px 16px;border-bottom:1px solid var(--br);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
 .modal-ttl{font-size:13px;font-weight:700;}
@@ -1654,11 +1655,7 @@ input,select,textarea{-webkit-appearance:none;appearance:none;}
   <div class="modal" style="width:320px;">
     <div class="modal-hdr"><span class="modal-ttl" id="alertTtl">알림</span><button class="modal-x" onclick="closeModal('alert')">×</button></div>
     <div class="modal-body"><p id="alertMsg" style="font-size:13px;line-height:1.6;"></p></div>
-    <div class="modal-ftr"><button class="mbtn" onclick="closeModal('alert')">확인</button></div>
-  </div>
-</div>
-
-<script>
+    <div class="modal-ftr"><button class="mbtn" onclick="closeModal('alert')">확인
 // ═══════════════════════════════
 // DATA
 // ═══════════════════════════════
@@ -4193,21 +4190,29 @@ async function runFullAnalysis(){
   if(!hasClaudeKey){
     // 로컬 분석으로 대체
     const tech=await detectTechnique(cs, stk);
+    const lc2=getCurrentCandle()||cs[cs.length-1];
+    const ep2=document.getElementById("entryPoint");
     if(tech){
       document.getElementById("techniqueTag").textContent=tech.technique;
       document.getElementById("techniqueTag").style.color="var(--b)";
-      document.getElementById("techniqueReason").textContent=tech.cond||'';
-      if(tech.entry){
-        document.getElementById("entryPoint").innerHTML=
-          `<span style="color:var(--b);font-weight:700;">진입 ${tech.entry.toLocaleString()}원</span><br>`+
-          `<span style="color:var(--r);">✂ 손절 ${tech.stop.toLocaleString()}원</span><br>`+
-          `<span style="color:var(--g);">🎯 목표 ${tech.target.toLocaleString()}원</span><br>`+
-          `<span style="font-size:8px;color:var(--ts);">R/R 1:${tech.rr}</span>`;
-      }
+      const rea=document.getElementById("techniqueReason");
+      if(rea)rea.textContent=tech.cond||'';
+      if(ep2) ep2.innerHTML=
+        `<span style="color:var(--r);font-weight:700;">📍 진입 ${(tech.entry||lc2.c).toLocaleString()}원</span><br>`+
+        `<span style="color:var(--b);">✂ 손절 ${(tech.stop||Math.round(lc2.c*0.97)).toLocaleString()}원</span><br>`+
+        `<span style="color:var(--g);">🎯 목표 ${(tech.target||Math.round(lc2.c*1.06)).toLocaleString()}원</span><br>`+
+        `<span style="font-size:8px;color:var(--ts);">R/R 1:${tech.rr||2}</span><br>`+
+        `<span style="font-size:7px;color:var(--tm);">* Claude 키 설정 시 AI 심층분석</span>`;
       const goEl=document.getElementById("goNogoTag");
       if(goEl){goEl.textContent=tech.score>=3?'✅ 진입검토':'⚪ 관망';goEl.style.color=tech.score>=3?'var(--g)':'var(--ts)';}
+    } else {
+      if(ep2) ep2.innerHTML=
+        `<span style="color:var(--r);font-weight:700;">📍 진입 ${lc2.c.toLocaleString()}원</span><br>`+
+        `<span style="color:var(--b);">✂ 손절 ${Math.round(lc2.c*0.97).toLocaleString()}원</span><br>`+
+        `<span style="color:var(--g);">🎯 목표 ${Math.round(lc2.c*1.06).toLocaleString()}원</span><br>`+
+        `<span style="font-size:8px;color:var(--ts);">R/R 1:2 (기본값)</span><br>`+
+        `<span style="font-size:7px;color:var(--tm);">* 봉 데이터 축적 중</span>`;
     }
-    document.getElementById("entryPoint").innerHTML+='<br><span style="font-size:7px;color:var(--tm);">* Claude 키 설정 시 AI 심층분석</span>';
     analysisRunning=false;
     return;
   }
@@ -5262,7 +5267,8 @@ function renderNews(){
 function selectStk(tk){activeTk=tk;const s=STOCKS.find(s=>s.tk===tk)||STOCKS[0];document.getElementById("siNm").textContent=s.nm;// 관심종목 자동 추가 제거 (수동으로 그룹 선택 후 추가)
   const tkEl=document.getElementById("obTkName");if(tkEl)tkEl.textContent=s.nm;document.getElementById("srchIn").value="";hideSrch();renderWL();genCandles(tk,sim.date);initChart();renderOB();renderTH();
   const atk=document.getElementById("analysisTk");if(atk)atk.textContent=s.nm;
-  setTimeout(()=>{updateAIAdvisor();runFullAnalysis();fetchDartNews();},400);}
+  setTimeout(()=>{updateAIAdvisor();runFullAnalysis();fetchDartNews();},400);
+  _syncIdxWithSim();}
 
 // ═══════════════════════════════
 // SEARCH
@@ -5967,7 +5973,12 @@ let _idxSim = { kospiChg: 0, kosdqChg: 0, lastPred: 0, predTimer: null };
 function _syncIdxWithSim(){
   // 현재 봉 기준으로 지수 추정 (시뮬 연동)
   const cs = getCandles(2);
-  if(cs.length < 2) return;
+  if(cs.length < 2){
+    // 봉 없어도 기본값 표시
+    _setIdxUI('idx-kospi', 2650, 0);
+    _setIdxUI('idx-kosdq', 850, 0);
+    return;
+  }
   const lc = cs[cs.length-1], pc = cs[cs.length-2];
   const chgPct = (lc.c - pc.c) / pc.c * 100;
   _idxSim.kospiChg = chgPct * 0.8 + (Math.random()-0.5)*0.1;
@@ -6414,6 +6425,7 @@ window.onload=()=>{
   const savedTrust=localStorage.getItem('trustScore');
   if(savedTrust){trustScore=parseInt(savedTrust);const sl=document.getElementById('trustSlider');if(sl)sl.value=trustScore;updateTrustScore(trustScore);}
   setTimeout(()=>{renderGrowthRoadmap();detectSlump();},500);
+};rGrowthRoadmap();detectSlump();},500);
 };</script>
 
 <!-- 동적 참조 요소 -->
