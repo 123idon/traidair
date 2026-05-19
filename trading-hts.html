@@ -5333,7 +5333,14 @@ function rTab(el,id){document.querySelectorAll(".rpt").forEach(t=>t.classList.re
 function brTab(el,id){document.querySelectorAll(".brpt").forEach(t=>t.classList.remove("on"));el.classList.add("on");document.querySelectorAll(".brpb").forEach(b=>{b.classList.remove("on");b.style.display="none";});const t=document.getElementById(id);if(t){t.style.display=id==="brpb-ai"?"flex":"block";t.classList.add("on");}}
 function openModal(id){
   document.getElementById("modal-"+id).classList.add("show");
-  if(id==="settings"){const keys=["capital","dayloss","maxpos","clim","mlim","crate","mrate","bf","sf","tx"];keys.forEach(k=>{const el=document.getElementById("cfg-"+k);if(el)el.value=cfg[k];});document.getElementById("cfg-bd").checked=cfg.bd;document.getElementById("cfg-al").checked=cfg.al;}
+  if(id==="settings"){
+    const keys=["capital","dayloss","maxpos","clim","mlim","crate","mrate","bf","sf","tx"];
+    keys.forEach(k=>{const el=document.getElementById("cfg-"+k);if(el)el.value=cfg[k];});
+    document.getElementById("cfg-bd").checked=cfg.bd;
+    document.getElementById("cfg-al").checked=cfg.al;
+    // ★ 설정창 열릴 때 서버에서 API 키 자동 로드
+    loadKisConfig();
+  }
   if(id==="journal"){const tt=mock.trades.filter(t=>t.date===sim.date);const pnl=tt.filter(t=>t.side==="sell").reduce((a,t)=>a+t.pnl,0);document.getElementById("jModalBody").innerHTML=tt.length?`<div style="font-size:11px;color:var(--ts);">${sim.date} 거래 ${tt.length}건 · 손익 ${pnl>=0?"+":""}${pnl.toLocaleString()}원</div><div style="font-size:10px;color:var(--tm);margin-top:5px;">AI 일지 생성 버튼을 눌러주세요.</div>`:"<div style='font-size:11px;color:var(--tm);'>오늘 거래가 없습니다.</div>";}
 }
 function closeModal(id){document.getElementById("modal-"+id).classList.remove("show");}
