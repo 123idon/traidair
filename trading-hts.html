@@ -1899,16 +1899,16 @@ function _cvCs(){
 function drawChart(){
   const canvas=document.getElementById("mainChart");
   if(!canvas)return;
-  // getBoundingClientRect으로 실제 렌더된 크기 읽기
   const rect=canvas.getBoundingClientRect();
   const W=Math.round(rect.width)||canvas.parentElement?.getBoundingClientRect().width||canvas.offsetWidth||600;
   const H=Math.round(rect.height)||canvas.parentElement?.getBoundingClientRect().height||canvas.offsetHeight||400;
+  // 디버그: 크기 표시
+  const ci=document.getElementById('cinfo');
+  if(ci)ci.textContent=`canvas W=${W} H=${H} rect=${Math.round(rect.width)}x${Math.round(rect.height)}`;
   if(W<20||H<20){
-    // 크기가 0이면 다음 프레임에 재시도
     requestAnimationFrame(()=>drawChart());
     return;
   }
-  // canvas 해상도 설정 (변경 시에만)
   if(canvas.width!==W||canvas.height!==H){canvas.width=W;canvas.height=H;}
   const ctx=canvas.getContext("2d");
 
