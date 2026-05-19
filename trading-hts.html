@@ -1726,8 +1726,8 @@ let WGS = JSON.parse(localStorage.getItem("htsWGS")||JSON.stringify([
 let curWG = 0;
 // 구버전 WL 호환
 let WL = WGS[0];
-function saveWL(){WGS[0]=WL;localStorage.setItem("htsWGS",JSON.stringify(WGS));}
-function saveWGS(){localStorage.setItem("htsWGS",JSON.stringify(WGS));}
+function saveWL(){WGS[0]=WL;const v=JSON.stringify(WGS);localStorage.setItem("htsWGS",v);saveToServer("htsWGS",v);}
+function saveWGS(){const v=JSON.stringify(WGS);localStorage.setItem("htsWGS",v);saveToServer("htsWGS",v);}
 function addToWL(tk){if(!WL.includes(tk)){WL.push(tk);saveWL();renderWLGroup();}}
 function removeFromWL(tk){WL=WL.filter(w=>w!==tk);WGS[0]=WL;saveWGS();renderWLGroup();}
 
@@ -1862,21 +1862,71 @@ function rng32(seed){let a=seed|0;return()=>{a=a+0x6D2B79F5|0;let t=Math.imul(a^
 
 function getDashData(dt){try{const r=localStorage.getItem("dashMarket_"+dt);return r?JSON.parse(r):null;}catch(e){return null;}}
 
+// ── 서버 데이터 저장/로드 (모의투자 계좌, 매매일지, 통계 영구 보존) ──
+let _saveTimer = null;
+function saveToServer(key, value) {
+  // 즉시 localStorage에 저장 (빠른 복원)
+  try { localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value)); } catch(e) {}
+  // 서버에 비동기 저장 (디바운스 1초)
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(() => {
+    fetch('/api/user-data/' + key, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ value: typeof value === 'string' ? value : JSON.stringify(value) })
+    }).catch(() => {});
+  }, 1000);
+}
+
+async function loadFromServer() {
+  try {
+    const r = await fetch('/api/user-data');
+    const d = await r.json();
+    if (!d.ok || !d.data) return false;
+    const data = d.data;
+    // 각 키를 localStorage에도 동기화
+    const keys = ['htsMock','htsStopOrders','htsCfg','htsWGS','htsBan','htsJournals','manualJournals','personalRules','masterCL'];
+    keys.forEach(k => {
+      if (data[k] !== undefined) {
+        try { localStorage.setItem(k, data[k]); } catch(e) {}
+      }
+    });
+    console.log('✅ 서버에서 데이터 로드됨');
+    return true;
+  } catch(e) {
+    return false;
+  }
+}
+
 function loadState(){
   const c=localStorage.getItem("htsCfg");if(c)cfg={...cfg,...JSON.parse(c)};
   const m=localStorage.getItem("htsMock");if(m){const p=JSON.parse(m);mock={...mock,...p};}
   mock.cash=mock.cash||cfg.capital;
   if(!mock.positions)mock.positions={};
   if(!mock.trades)mock.trades=[];
-  // BUG15 FIX: stopOrders 복원
   const so=localStorage.getItem("htsStopOrders");
   if(so){try{stopOrders={...JSON.parse(so)};}catch(e){}}
+  // 서버에서 최신 데이터 로드 (비동기, 완료 후 UI 갱신)
+  loadFromServer().then(ok => {
+    if(ok) {
+      // 서버 데이터로 덮어쓰기
+      const m2=localStorage.getItem("htsMock");
+      if(m2){const p=JSON.parse(m2);mock={...mock,...p};mock.cash=mock.cash||cfg.capital;if(!mock.positions)mock.positions={};if(!mock.trades)mock.trades=[];}
+      const so2=localStorage.getItem("htsStopOrders");
+      if(so2){try{stopOrders={...JSON.parse(so2)};}catch(e){}}
+      renderAll();
+    }
+  });
 }
 
 function saveMock(){
-  localStorage.setItem("htsMock",JSON.stringify(mock));
-  // BUG15 FIX: stopOrders도 저장
-  localStorage.setItem("htsStopOrders",JSON.stringify(stopOrders));
+  const mockStr = JSON.stringify(mock);
+  const soStr = JSON.stringify(stopOrders);
+  localStorage.setItem("htsMock", mockStr);
+  localStorage.setItem("htsStopOrders", soStr);
+  // 서버에 영구 저장
+  saveToServer('htsMock', mockStr);
+  saveToServer('htsStopOrders', soStr);
 }
 
 function renderAll(){renderWLGroup();renderCands();renderFilters();renderNews();renderPort();renderTradeLog();updCash();updCredLim();renderBanList();updateTrailPanel();checkPsychWarnings();detectSlump();renderGrowthRoadmap();}
@@ -1928,7 +1978,7 @@ let chatHist=[],chatBusy=false;
 function checkPending(){pendingOrders.forEach((o,i)=>{const stk=STOCKS.find(s=>s.tk===o.tk);if(!stk)return;const hit=(o.side==="buy"&&stk.pr<=o.price)||(o.side==="sell"&&stk.pr>=o.price);if(hit){const prev=activeTk,prevSide=oSide,prevType=oType;activeTk=o.tk;oSide=o.side;oType="market";document.getElementById("ofQty").value=o.qty;submitOrder(true);activeTk=prev;oSide=prevSide;oType=prevType;pendingOrders.splice(i,1);addMsg("ai",`✅ 지정가 체결: ${o.nm} ${o.side==="buy"?"매수":"매도"} ${o.price.toLocaleString()}원 × ${o.qty}주`);renderPending();}});}
 let pendingOrders=[];
 let priceAlerts=[]; // [{tk,price,dir:'above'|'below',memo,fired}]
-function saveBan(){localStorage.setItem("htsBan",JSON.stringify(BAN_LIST));}
+function saveBan(){const v=JSON.stringify(BAN_LIST);localStorage.setItem("htsBan",v);saveToServer("htsBan",v);}
 let stopOrders={};
 
 // ═══════════════════════════════
@@ -5295,7 +5345,7 @@ async function genJModal(){
     saveJEntry(sim.date,p,pnl,wins,total,str);
   }catch(e){body.innerHTML="<div style='color:var(--r);font-size:11px;'>⚠ API 오류 — /api/claude 확인</div>";}
 }
-function saveJEntry(date,p,pnl,wins,total,str){const js=JSON.parse(localStorage.getItem("htsJournals")||"{}");js[date]={date,pnl,wins,total,str,...p};localStorage.setItem("htsJournals",JSON.stringify(js));renderJPage();}
+function saveJEntry(date,p,pnl,wins,total,str){const js=JSON.parse(localStorage.getItem("htsJournals")||"{}");js[date]={date,pnl,wins,total,str,...p};const jv=JSON.stringify(js);localStorage.setItem("htsJournals",jv);saveToServer("htsJournals",jv);renderJPage();}
 function renderJPage(){
   const js=JSON.parse(localStorage.getItem("htsJournals")||"{}");
   const entries=Object.values(js).sort((a,b)=>b.date.localeCompare(a.date));
@@ -5324,7 +5374,7 @@ async function genAllJournals(){
 // ═══════════════════════════════
 function saveSettings(){
   cfg={capital:parseFloat(document.getElementById("cfg-capital").value)||10000000,dayloss:parseFloat(document.getElementById("cfg-dayloss").value)||2,maxpos:parseFloat(document.getElementById("cfg-maxpos").value)||20,clim:parseFloat(document.getElementById("cfg-clim").value)||140,mlim:parseFloat(document.getElementById("cfg-mlim").value)||40,crate:parseFloat(document.getElementById("cfg-crate").value)||8.5,mrate:parseFloat(document.getElementById("cfg-mrate").value)||12,bf:parseFloat(document.getElementById("cfg-bf").value)||0.015,sf:parseFloat(document.getElementById("cfg-sf").value)||0.015,tx:parseFloat(document.getElementById("cfg-tx").value)||0.18,bd:document.getElementById("cfg-bd").checked,al:document.getElementById("cfg-al").checked};
-  localStorage.setItem("htsCfg",JSON.stringify(cfg));closeModal("settings");showAlert("저장 완료","설정이 저장되었습니다.");
+  const cfgV=JSON.stringify(cfg);localStorage.setItem("htsCfg",cfgV);saveToServer("htsCfg",cfgV);closeModal("settings");showAlert("저장 완료","설정이 서버에 영구 저장되었습니다.");
 }
 function resetMock(){if(!confirm("모의투자를 초기화하시겠습니까?\n모든 거래 내역이 삭제됩니다."))return;mock={cash:cfg.capital,positions:{},trades:[],todayPnl:0,todayTrades:0,lossSeries:0,creditUsed:0,marginUsed:0};stopOrders={};saveMock();renderAll();closeModal("settings");}
 

@@ -384,6 +384,51 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ── 사용자 데이터 저장 (/api/user-data POST)
+  if (url === '/api/user-data' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const data = JSON.parse(body);
+        const ok = saveUserData(data);
+        res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+        res.end(JSON.stringify({ ok }));
+      } catch(e) {
+        res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+        res.end(JSON.stringify({ ok: false, error: e.message }));
+      }
+    });
+    return;
+  }
+
+  // ── 사용자 데이터 조회 (/api/user-data GET)
+  if (url === '/api/user-data' && req.method === 'GET') {
+    const data = loadUserData();
+    res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+    res.end(JSON.stringify({ ok: true, data }));
+    return;
+  }
+
+  // ── 특정 키만 저장 (/api/user-data/key POST)
+  if (url.startsWith('/api/user-data/') && req.method === 'POST') {
+    const key = url.replace('/api/user-data/', '').replace(/[^a-zA-Z0-9_-]/g, '');
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const { value } = JSON.parse(body);
+        const ok = saveUserData({ [key]: value });
+        res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+        res.end(JSON.stringify({ ok, key }));
+      } catch(e) {
+        res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+        res.end(JSON.stringify({ ok: false, error: e.message }));
+      }
+    });
+    return;
+  }
+
   // ── DART 고유번호 (/api/dart/corpcode)
   if (url === '/api/dart/corpcode') {
     const nm = query.get('nm') || '';
@@ -542,3 +587,119 @@ loadConfigFromGitHub().then(() => {
     account: runtimeConfig.kisAccount || '없음',
   });
 });
+
+// ── 사용자 데이터 영구 저장 (모의투자 계좌, 매매일지, 통계 등) ──
+const USER_DATA_PATH = '/tmp/traidair_userdata.json';
+
+function loadUserData() {
+  try {
+    if (fs.existsSync(USER_DATA_PATH)) {
+      return JSON.parse(fs.readFileSync(USER_DATA_PATH, 'utf8'));
+    }
+  } catch(e) {}
+  return {};
+}
+
+function saveUserData(data) {
+  try {
+    const current = loadUserData();
+    const merged = { ...current, ...data, _savedAt: new Date().toISOString() };
+    fs.writeFileSync(USER_DATA_PATH, JSON.stringify(merged), 'utf8');
+    // GitHub에도 백업
+    saveUserDataToGitHub(merged).catch(() => {});
+    return true;
+  } catch(e) {
+    console.error('userdata 저장 실패:', e.message);
+    return false;
+  }
+}
+
+// GitHub 백업
+async function saveUserDataToGitHub(data) {
+  if (!GITHUB_TOKEN) return;
+  const content = Buffer.from(JSON.stringify(data, null, 2)).toString('base64');
+  const body = JSON.stringify({
+    message: 'Update user data',
+    content,
+    ...(_userDataSha ? { sha: _userDataSha } : {}),
+  });
+  let _userDataSha_new = null;
+  await new Promise(resolve => {
+    // 먼저 현재 SHA 확인
+    const getReq = https.request({
+      hostname: 'api.github.com',
+      path: `/repos/${GITHUB_REPO}/contents/userdata.json`,
+      method: 'GET',
+      headers: { 'Authorization': `token ${GITHUB_TOKEN}`, 'User-Agent': 'traidair-server', 'Accept': 'application/vnd.github.v3+json' },
+    }, res => {
+      let d = ''; res.on('data', c => d += c);
+      res.on('end', () => {
+        try { _userDataSha = JSON.parse(d).sha || null; } catch(e) {}
+        resolve();
+      });
+    });
+    getReq.on('error', () => resolve());
+    getReq.end();
+  });
+
+  const bodyWithSha = JSON.stringify({
+    message: 'Update user data',
+    content,
+    ...(_userDataSha ? { sha: _userDataSha } : {}),
+  });
+  return new Promise(resolve => {
+    const req = https.request({
+      hostname: 'api.github.com',
+      path: `/repos/${GITHUB_REPO}/contents/userdata.json`,
+      method: 'PUT',
+      headers: {
+        'Authorization': `token ${GITHUB_TOKEN}`,
+        'User-Agent': 'traidair-server',
+        'Accept': 'application/vnd.github.v3+json',
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(bodyWithSha),
+      },
+    }, res => {
+      let d = ''; res.on('data', c => d += c);
+      res.on('end', () => {
+        try { _userDataSha = JSON.parse(d).content?.sha || _userDataSha; } catch(e) {}
+        resolve();
+      });
+    });
+    req.on('error', () => resolve());
+    req.write(bodyWithSha); req.end();
+  });
+}
+let _userDataSha = null;
+
+// GitHub에서 userdata 로드
+async function loadUserDataFromGitHub() {
+  if (!GITHUB_TOKEN) return null;
+  return new Promise(resolve => {
+    const req = https.request({
+      hostname: 'api.github.com',
+      path: `/repos/${GITHUB_REPO}/contents/userdata.json`,
+      method: 'GET',
+      headers: { 'Authorization': `token ${GITHUB_TOKEN}`, 'User-Agent': 'traidair-server', 'Accept': 'application/vnd.github.v3+json' },
+    }, res => {
+      let d = ''; res.on('data', c => d += c);
+      res.on('end', () => {
+        try {
+          const file = JSON.parse(d);
+          _userDataSha = file.sha;
+          const data = JSON.parse(Buffer.from(file.content, 'base64').toString('utf8'));
+          // /tmp에도 저장
+          fs.writeFileSync(USER_DATA_PATH, JSON.stringify(data, null, 2));
+          console.log('✅ GitHub userdata 로드됨');
+          resolve(data);
+        } catch(e) { resolve(null); }
+      });
+    });
+    req.on('error', () => resolve(null));
+    req.setTimeout(8000, () => { req.destroy(); resolve(null); });
+    req.end();
+  });
+}
+
+// 서버 시작 시 GitHub에서 userdata 로드
+loadUserDataFromGitHub().catch(() => {});
