@@ -2265,8 +2265,27 @@ function _initResizeObserver(){
   if(!wrap||wrap._roOk)return;
   wrap._roOk=true;
   if(typeof ResizeObserver!=='undefined'){
-    new ResizeObserver(()=>drawChart()).observe(wrap);
+    const ro=new ResizeObserver(entries=>{
+      for(const entry of entries){
+        const w=Math.round(entry.contentRect.width);
+        const h=Math.round(entry.contentRect.height);
+        if(w>20&&h>20){
+          const cv=document.getElementById('mainChart');
+          if(cv){cv.width=w;cv.height=h;}
+          drawChart();
+        }
+      }
+    });
+    ro.observe(wrap);
   }
+  // ResizeObserver 없거나 초기 렌더용 fallback
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    const cv=document.getElementById('mainChart');
+    if(!cv)return;
+    const w=Math.round(wrap.getBoundingClientRect().width||wrap.offsetWidth||600);
+    const h=Math.round(wrap.getBoundingClientRect().height||wrap.offsetHeight||400);
+    if(w>20&&h>20){cv.width=w;cv.height=h;drawChart();}
+  }));
 }
 
 
