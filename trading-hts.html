@@ -122,7 +122,7 @@ button{cursor:pointer;font-family:var(--sans);}
 .cinfo{font-family:var(--mono);font-size:9px;color:var(--ts);}
 .chart-area{flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0;}
 .chart-main{flex:1;position:relative;min-height:0;background:var(--pan);touch-action:none;user-select:none;}
-.chart-main canvas{position:absolute;inset:0;}
+.chart-main canvas{position:absolute;top:0;left:0;width:100%;height:100%;display:block;}
 .subc{height:58px;border-top:1px solid var(--br);position:relative;flex-shrink:0;}
 .subc.hide{display:none;}
 .subc canvas{position:absolute;inset:0;}
@@ -1899,11 +1899,17 @@ function _cvCs(){
 function drawChart(){
   const canvas=document.getElementById("mainChart");
   if(!canvas)return;
-  const W=canvas.clientWidth||canvas.offsetWidth||600;
-  const H=canvas.clientHeight||canvas.offsetHeight||300;
-  if(W<20||H<20)return;
-  if(canvas.width!==W)canvas.width=W;
-  if(canvas.height!==H)canvas.height=H;
+  // getBoundingClientRect으로 실제 렌더된 크기 읽기
+  const rect=canvas.getBoundingClientRect();
+  const W=Math.round(rect.width)||canvas.parentElement?.getBoundingClientRect().width||canvas.offsetWidth||600;
+  const H=Math.round(rect.height)||canvas.parentElement?.getBoundingClientRect().height||canvas.offsetHeight||400;
+  if(W<20||H<20){
+    // 크기가 0이면 다음 프레임에 재시도
+    requestAnimationFrame(()=>drawChart());
+    return;
+  }
+  // canvas 해상도 설정 (변경 시에만)
+  if(canvas.width!==W||canvas.height!==H){canvas.width=W;canvas.height=H;}
   const ctx=canvas.getContext("2d");
 
   const cs=_cvCs();
@@ -2050,9 +2056,11 @@ function _drawRSI(cs,cls){
   const el=document.getElementById('rsiSub'),cv=document.getElementById('rsiCanvas');
   if(!inds.rsi){if(el)el.classList.add('hide');return;}
   if(!el||!cv)return; el.classList.remove('hide');
-  const W=cv.clientWidth||600,H=cv.clientHeight||60;
+  const r=cv.getBoundingClientRect();
+  const W=Math.round(r.width)||cv.offsetWidth||600;
+  const H=Math.round(r.height)||cv.offsetHeight||60;
   if(W<10||H<10)return;
-  cv.width=W;cv.height=H;
+  if(cv.width!==W||cv.height!==H){cv.width=W;cv.height=H;}
   const ctx=cv.getContext('2d');
   ctx.clearRect(0,0,W,H);
   ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);
@@ -2076,9 +2084,11 @@ function _drawMACD(cs,cls){
   const el=document.getElementById('macdSub'),cv=document.getElementById('macdCanvas');
   if(!inds.macd){if(el)el.classList.add('hide');return;}
   if(!el||!cv)return; el.classList.remove('hide');
-  const W=cv.clientWidth||600,H=cv.clientHeight||60;
+  const r=cv.getBoundingClientRect();
+  const W=Math.round(r.width)||cv.offsetWidth||600;
+  const H=Math.round(r.height)||cv.offsetHeight||60;
   if(W<10||H<10)return;
-  cv.width=W;cv.height=H;
+  if(cv.width!==W||cv.height!==H){cv.width=W;cv.height=H;}
   const ctx=cv.getContext('2d');
   ctx.clearRect(0,0,W,H);
   ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);
@@ -5076,7 +5086,14 @@ window.onload=()=>{
   if(kisConfig.claudeKey){fetch('/api/set-claude-key',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:kisConfig.claudeKey})}).catch(()=>{});}
   updateKisStatus();
   renderAll();
-  genCandles(); drawChart();
+  genCandles();
+  // 레이아웃 완성 후 차트 렌더 (requestAnimationFrame 중첩으로 보장)
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    drawChart();
+    // 추가 보험: 100ms, 300ms 후 재렌더
+    setTimeout(drawChart, 100);
+    setTimeout(drawChart, 300);
+  }));
   renderOB(); renderTH();
   tick(); setInterval(tick,1000);
   setInterval(liveUpdate,2200);
