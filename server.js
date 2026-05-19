@@ -6,17 +6,17 @@ const path = require('path');
 const PORT = process.env.PORT || 3000;
 
 // ── 환경변수 기반 설정 (Railway Variables에서 영구 유지)
-// config.js는 git에서 제외 — 키 영구 보관
+// cfg.json에서 키 로드 (git 제외, Railway에 영구 보존)
 let _localCfg = {};
-try { _localCfg = require('./config.js'); } catch(e) {}
+try { _localCfg = JSON.parse(require('fs').readFileSync('./cfg.json','utf8')); } catch(e) {}
 
 let runtimeConfig = {
-  claudeKey:    process.env.ANTHROPIC_API_KEY || _localCfg.ANTHROPIC_API_KEY || '',
-  kisAppKey:    process.env.KIS_APP_KEY       || _localCfg.KIS_APP_KEY       || '',
-  kisAppSecret: process.env.KIS_APP_SECRET    || _localCfg.KIS_APP_SECRET    || '',
-  kisAccount:   process.env.KIS_ACCOUNT       || _localCfg.KIS_ACCOUNT       || '',
-  kisMode:      process.env.KIS_MODE          || _localCfg.KIS_MODE          || 'real',
-  dartKey:      process.env.DART_API_KEY      || _localCfg.DART_API_KEY      || '',
+  claudeKey:    process.env.ANTHROPIC_API_KEY || _localCfg.ck || '',
+  kisAppKey:    process.env.KIS_APP_KEY       || _localCfg.ak || '',
+  kisAppSecret: process.env.KIS_APP_SECRET    || _localCfg.as || '',
+  kisAccount:   process.env.KIS_ACCOUNT       || _localCfg.ac || '',
+  kisMode:      process.env.KIS_MODE          || _localCfg.md || 'real',
+  dartKey:      process.env.DART_API_KEY      || _localCfg.dk || '',
 };
 
 // 파일 저장 경로 (Railway 볼륨 없으면 /tmp 사용 — 재시작 후 날아가지만 환경변수로 복원됨)

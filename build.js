@@ -1,11 +1,18 @@
-// Railway 빌드 시 실행 — config.js 생성
 const fs = require('fs');
+// 환경변수가 있으면 cfg.json 생성 (Railway 배포 시)
 const cfg = {
-  ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || '',
-  KIS_APP_KEY: process.env.KIS_APP_KEY || '',
-  KIS_APP_SECRET: process.env.KIS_APP_SECRET || '',
-  KIS_ACCOUNT: process.env.KIS_ACCOUNT || '',
-  KIS_MODE: process.env.KIS_MODE || 'real',
+  ck: process.env.ANTHROPIC_API_KEY || '',
+  ak: process.env.KIS_APP_KEY || '',
+  as: process.env.KIS_APP_SECRET || '',
+  ac: process.env.KIS_ACCOUNT || '',
+  md: process.env.KIS_MODE || 'real',
 };
-fs.writeFileSync('./config.js', `module.exports = ${JSON.stringify(cfg, null, 2)};`);
-console.log('✅ config.js 생성됨');
+// 기존 cfg.json이 있으면 병합 (값이 있는 것 우선)
+let existing = {};
+try { existing = JSON.parse(fs.readFileSync('./cfg.json','utf8')); } catch(e) {}
+const merged = {};
+for(const k of ['ck','ak','as','ac','md','dk']){
+  merged[k] = cfg[k] || existing[k] || '';
+}
+fs.writeFileSync('./cfg.json', JSON.stringify(merged, null, 2));
+console.log('✅ cfg.json 생성/업데이트');
