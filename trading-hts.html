@@ -2361,15 +2361,34 @@ function _initResizeObserver(){
 // ═══════════════════════════════
 function togPlay(){
   sim.playing=!sim.playing;
+  _syncPlayBtn();
+  if(sim.playing){runStep();}
+  else{if(sim.timer){clearTimeout(sim.timer);sim.timer=null;}}
+}
+function _syncPlayBtn(){
   const btn=document.getElementById("playBtn");
-  if(sim.playing){btn.textContent="⏸";btn.classList.add("playing");runStep();}
-  else{btn.textContent="▶";btn.classList.remove("playing");if(sim.timer){clearTimeout(sim.timer);sim.timer=null;}}
+  if(!btn)return;
+  if(sim.playing){
+    btn.innerHTML='⏸';
+    btn.style.background='var(--g)';
+    btn.style.boxShadow='0 2px 8px rgba(5,192,114,.3)';
+    btn.title='일시정지';
+  }else{
+    btn.innerHTML='▶';
+    btn.style.background='var(--b)';
+    btn.style.boxShadow='0 2px 8px rgba(49,130,246,.3)';
+    btn.title='재생';
+  }
 }
 function runStep(){
   if(!sim.playing)return;
   sim.idx=Math.min(sim.idx+1,sim.candles.length-1);
   updChartToIdx();
-  if(sim.idx>=sim.candles.length-1){sim.playing=false;document.getElementById("playBtn").textContent="▶";document.getElementById("playBtn").classList.remove("playing");return;}
+  if(sim.idx>=sim.candles.length-1){
+    sim.playing=false;
+    _syncPlayBtn();
+    return;
+  }
   sim.timer=setTimeout(runStep,Math.max(25,1000/sim.speed));
 }
 function setSpd(el,v){sim.speed=v;document.querySelectorAll(".spd-btn").forEach(b=>b.classList.remove("on"));el.classList.add("on");}
@@ -5585,7 +5604,7 @@ function seekToSlider(val){
   const idx = Math.max(0, Math.min(Math.round((val/100)*(total-1)), total-1));
   sim.idx = idx;
   // 재생 중이면 멈추기
-  if(sim.playing){ sim.playing=false; const btn=document.getElementById('playBtn'); if(btn){btn.textContent='▶';btn.classList.remove('playing');}  if(sim.timer){clearTimeout(sim.timer);sim.timer=null;} }
+  if(sim.playing){ sim.playing=false; _syncPlayBtn(); if(sim.timer){clearTimeout(sim.timer);sim.timer=null;} }
   updChartToIdx();
 }
 function seekToPos(e, el){
