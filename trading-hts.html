@@ -788,7 +788,7 @@ input,select,textarea{-webkit-appearance:none;appearance:none;}
         <button class="ibtn" onclick="adjDate(1)">▶</button>
       </div>
       <div class="vsep" style="height:18px;"></div>
-      <button class="play-btn" id="playBtn" onclick="togPlay()">▶</button>
+      <button class="play-btn" id="playBtn" onclick="togPlay()" style="font-size:14px;line-height:1;">▶</button>
       <div class="spd-wrap">
         <span class="spd-l">배속</span>
         <button class="spd-btn on" onclick="setSpd(this,1)">x1</button>
@@ -4577,7 +4577,9 @@ async function callClaude(payload, feature){
     body: JSON.stringify(payload)
   });
   const data = await res.json();
-  // 사용량 추적 (응답에서 토큰 수 추출)
+  // API 키 만료/오류 감지
+  if(data.error){ checkApiKeyExpiry(JSON.stringify(data.error)); }
+  if(res.status === 401 || res.status === 403){ checkApiKeyExpiry('401 Unauthorized'); }
   const usage = data.usage || {};
   const inTok = usage.input_tokens || estimateTokens(JSON.stringify(payload));
   const outTok = usage.output_tokens || estimateTokens(data.content?.[0]?.text || '');
@@ -4595,16 +4597,22 @@ function estimateTokens(text){
 // KIS API 설정 저장/로드
 // ═══════════════════════════════
 // ── API 설정 (localStorage 영구 저장) ──
-const KIS_CFG_KEY = 'traidair_api_config_v2'; // v2: claudeKey 포함
+const KIS_CFG_KEY = 'traidair_api_config_v2';
+
+// ★ 하드코딩 기본값 — 만료 시 설정창에서 업데이트
+// 기본값은 서버 /api/get-config에서 로드 (window.onload에서 수행)
+const _DEFAULT_CFG = { appKey:'', appSecret:'', account:'47400138-01', mode:'real', dartKey:'', claudeKey:'' };
+
 function loadKisCfgFromStorage(){
   try {
     const raw = localStorage.getItem(KIS_CFG_KEY) || localStorage.getItem('kisConfig');
     if(raw) {
       const parsed = JSON.parse(raw);
-      return { appKey:'', appSecret:'', account:'', mode:'mock', dartKey:'', claudeKey:'', ...parsed };
+      // 저장된 값이 있으면 우선, 없는 필드는 기본값으로
+      return { ..._DEFAULT_CFG, ...parsed };
     }
   } catch(e) {}
-  return { appKey:'', appSecret:'', account:'', mode:'mock', dartKey:'', claudeKey:'' };
+  return { ..._DEFAULT_CFG };
 }
 let kisConfig = loadKisCfgFromStorage();
 
@@ -5731,6 +5739,20 @@ function drawSignalOverlay(){
     ctx.fillText(priceStr, x, isBuy?yBase+43:yBase-37);
     ctx.restore();
   });
+}
+
+// ── API 키 만료 감지 ──
+function checkApiKeyExpiry(errorMsg){
+  if(!errorMsg) return;
+  const expired = errorMsg.includes('expired') || errorMsg.includes('invalid') ||
+                  errorMsg.includes('401') || errorMsg.includes('authentication') ||
+                  errorMsg.includes('Unauthorized') || errorMsg.includes('invalid_api_key');
+  if(expired){
+    const box = document.createElement('div');
+    box.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#dc2626;color:#fff;padding:10px 16px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:10px;';
+    box.innerHTML = '⚠️ API 키가 만료됐어요. 설정창에서 키를 새로 입력해주세요. <button onclick="openSettings();this.parentNode.remove()" style="border:2px solid #fff;background:none;color:#fff;padding:3px 12px;border-radius:5px;cursor:pointer;font-weight:700;">설정 열기</button><button onclick="this.parentNode.remove()" style="border:none;background:none;color:#fff;cursor:pointer;font-size:16px;margin-left:auto;">✕</button>';
+    document.body.appendChild(box);
+  }
 }
 
 window.onload=()=>{
