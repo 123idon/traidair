@@ -1683,8 +1683,8 @@ const STOCKS=[
 // Phase 3-9: 관심종목 5그룹
 const WG_LABELS = ['🎯 오늘 진입 후보','📊 모니터링','🚫 매매금지','🔥 테마/이슈','📝 복기 대상'];
 const WG_MAX = [3, 10, 999, 10, 5];
-let WGS = JSON.parse(localStorage.getItem("htsWGS")||JSON.stringify([
-  ["005930","000660"],["373220","035420"],[]  ,[],[]]));
+let WGS = (()=>{try{return JSON.parse(localStorage.getItem("htsWGS")||JSON.stringify([
+  ["005930","000660"],["373220","035420"],[]  ,[],[]]))}catch(e){return [[],[],[],[],[]];}})();
 let curWG = 0;
 // 구버전 WL 호환
 let WL = WGS[0];
@@ -1966,7 +1966,7 @@ function genCandles(tk,dt){
 }
 
 // ── 추가 전역 변수/함수 ──
-let BAN_LIST=JSON.parse(localStorage.getItem("htsBan")||'[]');
+let BAN_LIST=safeParseJSON(localStorage.getItem("htsBan"), '[]');
 function addBanCurrent(){const stk=STOCKS.find(s=>s.tk===activeTk)||STOCKS[0];if(!BAN_LIST.includes(activeTk)){BAN_LIST.push(activeTk);saveBan();renderBanList();showAlert("매매금지 추가",stk.nm+" 매매금지 등록됨");}}
 function addPending(tk,nm,side,price,qty){const id=Date.now();pendingOrders.push({id,tk,nm,side,price,qty,time:new Date().toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"})});renderPending();return id;}
 let autoState={running:false,level:0,cfg:{rr:1.5,pos:15,stop:3,t1:3,t2:5,trail:"off",brk:true,explain:true}};
@@ -2916,7 +2916,7 @@ const INTRA_CHECKS = [
   {id:"ic8", txt:"매매금지 목록 확인 완료", phase:"3-9"},
   {id:"ic9", txt:"일일 손실 한도 80% 미만", phase:"0-3"},
 ];
-let intraState = JSON.parse(localStorage.getItem("htsIntra")||"{}");
+let intraState = safeParseJSON(localStorage.getItem("htsIntra"), "{}");
 
 function renderIntraCheck(){
   const el=document.getElementById("intraCheckList"); if(!el)return;
@@ -3622,7 +3622,7 @@ const MASTER_CL = {
     'HTS 종료'
   ]
 };
-let masterCLState = JSON.parse(localStorage.getItem('masterCL')||'{}');
+let masterCLState = safeParseJSON(localStorage.getItem('masterCL'), '{}');
 function renderMasterChecklist(){
   const sections={pre:'mcl-pre',entry:'mcl-entry',hold:'mcl-hold',post:'mcl-post'};
   Object.entries(sections).forEach(([key,id])=>{
@@ -3677,8 +3677,8 @@ function checkRealReadiness(){
   const total=trades.length;
   const wins=trades.filter(t=>t.pnl>0).length;
   const wr=total>0?wins/total:0;
-  const journals=JSON.parse(localStorage.getItem('manualJournals')||'[]');
-  const rules=JSON.parse(localStorage.getItem('personalRules')||'{}');
+  const journals=safeParseJSON(localStorage.getItem('manualJournals'), '[]');
+  const rules=safeParseJSON(localStorage.getItem('personalRules'), '{}');
   const items=[
     {txt:"Phase 0~12 전체 완료",done:true},
     {txt:`소액 실전 20회 이상 (현재 ${total}회)`,done:total>=20},
@@ -3715,7 +3715,7 @@ function savePersonalRules(){
   if(el){el.textContent='✅ 저장됨: '+new Date().toLocaleTimeString('ko-KR');el.style.color='var(--g)';}
 }
 function loadPersonalRules(){
-  const r=JSON.parse(localStorage.getItem('personalRules')||'{}');
+  const r=safeParseJSON(localStorage.getItem('personalRules'), '{}');
   ['strength','weakness','time','avoid','size','maxpos','stop','weekly'].forEach(k=>{
     const el=document.getElementById('pr-'+k);
     if(el&&r[k])el.value=r[k];
@@ -3772,7 +3772,7 @@ function saveJournalForm(){
     repeat:document.getElementById('jf-repeat')?.value||'none',
     ts:Date.now()
   };
-  const journals=JSON.parse(localStorage.getItem('manualJournals')||'[]');
+  const journals=safeParseJSON(localStorage.getItem('manualJournals'), '[]');
   journals.push(entry);
   localStorage.setItem('manualJournals',JSON.stringify(journals));
   // mock.trades에도 repeat 기록
@@ -4624,10 +4624,10 @@ function updAdvBoxes(now,action){
 const CLAUDE_IN_PRICE = 3.0 / 1_000_000;   // $3 per 1M input tokens
 const CLAUDE_OUT_PRICE = 15.0 / 1_000_000;  // $15 per 1M output tokens
 
-let apiUsage = JSON.parse(localStorage.getItem('apiUsage') || JSON.stringify({
+let apiUsage = (()=>{try{return JSON.parse(localStorage.getItem('apiUsage') || JSON.stringify({
   today: {date:'', calls:0, inTokens:0, outTokens:0, cost:0, breakdown:{}},
   total: {calls:0, inTokens:0, outTokens:0, cost:0}
-}));
+}))}catch(e){return {today:{date:"",calls:0,inTokens:0,outTokens:0,cost:0},total:{calls:0,inTokens:0,outTokens:0,cost:0}};}})();
 
 function ensureToday(){
   const today = new Date().toISOString().slice(0,10);
@@ -5315,7 +5315,7 @@ async function genJModal(){
   }catch(e){body.innerHTML="<div style='color:var(--r);font-size:11px;'>⚠ API 오류 — /api/claude 확인</div>";}
 }
 function renderJPage(){
-  const js=JSON.parse(localStorage.getItem("htsJournals")||"{}");
+  const js=safeParseJSON(localStorage.getItem("htsJournals"), "{}");
   const entries=Object.values(js).sort((a,b)=>b.date.localeCompare(a.date));
   if(!entries.length){document.getElementById("journalList").innerHTML="<div style='font-size:12px;color:var(--tm);text-align:center;padding:40px;'>거래 내역이 없습니다.</div>";return;}
   document.getElementById("journalList").innerHTML=entries.map(e=>{
@@ -6034,7 +6034,7 @@ function addToWG(g, tk){
 // 매매일지 AI 매매 구분 표시
 // ═══════════════════════════════
 function saveJEntry(date,p,pnl,wins,total,str){
-  const js2=JSON.parse(localStorage.getItem("htsJournals")||"{}");
+  const js2=safeParseJSON(localStorage.getItem("htsJournals"), "{}");
   // AI 매매 통계 추가
   const todayTrades=mock.trades.filter(t=>t.date===date);
   const aiTrades=todayTrades.filter(t=>t.auto);
@@ -6287,6 +6287,10 @@ function refreshAllData(){
   setTimeout(()=>finishProgress('새로고침 완료'),800);
 }
 
+function safeParseJSON(str, fallback){
+  if(str===null||str===undefined) return fallback;
+  try{return JSON.parse(str);}catch(e){return fallback;}
+}
 const _analysisCache={};
 function _getCachedAnalysis(key){
   const c=_analysisCache[key];
@@ -6353,7 +6357,14 @@ window.onload=()=>{
   if(savedTrust){trustScore=parseInt(savedTrust);const sl=document.getElementById('trustSlider');if(sl)sl.value=trustScore;updateTrustScore(trustScore);}
   setTimeout(()=>{renderGrowthRoadmap();detectSlump();},500);
 };
-
 </script>
+
+<!-- 동적 참조 요소 -->
+<span id="mentalResetStatus" style="display:none;"></span>
+<span id="bd_warning" style="display:none;"></span>
+<span id="bd_reentry" style="display:none;"></span>
+<span id="trustAutoLimit" style="display:none;"></span>
+<span id="trustScoreDesc" style="display:none;"></span>
+<span id="mktStrScore" style="display:none;"></span>
 </body>
 </html>
