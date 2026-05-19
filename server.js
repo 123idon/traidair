@@ -445,6 +445,48 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ── 코스피/코스닥 실시간 지수 (/api/market-index)
+  if (url === '/api/market-index') {
+    // 캐시: 3분마다 갱신
+    const now = Date.now();
+    if (!global._idxCache || now - global._idxCache.ts > 3 * 60 * 1000) {
+      try {
+        const fetchIdx = (symbol) => new Promise((resolve, reject) => {
+          const opts = {
+            hostname: 'query1.finance.yahoo.com',
+            path: `/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=2d`,
+            headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' },
+            timeout: 6000,
+          };
+          const r = require('https').get(opts, res2 => {
+            let d = '';
+            res2.on('data', c => d += c);
+            res2.on('end', () => {
+              try {
+                const j = JSON.parse(d);
+                const meta = j.chart.result[0].meta;
+                const price = meta.regularMarketPrice;
+                const prev = meta.previousClose || meta.chartPreviousClose;
+                const chgPct = prev ? ((price - prev) / prev * 100) : 0;
+                resolve({ price: Math.round(price * 100) / 100, prev: Math.round(prev * 100) / 100, chgPct: Math.round(chgPct * 100) / 100 });
+              } catch(e) { reject(e); }
+            });
+          });
+          r.on('error', reject);
+          r.on('timeout', () => { r.destroy(); reject(new Error('timeout')); });
+        });
+        const [kospi, kosdq] = await Promise.all([fetchIdx('^KS11'), fetchIdx('^KQ11')]);
+        global._idxCache = { ts: now, kospi, kosdq };
+      } catch(e) {
+        console.error('index fetch error:', e.message);
+        if (!global._idxCache) global._idxCache = { ts: 0, kospi: null, kosdq: null };
+      }
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+    res.end(JSON.stringify(global._idxCache || {}));
+    return;
+  }
+
   // 정적 파일
   let filePath = req.url === '/' ? '/trading-hts.html' : req.url.split('?')[0];
   filePath = path.join(__dirname, filePath);

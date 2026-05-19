@@ -1655,8 +1655,12 @@ input,select,textarea{-webkit-appearance:none;appearance:none;}
   <div class="modal" style="width:320px;">
     <div class="modal-hdr"><span class="modal-ttl" id="alertTtl">알림</span><button class="modal-x" onclick="closeModal('alert')">×</button></div>
     <div class="modal-body"><p id="alertMsg" style="font-size:13px;line-height:1.6;"></p></div>
-    <div class="modal-ftr"><button class="mbtn" onclick="closeModal('alert')">확인
+    <div class="modal-ftr"><button class="mbtn" onclick="closeModal('alert')">확인</button></div>
+  </div>
+</div>
+<script>
 // ═══════════════════════════════
+// DATA══════════════
 // DATA
 // ═══════════════════════════════
 const STOCKS=[
@@ -5062,27 +5066,120 @@ function sTab(el, id){
 
 function buildSys(){
   const stk=STOCKS.find(s=>s.tk===activeTk)||STOCKS[0];
-  const cs=getCandles(20);
-  const cls=cs.map(c=>c.c),vls=cs.map(c=>c.v);
+  const cs=getCandles(30);
+  const cls=cs.map(c=>c.c), vls=cs.map(c=>c.v);
   const lc=cs[cs.length-1]||{o:0,h:0,l:0,c:stk.pr,v:0};
-  const lrsi=(calcRSI(cls,14).slice(-1)[0]||50).toFixed(1);
-  const lma5=(calcMA(cls,5).slice(-1)[0]||0).toFixed(0);
-  const lma20=(calcMA(cls,20).slice(-1)[0]||0).toFixed(0);
-  const lma60=(calcMA(cls,60).slice(-1)[0]||0).toFixed(0);
+  const pc=cs[cs.length-2]||lc;
+
+  // ── 기술적 지표 계산 ──
+  const rsi=(calcRSI(cls,14).slice(-1)[0]||50).toFixed(1);
+  const ma5=(calcMA(cls,5).slice(-1)[0]||0).toFixed(0);
+  const ma20=(calcMA(cls,20).slice(-1)[0]||0).toFixed(0);
+  const ma60=(calcMA(cls,60).slice(-1)[0]||0).toFixed(0);
   const volR=vls.length>=2?(vls[vls.length-1]/vls[vls.length-2]).toFixed(1):"1.0";
-  const maArr=parseFloat(lma5)>parseFloat(lma20)&&parseFloat(lma20)>parseFloat(lma60)?"정배열":parseFloat(lma5)<parseFloat(lma20)?"역배열":"혼합";
+  const maArr=parseFloat(ma5)>parseFloat(ma20)&&parseFloat(ma20)>parseFloat(ma60)?"정배열(상승)":
+              parseFloat(ma5)<parseFloat(ma20)&&parseFloat(ma20)<parseFloat(ma60)?"역배열(하락)":"혼합";
+  const chgPct=((lc.c-lc.o)/lc.o*100).toFixed(2);
+  const body=Math.abs(lc.c-lc.o), total=(lc.h-lc.l)||1;
+  const lowerWick=(Math.min(lc.o,lc.c)-lc.l), upperWick=(lc.h-Math.max(lc.o,lc.c));
+  const candleShape=lc.c>lc.o?
+    (body/total>0.6?"강한 양봉":lowerWick>body*2?"망치형":upperWick>body*2?"유성형":"양봉"):
+    (body/total>0.6?"강한 음봉":lowerWick>body*2?"역망치형":"음봉");
+  const isHH=lc.h>pc.h, isHL=lc.l>pc.l;
+  const trendStr=isHH&&isHL?"HH-HL(상승추세)":!isHH&&!isHL?"LH-LL(하락추세)":"혼조";
+
+  // ── 수급 데이터 ──
   const pos=mock.positions[activeTk];
   const so=stopOrders[activeTk];
   const pnlPct=pos?((stk.pr-pos.avgPrice)/pos.avgPrice*100).toFixed(2):null;
-  return `20년 경력 단타 트레이딩 멘토이자 AI 투자 파트너.
-현재 HTS 상황:
-종목: ${stk.nm}(${activeTk}) ${stk.sec||""} ${stk.cap||""} | 현재가: ${stk.pr.toLocaleString()}원
-차트: RSI ${lrsi} | MA ${maArr} (5MA:${lma5}/20MA:${lma20}/60MA:${lma60}) | 거래량×${volR}
-캔들: O${lc.o.toLocaleString()} H${lc.h.toLocaleString()} L${lc.l.toLocaleString()} C${lc.c.toLocaleString()}
-보유: ${pos?`${pos.qty}주 평단${Math.round(pos.avgPrice).toLocaleString()}원 (${pnlPct>=0?"+":""}${pnlPct}%)${so?` | 손절${so.stop.toLocaleString()} | 1차목표${so.t1.toLocaleString()}`:""}`:없음}
-계좌: 잔고${mock.cash.toLocaleString()}원 | 신용${credType} | 오늘손익${mock.todayPnl>=0?"+":""}${Math.round(mock.todayPnl).toLocaleString()}원 (${mock.todayTrades}매매)
-AI자동매매: 레벨${autoState.level} ${autoState.running?"실행중":"중지"}
-원칙: 결론 먼저, Phase 번호 포함, 수치 근거, 200자 이내, 한국어.`;
+  const lossSeries=mock.lossSeries||0;
+  const todayPnlPct=(mock.todayPnl/(cfg.capital||10000000)*100).toFixed(2);
+  const lossLimit=cfg.dayloss||2;
+  const lossUsed=(-parseFloat(todayPnlPct)).toFixed(2);
+  const vwapCs=getCandles(50);
+  const vwap=vwapCs.length>0?(vwapCs.reduce((a,c)=>a+(c.h+c.l+c.c)/3*c.v,0)/vwapCs.reduce((a,c)=>a+c.v,1)||lc.c).toFixed(0):lc.c;
+  const aboveVwap=lc.c>parseFloat(vwap);
+
+  // ── STEP 0: 심리 상태 (Phase 8-2) ──
+  const trustScore=typeof window!=='undefined'&&window.trustScore!=null?window.trustScore:7;
+  const psyOk=trustScore>=5&&lossSeries<3;
+  const psyWarn=trustScore<5?"심리점수 낮음":lossSeries>=3?"연속손절 "+lossSeries+"회 → 뇌동매매 위험":"양호";
+
+  // ── STEP 1: 시장 환경 (Phase 8-3) ──
+  const idxKospi=document.getElementById('idx-kospi')?.textContent||'--';
+  const idxKosdq=document.getElementById('idx-kosdq')?.textContent||'--';
+  const idxPred=document.getElementById('idx-pred')?.textContent||'--';
+
+  // ── STEP 4: 차트 (Phase 8-6) ──
+  const chartSTEP4=`MA배열:${maArr} | 추세:${trendStr} | RSI:${rsi}(${parseFloat(rsi)>=70?"⚠과매수":parseFloat(rsi)<=30?"⚠과매도":"정상"}) | VWAP${aboveVwap?"위(긍정)":"아래(부정)"}`;
+
+  // ── STEP 5: 수급 (Phase 8-7) ──
+  const supplySTEP5=`거래량×${volR}(${parseFloat(volR)>=1.5?"수급강":"미약"}) | 캔들:${candleShape} | 등락:${chgPct}%`;
+
+  // ── STEP 6: R/R (Phase 8-8) ──
+  const entrySug=lc.c;
+  const stopSug=Math.round(lc.c*0.97);
+  const tgt1Sug=Math.round(lc.c*1.06);
+  const rr=((tgt1Sug-entrySug)/(entrySug-stopSug)).toFixed(1);
+  const commission=0.00015,tax=0.0018;
+  const netProfit=Math.round((tgt1Sug-entrySug)*100-(tgt1Sug*100*(commission+tax))-(entrySug*100*commission));
+  const netLoss=Math.round((entrySug-stopSug)*100+(entrySug*100*commission)+(stopSug*100*(commission+tax)));
+  const realRR=(netProfit/netLoss).toFixed(2);
+
+  // ── 보유 포지션 청산 전략 (Phase 9) ──
+  let exitCtx="";
+  if(pos&&pos.qty>0){
+    const p=parseFloat(pnlPct);
+    const t1ok=so&&lc.c>=so.t1;
+    exitCtx=`\n[Phase 9 청산전략] 보유${pos.qty}주 평단${Math.round(pos.avgPrice).toLocaleString()}원 (${p>=0?"+":""}${pnlPct}%)
+손절선:${so?so.stop.toLocaleString()+"원":"미설정⚠"} | 1차목표:${so?so.t1.toLocaleString()+"원":"미설정"}
+${p>=3?"1차 익절(50%) 검토 → 즉시 손절선 본전화":p<=-3?"손절선 근접 → 즉각 대응 준비":p>=1?"홀딩 유지 → 트레일링 스탑 점검":"보유 중 관찰"}
+${t1ok?"⚡ 1차 목표 도달 → 50% 익절 실행 권고":""}`;
+  }
+
+  return `당신은 20년 경력 단타 트레이딩 멘토이자 AI 파트너입니다.
+모든 판단은 아래 Phase 0~12 강의 체크 절차를 반드시 순서대로 확인한 뒤 내립니다.
+
+═══ Phase 8 매수 전 통합 점검 (현재 데이터 기반 자동 체크) ═══
+
+[STEP 0 | Phase 8-2 | 심리상태] ${psyOk?"✅":"🚨"} ${psyWarn} | 신뢰도점수:${trustScore}/10 | 연속손절:${lossSeries}회
+→ ${psyOk?"매매 가능":"진입 금지 상태 — 먼저 심리 리셋 필요"}
+
+[STEP 1 | Phase 8-3 | 시장환경] KOSPI:${idxKospi} | KOSDAQ:${idxKosdq} | 단기전망:${idxPred}
+→ 비우호적 시(선물-1.5%이하/VIX30이상): 비중 50%↓ 제한
+
+[STEP 2 | Phase 8-4 | 섹터] ${stk.sec||"미분류"} 섹터 | 오늘 강세 섹터 확인 필요
+→ 섹터 역방향 진입은 위험 증가
+
+[STEP 3 | Phase 8-5 | 종목스크리닝] ${stk.nm}(${activeTk}) ${stk.sec||""} ${stk.cap||""}
+→ 시총/거래대금/투자경고/재료 유무 체크 완료 기준 판단
+
+[STEP 4 | Phase 8-6 | 차트] ${chartSTEP4}
+→ 일봉-60분봉-5분봉 3단계 타임프레임 일치 여부 판단
+
+[STEP 5 | Phase 8-7 | 수급] ${supplySTEP5}
+→ 기관/외국인 수급 + VWAP 위치 + 체결강도 종합
+
+[STEP 6 | Phase 8-8 | R/R] 기준타점: 진입${entrySug.toLocaleString()} / 손절${stopSug.toLocaleString()}(-3%) / 목표${tgt1Sug.toLocaleString()}(+6%)
+→ 수수료/세금 포함 실질R/R: ${realRR} (기준 1.5 이상 권장)
+
+[STEP 7 | Phase 8-9 | GO/NOGO 기준]
+GO: 8항목 중 6개 이상 충족 시 / NOGO: 연속3회손절·일손실한도80%초과·R/R<1.0·손절미확정·FOMO 중 1개라도 해당 시 즉시 금지
+현재 일손실: ${lossUsed}% / 한도: ${lossLimit}% (${parseFloat(lossUsed)>=lossLimit*0.8?"⚠한도 80% 초과":parseFloat(lossUsed)>=lossLimit*0.5?"주의":"정상"})
+${exitCtx}
+
+═══ Phase 9 청산 원칙 ═══
+- 손절: 시장가 즉시 실행, 진입 즉시 예약주문 필수
+- 익절: 1차(+3%·50%) → 즉시 손절선 본전화 → 2차(+5%·30%) → 3차(잔여)
+- 트레일링: 고점-3% or 5MA 이탈 시 자동청산
+- 오버나잇: 수급3일지속+재료유효+비중50%이하 모두 충족 시만 허용
+
+═══ 응답 원칙 ═══
+1. 위 Phase 체크 데이터를 먼저 검토한 뒤 판단
+2. 결론 → 근거(Phase번호 포함) → 구체적 수치
+3. 뇌동매매 신호(빨리들어가야/느낌으로/본전만오면) 감지 시 즉시 경고 먼저
+4. 추측은 "(추정)"으로 표시, 확인불가는 "확인불가"
+5. 한국어, 간결하게`;
 }
 async function sendChat(txt){
   if(chatBusy)return;
@@ -5966,27 +6063,39 @@ function failProgress(label){
 }
 
 // ═══════════════════════════════
-// 실시간 지수 표시 + 3분마다 AI 방향 예측
+// 실시간 지수 표시 (Yahoo Finance 실제 데이터)
 // ═══════════════════════════════
-let _idxSim = { kospiChg: 0, kosdqChg: 0, lastPred: 0, predTimer: null };
+let _idxCache = null;
+let _idxFetching = false;
 
-function _syncIdxWithSim(){
-  // 현재 봉 기준으로 지수 추정 (시뮬 연동)
-  const cs = getCandles(2);
-  if(cs.length < 2){
-    // 봉 없어도 기본값 표시
-    _setIdxUI('idx-kospi', 2650, 0);
-    _setIdxUI('idx-kosdq', 850, 0);
-    return;
+async function fetchRealIndex(){
+  if(_idxFetching) return;
+  _idxFetching = true;
+  try{
+    const r = await fetch('/api/market-index');
+    if(!r.ok) throw new Error(r.status);
+    const d = await r.json();
+    _idxCache = d;
+    if(d.kospi && d.kospi.price){
+      _setIdxUI('idx-kospi', d.kospi.price, d.kospi.chgPct);
+    }
+    if(d.kosdq && d.kosdq.price){
+      _setIdxUI('idx-kosdq', d.kosdq.price, d.kosdq.chgPct);
+    }
+  }catch(e){
+    console.warn('지수 fetch 실패:', e.message);
+    // 실패 시 기존 캐시 유지 or 기본값
+    if(!_idxCache){
+      _setIdxUI('idx-kospi', 2650, 0);
+      _setIdxUI('idx-kosdq', 850, 0);
+    }
   }
-  const lc = cs[cs.length-1], pc = cs[cs.length-2];
-  const chgPct = (lc.c - pc.c) / pc.c * 100;
-  _idxSim.kospiChg = chgPct * 0.8 + (Math.random()-0.5)*0.1;
-  _idxSim.kosdqChg = chgPct * 1.1 + (Math.random()-0.5)*0.15;
-  const kospi = Math.round(2650 * (1 + _idxSim.kospiChg/100));
-  const kosdq = Math.round(850 * (1 + _idxSim.kosdqChg/100));
-  _setIdxUI('idx-kospi', kospi, _idxSim.kospiChg);
-  _setIdxUI('idx-kosdq', kosdq, _idxSim.kosdqChg);
+  _idxFetching = false;
+}
+
+// 하위호환: 시뮬 봉 진행 시 호출되던 함수 → 실제 API 호출로 대체
+function _syncIdxWithSim(){
+  fetchRealIndex();
 }
 function _setIdxUI(id, val, chg){
   const ve=document.getElementById(id), ce=document.getElementById(id+'-chg');
@@ -6425,7 +6534,6 @@ window.onload=()=>{
   const savedTrust=localStorage.getItem('trustScore');
   if(savedTrust){trustScore=parseInt(savedTrust);const sl=document.getElementById('trustSlider');if(sl)sl.value=trustScore;updateTrustScore(trustScore);}
   setTimeout(()=>{renderGrowthRoadmap();detectSlump();},500);
-};rGrowthRoadmap();detectSlump();},500);
 };</script>
 
 <!-- 동적 참조 요소 -->
