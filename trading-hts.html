@@ -79,7 +79,7 @@ button{cursor:pointer;font-family:var(--sans);}
 .hts{
   flex:1;
   display:grid;
-  grid-template-columns:152px 1fr 176px 220px;
+  grid-template-columns:162px 1fr 186px 232px;
   grid-template-rows:1fr 90px 76px;
   overflow:hidden;
   position:relative;
@@ -344,8 +344,8 @@ button{cursor:pointer;font-family:var(--sans);}
 button,a{touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
 input,select,textarea{-webkit-appearance:none;appearance:none;}
 .wg-body,.lpb,.brpb,.jpage,.stats-page{-webkit-overflow-scrolling:touch;overscroll-behavior:contain;}
-/* ── 태블릿/모바일 (600px 이하) ── */
-@media(max-width:600px){
+/* ── 태블릿/모바일 (860px 이하) ── */
+@media(max-width:860px){
   :root{--mob-nav:56px;}
   .hts{grid-template-columns:0 1fr 0 0;grid-template-rows:1fr;}
   .lp,.rp,.brp{position:fixed;z-index:300;top:0;bottom:calc(var(--mob-nav) + var(--sab));background:var(--pan);box-shadow:var(--sh2);transition:transform .25s cubic-bezier(.4,0,.2,1);will-change:transform;}
@@ -359,8 +359,8 @@ input,select,textarea{-webkit-appearance:none;appearance:none;}
   .spd-btn:nth-child(n+5){display:none;}
   .page{padding-bottom:calc(var(--mob-nav) + var(--sab));}
 }
-/* ── 모바일 (480px 이하) ── */
-@media(max-width:480px){
+/* ── 모바일 (520px 이하) ── */
+@media(max-width:520px){
   .bar{gap:4px;padding:0 7px;}
   .tab{padding:3px 7px;font-size:10px;min-height:32px;}
   .ibtn{font-size:10px;padding:3px 7px;min-height:32px;}
@@ -423,7 +423,6 @@ input,select,textarea{-webkit-appearance:none;appearance:none;}
     <button class="ibtn red" onclick="endMock()">■ 종료</button>
     <button class="ibtn pri" onclick="openModal('journal')">📓</button>
     <button class="ibtn pur" onclick="openModal('autotrade')" id="autoBtn">🤖 자동매매</button>
-    <button class="ibtn" onclick="refreshAll();runIntraCheck();showProgress('새로고침 완료',1);setTimeout(()=>finishProgress('완료'),800);" title="전체 새로고침" style="background:var(--g);color:#fff;border-color:var(--g);">↺ 새로고침</button>
   </div>
 </header>
 
@@ -531,43 +530,94 @@ input,select,textarea{-webkit-appearance:none;appearance:none;}
       </div>
       <!-- 장중 체크 탭 (Phase 8 실시간) -->
       <div class="lpb" id="lpb-ck">
-        <!-- 장중 자동 실시간 체크 -->
+
+        <!-- AI 시장 체력 지수 -->
         <div class="sec" style="padding:6px 8px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
-            <span class="sec-t" style="margin-bottom:0;">📡 장중 실시간 체크</span>
-            <button onclick="runIntraCheck()" style="padding:1px 6px;border-radius:4px;border:none;background:var(--b);color:#fff;font-size:8px;cursor:pointer;">새로고침</button>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
+            <span class="sec-t" style="margin-bottom:0;">📡 AI 시장 체력</span>
+            <button onclick="calcMarketStrength()" style="padding:1px 6px;border-radius:4px;border:none;background:var(--b);color:#fff;font-size:8px;cursor:pointer;">계산</button>
           </div>
-          <div id="intraLiveList" style="font-size:9px;line-height:1.8;">자동 체크 중...</div>
+          <div id="mktStrengthGauge" style="margin-bottom:5px;">
+            <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:9px;margin-bottom:3px;">
+              <span>체력 지수</span><span id="mktStrScore" style="font-weight:700;">-</span>
+            </div>
+            <div style="height:6px;background:var(--bg);border-radius:3px;overflow:hidden;">
+              <div id="mktStrBar" style="height:100%;width:0%;background:var(--b);border-radius:3px;transition:width .5s;"></div>
+            </div>
+          </div>
+          <div id="mktStrDetail" style="font-size:9px;color:var(--tm);line-height:1.6;">계산 버튼 눌러주세요</div>
         </div>
 
-        <!-- 뇌동매매 감지 -->
+        <!-- Phase 8 장중 STEP 체크 -->
         <div class="sec" style="padding:6px 8px;">
-          <span class="sec-t" style="color:var(--r);">⚡ 뇌동매매 감지</span>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
+            <span class="sec-t" style="margin-bottom:0;">✅ Phase 8 장중 체크</span>
+            <button onclick="resetIntraCheck()" style="padding:1px 6px;border-radius:4px;border:none;background:var(--bg);color:var(--ts);font-size:8px;cursor:pointer;border:1px solid var(--br);">초기화</button>
+          </div>
+          <div id="intraCheckList"></div>
+          <div style="margin-top:5px;padding:4px 7px;border-radius:6px;font-size:9px;font-weight:700;text-align:center;" id="intraGoNogo" style="background:var(--bg);">체크 완료 후 GO/NO-GO</div>
+        </div>
+
+        <!-- 뇌동매매 감지 패널 (Phase 11) -->
+        <div class="sec" style="padding:6px 8px;">
+          <span class="sec-t" style="color:var(--r);">⚡ 뇌동매매 감지 (Phase 11)</span>
           <div id="brainDongPanel" style="font-size:9px;line-height:1.7;">
             <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid var(--br);">
-              <span style="color:var(--ts);">연속 손절</span><span id="bd_loss" style="font-family:var(--mono);font-weight:700;">0회</span>
+              <span style="color:var(--ts);">연속 손절</span>
+              <span id="bd_loss" style="font-family:var(--mono);font-weight:700;">0회</span>
             </div>
             <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid var(--br);">
-              <span style="color:var(--ts);">30분내 매매</span><span id="bd_freq" style="font-family:var(--mono);font-weight:700;">0회</span>
+              <span style="color:var(--ts);">30분내 매매</span>
+              <span id="bd_freq" style="font-family:var(--mono);font-weight:700;">0회</span>
             </div>
             <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid var(--br);">
-              <span style="color:var(--ts);">단일비중 최고</span><span id="bd_size" style="font-family:var(--mono);font-weight:700;">0%</span>
+              <span style="color:var(--ts);">단일비중 최고</span>
+              <span id="bd_size" style="font-family:var(--mono);font-weight:700;">0%</span>
             </div>
-            <div style="display:flex;justify-content:space-between;padding:2px 0;">
-              <span style="color:var(--ts);">손절후재진입</span><span id="bd_re" style="font-family:var(--mono);font-weight:700;">0회</span>
+            <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid var(--br);">
+              <span style="color:var(--ts);">손절후재진입</span>
+              <span id="bd_reentry" style="font-family:var(--mono);font-weight:700;">0회</span>
             </div>
+            <div id="bd_warning" style="margin-top:4px;padding:4px 6px;border-radius:5px;font-size:9px;display:none;"></div>
           </div>
-          <div id="bdWarning" style="display:none;margin-top:4px;padding:4px 7px;border-radius:5px;background:rgba(240,64,64,.1);font-size:9px;color:var(--r);font-weight:700;"></div>
         </div>
 
-        <!-- 매매심리 지수 -->
+        <!-- 매매신뢰도지수 (Phase 11-13) -->
         <div class="sec" style="padding:6px 8px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px;">
-            <span class="sec-t" style="margin-bottom:0;">🧠 매매심리 지수</span>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
+            <span class="sec-t" style="margin-bottom:0;">🧠 매매신뢰도 지수</span>
+            <span style="font-family:var(--mono);font-size:10px;font-weight:700;" id="trustScoreVal">-/10</span>
           </div>
-          <div id="mktStrDetail" style="font-size:9px;color:var(--tm);line-height:1.6;">자동 계산 중...</div>
+          <input type="range" min="0" max="10" value="7" id="trustSlider" oninput="updateTrustScore(this.value)"
+            style="width:100%;-webkit-appearance:none;height:4px;border-radius:2px;background:var(--bg);outline:none;margin-bottom:5px;">
+          <div id="trustScoreDesc" style="font-size:9px;padding:4px 6px;border-radius:5px;background:var(--bg);"></div>
+          <div id="trustAutoLimit" style="font-size:8px;color:var(--a);margin-top:3px;display:none;"></div>
         </div>
+
+        <!-- 슬럼프 감지 (Phase 11-12) -->
+        <div class="sec" style="padding:6px 8px;">
+          <span class="sec-t" style="color:var(--p);">🌀 슬럼프 감지</span>
+          <div id="slumpPanel" style="font-size:9px;color:var(--ts);line-height:1.7;"></div>
+        </div>
+
+        <!-- 멘탈 리셋 루틴 (Phase 11-11) -->
+        <div class="sec" style="padding:6px 8px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+            <span class="sec-t" style="margin-bottom:0;color:var(--r);">🔄 멘탈 리셋 루틴</span>
+            <button onclick="showMentalReset()" style="padding:1px 6px;border-radius:4px;border:none;background:var(--r);color:#fff;font-size:8px;cursor:pointer;">실행</button>
+          </div>
+          <div style="font-size:9px;color:var(--tm);">연속손실 3회 이상 시 실행</div>
+          <div id="mentalResetStatus" style="font-size:9px;color:var(--ts);margin-top:3px;"></div>
+        </div>
+
+        <!-- 시간대별 루틴 가이드 -->
+        <div class="sec" style="padding:6px 8px;">
+          <span class="sec-t">⏰ 지금 해야 할 것</span>
+          <div id="timeGuide" style="font-size:9px;color:var(--ts);line-height:1.7;padding:4px 6px;background:var(--bg);border-radius:6px;"></div>
+        </div>
+
       </div>
+
       <div class="lpb" id="lpb-f">
         <div class="sec"><div class="sec-t">조건 검색</div><div id="filterList"></div></div>
         <div class="sec"><div class="sec-t">결과</div><div id="filterResult" style="font-size:9px;color:var(--tm);padding:3px 0;">조건을 선택하세요</div></div>
@@ -598,30 +648,33 @@ input,select,textarea{-webkit-appearance:none;appearance:none;}
 
       <!-- AI 섹터/종목 추천 패널 (Phase 6, 7 기반) -->
       <div class="lpb" id="lpb-ai">
-        <!-- 실시간 섹터 수급 순위 -->
+        <!-- 오늘의 강세 섹터 순위 -->
         <div class="sec" style="padding:6px 8px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
-            <span class="sec-t" style="margin-bottom:0;color:var(--p);">🔥 실시간 섹터 수급</span>
-            <button onclick="loadSectorRanking()" id="sectorRankBtn" style="padding:1px 7px;border-radius:4px;border:none;background:var(--p);color:#fff;font-size:8px;font-weight:600;cursor:pointer;">순위 보기</button>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
+            <span class="sec-t" style="margin-bottom:0;color:var(--p);">🏆 오늘 강세 섹터</span>
+            <button onclick="loadSectorRanking()" id="sectorRankBtn" style="padding:2px 8px;border-radius:5px;border:none;background:var(--p);color:#fff;font-size:9px;font-weight:600;cursor:pointer;">순위 보기</button>
           </div>
-          <div id="sectorRankList" style="font-size:9px;color:var(--tm);line-height:1.5;">버튼을 눌러 섹터 수급을 확인하세요.</div>
+          <div id="sectorRankList" style="font-size:9px;color:var(--tm);line-height:1.5;">
+            버튼을 눌러 오늘 주도 섹터를 확인하세요.
+          </div>
         </div>
         <!-- 재료 강도 판별 -->
         <div class="sec" style="padding:6px 8px;">
           <div class="sec-t" style="color:var(--a);">📋 재료 강도 판별</div>
-          <textarea id="materialInput" style="width:100%;height:44px;background:var(--bg);border:1px solid var(--br);border-radius:6px;color:var(--tp);font-family:var(--sans);font-size:9px;padding:4px;resize:none;outline:none;" placeholder="뉴스/공시 텍스트 붙여넣기..."></textarea>
-          <button onclick="runMaterialAnalysis()" style="width:100%;margin-top:3px;padding:4px;border-radius:5px;border:none;background:var(--a);color:#000;font-size:9px;font-weight:700;cursor:pointer;">재료 강도 분석</button>
+          <div style="font-size:8px;color:var(--tm);margin-bottom:4px;">뉴스/공시 텍스트 붙여넣기</div>
+          <textarea id="materialInput" style="width:100%;height:50px;background:var(--bg);border:1px solid var(--br);border-radius:6px;color:var(--tp);font-family:var(--sans);font-size:9px;padding:4px;resize:none;outline:none;" placeholder="예: 삼성전자 HBM4 수주 1조원..."></textarea>
+          <button onclick="runMaterialAnalysis()" style="width:100%;margin-top:3px;padding:4px;border-radius:5px;border:none;background:var(--a);color:#000;font-size:9px;font-weight:700;cursor:pointer;">재료 강도 분석 (S/A/B/C)</button>
           <div id="materialResult" style="font-size:9px;margin-top:4px;line-height:1.6;"></div>
         </div>
         <!-- AI 종목 스크리닝 -->
         <div class="sec" style="padding:6px 8px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
             <span class="sec-t" style="margin-bottom:0;color:var(--b);">🔍 AI 종목 스크리닝</span>
-            <button onclick="runAIStockScreening()" style="padding:1px 7px;border-radius:4px;border:none;background:var(--b);color:#fff;font-size:8px;font-weight:600;cursor:pointer;">스크리닝</button>
+            <button onclick="runAIStockScreening()" style="padding:2px 7px;border-radius:5px;border:none;background:var(--b);color:#fff;font-size:9px;font-weight:600;cursor:pointer;">스크리닝</button>
           </div>
+          <div style="font-size:8px;color:var(--tm);margin-bottom:4px;">수급폭발·모멘텀·눌림목 기준</div>
           <div id="aiScreenResult" style="font-size:9px;color:var(--tm);line-height:1.6;">스크리닝 버튼을 눌러주세요.</div>
         </div>
-      </div>
       </div>
     </div>
 
@@ -2916,11 +2969,47 @@ let autoLevel=0;
 // ═══════════════════════════════
 // 장중 체크리스트 (Phase 8 실시간)
 // ═══════════════════════════════
-// 구 버전 수동 체크리스트 — 새 자동 체크(runIntraCheck)로 대체됨
-let intraState = {};
-function renderIntraCheck(){ runIntraCheck && runIntraCheck(); }
-function togIntra(id){}
-function resetIntraCheck(){ runIntraCheck && runIntraCheck(); }
+const INTRA_CHECKS = [
+  {id:"ic0", txt:"STEP0: 심리 정상 (흥분/공포/복수심 없음)", phase:"8-2"},
+  {id:"ic1", txt:"STEP1: 시장 선물 방향 우호적", phase:"8-3"},
+  {id:"ic2", txt:"STEP2: 오늘 강한 섹터 파악 완료", phase:"8-4"},
+  {id:"ic3", txt:"STEP3: 종목 스크리닝 통과 (시총/거래대금)", phase:"8-5"},
+  {id:"ic4", txt:"STEP4: 차트 3단계 일치 (일봉/60분/5분)", phase:"8-6"},
+  {id:"ic5", txt:"STEP5: 수급 확인 (체결강도 100+)", phase:"8-7"},
+  {id:"ic6", txt:"STEP6: R/R 1.5 이상 계산 완료", phase:"8-8"},
+  {id:"ic7", txt:"STEP7: 손절가 사전 확정", phase:"8-9"},
+  {id:"ic8", txt:"매매금지 목록 확인 완료", phase:"3-9"},
+  {id:"ic9", txt:"일일 손실 한도 80% 미만", phase:"0-3"},
+];
+let intraState = JSON.parse(localStorage.getItem("htsIntra")||"{}");
+
+function renderIntraCheck(){
+  const el=document.getElementById("intraCheckList"); if(!el)return;
+  el.innerHTML=INTRA_CHECKS.map((c,i)=>`
+    <div style="display:flex;align-items:center;gap:6px;padding:4px 6px;border-radius:6px;cursor:pointer;margin-bottom:2px;background:${intraState[c.id]?"rgba(5,192,114,.07)":"transparent"};"
+      onclick="togIntra('${c.id}')">
+      <div style="width:14px;height:14px;border-radius:50%;border:1.5px solid ${intraState[c.id]?"var(--g)":"var(--br)"};background:${intraState[c.id]?"var(--g)":"transparent"};display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff;flex-shrink:0;">
+        ${intraState[c.id]?"✓":""}
+      </div>
+      <div style="font-size:9px;color:${intraState[c.id]?"var(--tp)":"var(--ts)"};flex:1;line-height:1.3;">${c.txt}</div>
+      <span style="font-size:7px;color:var(--tm);font-family:var(--mono);">${c.phase}</span>
+    </div>`).join("");
+  const done=INTRA_CHECKS.filter(c=>intraState[c.id]).length;
+  const total=INTRA_CHECKS.length;
+  const goEl=document.getElementById("intraGoNogo"); if(!goEl)return;
+  const isGo=done>=8;
+  goEl.style.background=isGo?"rgba(5,192,114,.12)":done>=6?"rgba(255,153,0,.12)":"rgba(240,62,62,.08)";
+  goEl.style.color=isGo?"var(--g)":done>=6?"var(--a)":"var(--r)";
+  goEl.textContent=isGo?`✅ GO 가능 (${done}/${total})`:done>=6?`△ 추가 확인 필요 (${done}/${total})`:`❌ NO-GO (${done}/${total})`;
+}
+function togIntra(id){
+  intraState[id]=!intraState[id];
+  localStorage.setItem("htsIntra",JSON.stringify(intraState));
+  renderIntraCheck();
+}
+function resetIntraCheck(){
+  intraState={};localStorage.setItem("htsIntra","{}");renderIntraCheck();
+}
 
 // ═══════════════════════════════
 // AI 시장 체력 지수
@@ -5430,7 +5519,7 @@ function quickSwitch(){
 }
 
 // ── 모바일 패널 제어 ──
-function isMobile(){return window.innerWidth<=600;}
+function isMobile(){return window.innerWidth<=860;}
 function openMobPanel(panel){
   // panel: 'lp' | 'rp' | 'brp'
   closeMobPanels();
@@ -6175,235 +6264,6 @@ function saveJEntry(date,p,pnl,wins,total,str){
   renderJPage();
 }
 
-// ═══════════════════════════════
-// 장중 실시간 자동 체크
-// ═══════════════════════════════
-const INTRA_CHECKS = [
-  { id:'ic_idx',    label:'코스피/코스닥 지수 방향', fn: ()=>{
-    const cs=getRecentCandles(3); if(cs.length<2) return {score:0,val:'데이터 부족'};
-    const chg=(cs[cs.length-1].c-cs[0].c)/cs[0].c*100;
-    return {score:chg>0.3?90:chg>0?65:chg>-0.3?45:20, val:`${chg>=0?'▲':'▼'}${Math.abs(chg).toFixed(2)}%`};
-  }},
-  { id:'ic_vol',    label:'거래량 수급 강도', fn: ()=>{
-    const cs=getRecentCandles(5); if(cs.length<3) return {score:50,val:'-'};
-    const avg=cs.slice(0,-1).reduce((a,c)=>a+c.v,0)/(cs.length-1);
-    const r=cs[cs.length-1].v/avg;
-    return {score:r>=2?90:r>=1.3?75:r>=0.8?50:30, val:`×${r.toFixed(1)}배`};
-  }},
-  { id:'ic_ma',     label:'5MA vs 20MA 배열', fn: ()=>{
-    const cs=getCandles(20); const cls=cs.map(c=>c.c);
-    const ma5=calcMA(cls,5).slice(-1)[0]||0, ma20=calcMA(cls,20).slice(-1)[0]||0;
-    const ok=ma5>ma20;
-    return {score:ok?80:35, val:`5MA ${Math.round(ma5).toLocaleString()} / 20MA ${Math.round(ma20).toLocaleString()}`};
-  }},
-  { id:'ic_rsi',    label:'RSI 모멘텀', fn: ()=>{
-    const cs=getCandles(20); const cls=cs.map(c=>c.c);
-    const rsi=parseFloat((calcRSI(cls,14).slice(-1)[0]||50).toFixed(1));
-    return {score:rsi>=50&&rsi<=70?85:rsi>=40&&rsi<50?60:rsi>70?40:25, val:`RSI ${rsi}`};
-  }},
-  { id:'ic_candle', label:'현재 캔들 형태', fn: ()=>{
-    const c=getCurrentCandle(); if(!c) return {score:50,val:'-'};
-    const up=c.c>c.o, body=Math.abs(c.c-c.o)/(c.h-c.l||1)*100;
-    return {score:up&&body>60?80:up?60:body<30?45:25, val:`${up?'양봉':'음봉'} 몸통${body.toFixed(0)}%`};
-  }},
-  { id:'ic_time',   label:'매매 적합 시간대', fn: ()=>{
-    const lc=getCurrentCandle(); if(!lc) return {score:50,val:'-'};
-    const [h,m]=lc.t.split(':').map(Number); const hm=h*60+m;
-    const best=(hm>=9*60+0&&hm<=9*60+30)||(hm>=14*60+0&&hm<=14*60+30);
-    const ok=hm>=9*60+30&&hm<=14*60;
-    return {score:best?90:ok?70:45, val:lc.t+(best?' ★매매적합':ok?'':' ⚠점심대')};
-  }},
-  { id:'ic_pos',    label:'포지션 리스크', fn: ()=>{
-    const totalVal=Object.values(mock.positions||{}).reduce((a,p)=>{
-      const s=STOCKS.find(s=>s.tk===p.tk||s.tk===Object.keys(mock.positions)[0])||{pr:0};
-      return a+p.qty*(p.avgPrice||s.pr||0);
-    },0);
-    const ratio=totalVal/(mock.cash+totalVal||1)*100;
-    return {score:ratio<50?85:ratio<80?60:30, val:`비중 ${ratio.toFixed(0)}%`};
-  }},
-  { id:'ic_pnl',    label:'오늘 손익 상태', fn: ()=>{
-    const pnl=mock.todayPnl||0, cap=cfg.capital||10000000;
-    const pct=pnl/cap*100;
-    return {score:pct>1?90:pct>0?75:pct>-1?50:pct>-2?30:10, val:`${pnl>=0?'+':''}${pnl.toLocaleString()}원 (${pct.toFixed(2)}%)`};
-  }},
-];
-
-function runIntraCheck(){
-  const el=document.getElementById('intraLiveList');
-  if(!el) return;
-  const rows=INTRA_CHECKS.map(ck=>{
-    let result={score:50,val:'-'};
-    try{result=ck.fn();}catch(e){}
-    const sc=result.score;
-    const col=sc>=75?'var(--g)':sc>=50?'var(--a)':'var(--r)';
-    const bar=`<div style="height:3px;background:var(--bg);border-radius:2px;margin-top:2px;overflow:hidden;"><div style="height:100%;width:${sc}%;background:${col};border-radius:2px;transition:width .5s;"></div></div>`;
-    return `<div style="padding:3px 0;border-bottom:1px solid rgba(0,0,0,.04);">
-      <div style="display:flex;justify-content:space-between;align-items:center;">
-        <span style="color:var(--ts);font-size:8px;">${ck.label}</span>
-        <span style="font-family:var(--mono);font-weight:800;font-size:10px;color:${col};">${sc}점</span>
-      </div>
-      <div style="font-size:8px;color:var(--tm);">${result.val}</div>
-      ${bar}
-    </div>`;
-  });
-  const totalScore=Math.round(INTRA_CHECKS.reduce((a,ck)=>{
-    try{return a+(ck.fn().score||50);}catch(e){return a+50;}
-  },0)/INTRA_CHECKS.length);
-  el.innerHTML=`<div style="text-align:center;margin-bottom:6px;padding:4px;background:var(--bg);border-radius:6px;">
-    <span style="font-size:11px;font-weight:800;color:${totalScore>=75?'var(--g)':totalScore>=50?'var(--a)':'var(--r)'};">${totalScore}점</span>
-    <span style="font-size:9px;color:var(--tm);"> / 100 — ${totalScore>=75?'✅ 매매 우호':'⚠ 신중 필요'}</span>
-  </div>${rows.join('')}`;
-}
-
-// 30초마다 자동 업데이트
-setInterval(()=>{ if(document.querySelector('.lpt.on[onclick*="lpb-ck"]')) runIntraCheck(); }, 30000);
-
-// ═══════════════════════════════
-// 섹터 수급 순위 — 실시간 + NEW 표시
-// ═══════════════════════════════
-let _prevSectorRank = [];
-
-async function loadSectorRanking(){
-  const el=document.getElementById('sectorRankList');
-  const btn=document.getElementById('sectorRankBtn');
-  if(!el) return;
-  el.innerHTML='<span style="color:var(--tm);font-style:italic;">AI 분석 중...</span>';
-  if(btn) btn.disabled=true;
-  try{
-    const cs=getRecentCandles(20);
-    const cls=cs.map(c=>c.c);
-    const rsi=(calcRSI(cls,14).slice(-1)[0]||50).toFixed(0);
-    const volR=cs.length>=2?(cs[cs.length-1].v/cs[cs.length-2].v).toFixed(1):'1.0';
-    const prompt=`단타 트레이더용 지금 이 순간 섹터별 수급 강도를 점수로 알려줘.
-RSI:${rsi} 거래량:${volR}배 종목:${STOCKS.find(s=>s.tk===activeTk)?.nm||activeTk}
-
-섹터: 반도체, 2차전지, 바이오, 자동차, 인터넷, 방산, 조선, 철강
-각 섹터를 0~100점으로 평가. 점수 높을수록 수급 강함.
-
-JSON만: {"sectors":[{"name":"섹터명","score":85,"reason":"한줄이유"},...]}`;
-    const data=await callClaude({model:'claude-sonnet-4-5',max_tokens:500,messages:[{role:'user',content:prompt}]},'섹터수급');
-    const text=data.content?.[0]?.text||'';
-    const m=text.match(/\{[\s\S]*\}/);
-    if(!m) throw new Error('파싱실패');
-    const result=JSON.parse(m[0]);
-    const sectors=(result.sectors||[]).sort((a,b)=>b.score-a.score);
-
-    // NEW 표시: 이전 순위와 비교
-    const prevNames=_prevSectorRank.map(s=>s.name);
-    const newSectors=sectors.filter((s,i)=>i<3&&(!prevNames.includes(s.name)||_prevSectorRank.findIndex(p=>p.name===s.name)>=3));
-    _prevSectorRank=sectors;
-
-    el.innerHTML=sectors.slice(0,6).map((s,i)=>{
-      const sc=s.score||50;
-      const col=sc>=75?'var(--g)':sc>=55?'var(--a)':'var(--r)';
-      const isNew=newSectors.some(n=>n.name===s.name);
-      return `<div onclick="loadSectorStocks('${s.name}')" style="padding:5px 4px;border-radius:6px;cursor:pointer;margin-bottom:2px;" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='none'">
-        <div style="display:flex;align-items:center;gap:5px;margin-bottom:2px;">
-          <span style="font-size:10px;font-weight:800;color:${i<3?'var(--b)':'var(--tm)'};min-width:14px;">${i+1}</span>
-          <span style="font-size:10px;font-weight:700;flex:1;">${s.name}</span>
-          ${isNew?'<span style="font-size:8px;background:var(--r);color:#fff;padding:1px 4px;border-radius:3px;font-weight:700;">NEW</span>':''}
-          <span style="font-family:var(--mono);font-size:10px;font-weight:800;color:${col};">${sc}점</span>
-        </div>
-        <div style="height:3px;background:var(--bg);border-radius:2px;overflow:hidden;">
-          <div style="height:100%;width:${sc}%;background:${col};border-radius:2px;"></div>
-        </div>
-        <div style="font-size:8px;color:var(--tm);margin-top:1px;">${s.reason||''}</div>
-      </div>`;
-    }).join('');
-  }catch(e){
-    el.innerHTML=`<span style="color:var(--r);font-size:9px;">분석 실패: ${e.message}</span>`;
-  }
-  if(btn) btn.disabled=false;
-}
-
-// ═══════════════════════════════
-// 진입후보 클릭 → 이유 팝업
-// ═══════════════════════════════
-function renderCands(){
-  const cc=document.getElementById('candCount');
-  const sorted=[...CANDS].sort((a,b)=>(b.score||0)-(a.score||0));
-  if(cc){cc.textContent=sorted.length+'/3';cc.style.color=sorted.length>=3?'var(--r)':'var(--ts)';}
-  document.getElementById('candList').innerHTML=sorted.map((c,i)=>{
-    const s=STOCKS.find(s=>s.tk===c.tk)||{nm:c.tk,pr:0,base:1};
-    const sc=c.score||0;
-    const col=sc>=80?'var(--g)':sc>=65?'var(--a)':'var(--r)';
-    const chg=((s.pr-s.base)/s.base*100).toFixed(2);
-    const up=parseFloat(chg)>=0;
-    return `<div style="position:relative;padding:6px 8px;border-radius:8px;cursor:pointer;border-bottom:1px solid var(--br);" onclick="showCandDetail('${c.tk}')" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='none'">
-      <div style="display:flex;align-items:center;gap:4px;">
-        <span style="font-size:10px;font-weight:800;color:var(--b);min-width:14px;">${i+1}</span>
-        <div style="flex:1;min-width:0;">
-          <div style="font-size:11px;font-weight:700;">${s.nm}</div>
-          <div style="font-size:8px;color:var(--ts);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${c.why||''}</div>
-        </div>
-        <div style="text-align:right;">
-          <div style="font-family:var(--mono);font-size:11px;font-weight:800;color:${col};">${sc}점</div>
-          <div style="font-size:9px;" class="${up?'cu':'cd'}">${up?'+':''}${chg}%</div>
-        </div>
-      </div>
-      <div style="height:2px;background:var(--bg);border-radius:1px;margin-top:4px;overflow:hidden;">
-        <div style="height:100%;width:${sc}%;background:${col};border-radius:1px;"></div>
-      </div>
-    </div>`;
-  }).join('');
-}
-
-function showCandDetail(tk){
-  const c=CANDS.find(c=>c.tk===tk);
-  const s=STOCKS.find(s=>s.tk===tk)||{nm:tk,pr:0,base:1};
-  if(!c&&!s) return;
-  // 팝업 생성
-  let popup=document.getElementById('_candPopup');
-  if(!popup){
-    popup=document.createElement('div');
-    popup.id='_candPopup';
-    popup.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9999;background:var(--pan);border-radius:14px;box-shadow:0 8px 40px rgba(0,0,0,.2);padding:18px;width:300px;max-width:92vw;';
-    document.body.appendChild(popup);
-  }
-  const sc=c?.score||0;
-  const col=sc>=80?'var(--g)':sc>=65?'var(--a)':'var(--r)';
-  popup.innerHTML=`
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-      <div>
-        <div style="font-size:14px;font-weight:800;">${s.nm}</div>
-        <div style="font-size:10px;color:var(--tm);font-family:var(--mono);">${tk}</div>
-      </div>
-      <div style="text-align:right;">
-        <div style="font-size:20px;font-weight:900;color:${col};">${sc}점</div>
-        <button onclick="document.getElementById('_candPopup').style.display='none'" style="border:none;background:none;font-size:14px;cursor:pointer;color:var(--tm);">✕</button>
-      </div>
-    </div>
-    <div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:12px;font-size:11px;line-height:1.7;color:var(--ts);" id="_candReason">
-      <div style="color:var(--tm);font-style:italic;">추천 이유 로딩 중...</div>
-    </div>
-    <div style="display:flex;gap:8px;">
-      <button onclick="selectStk('${tk}');document.getElementById('_candPopup').style.display='none';" style="flex:1;padding:8px;border-radius:8px;border:none;background:var(--b);color:#fff;font-size:12px;font-weight:700;cursor:pointer;">📊 차트 보기</button>
-      <button onclick="document.getElementById('_candPopup').style.display='none'" style="padding:8px 14px;border-radius:8px;border:1.5px solid var(--br);background:none;font-size:12px;cursor:pointer;">닫기</button>
-    </div>`;
-  popup.style.display='block';
-
-  // AI 추천 이유 생성
-  const cs=getCandles(10);
-  const cls=cs.map(x=>x.c);
-  const rsi=(calcRSI(cls,9).slice(-1)[0]||50).toFixed(0);
-  const lc=getCurrentCandle()||{c:s.pr||0};
-  callClaude({
-    model:'claude-sonnet-4-5',max_tokens:250,
-    messages:[{role:'user',content:`단타 트레이더야. ${s.nm}(${tk})을 진입후보로 선정한 이유를 구체적으로 알려줘.
-추천이유: ${c?.why||'조건검색 통과'}
-현재가: ${lc.c.toLocaleString()}원 | RSI: ${rsi}
-
-수급, 차트, 재료, 리스크 각 항목으로 나눠서 쉽게 4~5줄로.`}]
-  },'후보상세').then(d=>{
-    const t=d.content?.[0]?.text||'분석 실패';
-    const el=document.getElementById('_candReason');
-    if(el) el.innerHTML=t.replace(/\n/g,'<br>');
-  }).catch(()=>{
-    const el=document.getElementById('_candReason');
-    if(el) el.textContent=c?.why||'Claude API 키 설정 필요';
-  });
-}
-
 window.onload=()=>{
   loadState();
   goPage('hts',document.getElementById('tab-hts'));
@@ -6411,8 +6271,6 @@ window.onload=()=>{
   initChartEvents();
   _initResizeObserver();
   initChartRightClick();
-  // 장중 체크 자동 실행
-  setTimeout(runIntraCheck, 1500);
   // ★ 서버에서 저장된 API 설정 로드 (재배포 후에도 유지)
   fetch('/api/get-config').then(r=>r.json()).then(d=>{
     if(d.ok && (d.kisAppKey || d.claudeKeyFull)){
