@@ -1616,6 +1616,13 @@ input,select,textarea{-webkit-appearance:none;appearance:none;}
 </div>
 
 <script>
+// ── 디버그: 런타임 에러 화면 표시 ──
+window.onerror=function(msg,src,line,col,err){
+  const el=document.getElementById('cinfo');
+  if(el)el.textContent='JS오류 L'+line+': '+msg;
+  return false;
+};
+
 // ═══════════════════════════════
 // DATA
 // ═══════════════════════════════
@@ -1949,6 +1956,7 @@ function crosshairPlugin(){
 let chartViewStart=0, chartViewCount=100;
 
 function initChart(){
+  try{
   const allCs=sim.candles.slice(0,Math.max(sim.idx+1,10));
   if(!allCs.length)return;
 
@@ -2002,6 +2010,7 @@ function initChart(){
 
   if(inds.rsi)initSub("rsi",calcRSI(cls,14),"#a78bfa",lbls);
   if(inds.macd){const{ml,sig}=calcMACD(cls);initSubMACD(lbls,ml,sig);}
+  }catch(e){document.getElementById("cinfo").textContent="차트오류:"+e.message;throw e;}
 }
 
 // ── 차트 이벤트 (window.onload에서 1회만 등록) ──
@@ -2151,7 +2160,7 @@ function runStep(){
   sim.timer=setTimeout(runStep,Math.max(25,1000/sim.speed));
 }
 function setSpd(el,v){sim.speed=v;document.querySelectorAll(".spd-btn").forEach(b=>b.classList.remove("on"));el.classList.add("on");}
-function setTF(el,tf){sim.tf=tf;document.querySelectorAll(".tf-btn").forEach(b=>b.classList.remove("on"));el.classList.add("on");genCandles(activeTk,sim.date);initChart();}
+function setTF(el,tf){try{sim.tf=tf;document.querySelectorAll(".tf-btn").forEach(b=>b.classList.remove("on"));el.classList.add("on");genCandles(activeTk,sim.date);initChart();}catch(e){document.getElementById("cinfo").textContent="TF오류:"+e.message;throw e;}}
 function onDateChange(){
   sim.date=document.getElementById("mockDate").value;
   mock.todayPnl=0;mock.todayTrades=0;mock.lossSeries=0;
