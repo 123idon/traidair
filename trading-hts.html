@@ -79,7 +79,7 @@ button{cursor:pointer;font-family:var(--sans);}
 .hts{
   flex:1;
   display:grid;
-  grid-template-columns:162px 1fr 186px 232px;
+  grid-template-columns:152px 1fr 176px 220px;
   grid-template-rows:1fr 90px 76px;
   overflow:hidden;
   position:relative;
@@ -344,8 +344,8 @@ button{cursor:pointer;font-family:var(--sans);}
 button,a{touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
 input,select,textarea{-webkit-appearance:none;appearance:none;}
 .wg-body,.lpb,.brpb,.jpage,.stats-page{-webkit-overflow-scrolling:touch;overscroll-behavior:contain;}
-/* ── 태블릿/모바일 (860px 이하) ── */
-@media(max-width:860px){
+/* ── 태블릿/모바일 (600px 이하) ── */
+@media(max-width:600px){
   :root{--mob-nav:56px;}
   .hts{grid-template-columns:0 1fr 0 0;grid-template-rows:1fr;}
   .lp,.rp,.brp{position:fixed;z-index:300;top:0;bottom:calc(var(--mob-nav) + var(--sab));background:var(--pan);box-shadow:var(--sh2);transition:transform .25s cubic-bezier(.4,0,.2,1);will-change:transform;}
@@ -359,8 +359,8 @@ input,select,textarea{-webkit-appearance:none;appearance:none;}
   .spd-btn:nth-child(n+5){display:none;}
   .page{padding-bottom:calc(var(--mob-nav) + var(--sab));}
 }
-/* ── 모바일 (520px 이하) ── */
-@media(max-width:520px){
+/* ── 모바일 (480px 이하) ── */
+@media(max-width:480px){
   .bar{gap:4px;padding:0 7px;}
   .tab{padding:3px 7px;font-size:10px;min-height:32px;}
   .ibtn{font-size:10px;padding:3px 7px;min-height:32px;}
@@ -5430,7 +5430,7 @@ function quickSwitch(){
 }
 
 // ── 모바일 패널 제어 ──
-function isMobile(){return window.innerWidth<=860;}
+function isMobile(){return window.innerWidth<=600;}
 function openMobPanel(panel){
   // panel: 'lp' | 'rp' | 'brp'
   closeMobPanels();
