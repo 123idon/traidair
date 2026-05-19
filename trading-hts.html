@@ -4468,7 +4468,16 @@ async function sendKisOrder(side, code, qty, price, orderType) {
 }
 
 // 설정창에 KIS 연결 버튼 동작
-function kisConnectBtn() { kisConnect(); }
+function kisConnectBtn() {
+  // input 필드에 값이 있으면 자동으로 kisConfig에 반영 (저장 버튼 없이도 동작)
+  const ak = document.getElementById('kis-appkey')?.value?.trim() || '';
+  const as = document.getElementById('kis-appsecret')?.value?.trim() || '';
+  const ac = document.getElementById('kis-account')?.value?.trim() || '';
+  if(ak) kisConfig.appKey = ak;
+  if(as) kisConfig.appSecret = as;
+  if(ac) kisConfig.account = ac;
+  kisConnect();
+}
 
 // 설정 탭 전환
 function sTab(el, id){
