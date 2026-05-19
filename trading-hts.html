@@ -346,9 +346,52 @@ button,a{touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
 input,select,textarea{-webkit-appearance:none;appearance:none;}
 .wg-body,.lpb,.brpb,.jpage,.stats-page{-webkit-overflow-scrolling:touch;overscroll-behavior:contain;}
 /* ── 태블릿/모바일 (860px 이하) ── */
-@media(max-width:860px){
+/* ── 태블릿 / 폴드 펼침 (768px ~ 1023px) ── */
+@media(max-width:1023px){
+  /* 그리드: 호가창(.rp) 숨기고 3컬럼으로 */
+  .hts{grid-template-columns:0 1fr 0 232px;grid-template-rows:1fr 90px 76px;}
+  /* 관심목록 슬라이드 패널로 전환 */
+  .lp{
+    position:fixed;z-index:300;
+    top:0;bottom:0;
+    left:0;width:min(75vw,240px);
+    background:var(--pan);box-shadow:var(--sh2);
+    transform:translateX(-100%);
+    transition:transform .25s cubic-bezier(.4,0,.2,1);
+    will-change:transform;
+    overflow-y:auto;
+  }
+  .lp.mob-open{transform:translateX(0);}
+  /* 호가창 슬라이드 패널로 전환 */
+  .rp{
+    position:fixed;z-index:300;
+    top:0;bottom:0;
+    right:0;width:min(75vw,220px);
+    background:var(--pan);box-shadow:var(--sh2);
+    transform:translateX(100%);
+    transition:transform .25s cubic-bezier(.4,0,.2,1);
+    will-change:transform;
+    overflow-y:auto;
+  }
+  .rp.mob-open{transform:translateX(0);}
+  /* 오버레이 */
+  .mob-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:299;}
+  .mob-overlay.on{display:block;}
+  /* 차트 헤더 가로스크롤 */
+  .cp-head{overflow-x:auto;overflow-y:hidden;flex-wrap:nowrap;-webkit-overflow-scrolling:touch;}
+  .cp-head::-webkit-scrollbar{display:none;}
+  /* 상단바 압축 */
+  .bar{gap:3px;padding:0 8px;}
+  .si{display:none;}
+}
+/* ── 태블릿 전용 퀵 접근 버튼 ── */
+@media(min-width:768px) and (max-width:1023px){
+  .tab-quick-lp,.tab-quick-rp{display:flex !important;}
+}
+/* ── 모바일 / 폴드 접힘 (≤767px) ── */
+@media(max-width:767px){
   :root{--mob-nav:56px;}
-  /* 그리드: 사이드패널 0 → 중앙만 */
+  /* 그리드: 중앙 차트만 */
   .hts{grid-template-columns:0 1fr 0 0;grid-template-rows:1fr;}
   /* 슬라이드 패널 */
   .lp,.rp,.brp{
@@ -365,27 +408,23 @@ input,select,textarea{-webkit-appearance:none;appearance:none;}
   .lp.mob-open,.rp.mob-open,.brp.mob-open{transform:translateX(0);}
   /* 하단 탭바 */
   .mob-tabbar{display:flex;}
-  /* 시뮬 바 줄바꿈 허용 */
+  /* 시뮬 바 */
   .mock-bar{flex-wrap:wrap;height:auto;gap:4px;padding:4px 8px;}
   /* 불필요 요소 숨김 */
   .si,.clk{display:none;}
-  /* 배속 버튼 앞 4개만 */
   .spd-btn:nth-child(n+5){display:none;}
-  /* 하단 여백 (홈바) */
+  /* 하단 여백 */
   .page{padding-bottom:calc(var(--mob-nav) + var(--sab));}
   /* 터치 최적화 */
-  button,a,[role=button]{min-height:36px;min-width:36px;}
+  button,a,[role=button]{min-height:36px;}
   /* 차트 헤더 스크롤 */
   .cp-head{overflow-x:auto;overflow-y:hidden;flex-wrap:nowrap;-webkit-overflow-scrolling:touch;}
   .cp-head::-webkit-scrollbar{display:none;}
-  /* 인디케이터 버튼 숨김 (모바일 공간 부족) */
-  .ind-btn:nth-child(n+5){display:none;}
-  /* 주문창 폰트 키우기 */
-  #ofPr,#ofQty,#ofAmt{font-size:16px !important;}/* iOS zoom 방지 */
-  /* 설정창 full-width */
+  /* 주문창 iOS 줌 방지 */
+  #ofPr,#ofQty,#ofAmt{font-size:16px !important;}
+  /* 설정창 */
   .modal-content{width:94vw !important;max-width:none !important;}
 }
-/* ── 모바일 (520px 이하) ── */
 @media(max-width:520px){
   .bar{gap:3px;padding:0 6px;}
   .tab{padding:2px 6px;font-size:10px;min-height:34px;}
@@ -457,6 +496,8 @@ input,select,textarea{-webkit-appearance:none;appearance:none;}
       <span id="quickSwitchIcon">📊</span> <span id="quickSwitchTxt">대시보드</span>
     </button>
     <button class="ibtn" onclick="openModal('shortcuts')" title="단축키 도움말">⌨</button>
+    <button class="ibtn tab-quick-lp" onclick="openMobPanel('lp')" style="display:none;" title="관심종목">☰</button>
+    <button class="ibtn tab-quick-rp" onclick="openMobPanel('rp')" style="display:none;" title="호가창">📊</button>
     <button class="ibtn" onclick="openModal('settings')">⚙</button>
     <button class="ibtn red" onclick="endMock()">■ 종료</button>
     <button class="ibtn pri" onclick="openModal('journal')">📓</button>
@@ -1612,28 +1653,12 @@ input,select,textarea{-webkit-appearance:none;appearance:none;}
 <div class="modal-bg" id="modal-alert">
   <div class="modal" style="width:320px;">
     <div class="modal-hdr"><span class="modal-ttl" id="alertTtl">알림</span><button class="modal-x" onclick="closeModal('alert')">×</button></div>
-    <div class="modal-body"><div style="font-size:12px;line-height:1.7;" id="alertMsg"></div></div>
-    <div class="modal-ft"><button class="ibtn pri" onclick="closeModal('alert')">확인</button></div>
+    <div class="modal-body"><p id="alertMsg" style="font-size:13px;line-height:1.6;"></p></div>
+    <div class="modal-ftr"><button class="mbtn" onclick="closeModal('alert')">확인</button></div>
   </div>
 </div>
 
 <script>
-// ── 디버그: 런타임 에러 화면 표시 ──
-window.onerror=function(msg,src,line,col,err){
-  const el=document.getElementById('cinfo');
-  if(el)el.textContent='JS오류 L'+line+': '+msg;
-  // 상단에 큰 알림
-  let dbg=document.getElementById('_dbg');
-  if(!dbg){dbg=document.createElement('div');dbg.id='_dbg';dbg.style.cssText='position:fixed;top:0;left:0;right:0;background:red;color:#fff;font-size:13px;padding:8px;z-index:99999;font-family:monospace;';document.body.appendChild(dbg);}
-  dbg.textContent='ERROR L'+line+': '+msg+(err?' | '+err.stack?.split('\n')[0]:'');
-  return false;
-};
-window.addEventListener('unhandledrejection',e=>{
-  let dbg=document.getElementById('_dbg');
-  if(!dbg){dbg=document.createElement('div');dbg.id='_dbg';dbg.style.cssText='position:fixed;top:0;left:0;right:0;background:red;color:#fff;font-size:13px;padding:8px;z-index:99999;font-family:monospace;';document.body.appendChild(dbg);}
-  dbg.textContent='PROMISE ERROR: '+(e.reason?.message||e.reason||'unknown');
-});
-
 // ═══════════════════════════════
 // DATA
 // ═══════════════════════════════
@@ -5445,14 +5470,15 @@ function quickSwitch(){
 }
 
 // ── 모바일 패널 제어 ──
-function isMobile(){return window.innerWidth<=860;}
+function isMobile(){return window.innerWidth<=767;}
+function isTablet(){return window.innerWidth>=768&&window.innerWidth<=1023;}
 // 화면 크기 변경 시 자동 레이아웃 업데이트
-let _lastMobile=isMobile();
+let _lastW=window.innerWidth;
 window.addEventListener('resize',()=>{
-  const nowMobile=isMobile();
-  if(nowMobile!==_lastMobile){
-    _lastMobile=nowMobile;
-    if(!nowMobile) closeMobPanels(); // PC로 전환 시 패널 닫기
+  const w=window.innerWidth;
+  if(Math.abs(w-_lastW)>20){
+    _lastW=w;
+    if(w>1023) closeMobPanels(); // PC로 전환 시 패널 닫기
     drawChart(); // 차트 크기 재조정
   }
 });
@@ -5470,7 +5496,7 @@ function closeMobPanels(){
   if(ov)ov.style.display='none';
 }
 function mobTab(name,btn){
-  if(!isMobile())return;
+  if(!isMobile()&&!isTablet())return;
   // 먼저 HTS 페이지로 전환
   const htsTab=document.getElementById('tab-hts');
   goPage('hts',htsTab);
@@ -6388,8 +6414,7 @@ window.onload=()=>{
   const savedTrust=localStorage.getItem('trustScore');
   if(savedTrust){trustScore=parseInt(savedTrust);const sl=document.getElementById('trustSlider');if(sl)sl.value=trustScore;updateTrustScore(trustScore);}
   setTimeout(()=>{renderGrowthRoadmap();detectSlump();},500);
-};
-</script>
+};</script>
 
 <!-- 동적 참조 요소 -->
 <span id="mentalResetStatus" style="display:none;"></span>
