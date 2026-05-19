@@ -96,6 +96,9 @@ function httpsGet(url) {
   });
 }
 
+// ── 세션 Claude 키 (클라이언트가 설정창에서 입력)
+let sessionClaudeKey = '';
+
 const server = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') {
     res.writeHead(204, CORS); res.end(); return;
@@ -104,12 +107,30 @@ const server = http.createServer(async (req, res) => {
   const url = req.url.split('?')[0];
   const query = new URLSearchParams(req.url.includes('?') ? req.url.split('?')[1] : '');
 
+  // ── Claude 키 세션 설정 (/api/set-claude-key)
+  if (url === '/api/set-claude-key' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const { key } = JSON.parse(body);
+        if (key && key.startsWith('sk-ant-')) sessionClaudeKey = key;
+        res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+        res.end(JSON.stringify({ ok: true }));
+      } catch(e) {
+        res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+        res.end(JSON.stringify({ ok: false }));
+      }
+    });
+    return;
+  }
+
   // ── Claude API 프록시
   if (url === '/api/claude' && req.method === 'POST') {
     let body = '';
     req.on('data', c => body += c);
     req.on('end', () => {
-      const apiKey = process.env.ANTHROPIC_API_KEY || '';
+      const apiKey = sessionClaudeKey || process.env.ANTHROPIC_API_KEY || '';
       const opts = {
         hostname: 'api.anthropic.com',
         path: '/v1/messages',

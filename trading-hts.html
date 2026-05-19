@@ -1373,10 +1373,12 @@ input,select,textarea{-webkit-appearance:none;appearance:none;}
         <!-- Claude API -->
         <div class="sg" style="margin:0;border-bottom:1px solid var(--br);padding:14px 16px;">
           <div class="sg-title" style="margin-bottom:10px;">🤖 Claude API (Anthropic)</div>
-          <div style="background:rgba(49,130,246,.06);border:1px solid rgba(49,130,246,.15);border-radius:8px;padding:9px 12px;margin-bottom:10px;font-size:10px;color:var(--ts);line-height:1.7;">
-            <b style="color:var(--b);">현재 상태:</b> Railway 서버 환경변수로 설정됨<br>
-            Railway 대시보드 → Variables → <code style="background:var(--bg);padding:1px 4px;border-radius:3px;font-family:var(--mono);">ANTHROPIC_API_KEY</code> 에서 변경<br>
-            <span style="color:var(--tm);">보안상 브라우저에서 직접 API 키 입력/저장은 지원하지 않습니다.</span>
+          <div class="sg-r">
+            <div><div class="sg-l">Claude API Key</div><div class="sg-s">sk-ant-api03-...</div></div>
+            <input class="sg-i" type="password" id="claude-apikey" placeholder="sk-ant-api03-..." style="font-family:var(--mono);">
+          </div>
+          <div style="font-size:9px;color:var(--tm);margin:4px 0 8px;">
+            <a href="https://console.anthropic.com" target="_blank" style="color:var(--b);">console.anthropic.com</a> → API Keys → Create Key → 복사 후 입력
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
             <div style="background:var(--bg);border-radius:8px;padding:10px;">
@@ -1452,6 +1454,8 @@ input,select,textarea{-webkit-appearance:none;appearance:none;}
               <a href="https://opendart.fss.or.kr" target="_blank" style="color:var(--b);">opendart.fss.or.kr</a> → 인증키 신청 → 이메일 인증 즉시 발급
             </div>
           </div>
+          <!-- 저장 버튼 -->
+          <button onclick="saveKisConfig()" style="width:100%;margin-top:12px;padding:9px 0;background:var(--g);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;touch-action:manipulation;">💾 API 설정 저장</button>
           <div style="margin-top:10px;padding:8px 10px;background:var(--bg);border-radius:7px;">
             <div style="font-size:9px;color:var(--tm);margin-bottom:4px;">API 연결 상태</div>
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
@@ -4249,6 +4253,7 @@ function saveKisConfig(){
   const as = document.getElementById('kis-appsecret')?.value?.trim() || '';
   const ac = document.getElementById('kis-account')?.value?.trim() || '';
   const dk = document.getElementById('dart-key')?.value?.trim() || '';
+  const ck = document.getElementById('claude-apikey')?.value?.trim() || '';
   const mode = document.getElementById('kis-real')?.checked ? 'real' : 'mock';
   // 실거래 전환 시 경고
   if(mode === 'real' && kisConfig.mode !== 'real'){
@@ -4256,8 +4261,10 @@ function saveKisConfig(){
       document.getElementById('kis-mock').checked = true; return;
     }
   }
-  kisConfig = {appKey:ak, appSecret:as, account:ac, mode, dartKey:dk};
+  kisConfig = {appKey:ak, appSecret:as, account:ac, mode, dartKey:dk, claudeKey:ck};
   localStorage.setItem('kisConfig', JSON.stringify(kisConfig));
+  // Claude API Key를 서버로 전송 (세션 내 사용)
+  if(ck) fetch('/api/set-claude-key', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({key:ck})}).catch(()=>{});
   updateKisStatus();
   showAlert('설정 저장', 'API 설정이 저장되었습니다.');
 }
@@ -4266,10 +4273,12 @@ function loadKisConfig(){
   const ks = document.getElementById('kis-appsecret');
   const ka = document.getElementById('kis-account');
   const kd = document.getElementById('dart-key');
+  const kc = document.getElementById('claude-apikey');
   if(ki && kisConfig.appKey) ki.value = kisConfig.appKey;
   if(ks && kisConfig.appSecret) ks.value = kisConfig.appSecret;
   if(ka && kisConfig.account) ka.value = kisConfig.account;
   if(kd && kisConfig.dartKey) kd.value = kisConfig.dartKey;
+  if(kc && kisConfig.claudeKey) kc.value = kisConfig.claudeKey;
   if(kisConfig.mode === 'real'){
     const kr = document.getElementById('kis-real');
     if(kr) kr.checked = true;
