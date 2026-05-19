@@ -445,45 +445,186 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // ── 코스피/코스닥 실시간 지수 (/api/market-index)
-  if (url === '/api/market-index') {
-    // 캐시: 3분마다 갱신
-    const now = Date.now();
-    if (!global._idxCache || now - global._idxCache.ts > 3 * 60 * 1000) {
-      try {
-        const fetchIdx = (symbol) => new Promise((resolve, reject) => {
-          const opts = {
-            hostname: 'query1.finance.yahoo.com',
-            path: `/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=2d`,
-            headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' },
-            timeout: 6000,
-          };
-          const r = require('https').get(opts, res2 => {
-            let d = '';
-            res2.on('data', c => d += c);
-            res2.on('end', () => {
-              try {
-                const j = JSON.parse(d);
-                const meta = j.chart.result[0].meta;
-                const price = meta.regularMarketPrice;
-                const prev = meta.previousClose || meta.chartPreviousClose;
-                const chgPct = prev ? ((price - prev) / prev * 100) : 0;
-                resolve({ price: Math.round(price * 100) / 100, prev: Math.round(prev * 100) / 100, chgPct: Math.round(chgPct * 100) / 100 });
-              } catch(e) { reject(e); }
+  // ── 시장 데이터 통합 API (/api/market-data)
+  // 실시간: ?mode=realtime
+  // 모의투자 특정 시각: ?mode=sim&date=YYYY-MM-DD&time=HH:MM&tf=5
+  if (url.startsWith('/api/market-data')) {
+    const qStr = req.url.includes('?') ? req.url.split('?')[1] : '';
+    const params = new URLSearchParams(qStr);
+    const mode = params.get('mode') || 'realtime';
+    const simDate = params.get('date');   // YYYY-MM-DD
+    const simTime = params.get('time');   // HH:MM (모의투자 현재 시각)
+    const tf = parseInt(params.get('tf') || '5'); // 분봉 단위
+
+    const https = require('https');
+
+    // Yahoo Finance 5분봉 데이터 fetcher
+    const fetchYahoo = (symbol, period1, period2, interval='5m') => new Promise((resolve, reject) => {
+      const path2 = `/v8/finance/chart/${encodeURIComponent(symbol)}?interval=${interval}&period1=${period1}&period2=${period2}`;
+      const opts = {
+        hostname: 'query1.finance.yahoo.com',
+        path: path2,
+        headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36', 'Accept': 'application/json' },
+        timeout: 8000,
+      };
+      const r = https.get(opts, res2 => {
+        let d = '';
+        res2.on('data', c => d += c);
+        res2.on('end', () => {
+          try {
+            const j = JSON.parse(d);
+            if (!j.chart?.result?.[0]) { reject(new Error('no result')); return; }
+            const result = j.chart.result[0];
+            const meta = result.meta;
+            const timestamps = result.timestamp || [];
+            const quotes = result.indicators?.quote?.[0] || {};
+            const closes = quotes.close || [];
+            // 타임스탬프별 데이터 매핑
+            const bars = [];
+            for (let i = 0; i < timestamps.length; i++) {
+              if (closes[i] != null) {
+                bars.push({
+                  ts: timestamps[i],          // unix timestamp (초)
+                  o: quotes.open?.[i],
+                  h: quotes.high?.[i],
+                  l: quotes.low?.[i],
+                  c: closes[i],
+                  v: quotes.volume?.[i] || 0,
+                });
+              }
+            }
+            resolve({
+              symbol,
+              price: meta.regularMarketPrice,
+              prev: meta.previousClose || meta.chartPreviousClose,
+              currency: meta.currency,
+              bars,
+              meta,
             });
-          });
-          r.on('error', reject);
-          r.on('timeout', () => { r.destroy(); reject(new Error('timeout')); });
+          } catch(e) { reject(e); }
         });
-        const [kospi, kosdq] = await Promise.all([fetchIdx('^KS11'), fetchIdx('^KQ11')]);
-        global._idxCache = { ts: now, kospi, kosdq };
-      } catch(e) {
-        console.error('index fetch error:', e.message);
-        if (!global._idxCache) global._idxCache = { ts: 0, kospi: null, kosdq: null };
-      }
+      });
+      r.on('error', reject);
+      r.on('timeout', () => { r.destroy(); reject(new Error('timeout')); });
+    });
+
+    // KST 기준으로 period 계산
+    const KST_OFFSET = 9 * 3600;
+    let period1, period2, cutoffTs;
+
+    if (mode === 'sim' && simDate && simTime) {
+      // 모의투자 모드: 해당 날짜의 데이터 가져오되
+      // simTime 이후 데이터는 미래로 처리하여 제거
+      const [yr, mo, dy] = simDate.split('-').map(Number);
+      const [hh, mm] = simTime.split(':').map(Number);
+      // 전날 16시부터 해당일 종료까지 (미국 야간 포함)
+      period1 = Math.floor(new Date(Date.UTC(yr, mo-1, dy-1, 7, 0, 0)).getTime() / 1000); // 전날 16:00 KST
+      period2 = Math.floor(new Date(Date.UTC(yr, mo-1, dy, 15, 0, 0)).getTime() / 1000);  // 당일 24:00 KST
+      // 미래 차단: simTime 이후 데이터 제거
+      cutoffTs = Math.floor(new Date(Date.UTC(yr, mo-1, dy, hh-9, mm, 0)).getTime() / 1000) + tf * 60; // simTime + 1봉
+    } else {
+      // 실시간 모드: 오늘 데이터
+      const now = Math.floor(Date.now() / 1000);
+      period1 = now - 2 * 24 * 3600; // 2일 전
+      period2 = now;
+      cutoffTs = now;
     }
-    res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
-    res.end(JSON.stringify(global._idxCache || {}));
+
+    // 캐시 키
+    const cacheKey = `${mode}_${simDate}_${simTime}_${tf}`;
+    if (!global._mktCache) global._mktCache = {};
+    const cached = global._mktCache[cacheKey];
+    const CACHE_TTL = mode === 'realtime' ? 3 * 60 * 1000 : 30 * 60 * 1000; // 실시간 3분, 모의 30분
+    if (cached && Date.now() - cached.ts < CACHE_TTL) {
+      res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+      res.end(JSON.stringify(cached.data));
+      return;
+    }
+
+    try {
+      // 병렬로 모든 지수 데이터 가져오기
+      const SYMBOLS = {
+        kospi:  '^KS11',
+        kosdq:  '^KQ11',
+        nasdaq: '^IXIC',
+        sp500:  '^GSPC',
+        dow:    '^DJI',
+        usdkrw: 'KRW=X',
+        vix:    '^VIX',
+        nikkei: '^N225',
+        kospi200: '^KS200',
+      };
+
+      const interval = tf <= 5 ? '5m' : tf <= 60 ? '60m' : '1d';
+      const fetchAll = Object.entries(SYMBOLS).map(([key, sym]) =>
+        fetchYahoo(sym, period1, period2, interval)
+          .then(r => ({ key, ...r }))
+          .catch(e => ({ key, symbol: sym, error: e.message, bars: [], price: null }))
+      );
+      const raw = await Promise.all(fetchAll);
+
+      // 결과 정리: cutoffTs 이후 데이터 완전 제거 (미래 차단)
+      const result = {};
+      for (const item of raw) {
+        const filteredBars = item.bars.filter(b => b.ts < cutoffTs);
+        const lastBar = filteredBars[filteredBars.length - 1];
+        const prevBar = filteredBars[filteredBars.length - 2];
+
+        // 현재 시각 기준 최신값
+        const currentPrice = lastBar?.c ?? null;
+        const prevClose = prevBar?.c ?? item.prev ?? null;
+        const chgPct = (currentPrice && prevClose) ? ((currentPrice - prevClose) / prevClose * 100) : null;
+        const lastTs = lastBar?.ts ?? null;
+
+        result[item.key] = {
+          price: currentPrice ? Math.round(currentPrice * 100) / 100 : null,
+          prev: prevClose ? Math.round(prevClose * 100) / 100 : null,
+          chgPct: chgPct != null ? Math.round(chgPct * 100) / 100 : null,
+          lastUpdated: lastTs ? new Date(lastTs * 1000).toISOString() : null,
+          lastUpdatedKST: lastTs ? new Date((lastTs + KST_OFFSET) * 1000).toISOString().replace('T', ' ').substring(0, 19) + ' KST' : null,
+          barsCount: filteredBars.length,
+          // 모의투자에서 차트 표시용 전체 봉 데이터 (cutoff 이전만)
+          bars: mode === 'sim' ? filteredBars.map(b => ({ ts: b.ts, c: b.c, o: b.o, h: b.h, l: b.l })) : [],
+        };
+      }
+
+      // 미국 야간선물 추정 (코스피200 기준): 나스닥 야간 움직임으로 추정
+      // 전날 미국 마감 대비 현재 나스닥 변동률을 코스피200에 적용
+      if (result.nasdaq && result.nasdaq.chgPct != null) {
+        result.nightFutures = {
+          estimated: true,
+          chgPct: Math.round(result.nasdaq.chgPct * 0.7 * 100) / 100, // 나스닥의 70% 반영
+          note: '나스닥 기반 추정값',
+          lastUpdatedKST: result.nasdaq.lastUpdatedKST,
+        };
+      }
+
+      const responseData = {
+        mode,
+        simDate,
+        simTime,
+        cutoffKST: new Date((cutoffTs + KST_OFFSET) * 1000).toISOString().replace('T',' ').substring(0,19) + ' KST',
+        fetchedAt: new Date().toISOString(),
+        indices: result,
+      };
+
+      // 캐시 저장
+      global._mktCache[cacheKey] = { ts: Date.now(), data: responseData };
+
+      res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+      res.end(JSON.stringify(responseData));
+    } catch(e) {
+      console.error('market-data error:', e.message);
+      res.writeHead(500, { 'Content-Type': 'application/json', ...CORS });
+      res.end(JSON.stringify({ error: e.message }));
+    }
+    return;
+  }
+
+  // ── 레거시 호환 (/api/market-index)
+  if (url === '/api/market-index') {
+    res.writeHead(302, { Location: '/api/market-data?mode=realtime' });
+    res.end();
     return;
   }
 

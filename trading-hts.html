@@ -5452,10 +5452,27 @@ async function genJModal(){
   const wins=tt.filter(t=>t.side==="sell"&&t.pnl>0).length,total=tt.filter(t=>t.side==="sell").length;
   const str=tt.map(t=>`${t.side==="buy"?"매수":"매도"} ${t.nm} ${t.qty}주 @${t.price.toLocaleString()}${t.pnl?` 손익${t.pnl>=0?"+":""}${t.pnl.toLocaleString()}원`:""} ${t.auto?"[AI매매]":""}`).join("\n");
   try{
-    const res=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-5",max_tokens:600,messages:[{role:"user",content:`매매내역:\n${str}\n총손익:${pnl>=0?"+":""}${pnl}원 | 승률:${total?Math.round(wins/total*100):0}%\nJSON만 출력(다른텍스트금지): {"summary":"한줄요약","analysis":"분석2~3문장","mistakes":"반복주의실수1가지","tomorrow":"내일원칙1가지","score":"10점자가평가"} 한국어`}]})});
+    const res=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-5",max_tokens:600,messages:[{role:"user",content:`당신은 20년 경력 단타 트레이딩 멘토입니다. Phase 0~12 강의 기준으로 아래 매매를 완전 분석하세요.
+
+[매매 데이터]
+${str}
+총손익: ${pnl>=0?"+":""}${pnl}원 | 승률: ${total?Math.round(wins/total*100):0}% | 매매횟수: ${total}회
+
+JSON만 출력 (다른 텍스트 없이):
+{"summary":"오늘 매매 한줄 총평","market_context":"오늘 시장 환경 평가(코스피/나스닥 방향 등)","why_bought":"진입 이유 분석 - Phase 8 STEP 기준 충족 여부","why_sold":"청산 이유 분석 - 손절/익절 원칙 준수 여부","mistakes":"가장 심각한 실수 2~3가지(구체적 수치와 함께)","psychology":"심리 상태 평가(FOMO/복수매매/조기익절 등 오류)","phase_check":"Phase 8 체크리스트 중 건너뛴 항목","improvement":"다음에 같은 상황에서 다르게 할 행동(구체적으로)","score_principle":8,"score_timing":7,"score_psychology":7,"score_total":7,"score_reason":"점수 이유"}`}]})});
     const data=await res.json();
     let p;try{const m=(data.content?.[0]?.text||"{}").match(/\{[\s\S]*\}/);p=JSON.parse(m?m[0]:"{}"); }catch(e){p={};}
-    body.innerHTML=`<div class="jday" style="margin-bottom:0;"><div class="jd-hdr"><span class="jd-dt">${sim.date}</span><span class="jd-pnl ${pnl>=0?"cu":"cd"}">${pnl>=0?"+":""}${pnl.toLocaleString()}원</span></div><div class="jd-sub">${tt.length}건 · 승률${total?Math.round(wins/total*100):0}% · AI평가${p.score||"-"}/10</div><b style="font-size:12px;">${p.summary||""}</b><div class="jd-ai" style="margin-top:6px;">${(p.analysis||"").replace(/\n/g,"<br>")}</div>${p.mistakes?`<div class="jd-note err">⚠ ${p.mistakes}</div>`:""}${p.tomorrow?`<div class="jd-note tip">▶ 내일: ${p.tomorrow}</div>`:""}</div>`;
+    body.innerHTML=`<div class="jday" style="margin-bottom:0;"><div class="jd-hdr"><span class="jd-dt">${sim.date}</span><span class="jd-pnl ${pnl>=0?"cu":"cd"}">${pnl>=0?"+":""}${pnl.toLocaleString()}원</span></div><div class="jd-sub">${tt.length}건 · 승률${total?Math.round(wins/total*100):0}% · AI평가${p.score||"-"}/10</div><b style="font-size:12px;">${p.summary||""}</b>
+<div class="jd-ai" style="margin-top:8px;line-height:1.7;">
+  ${p.market_context?`<div class="jd-note" style="border-left:3px solid var(--b);padding-left:6px;margin-bottom:4px;">📊 시장: ${p.market_context}</div>`:""}
+  ${p.why_bought?`<div style="margin-bottom:4px;"><span style="color:var(--r);font-weight:700;">진입이유:</span> ${p.why_bought}</div>`:""}
+  ${p.why_sold?`<div style="margin-bottom:4px;"><span style="color:var(--b);font-weight:700;">청산이유:</span> ${p.why_sold}</div>`:""}
+  ${p.psychology?`<div class="jd-note" style="border-left:3px solid var(--a);padding-left:6px;margin-bottom:4px;">🧠 심리: ${p.psychology}</div>`:""}
+</div>
+${p.mistakes?`<div class="jd-note err" style="margin-top:4px;">🔴 실수: ${p.mistakes}</div>`:""}
+${p.phase_check?`<div class="jd-note err">⚠ 건너뛴 Phase: ${p.phase_check}</div>`:""}
+${p.improvement?`<div class="jd-note tip">💡 개선: ${p.improvement}</div>`:""}
+${(p.score_total||p.score)?`<div style="text-align:right;margin-top:4px;font-size:9px;color:var(--tm);">원칙:${p.score_principle||"-"} 타점:${p.score_timing||"-"} 심리:${p.score_psychology||"-"} <b>종합:${p.score_total||p.score}</b>/10</div>`:""}</div>`;
     saveJEntry(sim.date,p,pnl,wins,total,str);
   }catch(e){body.innerHTML="<div style='color:var(--r);font-size:11px;'>⚠ API 오류 — /api/claude 확인</div>";}
 }
@@ -6068,34 +6085,97 @@ function failProgress(label){
 let _idxCache = null;
 let _idxFetching = false;
 
-async function fetchRealIndex(){
-  if(_idxFetching) return;
-  _idxFetching = true;
+// ── 시장 데이터 통합 시스템 (실시간 + 모의투자 연동) ──
+let _mktData = null;      // 현재 로드된 시장 데이터
+let _mktFetching = false;
+let _mktLastFetch = 0;
+
+async function fetchMarketData(forceRefresh){
+  if(_mktFetching) return;
+  const now = Date.now();
+  // 실시간 모드: 3분 캐시 / 모의투자: 날짜+시간 바뀔 때만
+  if(!forceRefresh && _mktData && (now - _mktLastFetch < 3 * 60 * 1000)) return;
+  _mktFetching = true;
   try{
-    const r = await fetch('/api/market-index');
+    let url;
+    if(sim.playing || sim.idx > 0){
+      // 모의투자 모드: 현재 봉 시각 기준으로 데이터 요청
+      const curCandle = getCurrentCandle();
+      const simTimeStr = curCandle ? curCandle.t : '09:00';
+      url = `/api/market-data?mode=sim&date=${sim.date}&time=${encodeURIComponent(simTimeStr)}&tf=${sim.tf}`;
+    } else {
+      url = '/api/market-data?mode=realtime';
+    }
+    const r = await fetch(url);
     if(!r.ok) throw new Error(r.status);
     const d = await r.json();
-    _idxCache = d;
-    if(d.kospi && d.kospi.price){
-      _setIdxUI('idx-kospi', d.kospi.price, d.kospi.chgPct);
-    }
-    if(d.kosdq && d.kosdq.price){
-      _setIdxUI('idx-kosdq', d.kosdq.price, d.kosdq.chgPct);
-    }
+    _mktData = d;
+    _mktLastFetch = now;
+    _updateIdxUI(d);
+    _updateDashboardMarket(d);
   }catch(e){
-    console.warn('지수 fetch 실패:', e.message);
-    // 실패 시 기존 캐시 유지 or 기본값
-    if(!_idxCache){
-      _setIdxUI('idx-kospi', 2650, 0);
-      _setIdxUI('idx-kosdq', 850, 0);
+    console.warn('시장데이터 fetch 실패:', e.message);
+    if(!_mktData){
+      // 기본값
+      document.getElementById('idx-kospi') && (_setIdxUI('idx-kospi', 2650, 0));
+      document.getElementById('idx-kosdq') && (_setIdxUI('idx-kosdq', 850, 0));
     }
   }
-  _idxFetching = false;
+  _mktFetching = false;
 }
 
-// 하위호환: 시뮬 봉 진행 시 호출되던 함수 → 실제 API 호출로 대체
-function _syncIdxWithSim(){
-  fetchRealIndex();
+function _updateIdxUI(d){
+  if(!d || !d.indices) return;
+  const idx = d.indices;
+  if(idx.kospi?.price)  _setIdxUI('idx-kospi',  idx.kospi.price,  idx.kospi.chgPct||0);
+  if(idx.kosdq?.price)  _setIdxUI('idx-kosdq',  idx.kosdq.price,  idx.kosdq.chgPct||0);
+  // 업데이트 시각 표시
+  const kEl = document.getElementById('idx-kospi-time');
+  if(kEl && idx.kospi?.lastUpdatedKST) kEl.textContent = idx.kospi.lastUpdatedKST.slice(11,19);
+}
+
+function _updateDashboardMarket(d){
+  if(!d || !d.indices) return;
+  const idx = d.indices;
+  // 대시보드 시장카드 자동 업데이트
+  const cards = {
+    'dc-kospi': idx.kospi,
+    'dc-kosdq': idx.kosdq,
+    'dc-nasdaq': idx.nasdaq,
+    'dc-sp500': idx.sp500,
+    'dc-dow': idx.dow,
+    'dc-usdkrw': idx.usdkrw,
+    'dc-vix': idx.vix,
+    'dc-nikkei': idx.nikkei,
+  };
+  for(const [id, data] of Object.entries(cards)){
+    const el = document.getElementById(id);
+    if(!el || !data?.price) continue;
+    const up = (data.chgPct||0) >= 0;
+    el.innerHTML = `<span class="${up?'cu':'cd'}" style="font-family:var(--mono);font-weight:700;">${data.price.toLocaleString()}</span>
+      <span class="${up?'cu':'cd'}" style="font-size:8px;">${up?'+':''}${(data.chgPct||0).toFixed(2)}%</span>
+      ${data.lastUpdatedKST?`<span style="font-size:7px;color:var(--tm);display:block;">${data.lastUpdatedKST.slice(11,19)} 기준</span>`:''}`;
+  }
+  // 야간선물 추정
+  const nf = idx ? d.indices.kospi : null;
+  const nfEl = document.getElementById('dc-nightfutures');
+  if(nfEl && d.nightFutures){
+    const nfd = d.nightFutures;
+    const up = (nfd.chgPct||0) >= 0;
+    nfEl.innerHTML = `<span class="${up?'cu':'cd'}" style="font-weight:700;">${up?'+':''}${nfd.chgPct}%</span>
+      <span style="font-size:7px;color:var(--tm);display:block;">${nfd.note}</span>`;
+  }
+}
+
+// 하위호환
+function _syncIdxWithSim(){ fetchMarketData(); }
+async function fetchRealIndex(){ await fetchMarketData(); }
+
+// 모의투자 봉 진행 시 시장 데이터 갱신 (5봉마다)
+let _mktSyncCnt = 0;
+function _onSimBarAdvance(){
+  _mktSyncCnt++;
+  if(_mktSyncCnt % 5 === 0) fetchMarketData(true);
 }
 function _setIdxUI(id, val, chg){
   const ve=document.getElementById(id), ce=document.getElementById(id+'-chg');
@@ -6141,6 +6221,7 @@ const _origUpdChart = updChartToIdx;
 function updChartToIdx(){
   _origUpdChart();
   _syncIdxWithSim();
+  _onSimBarAdvance(); // 5봉마다 시장 데이터 갱신
   // 3분마다 AI 예측 (실제 시간 기준)
   runIdxAIPrediction().catch(()=>{});
 }
@@ -6476,6 +6557,26 @@ function _getCachedAnalysis(key){
   return null;
 }
 function _setCachedAnalysis(key,data){_analysisCache[key]={ts:Date.now(),data};}
+
+// 매매 시 시장 컨텍스트 자동 수집 (매매일지용)
+function collectMarketCtx(){
+  if(!_mktData || !_mktData.indices) return '데이터없음';
+  const idx = _mktData.indices;
+  const curCandle = getCurrentCandle();
+  const cs = getCandles(5);
+  const cls = cs.map(c=>c.c);
+  const rsi = (calcRSI(cls,9).slice(-1)[0]||50).toFixed(1);
+  const lines = [];
+  if(idx.kospi?.price) lines.push(`KOSPI: ${idx.kospi.price.toLocaleString()} (${idx.kospi.chgPct>=0?'+':''}${idx.kospi.chgPct}%) [${idx.kospi.lastUpdatedKST?.slice(11,19)||'--'}]`);
+  if(idx.kosdq?.price) lines.push(`KOSDQ: ${idx.kosdq.price.toLocaleString()} (${idx.kosdq.chgPct>=0?'+':''}${idx.kosdq.chgPct}%) [${idx.kosdq.lastUpdatedKST?.slice(11,19)||'--'}]`);
+  if(idx.nasdaq?.price) lines.push(`나스닥: ${idx.nasdaq.price.toLocaleString()} (${idx.nasdaq.chgPct>=0?'+':''}${idx.nasdaq.chgPct}%) [${idx.nasdaq.lastUpdatedKST?.slice(11,19)||'--'}]`);
+  if(idx.usdkrw?.price) lines.push(`USD/KRW: ${idx.usdkrw.price} [${idx.usdkrw.lastUpdatedKST?.slice(11,19)||'--'}]`);
+  if(idx.vix?.price) lines.push(`VIX: ${idx.vix.price} [${idx.vix.lastUpdatedKST?.slice(11,19)||'--'}]`);
+  if(curCandle) lines.push(`차트: RSI ${rsi} | 현재봉 O${curCandle.o?.toLocaleString()} H${curCandle.h?.toLocaleString()} L${curCandle.l?.toLocaleString()} C${curCandle.c?.toLocaleString()}`);
+  if(_mktData.simDate) lines.push(`모의날짜: ${_mktData.simDate} ${_mktData.simTime||''}`);
+  return lines.join('\n');
+}
+
 window.onload=()=>{
   loadState();
   goPage('hts',document.getElementById('tab-hts'));
