@@ -9,7 +9,7 @@
 <meta name="theme-color" content="#ffffff">
 <title>TraidAIr HTS</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+
 <style>
 :root{
   /* ── Toss-style Light Color System ── */
@@ -1794,441 +1794,385 @@ let mock={cash:10000000,positions:{},trades:[],todayPnl:0,todayTrades:0,lossSeri
 let sim={playing:false,speed:1,idx:0,candles:[],timer:null,date:todayStr(),tf:"5"};
 let activeTk="005930",oSide="buy",oType="limit",credType="cash",trailMode="off";
 let inds={ma:true,vol:true,rsi:false,macd:false,bb:false,vwap:false};
+// ═══════════════════════════════════════════════
+// PURE CANVAS CHART ENGINE v3
+// Chart.js 완전 제거 — 직접 렌더링
+// ═══════════════════════════════════════════════
+
 let mChart=null,rsiChart=null,macdChart=null,pnlChart=null;
-let chatHist=[],chatBusy=false;
-let autoState={running:false,level:0,cfg:{rr:1.5,pos:15,stop:3,t1:3,t2:5,trail:"off",brk:true,explain:true}};
-let priceAlerts=[]; // [{tk,price,dir:'above'|'below',memo,fired}]
-let autoTimer=null;
-let stopOrders={};
-let pendingOrders=[];
-function addPending(tk,nm,side,price,qty){const id=Date.now();pendingOrders.push({id,tk,nm,side,price,qty,time:new Date().toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"})});renderPending();return id;}
-function cancelPending(id){pendingOrders=pendingOrders.filter(o=>o.id!==id);renderPending();}
-function renderPending(){const el=document.getElementById("pendingList");if(!el)return;if(!pendingOrders.length){el.innerHTML="<div style='font-size:9px;color:var(--tm);padding:8px;'>미체결 없음</div>";return;}el.innerHTML=pendingOrders.map(o=>`<div style="padding:4px 8px;border-bottom:1px solid var(--br);display:flex;align-items:center;gap:4px;"><span style="font-size:9px;font-weight:700;color:${o.side==="buy"?"var(--g)":"var(--r)"};">${o.side==="buy"?"매수":"매도"}</span><span style="font-size:9px;flex:1;">${o.nm} ${o.price.toLocaleString()}×${o.qty}</span><span style="font-size:8px;color:var(--tm);">${o.time}</span><button onclick="cancelPending(${o.id})" style="background:var(--r);color:#fff;border:none;border-radius:3px;font-size:8px;padding:1px 4px;cursor:pointer;">취소</button></div>`).join("");}
-function checkPending(){pendingOrders.forEach((o,i)=>{const stk=STOCKS.find(s=>s.tk===o.tk);if(!stk)return;const hit=(o.side==="buy"&&stk.pr<=o.price)||(o.side==="sell"&&stk.pr>=o.price);if(hit){const prev=activeTk,prevSide=oSide,prevType=oType;activeTk=o.tk;oSide=o.side;oType="market";document.getElementById("ofQty").value=o.qty;submitOrder(true);activeTk=prev;oSide=prevSide;oType=prevType;pendingOrders.splice(i,1);addMsg("ai",`✅ 지정가 체결: ${o.nm} ${o.side==="buy"?"매수":"매도"} ${o.price.toLocaleString()}원 × ${o.qty}주`);renderPending();}});}
-
-function todayStr(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;}
-
-// ═══════════════════════════════
-// INIT
-// ═══════════════════════════════
-window.onload=()=>{
-  loadState();
-  // HTS 탭 명시적 활성화
-  goPage('hts', document.getElementById('tab-hts'));
-  document.getElementById("mockDate").value=sim.date;
-  // 차트 이벤트 1회 등록 (줌/팬/터치)
-  initChartEvents();
-  // 저장된 API 키 복원 및 서버 전송
-  if(kisConfig.claudeKey) {
-    fetch('/api/set-claude-key', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({key:kisConfig.claudeKey})}).catch(()=>{});
-  }
-  updateKisStatus();
-  renderAll();
-  genCandles(); initChart();
-  renderOB(); renderTH();
-  tick(); setInterval(tick,1000);
-  setInterval(liveUpdate,2200);
-  setInterval(checkStopOrders,800);
-  setInterval(autoAdvUpdate,8000);
-  // 초기 실행
-  setTimeout(async()=>{
-    await checkDartApiStatus();
-    updateAIAdvisor();
-    fetchDartNews();
-    runFullAnalysis();
-    renderIntraCheck();
-    updateTimeGuide();
-    calcMarketStrength();
-  }, 800);
-  setInterval(()=>{updateTimeGuide();}, 30000);
-  // 30초마다 공시 갱신 (실시간 딜레이 최소화)
-  setInterval(()=>fetchDartNews(), 30000);
-  ensureToday(); updateUsageUI();
-  // 신뢰도지수 복원
-  const savedTrust=localStorage.getItem('trustScore');
-  if(savedTrust){trustScore=parseInt(savedTrust);const sl=document.getElementById('trustSlider');if(sl)sl.value=trustScore;updateTrustScore(trustScore);}
-  // 성장단계 렌더링
-  setTimeout(()=>{renderGrowthRoadmap();detectSlump();},500);
-};
-function loadState(){
-  const c=localStorage.getItem("htsCfg");if(c)cfg={...cfg,...JSON.parse(c)};
-  const m=localStorage.getItem("htsMock");if(m){const p=JSON.parse(m);mock={...mock,...p};}
-  mock.cash=mock.cash||cfg.capital;
-  if(!mock.positions)mock.positions={};
-  if(!mock.trades)mock.trades=[];
-  // BUG15 FIX: stopOrders 복원
-  const so=localStorage.getItem("htsStopOrders");
-  if(so){try{stopOrders={...JSON.parse(so)};}catch(e){}}
-}
-function saveMock(){
-  localStorage.setItem("htsMock",JSON.stringify(mock));
-  // BUG15 FIX: stopOrders도 저장
-  localStorage.setItem("htsStopOrders",JSON.stringify(stopOrders));
-}
-let BAN_LIST=JSON.parse(localStorage.getItem("htsBan")||'[]');
-function saveBan(){localStorage.setItem("htsBan",JSON.stringify(BAN_LIST));}
-function addBanCurrent(){const stk=STOCKS.find(s=>s.tk===activeTk)||STOCKS[0];if(!BAN_LIST.includes(activeTk)){BAN_LIST.push(activeTk);saveBan();renderBanList();showAlert("매매금지 추가",stk.nm+" 매매금지 등록됨");}}
-function removeBan(tk){BAN_LIST=BAN_LIST.filter(b=>b!==tk);saveBan();renderBanList();}
-function renderBanList(){const el=document.getElementById("banList");if(!el)return;if(!BAN_LIST.length){el.textContent="없음";return;}el.innerHTML=BAN_LIST.map(tk=>{const s=STOCKS.find(s=>s.tk===tk)||{nm:tk};return`<div style="display:flex;align-items:center;justify-content:space-between;padding:2px 0;border-bottom:1px solid var(--br);"><span style="color:var(--r);font-size:9px;">${s.nm}</span><button onclick="removeBan('${tk}')" style="background:none;border:none;color:var(--tm);font-size:10px;cursor:pointer;">×</button></div>`;}).join("");}
-function isBanned(tk){return BAN_LIST.includes(tk);}
-function renderAll(){renderWLGroup();renderCands();renderFilters();renderNews();renderPort();renderTradeLog();updCash();updCredLim();renderBanList();updateTrailPanel();checkPsychWarnings();detectSlump();renderGrowthRoadmap();}
-
-// ═══════════════════════════════
-// CANDLE ENGINE
-// ═══════════════════════════════
-function rng32(seed){let a=seed|0;return()=>{a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
-function genCandles(tk,dt){
-  const stk=STOCKS.find(s=>s.tk===(tk||activeTk))||STOCKS[0];
-  let base=stk.base;
-  const intervals=sim.tf==="D"?390:parseInt(sim.tf)||5;
-  const perDay=sim.tf==="D"?1:Math.floor(390/intervals);
-  const tkSeed=stk.tk.split("").reduce((a,c)=>a+c.charCodeAt(0),0);
-  const seed=(parseInt((dt||sim.date).replace(/-/g,"").slice(-6))||9999)+tkSeed;
-  const rnd=rng32(seed);
-  const dash=getDashData(dt||sim.date);
-  const bias=dash?(dash.score>=7?3e-4:dash.score>=4?0:-3e-4):0;
-  const res=[];
-  for(let i=0;i<perDay;i++){
-    const r1=rnd(),r2=rnd(),r3=rnd(),r4=rnd();
-    const c=base*(1+(r1-.498+bias)*.018);
-    const h=c*(1+r2*.009),l=c*(1-r3*.009),o=base*(1+(r4-.5)*.007);
-    const v=Math.round(40000+r1*170000);
-    const hm=9*60+i*intervals;
-    res.push({t:`${String(Math.floor(hm/60)).padStart(2,"0")}:${String(hm%60).padStart(2,"0")}`,o:Math.round(o),h:Math.round(Math.max(o,c,h)),l:Math.round(Math.min(o,c,l)),c:Math.round(c),v});
-    base=c;
-  }
-  sim.candles=res; sim.idx=0; if(res.length>0)updPrice(res[0]); return res;
-}
-function getDashData(dt){try{const r=localStorage.getItem("dashMarket_"+dt);return r?JSON.parse(r):null;}catch(e){return null;}}
-
-// ═══════════════════════════════
-// INDICATORS
-// ═══════════════════════════════
-const calcMA=(d,n)=>d.map((v,i)=>i<n-1?null:d.slice(i-n+1,i+1).reduce((a,b)=>a+b,0)/n);
-function calcBB(d,n,k){const ma=calcMA(d,n);return{upper:d.map((v,i)=>{if(!ma[i])return null;const sl=d.slice(i-n+1,i+1),std=Math.sqrt(sl.reduce((a,b)=>a+(b-ma[i])**2,0)/n);return ma[i]+k*std;}),lower:d.map((v,i)=>{if(!ma[i])return null;const sl=d.slice(i-n+1,i+1),std=Math.sqrt(sl.reduce((a,b)=>a+(b-ma[i])**2,0)/n);return ma[i]-k*std;})};}
-function calcRSI(d,n){const r=[];for(let i=0;i<d.length;i++){if(i<n){r.push(null);continue;}let g=0,l=0;for(let j=i-n+1;j<=i;j++){if(j<1)continue;const dv=d[j]-d[j-1];if(dv>0)g+=dv;else l-=dv;}r.push(100-100/(1+((g/n)/((l/n)||.001))));}return r;}
-function calcMACD(d){const ema=(d,n)=>{const k=2/(n+1);let e=d[0];return d.map(v=>{e=v*k+e*(1-k);return e;});};const e12=ema(d,12),e26=ema(d,26);const ml=d.map((_,i)=>e12[i]-e26[i]);return{ml,sig:ema(ml,9)};}
-function calcVWAP(cs){let pv=0,tv=0;return cs.map(c=>{pv+=((c.h+c.l+c.c)/3)*c.v;tv+=c.v;return Math.round(pv/tv)});}
-
-// ═══════════════════════════════
-// CHART ENGINE (완전 재작성)
-// ═══════════════════════════════
-
-// 캔들 플러그인 - 뷰 범위 반영
-function drawCandlePlugin(){
-  return {
-    id:"candlePlugin",
-    afterDatasetsDraw(chart){
-      const ctx=chart.ctx;
-      const allCs=sim.candles.slice(0,Math.max(sim.idx+1,10));
-      const cs=allCs.slice(chartViewStart, chartViewStart+chartViewCount);
-      if(!cs.length)return;
-      const xs=chart.scales.x, ys=chart.scales.y;
-      if(!xs||!ys)return;
-      const bw=Math.max(2,Math.min(14,(xs.right-xs.left)/cs.length*0.65));
-      ctx.save();
-      cs.forEach((c,i)=>{
-        const x=xs.getPixelForValue(i);
-        const yO=ys.getPixelForValue(c.o),yC=ys.getPixelForValue(c.c);
-        const yH=ys.getPixelForValue(c.h),yL=ys.getPixelForValue(c.l);
-        const up=c.c>=c.o, col=up?"#dc2626":"#2563eb";
-        const top=Math.min(yO,yC), ht=Math.max(1,Math.abs(yO-yC));
-        ctx.fillStyle=col;
-        ctx.fillRect(x-bw/2,top,bw,ht);
-        ctx.beginPath();ctx.strokeStyle=col;ctx.lineWidth=1;
-        ctx.moveTo(x,yH);ctx.lineTo(x,top);
-        ctx.moveTo(x,top+ht);ctx.lineTo(x,yL);
-        ctx.stroke();
-      });
-      ctx.restore();
-    }
-  };
-}
-
-// 십자선 플러그인
-function crosshairPlugin(){
-  return {
-    id:"crosshair",
-    afterDraw(chart){
-      if(chart._cx==null)return;
-      const {ctx:c,chartArea:{top,bottom,left,right}}=chart;
-      c.save();c.strokeStyle="rgba(107,118,132,.5)";c.lineWidth=1;c.setLineDash([4,4]);
-      c.beginPath();c.moveTo(chart._cx,top);c.lineTo(chart._cx,bottom);c.stroke();
-      c.beginPath();c.moveTo(left,chart._cy);c.lineTo(right,chart._cy);c.stroke();
-      c.restore();
-    }
-  };
-}
+let chartViewStart=0,chartViewCount=80;
+let _chartRaf=null;
 
 // 뷰 상태
-let chartViewStart=0, chartViewCount=100;
+function _cvAll(){return sim.candles.slice(0,Math.max(sim.idx+1,10));}
+function _cvCs(){
+  const a=_cvAll();
+  chartViewCount=Math.max(10,Math.min(chartViewCount,a.length));
+  chartViewStart=Math.max(0,Math.min(chartViewStart,a.length-chartViewCount));
+  return a.slice(chartViewStart,chartViewStart+chartViewCount);
+}
 
-function initChart(){
-  try{
-  const allCs=sim.candles.slice(0,Math.max(sim.idx+1,10));
-  if(!allCs.length)return;
+// ── 메인 차트 렌더 ──────────────────────────────
+function drawChart(){
+  const canvas=document.getElementById("mainChart");
+  if(!canvas)return;
+  const W=canvas.clientWidth||canvas.offsetWidth||600;
+  const H=canvas.clientHeight||canvas.offsetHeight||300;
+  if(W<20||H<20)return;
+  if(canvas.width!==W)canvas.width=W;
+  if(canvas.height!==H)canvas.height=H;
+  const ctx=canvas.getContext("2d");
 
-  chartViewCount=Math.max(10,Math.min(chartViewCount,allCs.length));
-  chartViewStart=Math.max(0,Math.min(chartViewStart,allCs.length-chartViewCount));
-  const cs=allCs.slice(chartViewStart,chartViewStart+chartViewCount);
-  const lbls=cs.map(c=>c.t),cls=cs.map(c=>c.c),vls=cs.map(c=>c.v);
+  const cs=_cvCs();
+  if(!cs.length){ctx.clearRect(0,0,W,H);return;}
+  const cls=cs.map(c=>c.c),vls=cs.map(c=>c.v);
 
-  if(mChart){mChart.destroy();mChart=null;}
+  // 패딩
+  const PR=54,PL=4,PT=8,PB=22;
+  const SB=8; // 스크롤바 높이
+  const volH=inds.vol?Math.floor(H*0.20):0;
+  const mainH=H-PT-PB-volH-SB;
+  const cw=W-PL-PR;
 
-  // datasets — 캔들은 플러그인이 그리므로 종가 라인은 좌표 참조용으로만 (숨김)
-  const ds=[];
+  // Y범위
+  const prices=cs.flatMap(c=>[c.h,c.l]).filter(v=>v>0);
+  let yMin=Math.min(...prices),yMax=Math.max(...prices);
+  const yPad=(yMax-yMin)*0.06||yMin*0.005||1;
+  yMin-=yPad; yMax+=yPad;
+  const yR=yMax-yMin||1;
 
-  // 종가 — 캔들 플러그인이 Y축 스케일 참조용으로 필요, 화면에는 안 보임
-  ds.push({type:"line",label:"종가",data:cls,
-    borderColor:"rgba(0,0,0,0)",backgroundColor:"rgba(0,0,0,0)",
-    borderWidth:0,pointRadius:0,fill:false,yAxisID:"y",order:99,
-    tension:0,showLine:false});
+  const toX=i=>PL+(i+0.5)*(cw/cs.length);
+  const toY=v=>PT+mainH*(1-(v-yMin)/yR);
+  const bw=Math.max(1.5,Math.min(16,cw/cs.length*0.6));
 
-  // 이동평균선
-  if(inds.ma){
-    [["MA5","#f59e0b",5],["MA20","#10b981",20],["MA60","#ef4444",60]].forEach(([l,col,n])=>{
-      ds.push({type:"line",label:l,data:calcMA(cls,n),borderColor:col,
-        borderWidth:1.5,pointRadius:0,fill:false,yAxisID:"y",order:3,tension:.05,spanGaps:true});
-    });
+  // 배경
+  ctx.clearRect(0,0,W,H);
+  const bg=getComputedStyle(document.documentElement).getPropertyValue('--pan').trim()||'#ffffff';
+  ctx.fillStyle=bg; ctx.fillRect(0,0,W,H);
+
+  // 그리드 + Y축 레이블
+  ctx.strokeStyle='rgba(0,0,0,.05)'; ctx.lineWidth=1;
+  ctx.fillStyle='#8c9db5'; ctx.font='9px "JetBrains Mono",monospace'; ctx.textAlign='left';
+  for(let i=1;i<=4;i++){
+    const y=PT+mainH*i/4;
+    ctx.beginPath();ctx.moveTo(PL,y);ctx.lineTo(W-PR,y);ctx.stroke();
+    const v=yMax-yR*i/4;
+    const label=v>=10000?Math.round(v/100)/10+'k':v>=1000?v.toLocaleString():v.toFixed(0);
+    ctx.fillText(label,W-PR+4,y+3);
   }
 
   // 볼린저밴드
   if(inds.bb){
     const{upper,lower}=calcBB(cls,20,2);
-    ds.push({type:"line",label:"BB상단",data:upper,borderColor:"rgba(139,92,246,.5)",
-      borderWidth:1,borderDash:[4,3],pointRadius:0,fill:false,yAxisID:"y",order:3,spanGaps:true});
-    ds.push({type:"line",label:"BB하단",data:lower,borderColor:"rgba(139,92,246,.5)",
-      borderWidth:1,borderDash:[4,3],pointRadius:0,fill:false,yAxisID:"y",order:3,spanGaps:true});
+    ctx.strokeStyle='rgba(139,92,246,.45)';ctx.lineWidth=1;ctx.setLineDash([4,3]);
+    for(const arr of[upper,lower]){
+      ctx.beginPath();
+      arr.forEach((v,i)=>{if(v==null)return;
+        (i===0||arr[i-1]==null)?ctx.moveTo(toX(i),toY(v)):ctx.lineTo(toX(i),toY(v));});
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
   }
 
   // VWAP
   if(inds.vwap){
-    ds.push({type:"line",label:"VWAP",data:calcVWAP(cs),borderColor:"#06b6d4",
-      borderWidth:1.5,borderDash:[5,3],pointRadius:0,fill:false,yAxisID:"y",order:3,spanGaps:true});
+    const vw=calcVWAP(cs);
+    ctx.strokeStyle='#06b6d4';ctx.lineWidth=1.5;ctx.setLineDash([5,3]);
+    ctx.beginPath();
+    vw.forEach((v,i)=>{if(v==null)return;
+      (i===0||vw[i-1]==null)?ctx.moveTo(toX(i),toY(v)):ctx.lineTo(toX(i),toY(v));});
+    ctx.stroke();ctx.setLineDash([]);
   }
 
-  // 거래량 바
-  if(inds.vol){
-    ds.push({type:"bar",label:"거래량",data:vls,
-      backgroundColor:cs.map(c=>c.c>=c.o?"rgba(220,38,38,.35)":"rgba(37,99,235,.35)"),
-      yAxisID:"y2",order:10});
+  // 이동평균선
+  if(inds.ma){
+    [['MA5','#f59e0b',5],['MA20','#10b981',20],['MA60','#ef4444',60]].forEach(([,col,n])=>{
+      const ma=calcMA(cls,n);
+      ctx.strokeStyle=col;ctx.lineWidth=1.5;
+      ctx.beginPath();
+      ma.forEach((v,i)=>{if(v==null)return;
+        (i===0||ma[i-1]==null)?ctx.moveTo(toX(i),toY(v)):ctx.lineTo(toX(i),toY(v));});
+      ctx.stroke();
+    });
   }
 
-  // Y축 범위 - 캔들 OHLC 기반으로 명시적 설정
-  const allPrices=cs.flatMap(c=>[c.h,c.l,c.o,c.c]).filter(v=>v>0);
-  const yMin=allPrices.length?Math.min(...allPrices)*0.998:0;
-  const yMax=allPrices.length?Math.max(...allPrices)*1.002:100;
-
-  const canvas=document.getElementById("mainChart");
-  if(!canvas){console.error("mainChart canvas 없음");return;}
-
-  const scales={
-    x:{
-      grid:{color:"rgba(0,0,0,.05)"},
-      ticks:{color:"#8c9db5",font:{family:"JetBrains Mono",size:8},maxTicksLimit:12}
-    },
-    y:{
-      position:"right",
-      min:yMin,
-      max:yMax,
-      grid:{color:"rgba(0,0,0,.04)"},
-      ticks:{color:"#8c9db5",font:{family:"JetBrains Mono",size:8},callback:v=>v>=1000?Math.round(v/100)/10+"k":v}
-    }
-  };
-  // 거래량 Y축은 거래량 표시할 때만 추가
-  if(inds.vol){
-    scales.y2={position:"left",display:true,grid:{display:false},ticks:{display:false},
-      max:vls.length?Math.max(...vls)*6:1000000};
-  }
-
-  mChart=new Chart(canvas.getContext("2d"),{
-    type:"bar",
-    data:{labels:lbls,datasets:ds},
-    plugins:[drawCandlePlugin(),crosshairPlugin()],
-    options:{
-      responsive:true,
-      maintainAspectRatio:false,
-      animation:false,
-      interaction:{mode:"index",intersect:false},
-      plugins:{
-        legend:{display:false},
-        tooltip:{
-          backgroundColor:"#fff",borderColor:"rgba(0,0,0,.12)",borderWidth:1,
-          titleColor:"#6b7684",bodyColor:"#191f28",
-          titleFont:{family:"JetBrains Mono",size:9},
-          bodyFont:{family:"JetBrains Mono",size:10},padding:8,
-          filter:item=>item.dataset.label!=="종가"||!inds.ma,
-          callbacks:{
-            title:items=>items[0]?.label||"",
-            label:item=>{
-              if(item.dataset.label==="거래량")return "거래량:"+Math.round(item.parsed.y).toLocaleString();
-              if(item.dataset.label==="종가")return "";
-              return item.dataset.label+":"+Math.round(item.parsed.y).toLocaleString();
-            }
-          }
-        }
-      },
-      scales,
-      onHover:(e,items)=>{
-        if(!mChart||!e.native)return;
-        try{
-          const r=canvas.getBoundingClientRect();
-          mChart._cx=e.native.clientX-r.left;
-          mChart._cy=e.native.clientY-r.top;
-          mChart.draw();
-          if(items.length){
-            const idx=items[0].dataIndex;
-            const c=cs[idx];
-            if(c)document.getElementById("cinfo").textContent=
-              `O${c.o.toLocaleString()} H${c.h.toLocaleString()} L${c.l.toLocaleString()} C${c.c.toLocaleString()} V${c.v.toLocaleString()}`;
-          }
-        }catch(ex){}
-      }
-    }
+  // 캔들
+  cs.forEach((c,i)=>{
+    const x=toX(i),yO=toY(c.o),yC=toY(c.c),yH=toY(c.h),yL=toY(c.l);
+    const up=c.c>=c.o,col=up?'#dc2626':'#2563eb';
+    const top=Math.min(yO,yC),ht=Math.max(1,Math.abs(yO-yC));
+    ctx.strokeStyle=col;ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(x,yH);ctx.lineTo(x,top);
+    ctx.moveTo(x,top+ht);ctx.lineTo(x,yL);ctx.stroke();
+    ctx.fillStyle=col;ctx.fillRect(x-bw/2,top,bw,ht);
   });
 
-  if(inds.rsi)initSub("rsi",calcRSI(cls,14),"#a78bfa",lbls);
-  if(inds.macd){const{ml,sig}=calcMACD(cls);initSubMACD(lbls,ml,sig);}
+  // X축 레이블
+  ctx.fillStyle='#8c9db5';ctx.font='8px "JetBrains Mono",monospace';ctx.textAlign='center';
+  const step=Math.max(1,Math.floor(cs.length/8));
+  cs.forEach((c,i)=>{if(i%step===0)ctx.fillText(c.t,toX(i),PT+mainH+14);});
 
-  }catch(e){
-    const ci=document.getElementById("cinfo");
-    if(ci)ci.textContent="차트오류:"+e.message;
-    let dbg=document.getElementById('_dbg');
-    if(!dbg){dbg=document.createElement('div');dbg.id='_dbg';dbg.style.cssText='position:fixed;top:48px;left:0;right:0;background:#dc2626;color:#fff;font-size:12px;padding:6px 12px;z-index:99999;font-family:monospace;';document.body.appendChild(dbg);}
-    dbg.textContent='initChart 오류: '+e.message;
-    console.error('initChart error:',e);
+  // 거래량
+  if(volH>0){
+    const vY0=PT+mainH+PB+2;
+    const vMax=Math.max(...vls)||1;
+    ctx.fillStyle='rgba(0,0,0,.04)';ctx.fillRect(PL,vY0,cw,volH-4);
+    cs.forEach((c,i)=>{
+      const x=toX(i),bh=Math.max(1,(c.v/vMax)*(volH-4));
+      ctx.fillStyle=c.c>=c.o?'rgba(220,38,38,.45)':'rgba(37,99,235,.45)';
+      ctx.fillRect(x-bw/2,vY0+volH-4-bh,bw,bh);
+    });
   }
+
+  // ── 스크롤바 ────────────────────────────────────
+  const all=_cvAll();
+  if(all.length>chartViewCount){
+    const sbY=H-SB;
+    ctx.fillStyle='rgba(0,0,0,.06)';
+    ctx.beginPath();ctx.roundRect(PL,sbY+1,cw,SB-2,3);ctx.fill();
+    const tw=cw*(chartViewCount/all.length);
+    const tx=PL+cw*(chartViewStart/all.length);
+    ctx.fillStyle='rgba(0,0,0,.25)';
+    ctx.beginPath();ctx.roundRect(tx,sbY+1,tw,SB-2,3);ctx.fill();
+  }
+
+  // 십자선
+  if(canvas._cx!=null){
+    ctx.strokeStyle='rgba(107,118,132,.5)';ctx.lineWidth=1;ctx.setLineDash([4,4]);
+    ctx.beginPath();ctx.moveTo(canvas._cx,PT);ctx.lineTo(canvas._cx,PT+mainH);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(PL,canvas._cy);ctx.lineTo(W-PR,canvas._cy);ctx.stroke();
+    ctx.setLineDash([]);
+    const pv=yMax-((canvas._cy-PT)/mainH)*yR;
+    if(pv>0){
+      ctx.fillStyle='#191f28';ctx.font='bold 9px "JetBrains Mono",monospace';ctx.textAlign='left';
+      ctx.fillText(Math.round(pv).toLocaleString(),W-PR+4,canvas._cy+3);
+    }
+    // 해당 캔들 OHLCV 표시
+    const idx=Math.floor((canvas._cx-PL)/(cw/cs.length));
+    if(idx>=0&&idx<cs.length){
+      const c=cs[idx];
+      const ci=document.getElementById('cinfo');
+      if(ci)ci.textContent=`O${c.o.toLocaleString()} H${c.h.toLocaleString()} L${c.l.toLocaleString()} C${c.c.toLocaleString()} V${c.v.toLocaleString()}`;
+    }
+  }
+
+  // RSI/MACD 서브차트
+  _drawRSI(cs,cls);
+  _drawMACD(cs,cls);
+
+  mChart={_ok:true};
 }
 
-// ── 차트 이벤트 (window.onload에서 1회만 등록) ──
+function _drawRSI(cs,cls){
+  const el=document.getElementById('rsiSub'),cv=document.getElementById('rsiCanvas');
+  if(!inds.rsi){if(el)el.classList.add('hide');return;}
+  if(!el||!cv)return; el.classList.remove('hide');
+  const W=cv.clientWidth||600,H=cv.clientHeight||60;
+  if(W<10||H<10)return;
+  cv.width=W;cv.height=H;
+  const ctx=cv.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);
+  const rsi=calcRSI(cls,14);
+  const PL=4,PR=54,PT=2,PB=2,cw=W-PL-PR,ch=H-PT-PB;
+  const toX=i=>PL+(i+0.5)*(cw/cs.length);
+  const toY=v=>PT+ch*(1-v/100);
+  [[70,'rgba(220,38,38,.2)'],[50,'rgba(0,0,0,.08)'],[30,'rgba(37,99,235,.2)']].forEach(([v,c])=>{
+    ctx.strokeStyle=c;ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(PL,toY(v));ctx.lineTo(W-PR,toY(v));ctx.stroke();
+    ctx.fillStyle='#8c9db5';ctx.font='8px "JetBrains Mono",monospace';ctx.textAlign='left';
+    ctx.fillText(v,W-PR+4,toY(v)+3);
+  });
+  ctx.strokeStyle='#a78bfa';ctx.lineWidth=1.5;
+  ctx.beginPath();
+  rsi.forEach((v,i)=>{if(v==null)return;(i===0||rsi[i-1]==null)?ctx.moveTo(toX(i),toY(v)):ctx.lineTo(toX(i),toY(v));});
+  ctx.stroke();
+}
+
+function _drawMACD(cs,cls){
+  const el=document.getElementById('macdSub'),cv=document.getElementById('macdCanvas');
+  if(!inds.macd){if(el)el.classList.add('hide');return;}
+  if(!el||!cv)return; el.classList.remove('hide');
+  const W=cv.clientWidth||600,H=cv.clientHeight||60;
+  if(W<10||H<10)return;
+  cv.width=W;cv.height=H;
+  const ctx=cv.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);
+  const{ml,sig}=calcMACD(cls);
+  const all=[...ml,...sig].filter(v=>v!=null);
+  if(!all.length)return;
+  let vMin=Math.min(...all),vMax=Math.max(...all);
+  const vP=(vMax-vMin)*0.1||0.1;
+  vMin-=vP;vMax+=vP;
+  const vR=vMax-vMin||1;
+  const PL=4,PR=54,PT=2,PB=2,cw=W-PL-PR,ch=H-PT-PB;
+  const toX=i=>PL+(i+0.5)*(cw/cs.length);
+  const toY=v=>PT+ch*(1-(v-vMin)/vR);
+  // 0선
+  ctx.strokeStyle='rgba(0,0,0,.1)';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(PL,toY(0));ctx.lineTo(W-PR,toY(0));ctx.stroke();
+  [['ml','#3b82f6'],['sig','#f59e0b']].forEach(([k,col])=>{
+    const arr=k==='ml'?ml:sig;
+    ctx.strokeStyle=col;ctx.lineWidth=1.5;
+    ctx.beginPath();
+    arr.forEach((v,i)=>{if(v==null)return;(i===0||arr[i-1]==null)?ctx.moveTo(toX(i),toY(v)):ctx.lineTo(toX(i),toY(v));});
+    ctx.stroke();
+  });
+}
+
+// ── initChart (호환성 유지) ──
+function initChart(){
+  requestAnimationFrame(()=>drawChart());
+}
+function initSub(){}
+function initSubMACD(){}
+
+// ── 이벤트 (wrap div에 1회만) ──
 function initChartEvents(){
-  const wrap=document.querySelector(".chart-main");
+  const wrap=document.querySelector('.chart-main');
   if(!wrap||wrap._evtOk)return;
   wrap._evtOk=true;
 
-  // 마우스 떠나면 십자선 제거
-  wrap.addEventListener("mouseleave",()=>{if(mChart){mChart._cx=null;mChart.draw();}});
+  // 마우스 이동 (십자선)
+  wrap.addEventListener('mousemove',e=>{
+    const cv=document.getElementById('mainChart');
+    if(!cv)return;
+    const r=wrap.getBoundingClientRect();
+    cv._cx=e.clientX-r.left; cv._cy=e.clientY-r.top;
+    drawChart();
+  });
+  wrap.addEventListener('mouseleave',()=>{
+    const cv=document.getElementById('mainChart');
+    if(cv){cv._cx=null;cv._cy=null;} drawChart();
+  });
 
   // 휠 줌
-  wrap.addEventListener("wheel",e=>{
+  wrap.addEventListener('wheel',e=>{
     e.preventDefault();
-    const allC=sim.candles.slice(0,Math.max(sim.idx+1,10));
-    if(!allC.length)return;
-    const factor=e.deltaY>0?1.3:0.77;
+    const a=_cvAll();if(!a.length)return;
+    const factor=e.deltaY>0?1.25:0.8;
     const center=chartViewStart+chartViewCount/2;
-    chartViewCount=Math.max(10,Math.min(Math.round(chartViewCount*factor),allC.length));
-    chartViewStart=Math.max(0,Math.min(Math.round(center-chartViewCount/2),allC.length-chartViewCount));
-    initChart();
+    chartViewCount=Math.max(10,Math.min(Math.round(chartViewCount*factor),a.length));
+    chartViewStart=Math.max(0,Math.min(Math.round(center-chartViewCount/2),a.length-chartViewCount));
+    drawChart();
   },{passive:false});
 
   // 드래그 팬
   let dragX=null,dragBase=0;
-  wrap.addEventListener("mousedown",e=>{dragX=e.clientX;dragBase=chartViewStart;});
-  wrap.addEventListener("mousemove",e=>{
+  wrap.addEventListener('mousedown',e=>{dragX=e.clientX;dragBase=chartViewStart;});
+  window.addEventListener('mousemove',e=>{
     if(dragX===null)return;
-    const allC=sim.candles.slice(0,Math.max(sim.idx+1,10));
-    if(!allC.length)return;
+    const a=_cvAll();if(!a.length)return;
     const w=wrap.clientWidth||800;
     const shift=Math.round(-(e.clientX-dragX)/(w/Math.max(chartViewCount,1)));
-    chartViewStart=Math.max(0,Math.min(dragBase+shift,allC.length-chartViewCount));
-    initChart();
+    chartViewStart=Math.max(0,Math.min(dragBase+shift,a.length-chartViewCount));
+    drawChart();
   });
-  wrap.addEventListener("mouseup",()=>{dragX=null;});
-  wrap.addEventListener("mouseleave",()=>{dragX=null;});
+  window.addEventListener('mouseup',()=>{dragX=null;});
+
+  // 스크롤바 드래그
+  let sbDrag=false,sbDragX=0,sbDragBase=0;
+  wrap.addEventListener('mousedown',e=>{
+    const cv=document.getElementById('mainChart');
+    if(!cv)return;
+    const H=cv.clientHeight||300;
+    const SB=8;
+    const r=wrap.getBoundingClientRect();
+    const ly=e.clientY-r.top;
+    if(ly>=H-SB){
+      sbDrag=true; sbDragX=e.clientX; sbDragBase=chartViewStart;
+      dragX=null; // 스크롤바 드래그 중엔 팬 비활성
+    }
+  });
+  window.addEventListener('mousemove',e=>{
+    if(!sbDrag)return;
+    const a=_cvAll();if(!a.length)return;
+    const cv=document.getElementById('mainChart');
+    if(!cv)return;
+    const w=(cv.clientWidth||800)-4-54;
+    const total=a.length;
+    const px_per_candle=w/total;
+    const shift=Math.round((e.clientX-sbDragX)/px_per_candle);
+    chartViewStart=Math.max(0,Math.min(sbDragBase+shift,total-chartViewCount));
+    drawChart();
+  });
+  window.addEventListener('mouseup',()=>{sbDrag=false;});
 
   // 터치 (스와이프+핀치)
   let tx=null,txBase=0,tDist=null;
-  wrap.addEventListener("touchstart",e=>{
+  wrap.addEventListener('touchstart',e=>{
     if(e.touches.length===1){tx=e.touches[0].clientX;txBase=chartViewStart;}
-    if(e.touches.length===2){tDist=Math.abs(e.touches[0].clientX-e.touches[1].clientX);txBase=chartViewStart;}
+    if(e.touches.length===2){tDist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);}
   },{passive:true});
-  wrap.addEventListener("touchmove",e=>{
+  wrap.addEventListener('touchmove',e=>{
     e.preventDefault();
-    const allC=sim.candles.slice(0,Math.max(sim.idx+1,10));
-    if(!allC.length)return;
+    const a=_cvAll();if(!a.length)return;
     const w=wrap.clientWidth||800;
     if(e.touches.length===1&&tx!==null){
       const shift=Math.round(-(e.touches[0].clientX-tx)/(w/Math.max(chartViewCount,1)));
-      chartViewStart=Math.max(0,Math.min(txBase+shift,allC.length-chartViewCount));
-      initChart();
+      chartViewStart=Math.max(0,Math.min(txBase+shift,a.length-chartViewCount));
+      drawChart();
     }
     if(e.touches.length===2&&tDist){
-      const nd=Math.abs(e.touches[0].clientX-e.touches[1].clientX);
+      const nd=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
       const factor=tDist/nd; tDist=nd;
       const center=chartViewStart+chartViewCount/2;
-      chartViewCount=Math.max(10,Math.min(Math.round(chartViewCount*factor),allC.length));
-      chartViewStart=Math.max(0,Math.min(Math.round(center-chartViewCount/2),allC.length-chartViewCount));
-      initChart();
+      chartViewCount=Math.max(10,Math.min(Math.round(chartViewCount*factor),a.length));
+      chartViewStart=Math.max(0,Math.min(Math.round(center-chartViewCount/2),a.length-chartViewCount));
+      drawChart();
     }
   },{passive:false});
-  wrap.addEventListener("touchend",()=>{tx=null;tDist=null;});
+  wrap.addEventListener('touchend',()=>{tx=null;tDist=null;});
 }
 
-// 줌 버튼
+// ── 줌 버튼 ──
 function chartZoom(f){
-  const allC=sim.candles.slice(0,Math.max(sim.idx+1,10));
-  if(!allC.length)return;
+  const a=_cvAll();if(!a.length)return;
   const center=chartViewStart+chartViewCount/2;
-  chartViewCount=Math.max(10,Math.min(Math.round(chartViewCount*f),allC.length));
-  chartViewStart=Math.max(0,Math.min(Math.round(center-chartViewCount/2),allC.length-chartViewCount));
-  initChart();
+  chartViewCount=Math.max(10,Math.min(Math.round(chartViewCount*f),a.length));
+  chartViewStart=Math.max(0,Math.min(Math.round(center-chartViewCount/2),a.length-chartViewCount));
+  drawChart();
 }
 function chartReset(){
-  const allC=sim.candles.slice(0,Math.max(sim.idx+1,10));
-  const sel=document.getElementById("candleCount");
-  chartViewCount=Math.min(parseInt(sel?.value||100),allC.length)||allC.length;
-  chartViewStart=Math.max(0,allC.length-chartViewCount);
-  initChart();
+  const a=_cvAll();
+  const sel=document.getElementById('candleCount');
+  chartViewCount=Math.min(parseInt(sel?.value||80),a.length)||a.length;
+  chartViewStart=Math.max(0,a.length-chartViewCount);
+  drawChart();
 }
 function chartSetCount(val){
-  const allC=sim.candles.slice(0,Math.max(sim.idx+1,10));
-  chartViewCount=Math.min(parseInt(val)||100,allC.length)||allC.length;
-  chartViewStart=Math.max(0,allC.length-chartViewCount);
-  initChart();
+  const a=_cvAll();
+  chartViewCount=Math.min(parseInt(val)||80,a.length)||a.length;
+  chartViewStart=Math.max(0,a.length-chartViewCount);
+  drawChart();
 }
 
-function initSub(type,data,color,lbls){
-  const el=document.getElementById(type+"Sub"),cv=document.getElementById(type+"Canvas");
-  if(!cv)return; el.classList.remove("hide");
-  if(type==="rsi"&&rsiChart)rsiChart.destroy();
-  const inst=new Chart(cv.getContext("2d"),{type:"line",data:{labels:lbls,datasets:[{data,borderColor:color,borderWidth:1.5,pointRadius:0,fill:false,tension:.08},
-    {data:lbls.map(()=>70),borderColor:"rgba(255,71,87,.25)",borderWidth:1,borderDash:[3,3],pointRadius:0,fill:false},
-    {data:lbls.map(()=>30),borderColor:"rgba(0,217,126,.25)",borderWidth:1,borderDash:[3,3],pointRadius:0,fill:false}]},
-    options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false},tooltip:{enabled:false}},
-      scales:{x:{display:false},y:{position:"right",min:0,max:100,grid:{color:"rgba(0,0,0,.05)"},ticks:{color:"#8c9db5",font:{size:8},stepSize:30}}}}});
-  if(type==="rsi")rsiChart=inst;
-}
-function initSubMACD(lbls,l1,l2){
-  const el=document.getElementById("macdSub"),cv=document.getElementById("macdCanvas");
-  if(!cv)return; el.classList.remove("hide");
-  if(macdChart)macdChart.destroy();
-  macdChart=new Chart(cv.getContext("2d"),{type:"line",data:{labels:lbls,datasets:[{label:"MACD",data:l1,borderColor:"#4d9fff",borderWidth:1.5,pointRadius:0,fill:false,tension:.08},{label:"Signal",data:l2,borderColor:"#ffb800",borderWidth:1,pointRadius:0,fill:false,tension:.08}]},
-    options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false},tooltip:{enabled:false}},
-      scales:{x:{display:false},y:{position:"right",grid:{color:"rgba(0,0,0,.05)"},ticks:{color:"#8c9db5",font:{size:8}}}}}});
-}
+// ── 시뮬레이션 업데이트 (Chart.js 없이) ──
 function updChartToIdx(){
   const cs=sim.candles.slice(0,sim.idx+1);
-  if(!mChart||!cs.length)return;
-  const cls=cs.map(c=>c.c),vls=cs.map(c=>c.v),lbls=cs.map(c=>c.t);
-  mChart.data.labels=lbls;
-  const fd=l=>mChart.data.datasets.find(d=>d.label===l);
-  if(fd("종가"))fd("종가").data=cls;
-  if(inds.ma){[["MA5",5],["MA20",20],["MA60",60]].forEach(([l,n])=>{const d=fd(l);if(d)d.data=calcMA(cls,n);});}
-  if(inds.bb){const{upper,lower}=calcBB(cls,20,2);if(fd("BB상단"))fd("BB상단").data=upper;if(fd("BB하단"))fd("BB하단").data=lower;}
-  if(inds.vwap&&fd("VWAP"))fd("VWAP").data=calcVWAP(cs);
-  if(inds.vol&&fd("거래량")){const d=fd("거래량");d.data=vls;d.backgroundColor=cs.map(c=>c.c>=c.o?"rgba(220,38,38,.35)":"rgba(37,99,235,.35)");if(mChart.options.scales.y2)mChart.options.scales.y2.max=vls.length?Math.max(...vls)*6:1000000;}
-  mChart.update("none");
+  if(!cs.length)return;
+  drawChart();
   const cur=cs[cs.length-1]; updPrice(cur);
-  document.getElementById("msBar").textContent=sim.idx+1;
-  document.getElementById("msTime").textContent=cur.t;
-  document.getElementById("progF").style.width=((sim.idx/sim.candles.length)*100)+"%";
+  const msBar=document.getElementById('msBar');if(msBar)msBar.textContent=sim.idx+1;
+  const msTime=document.getElementById('msTime');if(msTime)msTime.textContent=cur.t;
+  const pf=document.getElementById('progF');if(pf)pf.style.width=((sim.idx/sim.candles.length)*100)+'%';
   updPnl(); renderOB();
-  if(inds.rsi&&rsiChart){const r=calcRSI(cls,14);rsiChart.data.labels=lbls;rsiChart.data.datasets[0].data=r;rsiChart.data.datasets[1].data=lbls.map(()=>70);rsiChart.data.datasets[2].data=lbls.map(()=>30);rsiChart.update("none");}
-  if(inds.macd&&macdChart){const{ml,sig}=calcMACD(cls);macdChart.data.labels=lbls;macdChart.data.datasets[0].data=ml;macdChart.data.datasets[1].data=sig;macdChart.update("none");}
   if(autoState.running&&sim.idx>0&&sim.idx%5===0)runAutoStep(cs);
   updateTrailPanel();
-  setTimeout(checkPsychWarnings, 100);
+  setTimeout(checkPsychWarnings,100);
 }
+
+// resize observer (캔버스 크기 변경 시 재렌더)
+function _initResizeObserver(){
+  const wrap=document.querySelector('.chart-main');
+  if(!wrap||wrap._roOk)return;
+  wrap._roOk=true;
+  if(typeof ResizeObserver!=='undefined'){
+    new ResizeObserver(()=>drawChart()).observe(wrap);
+  }
+}
+
 
 // ═══════════════════════════════
 // SIMULATION
@@ -4777,7 +4721,7 @@ function onSearch(q){
   }).join("");
 }
 function hideSrch(){document.getElementById("srchDrop").style.display="none";}
-function togInd(nm,el){inds[nm]=!inds[nm];el.classList.toggle("on",inds[nm]);if(!inds[nm]){if(nm==="rsi"){document.getElementById("rsiSub").classList.add("hide");if(rsiChart){rsiChart.destroy();rsiChart=null;}}if(nm==="macd"){document.getElementById("macdSub").classList.add("hide");if(macdChart){macdChart.destroy();macdChart=null;}}}initChart();}
+function togInd(nm,el){inds[nm]=!inds[nm];el.classList.toggle("on",inds[nm]);if(!inds[nm]){if(nm==="rsi"){const rs=document.getElementById("rsiSub");if(rs)rs.classList.add("hide");}if(nm==="macd"){const ms=document.getElementById("macdSub");if(ms)ms.classList.add("hide");}}drawChart();}
 
 // ═══════════════════════════════
 // LIVE UPDATE
@@ -5039,6 +4983,39 @@ function openModal(id){
 function closeModal(id){document.getElementById("modal-"+id).classList.remove("show");}
 function showAlert(t,m){document.getElementById("alertTtl").textContent=t;document.getElementById("alertMsg").textContent=m;openModal("alert");}
 document.querySelectorAll(".modal-bg").forEach(el=>{el.addEventListener("click",e=>{if(e.target===el){const id=el.id.replace("modal-","");closeModal(id);}});});
+
+window.onload=()=>{
+  loadState();
+  goPage('hts',document.getElementById('tab-hts'));
+  document.getElementById("mockDate").value=sim.date;
+  initChartEvents();
+  _initResizeObserver();
+  if(kisConfig.claudeKey){fetch('/api/set-claude-key',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:kisConfig.claudeKey})}).catch(()=>{});}
+  updateKisStatus();
+  renderAll();
+  genCandles(); drawChart();
+  renderOB(); renderTH();
+  tick(); setInterval(tick,1000);
+  setInterval(liveUpdate,2200);
+  setInterval(checkStopOrders,800);
+  setInterval(autoAdvUpdate,8000);
+  setTimeout(async()=>{
+    await checkDartApiStatus();
+    updateAIAdvisor();
+    fetchDartNews();
+    runFullAnalysis();
+    renderIntraCheck();
+    updateTimeGuide();
+    calcMarketStrength();
+  },800);
+  setInterval(()=>{updateTimeGuide();},30000);
+  setInterval(()=>fetchDartNews(),30000);
+  ensureToday(); updateUsageUI();
+  const savedTrust=localStorage.getItem('trustScore');
+  if(savedTrust){trustScore=parseInt(savedTrust);const sl=document.getElementById('trustSlider');if(sl)sl.value=trustScore;updateTrustScore(trustScore);}
+  setTimeout(()=>{renderGrowthRoadmap();detectSlump();},500);
+};
+
 </script>
 </body>
 </html>
