@@ -4074,41 +4074,181 @@ function addDecisionLog(action,reason,phase){
   log.insertBefore(div,log.firstChild);
   if(log.children.length>60)log.removeChild(log.lastChild);
 }
+// ══════════════════════════════════════════════════════
+// 자동매매 3단계 AI 검토 시스템
+// 1단계: 기술적 사전 필터 (빠른 로컬 계산)
+// 2단계: Claude AI 심층 분석 (추세/타점/R/R/리스크)
+// 3단계: 뇌동매매 체크 + 최종 실행 결정
+// ══════════════════════════════════════════════════════
+
+// 자동매매 중복 실행 방지
+let _autoScreenRunning = false;
+let _lastAutoScreenTime = 0;
+
 function runScreening(){
-  if(!autoState.running)return;
-  const stk=STOCKS.find(s=>s.tk===activeTk)||STOCKS[0];
-  const cs=getCandles(20);
-  if(cs.length<10)return;
-  const cls=cs.map(c=>c.c),vls=cs.map(c=>c.v);
-  const lc=cs[cs.length-1];
-  const ma5=calcMA(cls,5),ma20=calcMA(cls,20),rsi=calcRSI(cls,14);
-  const lma5=ma5[ma5.length-1]||0,lma20=ma20[ma20.length-1]||0,lrsi=rsi[rsi.length-1]||50;
-  const volR=vls.length>=2?vls[vls.length-1]/vls[vls.length-2]:1;
-  let score=0,reasons=[],phases=[];
-  if(lc.c>lma5){score+=2;reasons.push("5MA 위 (단기 매수세)");phases.push("Phase 4-2: 5MA 정배열");}
-  if(lc.c>lma20){score+=2;reasons.push("20MA 위 (중기 매수환경)");phases.push("Phase 4-2: 20MA 생명선");}
-  if(lrsi>=50&&lrsi<=65){score+=2;reasons.push(`RSI ${lrsi.toFixed(0)} (모멘텀 구간)`);phases.push("Phase 5: RSI 60 돌파=모멘텀");}
-  if(volR>=1.3){score+=2;reasons.push(`거래량 ${(volR*100).toFixed(0)}% 증가`);phases.push("Phase 4-3: 거래량 동반 상승");}
-  if(lc.c>lc.o){score+=1;reasons.push("양봉");}
-  const verdict=score>=7?"🟢 강한 매수 신호":score>=5?"🟡 매수 검토":score>=3?"⚪ 중립":"🔴 매수 비추천";
-  const rr=lc.c>0?(lc.c*(1+autoState.cfg.t1/100)-lc.c)/(lc.c-lc.c*(1-autoState.cfg.stop/100)):0;
-  addDecisionLog(`[${stk.nm}] 스크리닝 — ${verdict} (${score}/9점)`,reasons.join(" · "),phases[0]||"");
-  if(autoState.level>=2){
-    if(score>=5&&rr>=autoState.cfg.rr){ // 레벨4: 조건 완화 (5점 이상)
-      const stopPr=Math.round(lc.c*(1-autoState.cfg.stop/100));
-      const t1Pr=Math.round(lc.c*(1+autoState.cfg.t1/100));
-      addDecisionLog(`[${stk.nm}] 📊 진입 신호!`,`점수 ${score}/9 | R/R 1:${rr.toFixed(2)} | 진입 ${lc.c.toLocaleString()} | 손절 ${stopPr.toLocaleString()} | 1차목표 ${t1Pr.toLocaleString()}`,`Phase 8: STEP7 — R/R ${autoState.cfg.rr} 이상 GO 판정`);
-      updAdvBoxes(`📊 ${stk.nm} 진입 신호 (점수 ${score}/9)`,`R/R 1:${rr.toFixed(2)}\n${reasons.slice(0,2).join(", ")}`);
-      addMsg("ai",`📊 진입 신호!\n${stk.nm} ${lc.c.toLocaleString()}원\n\n셋업: ${score}/9점 | R/R 1:${rr.toFixed(2)}\n손절가: ${stopPr.toLocaleString()}원\n1차 목표: ${t1Pr.toLocaleString()}원\n\n${autoState.level>=3?"→ 자동 매수 실행...":"→ 직접 주문창에서 실행하세요"}\n[Phase 8: 체크리스트 통과]`);
-      if(autoState.level>=3){
-        execAutoBuy(lc.c,stk);
-        addMsg('ai',`🤖 자동매매 Lv${autoState.level} 실행\n${stk.nm} ${lc.c.toLocaleString()}원\n점수: ${score}/9 | R/R: ${rr.toFixed(2)}\n조건: ${reasons.slice(0,2).join(', ')}`);
+  if(!autoState.running) return;
+  const now = Date.now();
+  // 중복 실행 방지 (이전 스크리닝이 진행 중이거나 3초 이내)
+  if(_autoScreenRunning) return;
+  if(now - _lastAutoScreenTime < 3000) return;
+  _lastAutoScreenTime = now;
+  _autoScreenRunning = true;
+
+  // 비동기로 실행 (UI 블로킹 방지)
+  _runScreeningAsync().finally(() => { _autoScreenRunning = false; });
+}
+
+async function _runScreeningAsync(){
+  const stk = STOCKS.find(s=>s.tk===activeTk)||STOCKS[0];
+  const cs = getCandles(30);
+  if(cs.length < 10){ return; }
+
+  const cls = cs.map(c=>c.c), vls = cs.map(c=>c.v);
+  const lc = cs[cs.length-1];
+  const pc = cs[cs.length-2]||lc;
+  const pc2 = cs[cs.length-3]||pc;
+
+  // ── 1단계: 기술적 사전 필터 (로컬, 빠름) ──
+  const ma5 = calcMA(cls,5), ma20 = calcMA(cls,20), ma60 = calcMA(cls,60);
+  const lma5 = ma5[ma5.length-1]||0;
+  const lma20 = ma20[ma20.length-1]||0;
+  const lma60 = ma60[ma60.length-1]||0;
+  const rsiArr = calcRSI(cls,14);
+  const lrsi = parseFloat((rsiArr[rsiArr.length-1]||50).toFixed(1));
+  const volR = vls.length>=2 ? vls[vls.length-1]/vls[vls.length-2] : 1;
+
+  // ★ 하락 추세 즉시 차단 (이게 핵심)
+  const isDownTrend = lc.c < lma5 && lma5 < lma20; // 5MA < 20MA: 하락
+  const isConsecutiveDown = lc.c<lc.o && pc.c<pc.o && pc2.c<pc2.o; // 3연속 음봉
+  const isRSIWeak = lrsi < 40; // RSI 40 미만: 약세
+  const isPriceFalling = lc.c < pc.c && pc.c < pc2.c; // 3봉 연속 하락
+
+  if(isDownTrend || isConsecutiveDown || isPriceFalling){
+    const reason = isDownTrend ? '하락추세(5MA<20MA)' : isConsecutiveDown ? '3연속 음봉' : '3봉 연속 하락';
+    addDecisionLog(`[${stk.nm}] ⛔ 매수 차단`, reason, 'Phase 8: 추세 역방향 진입 금지');
+    updAdvBoxes(`⛔ 매수 차단 — ${stk.nm}`, `${reason}
+하락 중 매수는 절대 안 됨`);
+    return;
+  }
+
+  // 보유 중이면 추가 매수 금지 (피라미딩은 수동으로)
+  if(mock.positions[activeTk]?.qty > 0){
+    addDecisionLog(`[${stk.nm}] 이미 보유 중`, '추가매수 금지 — 현 포지션 관리에 집중', 'Phase 9');
+    return;
+  }
+
+  // 일일 손실 한도 체크
+  const dayLossRate = -mock.todayPnl / cfg.capital * 100;
+  if(dayLossRate >= cfg.dayloss * 0.8){
+    addDecisionLog(`[${stk.nm}] ⚠ 일손실 한도 80% 도달`, `오늘 손실 ${dayLossRate.toFixed(1)}%`, 'Phase 8-9: NOGO');
+    return;
+  }
+
+  // 연속 손절 체크
+  if(mock.lossSeries >= 3 && autoState.cfg.brk){
+    addDecisionLog(`[${stk.nm}] ⚠ 연속 손절 ${mock.lossSeries}회`, '매매 중단', 'Phase 11: 뇌동매매 방지');
+    return;
+  }
+
+  // 기본 조건 점수
+  let preScore = 0;
+  const preReasons = [];
+  if(lc.c > lma5){ preScore++; preReasons.push('5MA위'); }
+  if(lc.c > lma20){ preScore++; preReasons.push('20MA위'); }
+  if(lrsi >= 45 && lrsi <= 72){ preScore++; preReasons.push(`RSI${lrsi}`); }
+  if(volR >= 1.2){ preScore++; preReasons.push(`거래량×${volR.toFixed(1)}`); }
+  if(lc.c > lc.o){ preScore++; preReasons.push('양봉'); }
+  if(lma5 > lma20){ preScore++; preReasons.push('MA정배열'); }
+
+  // 사전 필터: 3점 미만은 AI 호출 없이 즉시 관망
+  if(preScore < 3){
+    updAdvBoxes(`관망 — ${stk.nm} (${preScore}/6점)`, `기술적 조건 미달
+${preReasons.join(' · ')||'매수 조건 없음'}`);
+    addDecisionLog(`[${stk.nm}] 관망`, `사전필터 ${preScore}/6점`, '1단계');
+    return;
+  }
+
+  addDecisionLog(`[${stk.nm}] 1단계 통과 (${preScore}/6점)`, preReasons.join(' · '), '2단계 AI 검토 시작');
+  updAdvBoxes(`🔍 AI 검토 중 — ${stk.nm}`, `1단계: ${preScore}/6점
+Claude가 심층 분석 중...`);
+
+  // ── 2단계: Claude AI 심층 분석 ──
+  if(autoState.level >= 3){
+    try{
+      const recentPrices = cls.slice(-5).map(p=>p.toLocaleString()).join('→');
+      const trend5 = ((lc.c-cls[cls.length-5]||lc.c)/( cls[cls.length-5]||lc.c)*100).toFixed(2);
+      const stopPr = Math.round(lc.c*(1-autoState.cfg.stop/100));
+      const t1Pr = Math.round(lc.c*(1+autoState.cfg.t1/100));
+      const rr = ((t1Pr-lc.c)/(lc.c-stopPr)).toFixed(2);
+
+      const prompt = `단타 트레이딩 멘토. 자동매매 최종 진입 여부를 결정해줘.
+
+종목: ${stk.nm}(${activeTk}) ${stk.sec||''}
+현재가: ${lc.c.toLocaleString()}원
+5봉 추세: ${recentPrices} (${trend5>=0?'+':''}${trend5}%)
+RSI: ${lrsi} | 5MA: ${Math.round(lma5).toLocaleString()} | 20MA: ${Math.round(lma20).toLocaleString()} | 60MA: ${Math.round(lma60).toLocaleString()}
+거래량: 전봉 대비 ${(volR*100).toFixed(0)}%
+현재봉: ${lc.c>lc.o?'양봉':'음봉'} O${lc.o.toLocaleString()} H${lc.h.toLocaleString()} L${lc.l.toLocaleString()} C${lc.c.toLocaleString()}
+손절가: ${stopPr.toLocaleString()} | 1차목표: ${t1Pr.toLocaleString()} | R/R: 1:${rr}
+오늘손익: ${mock.todayPnl>=0?'+':''}${mock.todayPnl.toLocaleString()}원 | 연속손절: ${mock.lossSeries}회
+
+Phase 8 기준으로 판단:
+1. 지금 추세 방향이 진입에 우호적인가?
+2. 타점이 적절한가 (고점 추격 아닌가)?
+3. R/R이 충분한가?
+4. 뇌동매매 신호 없는가?
+
+JSON만: {"decision":"BUY"또는"PASS","confidence":0-100,"reason":"2줄 이내","risk":"주요 리스크 1줄","waitFor":"PASS시 기다려야 할 조건"}`;
+
+      const res = await fetch('/api/claude', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({model:'claude-sonnet-4-5', max_tokens:300,
+          messages:[{role:'user', content:prompt}]})
+      });
+      const data = await res.json();
+      const text = data.content?.[0]?.text||'{}';
+      const m = text.match(/\{[\s\S]*\}/);
+      const ai = m ? JSON.parse(m[0]) : {};
+
+      if(ai.decision === 'BUY' && ai.confidence >= 65){
+        // ── 3단계: 최종 실행 ──
+        addDecisionLog(
+          `[${stk.nm}] ✅ AI 매수 결정 (신뢰도 ${ai.confidence}%)`,
+          `${ai.reason}\n타점: ${lc.c.toLocaleString()} 손절: ${stopPr.toLocaleString()} 목표: ${t1Pr.toLocaleString()} R/R:1:${rr}`,
+          'Phase 8: 3단계 검토 통과'
+        );
+        addMsg('ai', `🤖 AI 자동매수 결정\n\n종목: ${stk.nm} ${lc.c.toLocaleString()}원\n신뢰도: ${ai.confidence}%\n\n✅ 이유: ${ai.reason}\n⚠ 리스크: ${ai.risk}\n\n손절: ${stopPr.toLocaleString()} | 목표: ${t1Pr.toLocaleString()} | R/R 1:${rr}`);
+        updAdvBoxes(`✅ 매수 결정 — ${stk.nm}`, `신뢰도 ${ai.confidence}%\n${ai.reason}`);
+        await execAutoBuy(lc.c, stk);
+      } else {
+        // AI가 PASS 결정
+        addDecisionLog(
+          `[${stk.nm}] ⏸ AI 관망 결정 (신뢰도 ${ai.confidence||0}%)`,
+          `${ai.reason||'조건 미충족'}`,
+          'Phase 8: 2단계에서 차단'
+        );
+        updAdvBoxes(
+          `⏸ AI 관망 — ${stk.nm}`,
+          `${ai.reason||'조건 미충족'}\n기다려야 할 것: ${ai.waitFor||'추세 확인'}`
+        );
       }
-    } else {
-      updAdvBoxes(`관망 — ${stk.nm} (${score}/9점)`,`R/R ${rr.toFixed(2)} | ${score<7?"셋업 미완성":"R/R 기준 미달"}`);
+    } catch(e){
+      addDecisionLog(`[${stk.nm}] AI 분석 실패`, e.message, '폴백: 관망');
+      updAdvBoxes(`⚠ AI 분석 오류 — 관망`, e.message);
     }
+  } else if(autoState.level === 2){
+    // 레벨 2: 신호만 표시, 직접 실행
+    const stopPr = Math.round(lc.c*(1-autoState.cfg.stop/100));
+    const t1Pr = Math.round(lc.c*(1+autoState.cfg.t1/100));
+    const rr = ((t1Pr-lc.c)/(lc.c-stopPr)).toFixed(2);
+    updAdvBoxes(
+      `📊 진입 신호 — ${stk.nm}`,
+      `${preReasons.join(' · ')}\n진입: ${lc.c.toLocaleString()} 손절: ${stopPr.toLocaleString()} 목표: ${t1Pr.toLocaleString()} R/R:1:${rr}\n⚡ 직접 주문창에서 실행하세요`
+    );
+    addDecisionLog(`[${stk.nm}] 진입 신호 (Lv2)`, `${preScore}/6점 | R/R 1:${rr}`, 'Phase 8');
   }
 }
+
 function runAutoStep(cs){
   if(!autoState.running)return;
   // Level 4: 15:20 auto-close
