@@ -347,7 +347,7 @@ input,select,textarea{-webkit-appearance:none;appearance:none;}
 /* ── 태블릿/모바일 (860px 이하) ── */
 @media(max-width:700px){
   :root{--mob-nav:56px;}
-  .hts{grid-template-columns:0 1fr 0 0;grid-template-rows:1fr;}
+  /* ★ grid는 JS로 제어 — CSS 미디어쿼리에서 제거 */
   .lp,.rp,.brp{position:fixed;z-index:300;top:0;bottom:calc(var(--mob-nav) + var(--sab));background:var(--pan);box-shadow:var(--sh2);transition:transform .25s cubic-bezier(.4,0,.2,1);will-change:transform;}
   .lp{left:0;width:220px;transform:translateX(-100%);}
   .rp{right:0;width:200px;transform:translateX(100%);}
@@ -5432,6 +5432,18 @@ function quickSwitch(){
 
 // ── 모바일 패널 제어 ──
 function isMobile(){return window.innerWidth<=700;}
+
+function applyLayout(){
+  const hts = document.querySelector('.hts');
+  if(!hts) return;
+  if(isMobile()){
+    hts.style.gridTemplateColumns = '0 1fr 0 0';
+    hts.style.gridTemplateRows = '1fr';
+  } else {
+    hts.style.gridTemplateColumns = '';
+    hts.style.gridTemplateRows = '';
+  }
+}
 function openMobPanel(panel){
   // panel: 'lp' | 'rp' | 'brp'
   closeMobPanels();
@@ -5514,6 +5526,7 @@ function mobTab(name,btn){
 
 // ── 화면 크기 변경 시 처리 ──
 window.addEventListener('resize',()=>{
+  applyLayout();
   if(!isMobile())closeMobPanels();
   requestAnimationFrame(()=>drawChart());
 },false);
@@ -6412,6 +6425,7 @@ window.onload=()=>{
   initChartEvents();
   _initResizeObserver();
   initChartRightClick();
+  applyLayout();
   // 장중 체크 자동 실행
   setTimeout(runIntraCheck, 1500);
   // ★ 서버에서 저장된 API 설정 로드 (재배포 후에도 유지)
