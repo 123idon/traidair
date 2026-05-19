@@ -2457,38 +2457,15 @@ function updateTimeGuide(){
   const el=document.getElementById("timeGuide"); if(!el)return;
   const n=new Date(),hm=n.getHours()*100+n.getMinutes();
   let guide="",color="var(--ts)";
-  if(hm<800){guide="📋 장 전 준비
-시장 데이터 확인
-후보 종목 선정 (최대 3개)";color="var(--tm)";}
-  else if(hm<900){guide="📊 장 전 루틴 (Phase 8-10)
-• 매크로 확인 STEP 1
-• 섹터/종목 선정 STEP 2~3
-• 진입계획 확정 STEP 4~6";color="var(--b)";}
-  else if(hm<930){guide="⏸ 9:00~9:30 관망
-첫 봉 방향 확인
-돌발 이슈 체크
-신규 진입 금지";color="var(--a)";}
-  else if(hm<1000){guide="👀 시장 방향 재확인
-선물 방향, VWAP 위치
-준비 종목 셋업 확인";color="var(--b)";}
-  else if(hm<1130){guide="⭐ 적극 매매 구간
-10:00~11:30
-준비한 종목 진입 검토
-Phase 8 GO 조건 확인";color="var(--g)";}
-  else if(hm<1300){guide="🍽 점심 (11:30~13:00)
-신규 진입 자제
-보유 포지션 관리만
-오후 계획 재검토";color="var(--tm)";}
-  else if(hm<1430){guide="🔄 오후 매매 (13~14:30)
-프로그램 방향 확인
-오전 종목 지속 여부 판단";color="var(--b)";}
-  else if(hm<1520){guide="⚠ 마감 준비 (14:30~15:20)
-당일매매 포지션 정리
-오버나잇 여부 결정";color="var(--a)";}
-  else{guide="🔒 15:20 이후
-오버나잇 결정
-Phase 9-7 체크리스트
-미청산 = 오버나잇 허용 시만";color="var(--r)";}
+  if(hm<800){guide=`📋 장 전 준비\n시장 데이터 확인\n후보 종목 선정 (최대 3개)`;color="var(--tm)";}
+  else if(hm<900){guide=`📊 장 전 루틴 (Phase 8-10)\n• 매크로 확인 STEP 1\n• 섹터/종목 선정 STEP 2~3\n• 진입계획 확정 STEP 4~6`;color="var(--b)";}
+  else if(hm<930){guide=`⏸ 9:00~9:30 관망\n첫 봉 방향 확인\n돌발 이슈 체크\n신규 진입 금지`;color="var(--a)";}
+  else if(hm<1000){guide=`👀 시장 방향 재확인\n선물 방향, VWAP 위치\n준비 종목 셋업 확인`;color="var(--b)";}
+  else if(hm<1130){guide=`⭐ 적극 매매 구간\n10:00~11:30\n준비한 종목 진입 검토\nPhase 8 GO 조건 확인`;color="var(--g)";}
+  else if(hm<1300){guide=`🍽 점심 (11:30~13:00)\n신규 진입 자제\n보유 포지션 관리만\n오후 계획 재검토`;color="var(--tm)";}
+  else if(hm<1430){guide=`🔄 오후 매매 (13~14:30)\n프로그램 방향 확인\n오전 종목 지속 여부 판단`;color="var(--b)";}
+  else if(hm<1520){guide=`⚠ 마감 준비 (14:30~15:20)\n당일매매 포지션 정리\n오버나잇 여부 결정`;color="var(--a)";}
+  else{guide=`🔒 15:20 이후\n오버나잇 결정\nPhase 9-7 체크리스트\n미청산 = 오버나잇 허용 시만`;color="var(--r)";}
   el.textContent=guide;el.style.color=color;
 }
 
@@ -2536,14 +2513,7 @@ function checkBrainDong(side,price,qty,stk){
     warnEl.style.border="1px solid rgba(240,62,62,.2)";
     warnEl.style.color="var(--r)";
     warnEl.innerHTML="🚨 "+warnings.join("<br>🚨 ");
-    if(warnings.length>=2)showAlert("🚨 뇌동매매 경고 (Phase 11)","감지된 신호:
-"+warnings.map(w=>"• "+w).join("
-")+"
-
-지금 해야 할 것:
-1. 즉시 매매 중단
-2. HTS 5분 종료
-3. 냉각 후 복기");
+    if(warnings.length>=2)showAlert("🚨 뇌동매매 경고 (Phase 11)","감지된 신호:\n"+warnings.map(w=>"• "+w).join("\n")+"\n\n지금 해야 할 것:\n1. 즉시 매매 중단\n2. HTS 5분 종료\n3. 냉각 후 복기");
   } else if(warnEl){warnEl.style.display="none";}
 }
 // ═══════════════════════════════
@@ -2619,8 +2589,7 @@ async function runAIPatternAnalysis(){
 ${summary}
 
 최근 거래:
-${trades.slice(-10).map(t=>`${t.side==="buy"?"매수":"매도"} ${t.nm} ${t.price?.toLocaleString()}원 ${t.pnl>=0?"+":""}${t.pnl?.toLocaleString()}원`).join("
-")}
+${trades.slice(-10).map(t=>`${t.side==="buy"?"매수":"매도"} ${t.nm} ${t.price?.toLocaleString()}원 ${t.pnl>=0?"+":""}${t.pnl?.toLocaleString()}원`).join("\n")}
 
 분석해줘:
 1. 수익 나는 패턴 Top 2 (구체적으로)
@@ -2829,17 +2798,8 @@ function showMentalReset(){
     '5단계 (내일): 실수 반복 방지를 위한 구체적 변경 1가지 확정'
   ];
   showAlert('🔄 멘탈 리셋 루틴 (Phase 11-11)',
-    '연속손실 3회 이상 → 즉시 실행:
-
-'+steps.join('
-')+
-    '
-
-⚠ 오늘 재진입 조건:
-• 손실 원인 분석 완료
-• 30분 이상 경과
-• 비중 50% 이하로 축소
-• 다른 종목 + 다른 셋업');
+    '연속손실 3회 이상 → 즉시 실행:\n\n'+steps.join('\n')+
+    '\n\n⚠ 오늘 재진입 조건:\n• 손실 원인 분석 완료\n• 30분 이상 경과\n• 비중 50% 이하로 축소\n• 다른 종목 + 다른 셋업');
   const el = document.getElementById('mentalResetStatus');
   if(el){el.textContent='리셋 루틴 실행: '+new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'});el.style.color='var(--g)';}
 }
@@ -3261,8 +3221,7 @@ function autoFillJournal(){
     const pnl=document.getElementById('jf-pnl'); if(pnl)pnl.value=Math.round(last.pnl||0);
     const psy=document.getElementById('jf-psy'); if(psy)psy.value=trustScore||7;
   }
-  showAlert('자동입력','오늘 마지막 거래 데이터가 입력됐습니다.
-나머지 항목을 직접 입력해주세요.');
+  showAlert('자동입력','오늘 마지막 거래 데이터가 입력됐습니다.\n나머지 항목을 직접 입력해주세요.');
 }
 function saveJournalForm(){
   const entry={
@@ -3920,8 +3879,7 @@ async function runAIStockScreening(){
   const prompt=`단타 트레이딩 멘토. Phase 7-7 스크리닝 기준으로 아래 후보 종목을 분석해줘.
 
 후보 종목:
-${top3.map(r=>`- ${r.stk.nm}(${r.stk.tk}): 점수${r.score}/10, 신호:${r.tags.join(",")}, 등락${((r.stk.pr-r.stk.base)/r.stk.base*100).toFixed(2)}%`).join("
-")}
+${top3.map(r=>`- ${r.stk.nm}(${r.stk.tk}): 점수${r.score}/10, 신호:${r.tags.join(",")}, 등락${((r.stk.pr-r.stk.base)/r.stk.base*100).toFixed(2)}%`).join("\n")}
 
 각 종목에 대해:
 1. 단타 적합도: ○(적합)/△(보통)/✗(부적합)
@@ -4047,13 +4005,11 @@ R/R 계산 후 진입 결정`;
   const nowEl=document.getElementById("advNow");
   const actEl=document.getElementById("advAction");
   if(nowEl){
-    nowEl.innerHTML=situationText.replace(/
-/g,"<br>").replace(/(정배열)/g,"<span style='color:var(--g);font-weight:700;'>$1</span>").replace(/(역배열)/g,"<span style='color:var(--r);font-weight:700;'>$1</span>");
+    nowEl.innerHTML=situationText.replace(/\n/g,"<br>").replace(/(정배열)/g,"<span style='color:var(--g);font-weight:700;'>$1</span>").replace(/(역배열)/g,"<span style='color:var(--r);font-weight:700;'>$1</span>");
     nowEl.className="adv-txt";
   }
   if(actEl){
-    actEl.innerHTML=actionText.replace(/
-/g,"<br>").replace(/(🔴)/g,"<span style='color:var(--r);'>🔴</span>").replace(/(🟢)/g,"<span style='color:var(--g);'>🟢</span>");
+    actEl.innerHTML=actionText.replace(/\n/g,"<br>").replace(/(🔴)/g,"<span style='color:var(--r);'>🔴</span>").replace(/(🟢)/g,"<span style='color:var(--g);'>🟢</span>");
     actEl.className="adv-txt";
   }
   document.getElementById("aiModeBadge").textContent=score>=4?"📊 분석완료":"⚪ 관망";
@@ -4186,9 +4142,7 @@ function saveKisConfig(){
   const mode = document.getElementById('kis-real')?.checked ? 'real' : 'mock';
   // 실거래 전환 시 경고
   if(mode === 'real' && kisConfig.mode !== 'real'){
-    if(!confirm('⚠ 실거래 모드로 전환합니다.
-실제 자금이 사용됩니다.
-계속하시겠습니까?')){
+    if(!confirm('⚠ 실거래 모드로 전환합니다.\n실제 자금이 사용됩니다.\n계속하시겠습니까?')){
       document.getElementById('kis-mock').checked = true; return;
     }
   }
@@ -4445,8 +4399,7 @@ function addAlert(){
   priceAlerts.push({tk:activeTk,price:pr,dir,memo,fired:false});
   document.getElementById("alPr").value="";document.getElementById("alMemo").value="";
   renderAlerts();
-  showAlert("알림 설정","가격 알림이 설정되었습니다.
-"+
+  showAlert("알림 설정","가격 알림이 설정되었습니다.\n"+
     `${STOCKS.find(s=>s.tk===activeTk)?.nm||activeTk} ${pr.toLocaleString()}원 ${dir==="above"?"이상":"이하"} 도달 시 알림`);
 }
 function renderAlerts(){
@@ -4507,7 +4460,6 @@ function renderNews(){
 }
 function selectStk(tk){activeTk=tk;const s=STOCKS.find(s=>s.tk===tk)||STOCKS[0];document.getElementById("siNm").textContent=s.nm;// 관심종목 자동 추가 제거 (수동으로 그룹 선택 후 추가)
   const tkEl=document.getElementById("obTkName");if(tkEl)tkEl.textContent=s.nm;document.getElementById("srchIn").value="";hideSrch();renderWL();genCandles(tk,sim.date);initChart();renderOB();renderTH();
-  const tkEl=document.getElementById("obTkName");if(tkEl)tkEl.textContent=s.nm;
   const atk=document.getElementById("analysisTk");if(atk)atk.textContent=s.nm;
   setTimeout(()=>{updateAIAdvisor();runFullAnalysis();fetchDartNews();},400);}
 
@@ -4650,8 +4602,7 @@ function tick(){
   const hm=n.getHours()*100+n.getMinutes();
   if(hm===1520&&!overnightAlerted&&Object.keys(mock.positions).length>0){
     overnightAlerted=true;
-    const posList=Object.entries(mock.positions).map(([tk,p])=>{const s=STOCKS.find(s=>s.tk===tk)||{nm:tk,pr:0};const pnl=(s.pr-p.avgPrice)*p.qty;return `${s.nm}: ${pnl>=0?"+":""}${Math.round(pnl).toLocaleString()}원 (${((s.pr-p.avgPrice)/p.avgPrice*100).toFixed(1)}%)`;}).join("
-");
+    const posList=Object.entries(mock.positions).map(([tk,p])=>{const s=STOCKS.find(s=>s.tk===tk)||{nm:tk,pr:0};const pnl=(s.pr-p.avgPrice)*p.qty;return `${s.nm}: ${pnl>=0?"+":""}${Math.round(pnl).toLocaleString()}원 (${((s.pr-p.avgPrice)/p.avgPrice*100).toFixed(1)}%)`;}).join("\n");
     showAlert("⏰ 오버나잇 체크리스트 (Phase 9-7)",
       `15:20 마감 정리 시간입니다.
 
