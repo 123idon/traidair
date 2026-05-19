@@ -1937,6 +1937,108 @@ function isBanned(tk){return BAN_LIST.includes(tk);}
 function removeBan(tk){BAN_LIST=BAN_LIST.filter(b=>b!==tk);saveBan();renderBanList();}
 
 function genCandles(tk,dt){
+  const targetTk = tk||activeTk;
+  const targetDt = dt||sim.date;
+
+  // ── KIS API 연결 시: 실제 분봉 데이터 시도 ──
+  // 일봉/연봉이 아닌 경우에만 (KIS 분봉 API는 분봉만 지원)
+  if(kisConfig.appKey && kisConfig.appSecret && !(sim.tf==='D'||sim.tf.startsWith('D'))){
+    _fetchKisCandles(targetTk, targetDt, sim.tf).then(candles => {
+      if(candles && candles.length >= 10){
+        // 실제 데이터 성공 — 차트에 적용
+        sim.candles = candles;
+        sim.idx = 0;
+        chartViewCount = Math.min(80, candles.length);
+        chartViewStart = 0;
+        if(candles.length > 0) updPrice(candles[0]);
+        drawChart();
+        // 상단에 실제 데이터 표시
+        const ci = document.getElementById('cinfo');
+        if(ci) ci.textContent = `✅ 실제 데이터 ${candles.length}봉 | ${targetDt}`;
+        return;
+      }
+      // 실패 시 시뮬레이션으로 폴백
+      _genSimCandles(targetTk, targetDt);
+    }).catch(() => _genSimCandles(targetTk, targetDt));
+    // KIS 요청 동안 임시로 시뮬 데이터 표시 (로딩 표시)
+    _genSimCandles(targetTk, targetDt);
+    const ci = document.getElementById('cinfo');
+    if(ci) ci.textContent = '📡 KIS 실제 데이터 로딩 중...';
+    return sim.candles; // 비동기 결과는 위 then에서 처리
+  }
+
+  // ── KIS 미연결: 시뮬레이션 ──
+  return _genSimCandles(targetTk, targetDt);
+}
+
+async function _fetchKisCandles(code, date, tf){
+  try{
+    const r = await fetch('/api/kis/chart', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        appKey: kisConfig.appKey,
+        appSecret: kisConfig.appSecret,
+        mode: kisConfig.mode || 'real',
+        code, date, tf: tf||'5',
+      }),
+    });
+    const d = await r.json();
+    if(d.ok && d.candles && d.candles.length > 0) return d.candles;
+    console.warn('KIS 차트 데이터 없음:', d.error);
+    return null;
+  }catch(e){
+    console.warn('KIS 차트 fetch 실패:', e.message);
+    return null;
+  }
+}
+
+// 실제 호가창 KIS 데이터로 업데이트
+async function _refreshKisOrderbook(){
+  if(!kisConfig.appKey || !kisConfig.appSecret) return;
+  try{
+    const r = await fetch('/api/kis/orderbook', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        appKey: kisConfig.appKey, appSecret: kisConfig.appSecret,
+        mode: kisConfig.mode || 'real', code: activeTk,
+      }),
+    });
+    const d = await r.json();
+    if(!d.ok) return;
+    // 실제 호가 데이터로 호가창 렌더
+    _renderRealOrderbook(d);
+  }catch(e){}
+}
+
+function _renderRealOrderbook(d){
+  const stk = STOCKS.find(s=>s.tk===activeTk)||STOCKS[0];
+  const asks = d.asks||[], bids = d.bids||[];
+  const maxQ = Math.max(...asks.map(a=>a.qty), ...bids.map(b=>b.qty), 1);
+
+  let sell = `<div style="display:flex;justify-content:space-between;padding:3px 8px;background:rgba(37,99,235,.05);border-bottom:1px solid var(--br);font-family:var(--mono);font-size:9px;color:#2563eb;"><span>매도 총잔량</span><span>${(d.totalAsk||0).toLocaleString()}</span></div>`;
+  [...asks].reverse().forEach(a => {
+    const w = Math.min(100, (a.qty/maxQ*100)).toFixed(0);
+    sell += `<div class="ob-r" onclick="document.getElementById('ofPr').value=${a.price};updOSum()"><div class="ob-bg s" style="width:${w}%"></div><div class="ob-p" style="color:#2563eb;">${a.price.toLocaleString()}</div><div class="ob-q">${a.qty.toLocaleString()}</div></div>`;
+  });
+
+  let buy = '';
+  bids.forEach(b => {
+    const w = Math.min(100, (b.qty/maxQ*100)).toFixed(0);
+    buy += `<div class="ob-r" onclick="document.getElementById('ofPr').value=${b.price};updOSum()"><div class="ob-bg b" style="width:${w}%"></div><div class="ob-p" style="color:#dc2626;">${b.price.toLocaleString()}</div><div class="ob-q">${b.qty.toLocaleString()}</div></div>`;
+  });
+  buy += `<div style="display:flex;justify-content:space-between;padding:3px 8px;background:rgba(220,38,38,.05);border-top:1px solid var(--br);font-family:var(--mono);font-size:9px;color:#dc2626;"><span>매수 총잔량</span><span>${(d.totalBid||0).toLocaleString()}</span></div>`;
+
+  document.getElementById('obSell').innerHTML = sell;
+  document.getElementById('obBuy').innerHTML = buy;
+
+  // 체결강도 실제값
+  const strEl = document.getElementById('obStrength');
+  if(strEl){ strEl.textContent = Math.round(d.strength||100); strEl.style.color = d.strength>=120?'#dc2626':d.strength>=100?'var(--b)':'#2563eb'; }
+}
+
+function _genSimCandles(tk,dt){
   const stk=STOCKS.find(s=>s.tk===(tk||activeTk))||STOCKS[0];
   let base=stk.base;
   const tkSeed=stk.tk.split("").reduce((a,c)=>a+c.charCodeAt(0),0);
@@ -2629,6 +2731,12 @@ function updPnl(){
 // ORDERBOOK
 // ═══════════════════════════════
 function renderOB(){
+  // KIS 연결 시 실제 호가창 사용
+  if(kisConfig.appKey && kisConfig.appSecret){
+    _refreshKisOrderbook();
+    return; // 실제 데이터로 렌더됨
+  }
+  // KIS 미연결: 시뮬레이션 호가창
   const stk=STOCKS.find(s=>s.tk===activeTk)||STOCKS[0];
   const base=stk.pr||71500,tick=base>=500000?500:base>=100000?100:base>=10000?50:10;
   let sell="",buy="",totalSell=0,totalBuy=0;

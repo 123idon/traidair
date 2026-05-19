@@ -249,6 +249,101 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ── KIS 분봉 차트 (/api/kis/chart)
+  // 모의투자용: 해당 날짜 특정 종목의 실제 분봉 데이터
+  if (url === '/api/kis/chart' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        const { appKey, appSecret, mode, code, date, tf } = JSON.parse(body);
+        if (!appKey || !appSecret) throw new Error('appKey/appSecret 필요');
+        const token = await getKisToken(appKey, appSecret, mode || 'real');
+        if (!token) throw new Error('토큰 발급 실패');
+
+        const interval = tf === '1' ? '1' : tf === '3' ? '3' : tf === '15' ? '15' : tf === '60' ? '60' : '5';
+        // KIS 분봉 조회 API (FHKST03010200: 국내주식 분봉조회)
+        const queryDate = (date || new Date().toISOString().slice(0,10)).replace(/-/g,'');
+        const result = await kisRequest({
+          hostname: kisHost('real'), // 분봉은 항상 실전서버 (모의서버 미지원)
+          path: `/uapi/domestic-stock/v1/quotations/inquire-time-itemchartprice?fid_etc_cls_code=&fid_cond_mrkt_div_code=J&fid_input_iscd=${code}&fid_input_hour_1=${interval}&fid_pw_data_inqu_yn=N`,
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'authorization': `Bearer ${token}`,
+            'appkey': appKey, 'appsecret': appSecret,
+            'tr_id': 'FHKST03010200',
+            'custtype': 'P',
+          },
+        });
+
+        const output2 = result.data.output2 || [];
+        // output2: [{stck_bsop_date, stck_cntg_hour, stck_prpr, stck_oprc, stck_hgpr, stck_lwpr, cntg_vol}]
+        const candles = output2
+          .filter(r => !date || r.stck_bsop_date === queryDate)
+          .map(r => ({
+            t: `${r.stck_cntg_hour.slice(0,2)}:${r.stck_cntg_hour.slice(2,4)}`,
+            o: parseInt(r.stck_oprc || r.stck_prpr),
+            h: parseInt(r.stck_hgpr || r.stck_prpr),
+            l: parseInt(r.stck_lwpr || r.stck_prpr),
+            c: parseInt(r.stck_prpr),
+            v: parseInt(r.cntg_vol || 0),
+          }))
+          .filter(c => c.c > 0)
+          .sort((a, b) => a.t.localeCompare(b.t)); // 시간순 정렬
+
+        res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+        res.end(JSON.stringify({ ok: true, code, date, tf: interval, candles }));
+      } catch(e) {
+        res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+        res.end(JSON.stringify({ ok: false, error: e.message }));
+      }
+    });
+    return;
+  }
+
+  // ── KIS 호가창 (/api/kis/orderbook)
+  if (url === '/api/kis/orderbook' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        const { appKey, appSecret, mode, code } = JSON.parse(body);
+        if (!appKey || !appSecret) throw new Error('appKey/appSecret 필요');
+        const token = await getKisToken(appKey, appSecret, mode || 'real');
+        if (!token) throw new Error('토큰 발급 실패');
+
+        const result = await kisRequest({
+          hostname: kisHost('real'),
+          path: `/uapi/domestic-stock/v1/quotations/inquire-asking-price-exp-ccn?fid_cond_mrkt_div_code=J&fid_input_iscd=${code}`,
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'authorization': `Bearer ${token}`,
+            'appkey': appKey, 'appsecret': appSecret,
+            'tr_id': 'FHKST01010200', 'custtype': 'P',
+          },
+        });
+
+        const out = result.data.output1 || {};
+        const asks = [], bids = [];
+        for (let i = 1; i <= 10; i++) {
+          asks.push({ price: parseInt(out[`askp${i}`]||0), qty: parseInt(out[`askp_rsqn${i}`]||0) });
+          bids.push({ price: parseInt(out[`bidp${i}`]||0), qty: parseInt(out[`bidp_rsqn${i}`]||0) });
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+        res.end(JSON.stringify({ ok: true, asks, bids,
+          totalAsk: parseInt(out.total_askp_rsqn||0), totalBid: parseInt(out.total_bidp_rsqn||0),
+          strength: parseFloat(out.seln_rsqn_rate||100),
+        }));
+      } catch(e) {
+        res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+        res.end(JSON.stringify({ ok: false, error: e.message }));
+      }
+    });
+    return;
+  }
+
   // ── KIS 현재가 (/api/kis/price)
   if (url === '/api/kis/price' && req.method === 'POST') {
     let body = '';
