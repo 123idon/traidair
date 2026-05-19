@@ -1801,6 +1801,11 @@ window.onload=()=>{
   // HTS 탭 명시적 활성화
   goPage('hts', document.getElementById('tab-hts'));
   document.getElementById("mockDate").value=sim.date;
+  // 저장된 API 키 복원 및 서버 전송
+  if(kisConfig.claudeKey) {
+    fetch('/api/set-claude-key', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({key:kisConfig.claudeKey})}).catch(()=>{});
+  }
+  updateKisStatus();
   renderAll();
   genCandles(); initChart();
   renderOB(); renderTH();
@@ -4286,9 +4291,19 @@ function estimateTokens(text){
 // ═══════════════════════════════
 // KIS API 설정 저장/로드
 // ═══════════════════════════════
-let kisConfig = JSON.parse(localStorage.getItem('kisConfig') || JSON.stringify({
-  appKey: '', appSecret: '', account: '', mode: 'mock', dartKey: ''
-}));
+// ── API 설정 (localStorage 영구 저장) ──
+const KIS_CFG_KEY = 'traidair_api_config_v2'; // v2: claudeKey 포함
+function loadKisCfgFromStorage(){
+  try {
+    const raw = localStorage.getItem(KIS_CFG_KEY) || localStorage.getItem('kisConfig');
+    if(raw) {
+      const parsed = JSON.parse(raw);
+      return { appKey:'', appSecret:'', account:'', mode:'mock', dartKey:'', claudeKey:'', ...parsed };
+    }
+  } catch(e) {}
+  return { appKey:'', appSecret:'', account:'', mode:'mock', dartKey:'', claudeKey:'' };
+}
+let kisConfig = loadKisCfgFromStorage();
 
 function saveKisConfig(){
   const ak = document.getElementById('kis-appkey')?.value?.trim() || '';
@@ -4303,12 +4318,15 @@ function saveKisConfig(){
       document.getElementById('kis-mock').checked = true; return;
     }
   }
-  kisConfig = {appKey:ak, appSecret:as, account:ac, mode, dartKey:dk, claudeKey:ck};
-  localStorage.setItem('kisConfig', JSON.stringify(kisConfig));
-  // Claude API Key를 서버로 전송 (세션 내 사용)
+  kisConfig = { appKey:ak, appSecret:as, account:ac, mode, dartKey:dk, claudeKey:ck };
+  // 두 키에 모두 저장 (하위 호환)
+  const serialized = JSON.stringify(kisConfig);
+  localStorage.setItem(KIS_CFG_KEY, serialized);
+  localStorage.setItem('kisConfig', serialized);
+  // Claude API Key를 서버 세션으로 전송
   if(ck) fetch('/api/set-claude-key', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({key:ck})}).catch(()=>{});
   updateKisStatus();
-  showAlert('설정 저장', 'API 설정이 저장되었습니다.');
+  showAlert('✅ 저장 완료', 'API 설정이 저장되었습니다.\n브라우저를 닫아도 유지됩니다.');
 }
 function loadKisConfig(){
   const ki = document.getElementById('kis-appkey');
