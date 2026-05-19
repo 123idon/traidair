@@ -1810,7 +1810,7 @@ function updateCandsFromDash(candidates){
   CANDS = candidates.map(c=>({
     tk: c.code||c.tk||'',
     why: c.reason||c.why||'',
-    score: c.score || Math.round(70+Math.random()*20)
+    score: c.score || 0
   })).filter(c=>c.tk).sort((a,b)=>b.score-a.score).slice(0,3);
   renderCands();
 }
@@ -2698,13 +2698,11 @@ function updPrice(c){
   if(obPr){obPr.textContent=pr.toLocaleString();obPr.className="ob-cur-p "+cls;}
   const obInfo=document.getElementById("obInfo");
   if(obInfo)obInfo.textContent=(up?"+":"")+ca.toLocaleString()+" ("+cp+"%)";
-  // 체결강도 (100이상=매수우세, 150이상=강한매수)
-  const strength=Math.round(95+Math.random()*60);
+  // 체결강도/매수잔량: KIS 연결 시 실제 데이터, 미연결 시 표시 안 함
   const strEl=document.getElementById("obStrength");
-  if(strEl){strEl.textContent=strength;strEl.style.color=strength>=120?"var(--g)":strength>=100?"var(--b)":"var(--r)";}
-  // 매수잔량 (임의)
+  if(strEl&&(!kisConfig.appKey)){strEl.textContent="-";strEl.style.color="var(--tm)";}
   const buyEl=document.getElementById("obBuyTotal");
-  if(buyEl)buyEl.textContent=Math.round(20000+Math.random()*50000).toLocaleString();
+  if(buyEl&&(!kisConfig.appKey))buyEl.textContent="-";
   stk.pr=pr;
   const ofPr=document.getElementById("ofPr");
   if(ofPr)ofPr.value=pr;
@@ -2736,15 +2734,27 @@ function renderOB(){
     _refreshKisOrderbook();
     return; // 실제 데이터로 렌더됨
   }
-  // KIS 미연결: 시뮬레이션 호가창
+  // KIS 미연결: "실제 데이터 없음" 표시
   const stk=STOCKS.find(s=>s.tk===activeTk)||STOCKS[0];
-  const base=stk.pr||71500,tick=base>=500000?500:base>=100000?100:base>=10000?50:10;
+  document.getElementById('obSell').innerHTML=`<div style="padding:16px 8px;text-align:center;color:var(--tm);font-size:9px;line-height:1.8;">
+    <div style="font-size:20px;margin-bottom:6px;">📡</div>
+    <div style="font-weight:700;color:var(--a);margin-bottom:4px;">실제 호가 데이터 없음</div>
+    <div>KIS API 연결 후 실시간 호가창 이용 가능</div>
+    <div style="margin-top:6px;"><a onclick="openModal('settings')" style="color:var(--b);cursor:pointer;">⚙ 설정에서 KIS 연결하기</a></div>
+  </div>`;
+  document.getElementById('obBuy').innerHTML='';
+  // 현재가는 표시
+  const base=stk.pr||71500;
+  const tick=base>=500000?500:base>=100000?100:base>=10000?50:10;
   let sell="",buy="",totalSell=0,totalBuy=0;
   const maxQ=6000;
-  // 매도 10호가 (국내 표준: 매도=파랑)
+  // 주문창 현재가 업데이트만
+  const ofPrEl=document.getElementById('ofPr'); if(ofPrEl)ofPrEl.value=base;
+  updOSum();
+  return; // 가짜 호가창 렌더 중단
   const sellRows=[];
   for(let i=10;i>=1;i--){
-    const pr=base+tick*i,q=Math.round(50+Math.random()*maxQ);
+    const pr=base+tick*i,q=Math.round(50+1);
     totalSell+=q;
     const w=Math.min(100,(q/maxQ*100)).toFixed(0);
     sellRows.push(`<div class="ob-r" onclick="document.getElementById('ofPr').value=${pr};updOSum()"><div class="ob-bg s" style="width:${w}%"></div><div class="ob-p" style="color:#2563eb;">${pr.toLocaleString()}</div><div class="ob-q">${q.toLocaleString()}</div></div>`);
@@ -2752,7 +2762,7 @@ function renderOB(){
   // 매수 10호가 (국내 표준: 매수=빨강)
   const buyRows=[];
   for(let i=1;i<=10;i++){
-    const pr=base-tick*i,q=Math.round(50+Math.random()*maxQ);
+    const pr=base-tick*i,q=1; // 실행되지 않는 코드 (KIS 연결 후 실제 데이터 사용)
     totalBuy+=q;
     const w=Math.min(100,(q/maxQ*100)).toFixed(0);
     buyRows.push(`<div class="ob-r" onclick="document.getElementById('ofPr').value=${pr};updOSum()"><div class="ob-bg b" style="width:${w}%"></div><div class="ob-p" style="color:#dc2626;">${pr.toLocaleString()}</div><div class="ob-q">${q.toLocaleString()}</div></div>`);
@@ -2776,14 +2786,30 @@ function renderOB(){
   }
 }
 function renderTH(){
+  // KIS 연결 시 실제 체결창 (kisRefreshOrderbook에서 처리)
+  // 미연결 시: 빈 상태 표시
+  if(!kisConfig.appKey||!kisConfig.appSecret){
+    document.getElementById('thList').innerHTML=`<div style="padding:12px 8px;text-align:center;color:var(--tm);font-size:9px;">
+      <div>KIS 연결 후 실시간 체결창 이용 가능</div>
+    </div>`;
+    const s2=document.getElementById('obStrength2');
+    if(s2){s2.textContent='-';s2.style.color='var(--tm)';}
+    return;
+  }
   const stk=STOCKS.find(s=>s.tk===activeTk)||STOCKS[0];
   const base=stk.pr||71500;
   let h="",buyVol=0,sellVol=0;
   const rows=[];
+  // KIS 연결됐지만 실시간 체결 데이터는 웹소켓 필요 — 현재 "조회중" 표시
+  document.getElementById('thList').innerHTML=`<div style="padding:12px 8px;text-align:center;color:var(--tm);font-size:9px;">
+    <div style="color:var(--b);">● 실시간 체결 데이터 로딩 중...</div>
+  </div>`;
+  // TODO: KIS 웹소켓 연결 후 실시간 체결 스트리밍
+  return;
   for(let i=0;i<25;i++){
-    const isBuy=Math.random()>.48;
-    const pr=Math.round(base+(Math.random()-.5)*200);
-    const q=Math.round(10+Math.random()*500);
+    const isBuy=true;
+    const pr=base;
+    const q=1;
     if(isBuy)buyVol+=q;else sellVol+=q;
     const tm=`${String(9+Math.floor(i/5)).padStart(2,"0")}:${String((i*11)%60).padStart(2,"0")}:${String((i*7)%60).padStart(2,"0")}`;
     // 국내 표준: 매수체결=빨강(상승압력), 매도체결=파랑(하락압력)
@@ -4161,24 +4187,15 @@ function renderDartReal(el, list){
 }
 
 function renderDartSample(el, corpName){
-  const relevant=SAMPLE_DARTS.filter(d=>d.corp===corpName||Math.random()>0.6).slice(0,4);
-  el.innerHTML=`<div style="font-size:8px;color:var(--a);font-family:var(--mono);padding:2px 0;margin-bottom:3px;">
-    ⚠ DART_API_KEY 미설정 — 샘플 데이터
-    <br><span style="color:var(--tm);">Railway Variables에 DART_API_KEY 추가 시 실시간 전환</span>
-  </div>`+
-  relevant.map(d=>{
-    const rx=DART_REACTIONS[d.type]||{reaction:"불명확"};
-    const gc={"S":"var(--p)","A":"var(--b)","B":"var(--a)","C":"var(--r)"}[d.impact]||"var(--ts)";
-    return`<div style="padding:4px 0;border-bottom:1px solid var(--br);cursor:pointer;" onclick="analyzeDart('${d.title}','${d.type}','${d.corp}')">
-      <div style="display:flex;align-items:center;gap:4px;margin-bottom:1px;">
-        <span style="font-family:var(--mono);font-size:8px;color:var(--tm);">${d.time}</span>
-        <span style="font-size:8px;padding:0 4px;border-radius:3px;font-weight:700;color:${gc};background:${gc}18;">${d.impact}급</span>
-        <span style="font-size:9px;font-weight:600;">${d.corp}</span>
-      </div>
-      <div style="font-size:9px;color:var(--ts);line-height:1.35;">${d.title}</div>
-      <div style="font-size:8px;color:var(--tm);margin-top:1px;">예상 ${rx.reaction}</div>
-    </div>`;
-  }).join("")||"<div style='font-size:9px;color:var(--tm);'>공시 없음</div>";
+  // DART API 키 없음 — 실제 데이터 없음을 명확히 표시
+  el.innerHTML=`<div style="padding:8px;background:rgba(255,153,0,.06);border:1px solid rgba(255,153,0,.2);border-radius:7px;font-size:10px;line-height:1.7;">
+    <div style="font-weight:700;color:var(--a);margin-bottom:4px;">⚠ DART API 키 미설정</div>
+    <div style="color:var(--ts);">공시 데이터를 표시하려면 DART API 키가 필요합니다.</div>
+    <div style="margin-top:6px;color:var(--tm);font-size:9px;">
+      1. <a href="https://opendart.fss.or.kr" target="_blank" style="color:var(--b);">opendart.fss.or.kr</a> → 인증키 신청 (무료)<br>
+      2. ⚙ 설정 → API 키 탭 → DART API 키 입력 → 저장
+    </div>
+  </div>`;
 }
 
 function classifyDartGrade(title){
@@ -4603,15 +4620,22 @@ async function runAIStockScreening(){
   STOCKS.forEach(stk=>{
     let score=0,tags=[];
     const chgPct=(stk.pr-stk.base)/stk.base*100;
-    // 필터1: 수급 폭발 (거래량 300%+ 시뮬)
-    const volSim=Math.random();
-    if(volSim>0.6){score+=3;tags.push("수급폭발");}
-    // 필터2: 기관 연속 매수 시뮬
-    if(Math.random()>0.7){score+=3;tags.push("기관연속");}
-    // 필터3: 모멘텀 (+3% 이상)
-    if(chgPct>=1){score+=2;tags.push(`+${chgPct.toFixed(1)}%`);}
-    // 필터4: 눌림목 (전날 강세 후 조정)
-    if(Math.random()>0.65&&chgPct>-3&&chgPct<1){score+=2;tags.push("눌림목");}
+    // 실제 기술적 분석 기반 스크리닝 (가짜 random 없음)
+    const cs2=getCandles(20);
+    if(cs2.length>=5){
+      const cls2=cs2.map(c=>c.c),vls2=cs2.map(c=>c.v);
+      const lc2=cs2[cs2.length-1],pc2=cs2[cs2.length-2]||lc2;
+      const ma5_2=(calcMA(cls2,5).slice(-1)[0]||0);
+      const ma20_2=(calcMA(cls2,20).slice(-1)[0]||0);
+      const rsi2=parseFloat((calcRSI(cls2,14).slice(-1)[0]||50).toFixed(0));
+      const volR2=vls2.length>=2?vls2[vls2.length-1]/vls2[vls2.length-2]:1;
+      // 실제 지표 기반 점수
+      if(volR2>=1.5){score+=3;tags.push(`거래량×${volR2.toFixed(1)}`);}
+      if(ma5_2>ma20_2){score+=2;tags.push("MA정배열");}
+      if(rsi2>=45&&rsi2<=70){score+=2;tags.push(`RSI${rsi2}`);}
+      if(lc2.c>lc2.o&&pc2.c<pc2.o){score+=2;tags.push("음→양전환");}
+      if(chgPct>=1){score+=2;tags.push(`+${chgPct.toFixed(1)}%`);}
+    }
     if(score>=4)results.push({stk,score,tags});
   });
   results.sort((a,b)=>b.score-a.score);
@@ -5550,8 +5574,9 @@ function liveUpdate(){
   if(kisConfig.appKey && kisConfig.account){
     kisRefreshPrice(activeTk); // 현재 선택 종목만 조회 (API 호출 최소화)
   } else {
-    STOCKS.forEach(s=>{const c=(Math.random()-.499)*.002;s.pr=Math.max(s.base*.7,Math.round(s.pr*(1+c)));});
+    // KIS 미연결: 주가 임의 변동 없음 — 마지막 알려진 가격 유지
     const stk=STOCKS.find(s=>s.tk===activeTk)||STOCKS[0];
+    // 현재가 표시만 유지 (가짜 변동 없음)
     updPrice({c:stk.pr});
   }
   renderWL();renderOB();updPnl();
@@ -6342,15 +6367,9 @@ function _updateDashboardMarket(d){
       <span class="${up?'cu':'cd'}" style="font-size:8px;">${up?'+':''}${(data.chgPct||0).toFixed(2)}%</span>
       ${data.lastUpdatedKST?`<span style="font-size:7px;color:var(--tm);display:block;">${data.lastUpdatedKST.slice(11,19)} 기준</span>`:''}`;
   }
-  // 야간선물 추정
-  const nf = idx ? d.indices.kospi : null;
-  const nfEl = document.getElementById('dc-nightfutures');
-  if(nfEl && d.nightFutures){
-    const nfd = d.nightFutures;
-    const up = (nfd.chgPct||0) >= 0;
-    nfEl.innerHTML = `<span class="${up?'cu':'cd'}" style="font-weight:700;">${up?'+':''}${nfd.chgPct}%</span>
-      <span style="font-size:7px;color:var(--tm);display:block;">${nfd.note}</span>`;
-  }
+  // 야간선물: 실제 데이터 없음 (표시 안 함)
+  const nfEl2 = document.getElementById('dc-nightfutures');
+  if(nfEl2){ nfEl2.innerHTML = '<span style="color:var(--tm);font-size:9px;">실시간 연결 필요</span>'; }
 }
 
 // 하위호환

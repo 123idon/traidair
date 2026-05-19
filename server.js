@@ -697,16 +697,8 @@ const server = http.createServer(async (req, res) => {
         };
       }
 
-      // 미국 야간선물 추정 (코스피200 기준): 나스닥 야간 움직임으로 추정
-      // 전날 미국 마감 대비 현재 나스닥 변동률을 코스피200에 적용
-      if (result.nasdaq && result.nasdaq.chgPct != null) {
-        result.nightFutures = {
-          estimated: true,
-          chgPct: Math.round(result.nasdaq.chgPct * 0.7 * 100) / 100, // 나스닥의 70% 반영
-          note: '나스닥 기반 추정값',
-          lastUpdatedKST: result.nasdaq.lastUpdatedKST,
-        };
-      }
+      // 야간선물: KIS API 없이는 실제 데이터 불가 — 표시 안 함
+      // (나스닥 기반 추정값은 가짜 데이터이므로 제거)
 
       const responseData = {
         mode,
