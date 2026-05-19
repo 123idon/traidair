@@ -423,6 +423,7 @@ input,select,textarea{-webkit-appearance:none;appearance:none;}
     <button class="ibtn red" onclick="endMock()">■ 종료</button>
     <button class="ibtn pri" onclick="openModal('journal')">📓</button>
     <button class="ibtn pur" onclick="openModal('autotrade')" id="autoBtn">🤖 자동매매</button>
+    <button class="ibtn" onclick="refreshAllData()" title="전체 새로고침" style="background:var(--g);color:#fff;border-color:var(--g);">↺</button>
   </div>
 </header>
 
@@ -465,7 +466,7 @@ input,select,textarea{-webkit-appearance:none;appearance:none;}
 </div>
 
 <!-- ── HTS PAGE ── -->
-<div class="page on" id="page-hts" class="page on" style="position:relative;">
+<div class="page on" id="page-hts" style="position:relative;">
   <!-- LIVE OVERLAY -->
   <div class="live-ov" id="liveOv">
     <div class="live-box">
@@ -530,94 +531,27 @@ input,select,textarea{-webkit-appearance:none;appearance:none;}
       </div>
       <!-- 장중 체크 탭 (Phase 8 실시간) -->
       <div class="lpb" id="lpb-ck">
-
-        <!-- AI 시장 체력 지수 -->
-        <div class="sec" style="padding:6px 8px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
-            <span class="sec-t" style="margin-bottom:0;">📡 AI 시장 체력</span>
-            <button onclick="calcMarketStrength()" style="padding:1px 6px;border-radius:4px;border:none;background:var(--b);color:#fff;font-size:8px;cursor:pointer;">계산</button>
-          </div>
-          <div id="mktStrengthGauge" style="margin-bottom:5px;">
-            <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:9px;margin-bottom:3px;">
-              <span>체력 지수</span><span id="mktStrScore" style="font-weight:700;">-</span>
-            </div>
-            <div style="height:6px;background:var(--bg);border-radius:3px;overflow:hidden;">
-              <div id="mktStrBar" style="height:100%;width:0%;background:var(--b);border-radius:3px;transition:width .5s;"></div>
-            </div>
-          </div>
-          <div id="mktStrDetail" style="font-size:9px;color:var(--tm);line-height:1.6;">계산 버튼 눌러주세요</div>
-        </div>
-
-        <!-- Phase 8 장중 STEP 체크 -->
-        <div class="sec" style="padding:6px 8px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
-            <span class="sec-t" style="margin-bottom:0;">✅ Phase 8 장중 체크</span>
-            <button onclick="resetIntraCheck()" style="padding:1px 6px;border-radius:4px;border:none;background:var(--bg);color:var(--ts);font-size:8px;cursor:pointer;border:1px solid var(--br);">초기화</button>
-          </div>
-          <div id="intraCheckList"></div>
-          <div style="margin-top:5px;padding:4px 7px;border-radius:6px;font-size:9px;font-weight:700;text-align:center;" id="intraGoNogo" style="background:var(--bg);">체크 완료 후 GO/NO-GO</div>
-        </div>
-
-        <!-- 뇌동매매 감지 패널 (Phase 11) -->
-        <div class="sec" style="padding:6px 8px;">
-          <span class="sec-t" style="color:var(--r);">⚡ 뇌동매매 감지 (Phase 11)</span>
-          <div id="brainDongPanel" style="font-size:9px;line-height:1.7;">
-            <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid var(--br);">
-              <span style="color:var(--ts);">연속 손절</span>
-              <span id="bd_loss" style="font-family:var(--mono);font-weight:700;">0회</span>
-            </div>
-            <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid var(--br);">
-              <span style="color:var(--ts);">30분내 매매</span>
-              <span id="bd_freq" style="font-family:var(--mono);font-weight:700;">0회</span>
-            </div>
-            <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid var(--br);">
-              <span style="color:var(--ts);">단일비중 최고</span>
-              <span id="bd_size" style="font-family:var(--mono);font-weight:700;">0%</span>
-            </div>
-            <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid var(--br);">
-              <span style="color:var(--ts);">손절후재진입</span>
-              <span id="bd_reentry" style="font-family:var(--mono);font-weight:700;">0회</span>
-            </div>
-            <div id="bd_warning" style="margin-top:4px;padding:4px 6px;border-radius:5px;font-size:9px;display:none;"></div>
-          </div>
-        </div>
-
-        <!-- 매매신뢰도지수 (Phase 11-13) -->
-        <div class="sec" style="padding:6px 8px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
-            <span class="sec-t" style="margin-bottom:0;">🧠 매매신뢰도 지수</span>
-            <span style="font-family:var(--mono);font-size:10px;font-weight:700;" id="trustScoreVal">-/10</span>
-          </div>
-          <input type="range" min="0" max="10" value="7" id="trustSlider" oninput="updateTrustScore(this.value)"
-            style="width:100%;-webkit-appearance:none;height:4px;border-radius:2px;background:var(--bg);outline:none;margin-bottom:5px;">
-          <div id="trustScoreDesc" style="font-size:9px;padding:4px 6px;border-radius:5px;background:var(--bg);"></div>
-          <div id="trustAutoLimit" style="font-size:8px;color:var(--a);margin-top:3px;display:none;"></div>
-        </div>
-
-        <!-- 슬럼프 감지 (Phase 11-12) -->
-        <div class="sec" style="padding:6px 8px;">
-          <span class="sec-t" style="color:var(--p);">🌀 슬럼프 감지</span>
-          <div id="slumpPanel" style="font-size:9px;color:var(--ts);line-height:1.7;"></div>
-        </div>
-
-        <!-- 멘탈 리셋 루틴 (Phase 11-11) -->
         <div class="sec" style="padding:6px 8px;">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
-            <span class="sec-t" style="margin-bottom:0;color:var(--r);">🔄 멘탈 리셋 루틴</span>
-            <button onclick="showMentalReset()" style="padding:1px 6px;border-radius:4px;border:none;background:var(--r);color:#fff;font-size:8px;cursor:pointer;">실행</button>
+            <span class="sec-t" style="margin-bottom:0;">📡 장중 자동 체크</span>
+            <button onclick="runIntraCheck()" style="padding:1px 7px;border-radius:4px;border:none;background:var(--b);color:#fff;font-size:8px;cursor:pointer;">↺ 갱신</button>
           </div>
-          <div style="font-size:9px;color:var(--tm);">연속손실 3회 이상 시 실행</div>
-          <div id="mentalResetStatus" style="font-size:9px;color:var(--ts);margin-top:3px;"></div>
+          <div id="intraLiveList" style="font-size:9px;color:var(--tm);">자동 체크 중...</div>
         </div>
-
-        <!-- 시간대별 루틴 가이드 -->
         <div class="sec" style="padding:6px 8px;">
-          <span class="sec-t">⏰ 지금 해야 할 것</span>
-          <div id="timeGuide" style="font-size:9px;color:var(--ts);line-height:1.7;padding:4px 6px;background:var(--bg);border-radius:6px;"></div>
+          <span class="sec-t" style="color:var(--r);">⚡ 뇌동매매 감지</span>
+          <div id="brainDongPanel" style="font-size:9px;line-height:1.9;">
+            <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid var(--br);">
+              <span style="color:var(--ts);">연속 손절</span><span id="bd_loss" style="font-family:var(--mono);font-weight:700;">0회</span></div>
+            <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid var(--br);">
+              <span style="color:var(--ts);">30분내 매매</span><span id="bd_freq" style="font-family:var(--mono);font-weight:700;">0회</span></div>
+            <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid var(--br);">
+              <span style="color:var(--ts);">단일비중 최고</span><span id="bd_size" style="font-family:var(--mono);font-weight:700;">0%</span></div>
+            <div style="display:flex;justify-content:space-between;padding:2px 0;">
+              <span style="color:var(--ts);">손절후재진입</span><span id="bd_re" style="font-family:var(--mono);font-weight:700;">0회</span></div>
+          </div>
         </div>
-
       </div>
-
       <div class="lpb" id="lpb-f">
         <div class="sec"><div class="sec-t">조건 검색</div><div id="filterList"></div></div>
         <div class="sec"><div class="sec-t">결과</div><div id="filterResult" style="font-size:9px;color:var(--tm);padding:3px 0;">조건을 선택하세요</div></div>
@@ -648,33 +582,20 @@ input,select,textarea{-webkit-appearance:none;appearance:none;}
 
       <!-- AI 섹터/종목 추천 패널 (Phase 6, 7 기반) -->
       <div class="lpb" id="lpb-ai">
-        <!-- 오늘의 강세 섹터 순위 -->
         <div class="sec" style="padding:6px 8px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
-            <span class="sec-t" style="margin-bottom:0;color:var(--p);">🏆 오늘 강세 섹터</span>
-            <button onclick="loadSectorRanking()" id="sectorRankBtn" style="padding:2px 8px;border-radius:5px;border:none;background:var(--p);color:#fff;font-size:9px;font-weight:600;cursor:pointer;">순위 보기</button>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+            <span class="sec-t" style="margin-bottom:0;color:var(--p);">🔥 섹터 수급 순위</span>
+            <button onclick="loadSectorRanking()" id="sectorRankBtn" style="padding:1px 7px;border-radius:4px;border:none;background:var(--p);color:#fff;font-size:8px;font-weight:600;cursor:pointer;">순위 보기</button>
           </div>
-          <div id="sectorRankList" style="font-size:9px;color:var(--tm);line-height:1.5;">
-            버튼을 눌러 오늘 주도 섹터를 확인하세요.
-          </div>
+          <div id="sectorRankList" style="font-size:9px;color:var(--tm);">버튼을 눌러 섹터 수급을 확인하세요</div>
         </div>
-        <!-- 재료 강도 판별 -->
         <div class="sec" style="padding:6px 8px;">
-          <div class="sec-t" style="color:var(--a);">📋 재료 강도 판별</div>
-          <div style="font-size:8px;color:var(--tm);margin-bottom:4px;">뉴스/공시 텍스트 붙여넣기</div>
-          <textarea id="materialInput" style="width:100%;height:50px;background:var(--bg);border:1px solid var(--br);border-radius:6px;color:var(--tp);font-family:var(--sans);font-size:9px;padding:4px;resize:none;outline:none;" placeholder="예: 삼성전자 HBM4 수주 1조원..."></textarea>
-          <button onclick="runMaterialAnalysis()" style="width:100%;margin-top:3px;padding:4px;border-radius:5px;border:none;background:var(--a);color:#000;font-size:9px;font-weight:700;cursor:pointer;">재료 강도 분석 (S/A/B/C)</button>
+          <div class="sec-t" style="color:var(--a);">📋 재료 강도 분석</div>
+          <textarea id="materialInput" style="width:100%;height:40px;background:var(--bg);border:1px solid var(--br);border-radius:6px;color:var(--tp);font-size:9px;padding:4px;resize:none;outline:none;" placeholder="뉴스/공시 텍스트 붙여넣기..."></textarea>
+          <button onclick="runMaterialAnalysis()" style="width:100%;margin-top:3px;padding:4px;border-radius:5px;border:none;background:var(--a);color:#000;font-size:9px;font-weight:700;cursor:pointer;">S/A/B/C 재료강도 분석</button>
           <div id="materialResult" style="font-size:9px;margin-top:4px;line-height:1.6;"></div>
         </div>
-        <!-- AI 종목 스크리닝 -->
-        <div class="sec" style="padding:6px 8px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
-            <span class="sec-t" style="margin-bottom:0;color:var(--b);">🔍 AI 종목 스크리닝</span>
-            <button onclick="runAIStockScreening()" style="padding:2px 7px;border-radius:5px;border:none;background:var(--b);color:#fff;font-size:9px;font-weight:600;cursor:pointer;">스크리닝</button>
-          </div>
-          <div style="font-size:8px;color:var(--tm);margin-bottom:4px;">수급폭발·모멘텀·눌림목 기준</div>
-          <div id="aiScreenResult" style="font-size:9px;color:var(--tm);line-height:1.6;">스크리닝 버튼을 눌러주세요.</div>
-        </div>
+      </div>
       </div>
     </div>
 
@@ -6264,6 +6185,242 @@ function saveJEntry(date,p,pnl,wins,total,str){
   renderJPage();
 }
 
+// ═══════════════════════════════════════════════════
+// 🤖 AI 파트너 — 장중 자동 체크 + 섹터수급 + 진입후보
+// ═══════════════════════════════════════════════════
+
+// ── 장중 자동 체크 (체크탭) ──
+const INTRA_ITEMS = [
+  { label:'지수 방향', icon:'📈', fn:()=>{
+    const cs=getCandles(3); if(cs.length<2) return {score:50,val:'데이터 부족',ok:null};
+    const chg=(cs[cs.length-1].c-cs[0].c)/cs[0].c*100;
+    const ok=chg>0.2; return {score:ok?85:chg>-0.2?55:25, val:`${chg>=0?'▲':'▼'}${Math.abs(chg).toFixed(2)}%`, ok};
+  }},
+  { label:'거래량 수급', icon:'💧', fn:()=>{
+    const cs=getRecentCandles(5); if(cs.length<2) return {score:50,val:'-',ok:null};
+    const avg=cs.slice(0,-1).reduce((a,c)=>a+c.v,0)/(cs.length-1)||1;
+    const r=cs[cs.length-1].v/avg; const ok=r>=1.3;
+    return {score:ok?85:r>=0.8?55:30, val:`×${r.toFixed(1)}배`, ok};
+  }},
+  { label:'MA 배열', icon:'📊', fn:()=>{
+    const cs=getCandles(25); const cls=cs.map(c=>c.c);
+    const m5=(calcMA(cls,5).slice(-1)[0]||0), m20=(calcMA(cls,20).slice(-1)[0]||0);
+    const ok=m5>m20; return {score:ok?80:35, val:ok?'정배열 ✅':'역배열', ok};
+  }},
+  { label:'RSI 모멘텀', icon:'⚡', fn:()=>{
+    const cs=getCandles(20); const cls=cs.map(c=>c.c);
+    const rsi=parseFloat((calcRSI(cls,14).slice(-1)[0]||50).toFixed(0));
+    const ok=rsi>=45&&rsi<=70; return {score:ok?82:rsi>=40?60:25, val:`RSI ${rsi}`, ok};
+  }},
+  { label:'캔들 형태', icon:'🕯️', fn:()=>{
+    const c=getCurrentCandle(); if(!c) return {score:50,val:'-',ok:null};
+    const up=c.c>c.o; const body=Math.abs(c.c-c.o)/(c.h-c.l||1)*100;
+    const ok=up&&body>50; return {score:ok?78:up?58:30, val:`${up?'양봉':'음봉'} ${body.toFixed(0)}%`, ok};
+  }},
+  { label:'매매 시간대', icon:'🕐', fn:()=>{
+    const lc=getCurrentCandle(); if(!lc) return {score:50,val:'-',ok:null};
+    const [h,m]=(lc.t||'09:00').split(':').map(Number); const hm=h*60+m;
+    const best=(hm>=9*60&&hm<=9*60+30)||(hm>=14*60&&hm<=14*60+30);
+    const ok=hm>=9*60+30&&hm<=14*60;
+    return {score:best?90:ok?70:40, val:lc.t+(best?' ⭐':ok?'':' ⚠️점심'), ok:best||ok};
+  }},
+  { label:'포지션 비중', icon:'💼', fn:()=>{
+    const total=Object.values(mock.positions||{}).reduce((a,p)=>a+(p.qty*(p.avgPrice||0)),0);
+    const r=total/((mock.cash||10000000)+total||1)*100;
+    const ok=r<60; return {score:ok?80:r<80?55:30, val:`${r.toFixed(0)}%`, ok};
+  }},
+  { label:'오늘 손익', icon:'💰', fn:()=>{
+    const pnl=mock.todayPnl||0; const cap=cfg.capital||10000000;
+    const pct=pnl/cap*100; const ok=pct>0;
+    return {score:ok?85:pct>-1?60:pct>-2?35:15, val:`${pnl>=0?'+':''}${pnl.toLocaleString()}원`, ok};
+  }},
+];
+
+function runIntraCheck(){
+  const el=document.getElementById('intraLiveList');
+  if(!el) return;
+  const results=INTRA_ITEMS.map(item=>{
+    let r={score:50,val:'-',ok:null};
+    try{r=item.fn();}catch(e){}
+    return {...item,...r};
+  });
+  const total=Math.round(results.reduce((a,r)=>a+r.score,0)/results.length);
+  const goColor=total>=75?'var(--g)':total>=50?'var(--a)':'var(--r)';
+  const goText=total>=75?'✅ 매매 우호':'⚠️ 신중 필요';
+  el.innerHTML=`
+    <div style="text-align:center;padding:6px 4px;margin-bottom:6px;border-radius:8px;background:var(--bg);">
+      <span style="font-size:18px;font-weight:900;color:${goColor};">${total}점</span>
+      <span style="font-size:10px;color:var(--tm);"> / 100 &nbsp; ${goText}</span>
+    </div>
+    ${results.map(r=>{
+      const col=r.score>=75?'var(--g)':r.score>=50?'var(--a)':'var(--r)';
+      const dot=r.ok===true?'🟢':r.ok===false?'🔴':'🟡';
+      return `<div style="padding:4px 2px;border-bottom:1px solid rgba(0,0,0,.04);">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:9px;color:var(--ts);">${r.icon} ${r.label}</span>
+          <div style="display:flex;align-items:center;gap:5px;">
+            <span style="font-size:9px;color:var(--tm);">${r.val}</span>
+            <span style="font-size:10px;font-weight:800;color:${col};">${r.score}</span>
+          </div>
+        </div>
+        <div style="height:2px;background:var(--bg);border-radius:1px;margin-top:2px;overflow:hidden;">
+          <div style="height:100%;width:${r.score}%;background:${col};border-radius:1px;transition:width .4s;"></div>
+        </div>
+      </div>`;
+    }).join('')}`;
+}
+setInterval(()=>{ if(document.querySelector('.lpt.on[onclick*="lpb-ck"]')) runIntraCheck(); }, 30000);
+
+// ── 섹터 수급 순위 (AI) ──
+let _prevSectorRank=[];
+async function loadSectorRanking(){
+  const el=document.getElementById('sectorRankList');
+  const btn=document.getElementById('sectorRankBtn');
+  if(!el) return;
+  el.innerHTML='<span style="color:var(--tm);font-style:italic;font-size:9px;">AI 분석 중...</span>';
+  if(btn) btn.disabled=true;
+  try{
+    const cs=getRecentCandles(20);
+    const cls=cs.map(c=>c.c);
+    const rsi=(calcRSI(cls,14).slice(-1)[0]||50).toFixed(0);
+    const volR=cs.length>=2?(cs[cs.length-1].v/cs[cs.length-2].v).toFixed(1):'1.0';
+    const prompt=`지금 이 순간 단타 트레이더 관점에서 섹터별 수급 점수를 알려줘.
+RSI:${rsi} 거래량:${volR}배 종목:${STOCKS.find(s=>s.tk===activeTk)?.nm||activeTk}
+
+섹터: 반도체, 2차전지, 바이오, 자동차, 인터넷, 방산, 조선, 철강
+0~100점 평가. JSON만: {"sectors":[{"name":"반도체","score":82,"reason":"외국인 순매수 지속","stocks":["삼성전자","SK하이닉스"]},...]}`; 
+    const data=await callClaude({model:'claude-sonnet-4-5',max_tokens:500,messages:[{role:'user',content:prompt}]},'섹터수급');
+    const text=data.content?.[0]?.text||'';
+    const m=text.match(/\{[\s\S]*\}/);
+    if(!m) throw new Error('파싱실패');
+    const sectors=(JSON.parse(m[0]).sectors||[]).sort((a,b)=>b.score-a.score);
+    const prevNames=_prevSectorRank.map(s=>s.name);
+    const newOnes=sectors.filter((s,i)=>i<3&&!prevNames.slice(0,3).includes(s.name));
+    _prevSectorRank=sectors;
+    el.innerHTML=sectors.slice(0,6).map((s,i)=>{
+      const sc=s.score||50;
+      const col=sc>=75?'var(--g)':sc>=55?'var(--a)':'var(--r)';
+      const isNew=newOnes.some(n=>n.name===s.name);
+      return `<div onclick="loadSectorStocks('${s.name}','${(s.stocks||[]).join(',')}','${s.reason||''}')" style="padding:5px 3px;border-radius:6px;cursor:pointer;margin-bottom:2px;" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='none'">
+        <div style="display:flex;align-items:center;gap:4px;margin-bottom:2px;">
+          <span style="font-size:10px;font-weight:800;color:${i<3?'var(--b)':'var(--tm)'};min-width:14px;">${i+1}</span>
+          <span style="font-size:10px;font-weight:700;flex:1;">${s.name}</span>
+          ${isNew?'<span style="font-size:8px;background:var(--r);color:#fff;padding:1px 4px;border-radius:3px;font-weight:700;">NEW</span>':''}
+          <span style="font-family:var(--mono);font-size:10px;font-weight:800;color:${col};">${sc}점</span>
+        </div>
+        <div style="height:3px;background:var(--bg);border-radius:2px;overflow:hidden;">
+          <div style="height:100%;width:${sc}%;background:${col};border-radius:2px;"></div>
+        </div>
+        <div style="font-size:8px;color:var(--tm);margin-top:1px;">${s.reason||''}</div>
+      </div>`;
+    }).join('');
+  }catch(e){
+    el.innerHTML=`<span style="color:var(--r);font-size:9px;">Claude API 키 필요</span>`;
+  }
+  if(btn){btn.disabled=false;btn.textContent='↺ 갱신';}
+}
+
+function loadSectorStocks(name, stocksStr, reason){
+  // 섹터 종목 중 STOCKS에 있는 것 필터
+  const stkNames=(stocksStr||'').split(',').filter(Boolean);
+  const matched=STOCKS.filter(s=>stkNames.some(n=>s.nm.includes(n)||n.includes(s.nm)));
+  if(!matched.length){ showAlert(name+' 섹터', reason||'수급 집중 섹터'); return; }
+  let popup=document.getElementById('_sectorPopup');
+  if(!popup){ popup=document.createElement('div'); popup.id='_sectorPopup';
+    popup.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9999;background:var(--pan);border-radius:14px;box-shadow:0 8px 40px rgba(0,0,0,.2);padding:18px;width:280px;max-width:92vw;';
+    document.body.appendChild(popup); }
+  popup.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+    <span style="font-size:14px;font-weight:800;">🔥 ${name} 주도주</span>
+    <button onclick="document.getElementById('_sectorPopup').style.display='none'" style="border:none;background:none;font-size:16px;cursor:pointer;">✕</button>
+  </div>
+  <div style="font-size:10px;color:var(--tm);margin-bottom:10px;">${reason}</div>
+  ${matched.map(s=>{const chg=((s.pr-s.base)/s.base*100).toFixed(2);const up=parseFloat(chg)>=0;
+    return `<div onclick="selectStk('${s.tk}');document.getElementById('_sectorPopup').style.display='none';" style="display:flex;align-items:center;gap:8px;padding:7px;border-radius:8px;cursor:pointer;margin-bottom:3px;" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='none'">
+      <div style="font-size:11px;font-weight:700;flex:1;">${s.nm}</div>
+      <div class="${up?'cu':'cd'}" style="font-size:11px;">${up?'+':''}${chg}%</div>
+    </div>`;}).join('')}`;
+  popup.style.display='block';
+}
+
+// ── 진입후보 점수 + 클릭 상세 ──
+function renderCands(){
+  const cc=document.getElementById('candCount');
+  const sorted=[...CANDS].sort((a,b)=>(b.score||0)-(a.score||0));
+  if(cc){cc.textContent=sorted.length+'/3';cc.style.color=sorted.length>=3?'var(--r)':'var(--ts)';}
+  const el=document.getElementById('candList');
+  if(!el) return;
+  el.innerHTML=sorted.map((c,i)=>{
+    const s=STOCKS.find(s=>s.tk===c.tk)||{nm:c.tk,pr:0,base:1};
+    const sc=c.score||70;
+    const col=sc>=80?'var(--g)':sc>=65?'var(--a)':'var(--r)';
+    const chg=((s.pr-s.base)/s.base*100).toFixed(2);
+    const up=parseFloat(chg)>=0;
+    return `<div onclick="showCandDetail('${c.tk}')" style="padding:7px 6px;border-radius:8px;cursor:pointer;border-bottom:1px solid var(--br);" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='none'">
+      <div style="display:flex;align-items:center;gap:5px;">
+        <span style="font-size:11px;font-weight:800;color:var(--b);min-width:16px;">${i+1}</span>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:11px;font-weight:700;">${s.nm}</div>
+          <div style="font-size:8px;color:var(--ts);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.why||''}</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:12px;font-weight:900;color:${col};">${sc}점</div>
+          <div style="font-size:9px;" class="${up?'cu':'cd'}">${up?'+':''}${chg}%</div>
+        </div>
+      </div>
+      <div style="height:2px;background:var(--bg);border-radius:1px;margin-top:4px;overflow:hidden;">
+        <div style="height:100%;width:${sc}%;background:${col};border-radius:1px;"></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function showCandDetail(tk){
+  const c=CANDS.find(c=>c.tk===tk)||{tk,why:'',score:70};
+  const s=STOCKS.find(s=>s.tk===tk)||{nm:tk,pr:0,base:1};
+  const sc=c.score||70;
+  const col=sc>=80?'var(--g)':sc>=65?'var(--a)':'var(--r)';
+  let popup=document.getElementById('_candPopup');
+  if(!popup){ popup=document.createElement('div'); popup.id='_candPopup';
+    popup.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9999;background:var(--pan);border-radius:14px;box-shadow:0 8px 40px rgba(0,0,0,.2);padding:18px;width:300px;max-width:92vw;';
+    document.body.appendChild(popup); }
+  popup.innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <div><div style="font-size:14px;font-weight:800;">${s.nm}</div><div style="font-size:10px;color:var(--tm);">${tk}</div></div>
+      <div style="text-align:right;"><div style="font-size:22px;font-weight:900;color:${col};">${sc}점</div>
+      <button onclick="document.getElementById('_candPopup').style.display='none'" style="border:none;background:none;font-size:14px;cursor:pointer;color:var(--tm);">✕</button></div>
+    </div>
+    <div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:12px;font-size:11px;line-height:1.8;color:var(--ts);" id="_candReason">
+      <span style="color:var(--tm);">🤖 AI가 분석 중이에요...</span>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button onclick="selectStk('${tk}');document.getElementById('_candPopup').style.display='none';" style="flex:1;padding:9px;border-radius:8px;border:none;background:var(--b);color:#fff;font-size:12px;font-weight:700;cursor:pointer;">📊 차트 보기</button>
+      <button onclick="document.getElementById('_candPopup').style.display='none'" style="padding:9px 14px;border-radius:8px;border:1.5px solid var(--br);background:none;font-size:12px;cursor:pointer;">닫기</button>
+    </div>`;
+  popup.style.display='block';
+  const cs=getRecentCandles(5); const cls=cs.map(x=>x.c);
+  const rsi=(calcRSI(cls,9).slice(-1)[0]||50).toFixed(0);
+  const lc=getCurrentCandle()||{c:s.pr};
+  callClaude({model:'claude-sonnet-4-5',max_tokens:200,
+    messages:[{role:'user',content:`단타 트레이더야. ${s.nm}(${tk})이 오늘 진입 후보인 이유를 토스처럼 쉽게 알려줘.
+추천이유: ${c.why||'조건검색 통과'} | 현재가: ${lc.c.toLocaleString()}원 | RSI: ${rsi}
+수급/차트/재료/리스크 각 한줄씩, 이모지 사용해서 쉽게.`}]},'후보상세').then(d=>{
+    const t=d.content?.[0]?.text||'분석 실패';
+    const el=document.getElementById('_candReason');
+    if(el) el.innerHTML=t.replace(/\n/g,'<br>');
+  }).catch(()=>{
+    const el=document.getElementById('_candReason');
+    if(el) el.textContent=c.why||'Claude API 키를 설정창에서 입력해 주세요.';
+  });
+}
+
+// ── 전체 새로고침 버튼 ──
+function refreshAllData(){
+  showProgress('전체 새로고침 중...',3);
+  renderAll();
+  runIntraCheck();
+  setTimeout(()=>finishProgress('새로고침 완료'),800);
+}
+
 window.onload=()=>{
   loadState();
   goPage('hts',document.getElementById('tab-hts'));
@@ -6271,6 +6428,8 @@ window.onload=()=>{
   initChartEvents();
   _initResizeObserver();
   initChartRightClick();
+  // 장중 체크 자동 실행
+  setTimeout(runIntraCheck, 1500);
   // ★ 서버에서 저장된 API 설정 로드 (재배포 후에도 유지)
   fetch('/api/get-config').then(r=>r.json()).then(d=>{
     if(d.ok && (d.kisAppKey || d.claudeKeyFull)){
