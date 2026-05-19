@@ -2776,13 +2776,11 @@ function renderOB(){
   // 매수잔량 업데이트
   const btEl=document.getElementById("obBuyTotal");
   if(btEl)btEl.textContent=totalBuy.toLocaleString();
-  // 비율 표시
-  const ratio=(totalBuy/(totalBuy+totalSell)*100).toFixed(0);
+  // 체결강도: KIS 없으면 표시 안 함
   const strEl=document.getElementById("obStrength");
   if(strEl){
-    const strength=Math.round(95+Math.random()*60);
-    strEl.textContent=strength;
-    strEl.style.color=strength>=120?"#dc2626":strength>=100?"var(--b)":"#2563eb";
+    strEl.textContent="-";
+    strEl.style.color="var(--tm)";
   }
 }
 function renderTH(){
