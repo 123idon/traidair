@@ -4154,14 +4154,7 @@ const DART_REACTIONS = {
   "FDA 임상 실패": {reaction:"-20~50%", timing:"진입 금지", grade:"C"},
   "CB/BW 발행": {reaction:"-3~10%", timing:"진입 자제", grade:"C"},
 };
-const SAMPLE_DARTS = [
-  {time:"08:42",corp:"삼성전자",title:"HBM4 NVIDIA 공급 계약 체결 (8조원 규모)",type:"신규 수주",impact:"S"},
-  {time:"08:55",corp:"LG에너지솔루션",title:"유럽 전기차 배터리 장기 공급 계약",type:"신규 수주",impact:"A"},
-  {time:"09:10",corp:"셀트리온",title:"미국 FDA 임상 2상 긍정적 중간 결과 발표",type:"FDA 임상 성공",impact:"A"},
-  {time:"07:30",corp:"카카오",title:"자사주 1,000억원 매입 결정",type:"자사주 매입",impact:"A"},
-  {time:"09:35",corp:"에코프로",title:"제3자 배정 유상증자 결정 (1,200억원)",type:"유상증자",impact:"B"},
-  {time:"10:05",corp:"HMM",title:"1분기 영업이익 컨센서스 40% 상회",type:"실적 호조",impact:"A"},
-];
+// SAMPLE_DARTS 제거됨 (가짜 하드코딩 데이터)
 
 // DART API 상태
 let dartApiAvailable = false;
@@ -5613,16 +5606,29 @@ function togInd(nm,el){inds[nm]=!inds[nm];el.classList.toggle("on",inds[nm]);if(
 // ═══════════════════════════════
 // LIVE UPDATE
 // ═══════════════════════════════
+// 관심종목 가격 KIS 갱신 (30초마다 순차 조회)
+let _wlRefreshIdx = 0;
+async function refreshWatchlistPrices(){
+  if(!kisConfig.appKey || !kisConfig.account) return;
+  // 관심종목 + activeTk 모든 종목 수집
+  const allTks = [...new Set([activeTk, ...(WGS[0]||[]), ...(WGS[1]||[])])];
+  if(!allTks.length) return;
+  // 한 번에 한 종목씩 순차 조회 (API 부하 방지)
+  const tk = allTks[_wlRefreshIdx % allTks.length];
+  _wlRefreshIdx++;
+  await kisRefreshPrice(tk);
+  renderWLGroup(); // 관심목록 가격 재렌더
+}
+
 function liveUpdate(){
   if(document.hidden)return; // 탭 비활성 시 스킵
   if(sim.playing)return;
-  // KIS 연결 시 실제 시세 조회, 미연결 시 시뮬레이션
   if(kisConfig.appKey && kisConfig.account){
-    kisRefreshPrice(activeTk); // 현재 선택 종목만 조회 (API 호출 최소화)
+    kisRefreshPrice(activeTk); // 현재 선택 종목 즉시 갱신
+    // 관심종목 가격은 별도 인터벌에서 갱신 (setInterval 아래에서 처리)
   } else {
-    // KIS 미연결: 주가 임의 변동 없음 — 마지막 알려진 가격 유지
+    // KIS 미연결: 가격 변동 없음 — 마지막 값 유지
     const stk=STOCKS.find(s=>s.tk===activeTk)||STOCKS[0];
-    // 현재가 표시만 유지 (가짜 변동 없음)
     updPrice({c:stk.pr});
   }
   renderWL();renderOB();updPnl();
@@ -6900,6 +6906,7 @@ window.onload=()=>{
   tick(); setInterval(tick,1000);
   setInterval(liveUpdate,2200);
   setInterval(checkStopOrders,800);
+  setInterval(refreshWatchlistPrices, 5000); // 관심종목 가격 5초마다 순차 갱신
   setInterval(autoAdvUpdate,8000);
   setTimeout(async()=>{
     await checkDartApiStatus();
