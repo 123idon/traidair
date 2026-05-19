@@ -28,6 +28,8 @@ function kisRequest(opts, body) {
       });
     });
     req.on('error', reject);
+    // 8초 타임아웃
+    req.setTimeout(8000, () => { req.destroy(new Error('KIS 서버 응답 없음 (8초 초과)')); });
     if (body) req.write(typeof body === 'string' ? body : JSON.stringify(body));
     req.end();
   });
