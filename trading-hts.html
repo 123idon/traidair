@@ -405,8 +405,10 @@ button{cursor:pointer;font-family:var(--sans);}
   margin:8px auto 4px;flex-shrink:0;
 }
 /* ── 터치 최적화 ── */
-button,a,[onclick]{touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
-input,select,textarea{-webkit-appearance:none;appearance:none;font-size:16px;} /* 16px: iOS 줌 방지 */
+button,a{touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
+*{-webkit-tap-highlight-color:transparent;}
+/* input font-size: iOS 줌 방지는 label로 해결, 강제 16px 제거 */
+input,select,textarea{-webkit-appearance:none;appearance:none;}
 /* ── 스크롤 성능 최적화 ── */
 .wg-body,.lpb,.brpb,.jpage,.stats-page{-webkit-overflow-scrolling:touch;overscroll-behavior:contain;}
 </style>
