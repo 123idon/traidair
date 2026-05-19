@@ -1855,6 +1855,20 @@ function genCandles(tk,dt){
   sim.candles=res; sim.idx=0; if(res.length>0)updPrice(res[0]); return res;
 }
 
+// ── 추가 전역 변수/함수 ──
+let BAN_LIST=JSON.parse(localStorage.getItem("htsBan")||'[]');
+function addBanCurrent(){const stk=STOCKS.find(s=>s.tk===activeTk)||STOCKS[0];if(!BAN_LIST.includes(activeTk)){BAN_LIST.push(activeTk);saveBan();renderBanList();showAlert("매매금지 추가",stk.nm+" 매매금지 등록됨");}}
+function addPending(tk,nm,side,price,qty){const id=Date.now();pendingOrders.push({id,tk,nm,side,price,qty,time:new Date().toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"})});renderPending();return id;}
+let autoState={running:false,level:0,cfg:{rr:1.5,pos:15,stop:3,t1:3,t2:5,trail:"off",brk:true,explain:true}};
+let autoTimer=null;
+function cancelPending(id){pendingOrders=pendingOrders.filter(o=>o.id!==id);renderPending();}
+let chatHist=[],chatBusy=false;
+function checkPending(){pendingOrders.forEach((o,i)=>{const stk=STOCKS.find(s=>s.tk===o.tk);if(!stk)return;const hit=(o.side==="buy"&&stk.pr<=o.price)||(o.side==="sell"&&stk.pr>=o.price);if(hit){const prev=activeTk,prevSide=oSide,prevType=oType;activeTk=o.tk;oSide=o.side;oType="market";document.getElementById("ofQty").value=o.qty;submitOrder(true);activeTk=prev;oSide=prevSide;oType=prevType;pendingOrders.splice(i,1);addMsg("ai",`✅ 지정가 체결: ${o.nm} ${o.side==="buy"?"매수":"매도"} ${o.price.toLocaleString()}원 × ${o.qty}주`);renderPending();}});}
+let pendingOrders=[];
+let priceAlerts=[]; // [{tk,price,dir:'above'|'below',memo,fired}]
+function saveBan(){localStorage.setItem("htsBan",JSON.stringify(BAN_LIST));}
+let stopOrders={};
+
 // ═══════════════════════════════
 // STATE
 // ═══════════════════════════════
