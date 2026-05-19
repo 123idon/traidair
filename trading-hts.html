@@ -4063,7 +4063,7 @@ function stopAuto(){
   document.getElementById("autoBtn").classList.remove("on");document.getElementById("aiModeBadge").textContent="대기중";
   addMsg("ai","⏹ AI 자동매매 중지.");
 }
-function scheduleScreening(){if(!autoState.running)return;runScreening();autoTimer=setTimeout(scheduleScreening,10000);}
+function scheduleScreening(){if(!autoState.running)return;runScreening();autoTimer=setTimeout(scheduleScreening,5000);}
 function addDecisionLog(action,reason,phase){
   const log=document.getElementById("aiDecisionLog");
   const now=new Date().toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
@@ -4094,13 +4094,16 @@ function runScreening(){
   const rr=lc.c>0?(lc.c*(1+autoState.cfg.t1/100)-lc.c)/(lc.c-lc.c*(1-autoState.cfg.stop/100)):0;
   addDecisionLog(`[${stk.nm}] 스크리닝 — ${verdict} (${score}/9점)`,reasons.join(" · "),phases[0]||"");
   if(autoState.level>=2){
-    if(score>=7&&rr>=autoState.cfg.rr){
+    if(score>=5&&rr>=autoState.cfg.rr){ // 레벨4: 조건 완화 (5점 이상)
       const stopPr=Math.round(lc.c*(1-autoState.cfg.stop/100));
       const t1Pr=Math.round(lc.c*(1+autoState.cfg.t1/100));
       addDecisionLog(`[${stk.nm}] 📊 진입 신호!`,`점수 ${score}/9 | R/R 1:${rr.toFixed(2)} | 진입 ${lc.c.toLocaleString()} | 손절 ${stopPr.toLocaleString()} | 1차목표 ${t1Pr.toLocaleString()}`,`Phase 8: STEP7 — R/R ${autoState.cfg.rr} 이상 GO 판정`);
       updAdvBoxes(`📊 ${stk.nm} 진입 신호 (점수 ${score}/9)`,`R/R 1:${rr.toFixed(2)}\n${reasons.slice(0,2).join(", ")}`);
       addMsg("ai",`📊 진입 신호!\n${stk.nm} ${lc.c.toLocaleString()}원\n\n셋업: ${score}/9점 | R/R 1:${rr.toFixed(2)}\n손절가: ${stopPr.toLocaleString()}원\n1차 목표: ${t1Pr.toLocaleString()}원\n\n${autoState.level>=3?"→ 자동 매수 실행...":"→ 직접 주문창에서 실행하세요"}\n[Phase 8: 체크리스트 통과]`);
-      if(autoState.level>=3)execAutoBuy(lc.c,stk);
+      if(autoState.level>=3){
+        execAutoBuy(lc.c,stk);
+        addMsg('ai',`🤖 자동매매 Lv${autoState.level} 실행\n${stk.nm} ${lc.c.toLocaleString()}원\n점수: ${score}/9 | R/R: ${rr.toFixed(2)}\n조건: ${reasons.slice(0,2).join(', ')}`);
+      }
     } else {
       updAdvBoxes(`관망 — ${stk.nm} (${score}/9점)`,`R/R ${rr.toFixed(2)} | ${score<7?"셋업 미완성":"R/R 기준 미달"}`);
     }
@@ -4122,7 +4125,7 @@ function runAutoStep(cs){
     }
   }
 }
-function execAutoBuy(pr,stk){
+async function execAutoBuy(pr,stk){
   if(!autoState.running||autoState.level<3)return;
   if(mock.lossSeries>=3&&autoState.cfg.brk){addMsg("ai","⏸ 연속 손절 3회 — 자동매매 일시정지\n[Phase 11: 뇌동매매 방지]");stopAuto();return;}
   const qty=Math.floor(mock.cash*(autoState.cfg.pos/100)/pr);
@@ -4302,7 +4305,7 @@ async function detectTechnique(cs, stk){
   const isBreakout=lc.h>=maxHigh*0.99&&volRatio>=2;
   const isPullback=lc.c>lma20&&lc.c<lma5&&volRatio<1;
   const isGap=lc.o>pc.c*1.01;
-  const isFirstBar=sim.idx<=3;
+  const isFirstBar=sim.idx<=6; // 처음 6봉 이내
   const isMomentum=rsi>=50&&volRatio>=1.5&&chgPct>0;
   let technique="눌림목", score=0;
   if(isBreakout){technique="돌파";score=4;}
@@ -4564,13 +4567,13 @@ async function runFullAutoStep(cs, stk){
   const reason=`${tech.technique} 기법 감지 · RSI${tech.rsi} · 거래량×${tech.volRatio} · R/R 1:${tech.rr}`;
   addDecisionLog(`[${stk.nm}] 기법감지: ${tech.technique}`, reason, `Phase ${tech.phase}`);
   // Level 2 이상: 진입 신호 표시
-  if(autoState.level>=2 && tech.score>=3){
+  if(autoState.level>=2 && tech.score>=2){
     updAdvBoxes(
       `${tech.technique} 셋업 감지 — ${stk.nm}`,
       `진입 ${tech.entry.toLocaleString()} / 손절 ${tech.stop.toLocaleString()} / 목표 ${tech.target.toLocaleString()}
 ${TECHNIQUES[tech.technique]?.cond||""}`
     );
-    if(autoState.level>=3 && tech.score>=3){
+    if(autoState.level>=3 && tech.score>=2){
       // 진입가/손절/목표 주문창에 자동 세팅 후 매수
       document.getElementById("ofPr").value=tech.entry;
       document.getElementById("ofStop").value=tech.stop;
@@ -6925,7 +6928,7 @@ window.onload=()=>{
   setInterval(liveUpdate,2200);
   setInterval(checkStopOrders,800);
   setInterval(refreshWatchlistPrices, 5000); // 관심종목 가격 5초마다 순차 갱신
-  setInterval(autoAdvUpdate,8000);
+  setInterval(autoAdvUpdate,5000);
   setTimeout(async()=>{
     await checkDartApiStatus();
     updateAIAdvisor();
