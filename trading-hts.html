@@ -456,7 +456,7 @@ input,select,textarea{-webkit-appearance:none;appearance:none;}
 </div>
 
 <!-- ── HTS PAGE ── -->
-<div class="page on" id="page-hts" style="position:relative;">
+<div class="page on" id="page-hts" class="page on" style="position:relative;">
   <!-- LIVE OVERLAY -->
   <div class="live-ov" id="liveOv">
     <div class="live-box">
@@ -1798,6 +1798,8 @@ function todayStr(){const d=new Date();return `${d.getFullYear()}-${String(d.get
 // ═══════════════════════════════
 window.onload=()=>{
   loadState();
+  // HTS 탭 명시적 활성화
+  goPage('hts', document.getElementById('tab-hts'));
   document.getElementById("mockDate").value=sim.date;
   renderAll();
   genCandles(); initChart();
@@ -2016,7 +2018,8 @@ function initChart(){
       if(dragStart===null) return;
       const dx = e.clientX - dragStart;
       const allC = sim.candles.slice(0, Math.max(sim.idx+1,10));
-      const pixPerCandle = canvas.clientWidth / chartViewCount;
+      const w = canvas.clientWidth || canvas.offsetWidth || 800;
+      const pixPerCandle = w / Math.max(chartViewCount, 1);
       const candleShift = Math.round(-dx / pixPerCandle);
       chartViewStart = Math.max(0, Math.min(dragStartView+candleShift, allC.length-chartViewCount));
       initChart();
@@ -2033,9 +2036,10 @@ function initChart(){
     canvas.addEventListener("touchmove", e=>{
       e.preventDefault();
       const allC = sim.candles.slice(0, Math.max(sim.idx+1,10));
+      const w = canvas.clientWidth || canvas.offsetWidth || 800;
       if(e.touches.length===1 && touchStart!==null){
         const dx=e.touches[0].clientX-touchStart;
-        const pixPerCandle=canvas.clientWidth/chartViewCount;
+        const pixPerCandle=w/Math.max(chartViewCount,1);
         const shift=Math.round(-dx/pixPerCandle);
         chartViewStart=Math.max(0,Math.min(touchStartView+shift,allC.length-chartViewCount));
         initChart();
