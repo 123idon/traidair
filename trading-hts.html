@@ -1872,8 +1872,9 @@ function genCandles(tk,dt){
   const tkSeed=stk.tk.split("").reduce((a,c)=>a+c.charCodeAt(0),0);
   const seed=(parseInt((dt||sim.date).replace(/-/g,"").slice(-6))||9999)+tkSeed;
   const rnd=rng32(seed);
-  const dash=getDashData(dt||sim.date);
-  const bias=dash?(dash.score>=7?3e-4:dash.score>=4?0:-3e-4):0;
+  // ★ 미래 데이터 참조 금지: getDashData(당일 점수)로 bias 계산하면 안 됨
+  // 봉 데이터는 순수하게 랜덤 시드만으로 생성 (당일 결과를 미리 알 수 없음)
+  const bias=0; // 시장 점수 기반 bias 제거
   const res=[];
   for(let i=0;i<perDay;i++){
     const r1=rnd(),r2=rnd(),r3=rnd(),r4=rnd();
@@ -1884,7 +1885,11 @@ function genCandles(tk,dt){
     res.push({t:`${String(Math.floor(hm/60)).padStart(2,"0")}:${String(hm%60).padStart(2,"0")}`,o:Math.round(o),h:Math.round(Math.max(o,c,h)),l:Math.round(Math.min(o,c,l)),c:Math.round(c),v});
     base=c;
   }
-  sim.candles=res; sim.idx=res.length-1; if(res.length>0)updPrice(res[res.length-1]); return res;
+  sim.candles=res;
+  // ★ 시뮬 시작 시 idx를 0으로 설정 — 처음부터 시작
+  sim.idx=0;
+  if(res.length>0)updPrice(res[0]);
+  return res;
 }
 
 // ── 추가 전역 변수/함수 ──
@@ -1920,11 +1925,12 @@ let _chartRaf=null;
 
 // 뷰 상태
 function _cvAll(){
-  // 시뮬 재생 중이면 idx까지만, 아니면 전체
-  if(sim.playing){
-    return sim.candles.slice(0,Math.max(sim.idx+1,10));
-  }
-  return sim.candles.length?sim.candles:[];
+  // ★ 핵심 원칙: 절대 미래 봉 참조 금지
+  // sim.idx = 현재 시각. 이 이후 봉은 아직 일어나지 않은 미래.
+  // 재생 중이든 아니든 항상 idx까지만 반환
+  if(!sim.candles.length) return [];
+  const cutoff = Math.min(sim.idx+1, sim.candles.length);
+  return sim.candles.slice(0, Math.max(cutoff, 1));
 }
 function _cvCs(){
   const a=_cvAll();
@@ -2403,10 +2409,10 @@ function setTF(el,tf){
     document.querySelectorAll(".tf-btn").forEach(b=>b.classList.remove("on"));
     el.classList.add("on");
     genCandles(activeTk,sim.date);
-    // TF 변경 시 뷰 리셋 — 전체 봉 보이도록
-    const total=sim.candles.length;
-    chartViewCount=Math.min(total,80);
-    chartViewStart=Math.max(0,total-chartViewCount);
+    // ★ idx=0부터 시작 (미래 데이터 참조 금지)
+    sim.idx=0;
+    chartViewCount=Math.min(80,sim.candles.length);
+    chartViewStart=0;
     drawChart();
   }catch(e){
     const ci=document.getElementById("cinfo");
@@ -5803,7 +5809,9 @@ window.onload=()=>{
   }).catch(()=>{});
   updateKisStatus();
   renderAll();
-  genCandles();
+  genCandles(); // ★ genCandles 내부에서 idx=0 설정됨 (미래 데이터 참조 금지)
+  chartViewCount=Math.min(80,sim.candles.length);
+  chartViewStart=0;
   // 레이아웃 완성 후 차트 렌더 (requestAnimationFrame 중첩으로 보장)
   requestAnimationFrame(()=>requestAnimationFrame(()=>{
     drawChart();
