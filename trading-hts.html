@@ -6132,8 +6132,7 @@ function seekToPos(e, el){
   seekToSlider(pct*100);
 }
 
-// ── updChartToIdx에서 슬라이더 동기화 ──
-const _origUpdChartToIdx = updChartToIdx;
+// ── updChartToIdx에서 슬라이더 동기화 (seekToPos에서 직접 호출) ──
 
 // ── Phase 8 실시간 수치 표시 ──
 function updatePhase8Live(){
@@ -6473,13 +6472,32 @@ async function runIdxAIPrediction(){
   }catch(e){}
 }
 
-// updChartToIdx에서 지수 동기화 (봉 진행 시마다)
-const _origUpdChart = updChartToIdx;
+// ── updChartToIdx: 봉 이동 시 일괄 처리 (무한재귀 없음) ──
 function updChartToIdx(){
-  _origUpdChart();
-  _syncIdxWithSim();
-  _onSimBarAdvance(); // 5봉마다 시장 데이터 갱신
-  // 3분마다 AI 예측 (실제 시간 기준)
+  // 1. 차트 렌더
+  const cs = getCandles(1);
+  const lc = cs[cs.length-1];
+  if(lc) updPrice(lc);
+  // 슬라이더 동기화
+  const total = sim.candles.length;
+  const pct = total > 1 ? (sim.idx / (total-1)) * 100 : 0;
+  const sl = document.getElementById('simSlider');
+  if(sl) sl.value = pct;
+  const pf = document.getElementById('progF');
+  if(pf) pf.style.width = pct + '%';
+  const msBar = document.getElementById('msBar');
+  if(msBar) msBar.textContent = sim.idx;
+  const msTime = document.getElementById('msTime');
+  if(msTime && lc) msTime.textContent = lc.t || '--:--';
+  drawChart();
+  // 2. 자동매매 step 체크 (Level 4 마감청산)
+  if(autoState.running){
+    const _cs = getCandles(1);
+    runAutoStep(_cs);  // Level 4 마감청산 전용
+  }
+  // 3. 지수/시장 데이터 동기화 (5봉마다)
+  _onSimBarAdvance();
+  // 4. AI 예측 (3분마다, 비동기)
   runIdxAIPrediction().catch(()=>{});
 }
 
