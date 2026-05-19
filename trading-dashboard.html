@@ -265,7 +265,7 @@ async function callClaude(prompt, maxTokens=800){
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
-        model:'claude-sonnet-4-20250514',
+        model:'claude-sonnet-4-5',
         max_tokens: maxTokens,
         messages:[{role:'user',content:prompt}]
       })
@@ -458,7 +458,7 @@ async function sendChat(){
     const res = await fetch('/api/claude',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:300,system:sysPrompt,messages:hist})
+      body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:300,system:sysPrompt,messages:hist})
     });
     const d = await res.json();
     const reply = d.content?.[0]?.text||'응답 없음';

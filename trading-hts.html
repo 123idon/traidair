@@ -1412,7 +1412,7 @@ input,select,textarea{-webkit-appearance:none;appearance:none;}
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
             <div style="background:var(--bg);border-radius:8px;padding:10px;">
               <div style="font-size:9px;color:var(--tm);font-family:var(--mono);">사용 모델</div>
-              <div style="font-family:var(--mono);font-size:11px;font-weight:600;margin-top:2px;">claude-sonnet-4-20250514</div>
+              <div style="font-family:var(--mono);font-size:11px;font-weight:600;margin-top:2px;">claude-sonnet-4-5</div>
             </div>
             <div style="background:var(--bg);border-radius:8px;padding:10px;">
               <div style="font-size:9px;color:var(--tm);font-family:var(--mono);">오늘 호출 횟수</div>
@@ -1576,7 +1576,7 @@ input,select,textarea{-webkit-appearance:none;appearance:none;}
         </div>
         <!-- 요금 계산 기준 -->
         <div style="margin-top:10px;padding:8px 10px;background:rgba(49,130,246,.05);border-radius:8px;font-size:9px;color:var(--tm);line-height:1.6;">
-          💡 요금 기준 (claude-sonnet-4-20250514)<br>
+          💡 요금 기준 (claude-sonnet-4-5)<br>
           입력: $3.00 / 1M tokens · 출력: $15.00 / 1M tokens<br>
           실제 청구는 Anthropic 콘솔에서 확인 → <a href="https://console.anthropic.com" target="_blank" style="color:var(--b);">console.anthropic.com</a>
         </div>
@@ -2994,7 +2994,7 @@ async function runNewsImpact(){
   el.innerHTML='<span style="color:var(--tm);font-style:italic;">AI 분석 중...</span>';
   try{
     const res=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:500,
+      body:JSON.stringify({model:"claude-sonnet-4-5",max_tokens:500,
         messages:[{role:"user",content:`단타 트레이딩 멘토. 아래 뉴스/공시가 어떤 섹터에 어떻게 영향 미치는지 분석해줘.
 
 뉴스: ${text}
@@ -3050,7 +3050,7 @@ async function runAIPatternAnalysis(){
 최대 연속 손실: ${mock.lossSeries}회`;
   try{
     const res=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:600,
+      body:JSON.stringify({model:"claude-sonnet-4-5",max_tokens:600,
         messages:[{role:"user",content:`단타 트레이딩 멘토. Phase 12 복기 분석을 해줘.
 
 매매 통계:
@@ -3084,7 +3084,7 @@ async function runMySetupAI(){
   const wins=trades.filter(t=>t.pnl>0);
   const summary=`수익 매매 ${wins.length}회 / 총 ${trades.length}회\n승률 ${(wins.length/trades.length*100).toFixed(0)}%\n평균수익 ${wins.length?Math.round(wins.reduce((a,t)=>a+t.pnl,0)/wins.length).toLocaleString():'0'}원`;
   try{
-    const data=await callClaude({model:"claude-sonnet-4-20250514",max_tokens:500,
+    const data=await callClaude({model:"claude-sonnet-4-5",max_tokens:500,
       messages:[{role:"user",content:`단타 트레이딩 Phase 10-10. 아래 매매 데이터에서 나만의 셋업을 추출해줘.\n\n${summary}\n\n수익 거래: ${wins.slice(-10).map(t=>`${t.nm} ${(t.price||0).toLocaleString()}원 +${Math.round(t.pnl)}원 (${t.time||''})`).join(' / ')}\n\n분석:\n1. 수익 패턴의 공통 조건 (시간대/종목특성/진입방식)\n2. 나만의 셋업 이름 제안\n3. 셋업 진입 조건 3가지\n4. 셋업 청산 조건\n5. 백테스트 권장 사항\n100자 이내.`}]},
       "나만의셋업AI");
     el.style.whiteSpace='pre-wrap'; el.style.color='var(--ts)';
@@ -4157,7 +4157,7 @@ Phase 8 STEP 0~7 간략 점검 결과를 JSON으로 답해:
 }`;
 
   try{
-    const data=await callClaude({model:"claude-sonnet-4-20250514",max_tokens:700,messages:[{role:"user",content:prompt}]},"Phase8 종합분석");
+    const data=await callClaude({model:"claude-sonnet-4-5",max_tokens:700,messages:[{role:"user",content:prompt}]},"Phase8 종합분석");
     const raw=data.content?.[0]?.text||"{}";
     let p;try{const m=raw.match(/\{[\s\S]*\}/);p=JSON.parse(m?m[0]:"{}"); }catch(e){p={};}
 
@@ -4345,7 +4345,7 @@ async function runAISectorAnalysis(){
 JSON 형식으로만 답해 (다른 텍스트 없이):
 {"sectors":[{"name":"섹터명","grade":"🟢","material":"A","reason":"이유"},...], "topSector":"최우선섹터명", "caution":"오늘 주의사항"}`;
   try{
-    const res=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:500,messages:[{role:"user",content:prompt}]})});
+    const res=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-5",max_tokens:500,messages:[{role:"user",content:prompt}]})});
     const data=await res.json();
     const raw=data.content?.[0]?.text||"{}";
     let p;try{const m=raw.match(/\{[\s\S]*\}/);p=JSON.parse(m?m[0]:"{}");}catch(e){p={};}
@@ -4399,7 +4399,7 @@ ${top3.map(r=>`- ${r.stk.nm}(${r.stk.tk}): 점수${r.score}/10, 신호:${r.tags.
 JSON만 답해:
 {"stocks":[{"name":"종목명","fit":"○","material":"A","stop":"3%","reason":"이유"},...], "bestPick":"최우선종목명"}`;
   try{
-    const res=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:400,messages:[{role:"user",content:prompt}]})});
+    const res=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-5",max_tokens:400,messages:[{role:"user",content:prompt}]})});
     const data=await res.json();
     const raw=data.content?.[0]?.text||"{}";
     let p;try{const m=raw.match(/\{[\s\S]*\}/);p=JSON.parse(m?m[0]:"{}");}catch(e){p={};}
@@ -4445,7 +4445,7 @@ C급: 소문/SNS — 진입금지
 JSON만 답해:
 {"grade":"A","duration":"1~3일","action":"눌림목 진입 검토","reason":"이유 1문장","warning":"주의사항"}`;
   try{
-    const res=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:250,messages:[{role:"user",content:prompt}]})});
+    const res=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-5",max_tokens:250,messages:[{role:"user",content:prompt}]})});
     const data=await res.json();
     const raw=data.content?.[0]?.text||"{}";
     let p;try{const m=raw.match(/\{[\s\S]*\}/);p=JSON.parse(m?m[0]:"{}");}catch(e){p={};}
@@ -4971,7 +4971,7 @@ async function sendChat(txt){
   addMsg("me",msg);chatHist.push({role:"user",content:msg});
   appendTyping();chatBusy=true;document.getElementById("sendBtn").disabled=true;
   try{
-    const res=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:500,system:buildSys(),messages:chatHist.slice(-10)})});
+    const res=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-5",max_tokens:500,system:buildSys(),messages:chatHist.slice(-10)})});
     const data=await res.json();removeTyping();
     const rep=data.content?.[0]?.text||"응답 오류";
     chatHist.push({role:"assistant",content:rep});addMsg("ai",rep);
@@ -5186,7 +5186,7 @@ async function genJModal(){
   const wins=tt.filter(t=>t.side==="sell"&&t.pnl>0).length,total=tt.filter(t=>t.side==="sell").length;
   const str=tt.map(t=>`${t.side==="buy"?"매수":"매도"} ${t.nm} ${t.qty}주 @${t.price.toLocaleString()}${t.pnl?` 손익${t.pnl>=0?"+":""}${t.pnl.toLocaleString()}원`:""} ${t.auto?"[AI매매]":""}`).join("\n");
   try{
-    const res=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:600,messages:[{role:"user",content:`매매내역:\n${str}\n총손익:${pnl>=0?"+":""}${pnl}원 | 승률:${total?Math.round(wins/total*100):0}%\nJSON만 출력(다른텍스트금지): {"summary":"한줄요약","analysis":"분석2~3문장","mistakes":"반복주의실수1가지","tomorrow":"내일원칙1가지","score":"10점자가평가"} 한국어`}]})});
+    const res=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-5",max_tokens:600,messages:[{role:"user",content:`매매내역:\n${str}\n총손익:${pnl>=0?"+":""}${pnl}원 | 승률:${total?Math.round(wins/total*100):0}%\nJSON만 출력(다른텍스트금지): {"summary":"한줄요약","analysis":"분석2~3문장","mistakes":"반복주의실수1가지","tomorrow":"내일원칙1가지","score":"10점자가평가"} 한국어`}]})});
     const data=await res.json();
     let p;try{const m=(data.content?.[0]?.text||"{}").match(/\{[\s\S]*\}/);p=JSON.parse(m?m[0]:"{}"); }catch(e){p={};}
     body.innerHTML=`<div class="jday" style="margin-bottom:0;"><div class="jd-hdr"><span class="jd-dt">${sim.date}</span><span class="jd-pnl ${pnl>=0?"cu":"cd"}">${pnl>=0?"+":""}${pnl.toLocaleString()}원</span></div><div class="jd-sub">${tt.length}건 · 승률${total?Math.round(wins/total*100):0}% · AI평가${p.score||"-"}/10</div><b style="font-size:12px;">${p.summary||""}</b><div class="jd-ai" style="margin-top:6px;">${(p.analysis||"").replace(/\n/g,"<br>")}</div>${p.mistakes?`<div class="jd-note err">⚠ ${p.mistakes}</div>`:""}${p.tomorrow?`<div class="jd-note tip">▶ 내일: ${p.tomorrow}</div>`:""}</div>`;
@@ -5208,7 +5208,7 @@ async function genAllJournals(){
     const wins=tt.filter(t=>t.side==="sell"&&t.pnl>0).length,total=tt.filter(t=>t.side==="sell").length;
     const str=tt.map(t=>`${t.side==="buy"?"매수":"매도"} ${t.nm} @${t.price.toLocaleString()} ${t.qty}주 ${t.auto?"[AI]":""}`).join(", ");
     try{
-      const res=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:400,messages:[{role:"user",content:`${str}\n손익${pnl>=0?"+":""}${pnl}원 승률${total?Math.round(wins/total*100):0}%\nJSON: {"summary":"...","analysis":"...","mistakes":"...","tomorrow":"...","score":"..."} 한국어`}]})});
+      const res=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-5",max_tokens:400,messages:[{role:"user",content:`${str}\n손익${pnl>=0?"+":""}${pnl}원 승률${total?Math.round(wins/total*100):0}%\nJSON: {"summary":"...","analysis":"...","mistakes":"...","tomorrow":"...","score":"..."} 한국어`}]})});
       const data=await res.json();
       let p;try{const m=(data.content?.[0]?.text||"{}").match(/\{[\s\S]*\}/);p=JSON.parse(m?m[0]:"{}"); }catch(e){p={};}
       saveJEntry(date,p,pnl,wins,total,str);await new Promise(r=>setTimeout(r,400));
@@ -5453,7 +5453,7 @@ async function loadSectorRanking(){
 응답 형식 (JSON만, 다른 텍스트 없이):
 {"sectors":[{"rank":1,"name":"섹터명","reason":"한줄이유","signal":"🔥강세/🟡중립/⚪약세"},...]}`;
 
-    const data = await callClaude({model:'claude-sonnet-4-20250514',max_tokens:600,messages:[{role:'user',content:prompt}]},'섹터순위');
+    const data = await callClaude({model:'claude-sonnet-4-5',max_tokens:600,messages:[{role:'user',content:prompt}]},'섹터순위');
     const text = data.content?.[0]?.text||'';
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if(!jsonMatch) throw new Error('파싱 실패');
@@ -5487,7 +5487,7 @@ async function loadSectorStocks(sectorName){
 
 응답 형식 (JSON만):
 {"stocks":[{"rank":1,"name":"종목명","code":"코드","reason":"한줄이유(쉽게)","action":"매수관심/관망/주의"},...]}`;
-    const data = await callClaude({model:'claude-sonnet-4-20250514',max_tokens:500,messages:[{role:'user',content:prompt}]},'주도주');
+    const data = await callClaude({model:'claude-sonnet-4-5',max_tokens:500,messages:[{role:'user',content:prompt}]},'주도주');
     const text = data.content?.[0]?.text||'';
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if(!jsonMatch) throw new Error('파싱 실패');
@@ -5582,7 +5582,7 @@ RSI: ${rsi} | 5MA: ${ma5} | 20MA: ${ma20}
 이 구간 차트 상황 한마디로 요약하고 대응 알려줘. 4줄 이내.`,
   };
   try{
-    const data = await callClaude({model:'claude-sonnet-4-20250514',max_tokens:200,messages:[{role:'user',content:prompts[type]}]},'차트클릭AI');
+    const data = await callClaude({model:'claude-sonnet-4-5',max_tokens:200,messages:[{role:'user',content:prompts[type]}]},'차트클릭AI');
     const text = data.content?.[0]?.text||'분석 실패';
     if(body) body.innerHTML = text.replace(/\n/g,'<br>');
   }catch(e){
