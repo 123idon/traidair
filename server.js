@@ -141,8 +141,12 @@ const server = http.createServer(async (req, res) => {
         if (cfg.dartKey)      runtimeConfig.dartKey = cfg.dartKey;
         saveToFile(runtimeConfig);
         console.log('✅ 설정 저장:', Object.keys(cfg).join(', '));
+        // GitHub에 영구 저장 (재배포 후에도 유지)
+        saveConfigToGitHub(runtimeConfig).then(ok => {
+          if(ok) console.log('✅ GitHub 영구 저장 완료');
+        }).catch(()=>{});
         res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
-        res.end(JSON.stringify({ ok: true, saved: Object.keys(cfg) }));
+        res.end(JSON.stringify({ ok: true, saved: Object.keys(cfg), github: true }));
       } catch(e) {
         res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
         res.end(JSON.stringify({ ok: false, error: e.message }));
@@ -415,4 +419,122 @@ server.listen(PORT, () => {
   console.log(`Claude API: ${runtimeConfig.claudeKey ? '✅' : '❌ 없음 — Railway Variables에 ANTHROPIC_API_KEY 설정'}`);
   console.log(`KIS API: ${runtimeConfig.kisAppKey ? '✅' : '❌ 없음'}`);
   console.log(`DART API: ${runtimeConfig.dartKey ? '✅' : '❌ 없음'}`);
+});
+
+// ── GitHub 기반 영구 설정 저장/로드 ──
+const GITHUB_TOKEN = process.env.GITHUB_TOKEN || '';
+const GITHUB_REPO = '123idon/traidair';
+const CONFIG_FILE = 'user.config.json';
+
+async function loadConfigFromGitHub() {
+  if (!GITHUB_TOKEN) return;
+  return new Promise((resolve) => {
+    const req = https.request({
+      hostname: 'api.github.com',
+      path: `/repos/${GITHUB_REPO}/contents/${CONFIG_FILE}`,
+      method: 'GET',
+      headers: {
+        'Authorization': `token ${GITHUB_TOKEN}`,
+        'User-Agent': 'traidair-server',
+        'Accept': 'application/vnd.github.v3+json',
+      },
+    }, res => {
+      let d = '';
+      res.on('data', c => d += c);
+      res.on('end', () => {
+        try {
+          if (res.statusCode === 200) {
+            const file = JSON.parse(d);
+            const content = Buffer.from(file.content, 'base64').toString('utf-8');
+            const cfg = JSON.parse(content);
+            if (cfg.kisAppKey)    runtimeConfig.kisAppKey = cfg.kisAppKey;
+            if (cfg.kisAppSecret) runtimeConfig.kisAppSecret = cfg.kisAppSecret;
+            if (cfg.kisAccount)   runtimeConfig.kisAccount = cfg.kisAccount;
+            if (cfg.kisMode)      runtimeConfig.kisMode = cfg.kisMode;
+            if (cfg.dartKey)      runtimeConfig.dartKey = cfg.dartKey;
+            if (cfg.claudeKey)    runtimeConfig.claudeKey = cfg.claudeKey;
+            console.log('✅ GitHub에서 설정 로드됨:', {
+              kis: cfg.kisAppKey ? '✅' : '❌',
+              account: cfg.kisAccount || '없음',
+              claude: cfg.claudeKey ? '✅' : '❌',
+            });
+          }
+        } catch(e) { console.log('GitHub 설정 파싱 실패:', e.message); }
+        resolve();
+      });
+    });
+    req.on('error', () => resolve());
+    req.setTimeout(5000, () => { req.destroy(); resolve(); });
+    req.end();
+  });
+}
+
+let _githubFileSha = null;
+async function saveConfigToGitHub(cfg) {
+  if (!GITHUB_TOKEN) return false;
+  const content = Buffer.from(JSON.stringify({...runtimeConfig, ...cfg, savedAt: new Date().toISOString()}, null, 2)).toString('base64');
+  
+  // 현재 SHA 가져오기 (업데이트에 필요)
+  if (!_githubFileSha) {
+    await new Promise(resolve => {
+      const req = https.request({
+        hostname: 'api.github.com',
+        path: `/repos/${GITHUB_REPO}/contents/${CONFIG_FILE}`,
+        method: 'GET',
+        headers: { 'Authorization': `token ${GITHUB_TOKEN}`, 'User-Agent': 'traidair-server', 'Accept': 'application/vnd.github.v3+json' },
+      }, res => {
+        let d = '';
+        res.on('data', c => d += c);
+        res.on('end', () => {
+          try { if (res.statusCode === 200) _githubFileSha = JSON.parse(d).sha; } catch(e) {}
+          resolve();
+        });
+      });
+      req.on('error', () => resolve());
+      req.end();
+    });
+  }
+
+  const body = JSON.stringify({
+    message: 'Update user config',
+    content,
+    ...(_githubFileSha ? { sha: _githubFileSha } : {}),
+  });
+
+  return new Promise(resolve => {
+    const req = https.request({
+      hostname: 'api.github.com',
+      path: `/repos/${GITHUB_REPO}/contents/${CONFIG_FILE}`,
+      method: 'PUT',
+      headers: {
+        'Authorization': `token ${GITHUB_TOKEN}`,
+        'User-Agent': 'traidair-server',
+        'Accept': 'application/vnd.github.v3+json',
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(body),
+      },
+    }, res => {
+      let d = '';
+      res.on('data', c => d += c);
+      res.on('end', () => {
+        try {
+          const result = JSON.parse(d);
+          if (result.content?.sha) { _githubFileSha = result.content.sha; }
+          console.log('✅ GitHub 설정 저장됨 (영구)');
+          resolve(true);
+        } catch(e) { resolve(false); }
+      });
+    });
+    req.on('error', () => resolve(false));
+    req.write(body); req.end();
+  });
+}
+
+// 서버 시작 시 GitHub에서 설정 로드
+loadConfigFromGitHub().then(() => {
+  console.log('설정 최종 상태:', {
+    claude: runtimeConfig.claudeKey ? '✅' : '❌',
+    kis: runtimeConfig.kisAppKey ? '✅' : '❌',
+    account: runtimeConfig.kisAccount || '없음',
+  });
 });
