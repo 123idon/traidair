@@ -44,8 +44,17 @@ function kisHost(mode) {
     : 'openapivts.koreainvestment.com';
 }
 
+function kisPort(mode) {
+  return mode === 'real' ? 9443 : 29443;
+}
+
 function kisRequest(opts, body) {
   return new Promise((resolve, reject) => {
+    // port가 없으면 모드에 따라 자동 설정
+    if (!opts.port) {
+      const mode = opts._mode || 'real';
+      opts.port = kisPort(mode);
+    }
     const req = https.request(opts, res => {
       let d = '';
       res.on('data', c => d += c);
@@ -69,6 +78,7 @@ async function getKisToken(appKey, appSecret, mode) {
   const body = JSON.stringify({ grant_type: 'client_credentials', appkey: appKey, appsecret: appSecret });
   const result = await kisRequest({
     hostname: kisHost(mode),
+    port: kisPort(mode),
     path: '/oauth2/tokenP',
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
@@ -315,6 +325,7 @@ const server = http.createServer(async (req, res) => {
 
         const result = await kisRequest({
           hostname: kisHost('real'),
+          port: kisPort('real'),
           path: `/uapi/domestic-stock/v1/quotations/inquire-asking-price-exp-ccn?fid_cond_mrkt_div_code=J&fid_input_iscd=${code}`,
           method: 'GET',
           headers: {
@@ -355,6 +366,7 @@ const server = http.createServer(async (req, res) => {
         if (!token) throw new Error('토큰 없음');
         const result = await kisRequest({
           hostname: kisHost(mode || 'mock'),
+          port: kisPort(mode || 'mock'),
           path: `/uapi/domestic-stock/v1/quotations/inquire-price?fid_cond_mrkt_div_code=J&fid_input_iscd=${code}`,
           method: 'GET',
           headers: {
@@ -397,7 +409,8 @@ const server = http.createServer(async (req, res) => {
         const orderBody = { CANO: acntPfx, ACNT_PRDT_CD: acntSfx || '01', PDNO: code, ORD_DVSN: ordDvsn, ORD_QTY: String(qty), ORD_UNPR: ordDvsn === '01' ? '0' : String(price) };
         const bodyStr = JSON.stringify(orderBody);
         const result = await kisRequest({
-          hostname: kisHost(mode || 'mock'), path: '/uapi/domestic-stock/v1/trading/order-cash', method: 'POST',
+          hostname: kisHost(mode || 'mock'),
+          port: kisPort(mode || 'mock'), path: '/uapi/domestic-stock/v1/trading/order-cash', method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(bodyStr), 'authorization': `Bearer ${token}`, 'appkey': appKey, 'appsecret': appSecret, 'tr_id': trId, 'custtype': 'P', 'hashkey': '' },
         }, bodyStr);
         const d = result.data;
@@ -426,6 +439,7 @@ const server = http.createServer(async (req, res) => {
         const isMock = (mode || 'mock') === 'mock';
         const result = await kisRequest({
           hostname: kisHost(mode || 'mock'),
+          port: kisPort(mode || 'mock'),
           path: `/uapi/domestic-stock/v1/trading/inquire-balance?CANO=${acntPfx}&ACNT_PRDT_CD=${acntSfx||'01'}&AFHR_FLPR_YN=N&OFL_YN=&INQR_DVSN=02&UNPR_DVSN=01&FUND_STTL_ICLD_YN=N&FNCG_AMT_AUTO_RDPT_YN=N&PRCS_DVSN=01&CTX_AREA_FK100=&CTX_AREA_NK100=`,
           method: 'GET',
           headers: { 'Content-Type': 'application/json', 'authorization': `Bearer ${token}`, 'appkey': appKey, 'appsecret': appSecret, 'tr_id': isMock ? 'VTTC8434R' : 'TTTC8434R' },
