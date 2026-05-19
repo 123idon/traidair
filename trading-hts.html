@@ -1944,17 +1944,24 @@ function genCandles(tk,dt){
   // 일봉/연봉이 아닌 경우에만 (KIS 분봉 API는 분봉만 지원)
   if(kisConfig.appKey && kisConfig.appSecret && !(sim.tf==='D'||sim.tf.startsWith('D'))){
     _fetchKisCandles(targetTk, targetDt, sim.tf).then(candles => {
-      if(candles && candles.length >= 10){
+      if(candles && candles.length >= 5){
         // 실제 데이터 성공 — 차트에 적용
         sim.candles = candles;
-        sim.idx = 0;
-        chartViewCount = Math.min(80, candles.length);
-        chartViewStart = 0;
-        if(candles.length > 0) updPrice(candles[0]);
+        const prevCount = _kisChartMeta.prevCount || 0;
+        const todayCount = _kisChartMeta.todayCount || candles.length;
+        // sim.idx: 전일 마지막 봉에서 시작 (전일 분봉 끝 + 오늘 첫 봉 전)
+        // 오늘 봉이 있으면 전일 마지막 봉에서 멈춤, 없으면 끝에서 시작
+        sim.idx = prevCount > 0 ? prevCount - 1 : 0;
+        chartViewCount = Math.min(Math.max(prevCount + 20, 80), candles.length);
+        chartViewStart = Math.max(0, candles.length - chartViewCount);
+        if(candles.length > 0) updPrice(candles[sim.idx]);
+        // 전일/당일 구분 정보 저장 (drawChart에서 사용)
+        _kisChartMeta._prevCount = prevCount;
         drawChart();
         // 상단에 실제 데이터 표시
         const ci = document.getElementById('cinfo');
-        if(ci) ci.textContent = `✅ 실제 데이터 ${candles.length}봉 | ${targetDt}`;
+        const prevDateStr = _kisChartMeta.prevDate || '';
+        if(ci) ci.textContent = `✅ 실제 ${candles.length}봉 | 전일${prevCount}봉+당일${todayCount}봉`;
         return;
       }
       // 실패 시 시뮬레이션으로 폴백
@@ -1971,6 +1978,8 @@ function genCandles(tk,dt){
   return _genSimCandles(targetTk, targetDt);
 }
 
+let _kisChartMeta = {}; // 전일/당일 봉 수 등 메타데이터
+
 async function _fetchKisCandles(code, date, tf){
   try{
     const r = await fetch('/api/kis/chart', {
@@ -1984,7 +1993,16 @@ async function _fetchKisCandles(code, date, tf){
       }),
     });
     const d = await r.json();
-    if(d.ok && d.candles && d.candles.length > 0) return d.candles;
+    if(d.ok && d.candles && d.candles.length > 0){
+      // 전일/당일 구분 메타 저장
+      _kisChartMeta = {
+        prevCount: d.prevCount || 0,
+        todayCount: d.todayCount || 0,
+        prevDate: d.prevDate || '',
+        todayDate: d.date || '',
+      };
+      return d.candles;
+    }
     console.warn('KIS 차트 데이터 없음:', d.error);
     return null;
   }catch(e){
@@ -2294,6 +2312,36 @@ function drawChart(){
   ctx.fillStyle='#8c9db5';ctx.font='8px "JetBrains Mono",monospace';ctx.textAlign='center';
   const step=Math.max(1,Math.floor(cs.length/8));
   cs.forEach((c,i)=>{if(i%step===0)ctx.fillText(c.t,toX(i),PT+mainH+14);});
+
+  // ── 전일/당일 구분선 (실제 KIS 데이터일 때) ──
+  const _prevCnt = _kisChartMeta?._prevCount || 0;
+  if(_prevCnt > 0 && _prevCnt < cs.length){
+    // 뷰포트 내 전일 마지막 봉 인덱스 계산
+    const absIdx = _prevCnt - 1; // candles 전체에서의 인덱스
+    const viewIdx = absIdx - chartViewStart; // 현재 뷰에서의 인덱스
+    if(viewIdx >= 0 && viewIdx < cs.length){
+      const lx = toX(viewIdx) + (cw/cs.length)/2; // 봉과 봉 사이
+      ctx.save();
+      ctx.strokeStyle = 'rgba(49,130,246,.5)';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4,3]);
+      ctx.beginPath();
+      ctx.moveTo(lx, PT);
+      ctx.lineTo(lx, PT + mainH);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      // "전일" 레이블
+      ctx.fillStyle = 'rgba(49,130,246,.85)';
+      ctx.font = 'bold 8px "JetBrains Mono",monospace';
+      ctx.textAlign = 'center';
+      const lbl = '전일↑오늘';
+      const lblW = ctx.measureText(lbl).width + 6;
+      ctx.fillRect(lx - lblW/2, PT + 2, lblW, 13);
+      ctx.fillStyle = '#fff';
+      ctx.fillText(lbl, lx, PT + 12);
+      ctx.restore();
+    }
+  }
 
   // 거래량
   if(volH>0){

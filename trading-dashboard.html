@@ -603,15 +603,23 @@ async function autoLoadMarketData(){
       fillMkt('bond', idx.tnx, '미국10년채');
     }
 
-    // 야간선물 (나스닥 기반 추정)
-    if (data.nightFutures) {
-      const nf = data.nightFutures;
-      const up = (nf.chgPct || 0) >= 0;
-      setMkt('night',
-        `${up ? '+' : ''}${(nf.chgPct || 0).toFixed(2)}%`,
-        nf.note || '나스닥 기반 추정',
-        up ? 1 : -1
-      );
+    // 야간선물: 나스닥 전날 데이터 = 한국 당일 장 시작 전 미국 마감 기준
+    // idx.nasdaq에 이미 올바른 전날 마감값이 들어있음 (서버에서 시간 기준 조정됨)
+    const nightEl = document.getElementById('m-night');
+    if (nightEl) {
+      if (idx.nasdaq?.price && idx.nasdaq?.chgPct != null) {
+        const nq = idx.nasdaq;
+        const up = (nq.chgPct || 0) >= 0;
+        const timeLabel = nq.lastUpdatedKST ? nq.lastUpdatedKST.slice(0,16) : '전날';
+        setMkt('night',
+          `${up ? '+' : ''}${(nq.chgPct || 0).toFixed(2)}%`,
+          `나스닥 ${timeLabel} KST 마감기준`,
+          up ? 1 : -1
+        );
+        nightEl.title = `나스닥 전날 마감: ${nq.price?.toLocaleString()} (실제 데이터)`;
+      } else {
+        setMkt('night', '-', '데이터 없음', 0);
+      }
     }
 
     // ── 갱신 시각 표시 (가장 최근 갱신된 지수 기준) ──

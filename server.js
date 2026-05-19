@@ -272,38 +272,68 @@ const server = http.createServer(async (req, res) => {
         if (!token) throw new Error('토큰 발급 실패');
 
         const interval = tf === '1' ? '1' : tf === '3' ? '3' : tf === '15' ? '15' : tf === '60' ? '60' : '5';
-        // KIS 분봉 조회 API (FHKST03010200: 국내주식 분봉조회)
-        const queryDate = (date || new Date().toISOString().slice(0,10)).replace(/-/g,'');
-        const result = await kisRequest({
-          hostname: kisHost('real'), // 분봉은 항상 실전서버 (모의서버 미지원)
-          path: `/uapi/domestic-stock/v1/quotations/inquire-time-itemchartprice?fid_etc_cls_code=&fid_cond_mrkt_div_code=J&fid_input_iscd=${code}&fid_input_hour_1=${interval}&fid_pw_data_inqu_yn=N`,
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'authorization': `Bearer ${token}`,
-            'appkey': appKey, 'appsecret': appSecret,
-            'tr_id': 'FHKST03010200',
-            'custtype': 'P',
-          },
-        });
 
-        const output2 = result.data.output2 || [];
-        // output2: [{stck_bsop_date, stck_cntg_hour, stck_prpr, stck_oprc, stck_hgpr, stck_lwpr, cntg_vol}]
-        const candles = output2
-          .filter(r => !date || r.stck_bsop_date === queryDate)
-          .map(r => ({
-            t: `${r.stck_cntg_hour.slice(0,2)}:${r.stck_cntg_hour.slice(2,4)}`,
-            o: parseInt(r.stck_oprc || r.stck_prpr),
-            h: parseInt(r.stck_hgpr || r.stck_prpr),
-            l: parseInt(r.stck_lwpr || r.stck_prpr),
-            c: parseInt(r.stck_prpr),
-            v: parseInt(r.cntg_vol || 0),
-          }))
-          .filter(c => c.c > 0)
-          .sort((a, b) => a.t.localeCompare(b.t)); // 시간순 정렬
+        // 당일 + 전일 분봉을 합쳐서 연속 차트 구성
+        // KIS FHKST03010200: 특정일 분봉 조회
+        const targetDate = (date || new Date().toISOString().slice(0,10)).replace(/-/g,'');
+
+        // 전일 날짜 계산 (주말 건너뜀)
+        const getPrevBusinessDay = (dateStr) => {
+          const d = new Date(dateStr.slice(0,4)+'-'+dateStr.slice(4,6)+'-'+dateStr.slice(6,8));
+          do { d.setDate(d.getDate() - 1); } while (d.getDay() === 0 || d.getDay() === 6);
+          return d.toISOString().slice(0,10).replace(/-/g,'');
+        };
+        const prevDate = getPrevBusinessDay(targetDate);
+
+        const fetchDayCandles = async (dayStr) => {
+          const result = await kisRequest({
+            hostname: kisHost('real'),
+            port: kisPort('real'),
+            path: `/uapi/domestic-stock/v1/quotations/inquire-time-itemchartprice?fid_etc_cls_code=&fid_cond_mrkt_div_code=J&fid_input_iscd=${code}&fid_input_hour_1=${interval}&fid_pw_data_inqu_yn=N`,
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              'authorization': `Bearer ${token}`,
+              'appkey': appKey, 'appsecret': appSecret,
+              'tr_id': 'FHKST03010200',
+              'custtype': 'P',
+            },
+          });
+          const output2 = result.data.output2 || [];
+          return output2
+            .filter(r => r.stck_bsop_date === dayStr)
+            .map(r => ({
+              t: `${r.stck_cntg_hour.slice(0,2)}:${r.stck_cntg_hour.slice(2,4)}`,
+              date: r.stck_bsop_date,
+              o: parseInt(r.stck_oprc || r.stck_prpr),
+              h: parseInt(r.stck_hgpr || r.stck_prpr),
+              l: parseInt(r.stck_lwpr || r.stck_prpr),
+              c: parseInt(r.stck_prpr),
+              v: parseInt(r.cntg_vol || 0),
+            }))
+            .filter(c => c.c > 0)
+            .sort((a, b) => a.t.localeCompare(b.t));
+        };
+
+        // 전일 + 당일 병렬 조회
+        const [prevCandles, todayCandles] = await Promise.all([
+          fetchDayCandles(prevDate).catch(() => []),
+          fetchDayCandles(targetDate).catch(() => []),
+        ]);
+
+        // 전일 분봉에 날짜 태그 추가 (차트 구분용)
+        const allCandles = [
+          ...prevCandles.map(c => ({ ...c, isPrev: true })),
+          ...todayCandles,
+        ];
 
         res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
-        res.end(JSON.stringify({ ok: true, code, date, tf: interval, candles }));
+        res.end(JSON.stringify({
+          ok: true, code, date: targetDate, prevDate, tf: interval,
+          candles: allCandles,
+          prevCount: prevCandles.length,
+          todayCount: todayCandles.length,
+        }));
       } catch(e) {
         res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
         res.end(JSON.stringify({ ok: false, error: e.message }));
@@ -620,21 +650,30 @@ const server = http.createServer(async (req, res) => {
     // KST 기준으로 period 계산
     const KST_OFFSET = 9 * 3600;
     let period1, period2, cutoffTs;
+    // 전일 영업일 계산 (주말 건너뜀)
+    const getPrevBusinessDay = (yr, mo, dy) => {
+      const d = new Date(Date.UTC(yr, mo-1, dy));
+      do { d.setDate(d.getDate() - 1); } while (d.getDay() === 0 || d.getDay() === 6);
+      return d;
+    };
 
     if (mode === 'sim' && simDate && simTime) {
-      // 모의투자 모드: 해당 날짜의 데이터 가져오되
-      // simTime 이후 데이터는 미래로 처리하여 제거
       const [yr, mo, dy] = simDate.split('-').map(Number);
       const [hh, mm] = simTime.split(':').map(Number);
-      // 전날 16시부터 해당일 종료까지 (미국 야간 포함)
-      period1 = Math.floor(new Date(Date.UTC(yr, mo-1, dy-1, 7, 0, 0)).getTime() / 1000); // 전날 16:00 KST
-      period2 = Math.floor(new Date(Date.UTC(yr, mo-1, dy, 15, 0, 0)).getTime() / 1000);  // 당일 24:00 KST
-      // 미래 차단: simTime 이후 데이터 제거
-      cutoffTs = Math.floor(new Date(Date.UTC(yr, mo-1, dy, hh-9, mm, 0)).getTime() / 1000) + tf * 60; // simTime + 1봉
+      const prevDay = getPrevBusinessDay(yr, mo, dy);
+      const prevYr = prevDay.getUTCFullYear(), prevMo = prevDay.getUTCMonth()+1, prevDy = prevDay.getUTCDate();
+
+      // ── 국내 지수 (코스피/코스닥): 해당일 장 시작(9:00 KST) ~ simTime ──
+      // ── 미국 지수 (나스닥/S&P): 전날 미국 장 시작(22:30 KST) ~ 익일 5:00 KST ──
+      // 전날 00:00 KST부터 당일 종료까지 충분히 포함
+      period1 = Math.floor(new Date(Date.UTC(prevYr, prevMo-1, prevDy, 0, 0, 0)).getTime() / 1000);
+      period2 = Math.floor(new Date(Date.UTC(yr, mo-1, dy, 15, 30, 0)).getTime() / 1000); // 당일 장 마감 KST
+      // simTime 기준 cutoff (미래 차단)
+      cutoffTs = Math.floor(new Date(Date.UTC(yr, mo-1, dy, hh-9, mm, 0)).getTime() / 1000) + tf * 60;
     } else {
-      // 실시간 모드: 오늘 데이터
+      // 실시간 모드
       const now = Math.floor(Date.now() / 1000);
-      period1 = now - 2 * 24 * 3600; // 2일 전
+      period1 = now - 2 * 24 * 3600;
       period2 = now;
       cutoffTs = now;
     }
@@ -672,14 +711,38 @@ const server = http.createServer(async (req, res) => {
       );
       const raw = await Promise.all(fetchAll);
 
-      // 결과 정리: cutoffTs 이후 데이터 완전 제거 (미래 차단)
+      // 결과 정리: 지수별로 올바른 기준 시간 적용
       const result = {};
       for (const item of raw) {
-        const filteredBars = item.bars.filter(b => b.ts < cutoffTs);
-        const lastBar = filteredBars[filteredBars.length - 1];
-        const prevBar = filteredBars[filteredBars.length - 2];
+        // 지수별 cutoff 조정:
+        // 국내(코스피/코스닥): cutoffTs 그대로 (KST 기준)
+        // 미국(나스닥/S&P/다우/VIX): 해당일 미국 장 마감 기준 (전날 KST 6:00 = 전날 미국 21:00 EST)
+        // 환율(USD/KRW): 실시간에 가까운 값 사용
+        let useCutoff = cutoffTs;
+        const isKorean = ['kospi','kosdq','kospi200'].includes(item.key);
+        const isUS = ['nasdaq','sp500','dow','vix'].includes(item.key);
+        if (mode === 'sim' && simDate) {
+          if (isUS) {
+            // 미국 장: 전날 KST 06:00 마감 (당일 KST 기준 전날 미국 마감)
+            const [yr, mo, dy] = simDate.split('-').map(Number);
+            useCutoff = Math.floor(new Date(Date.UTC(yr, mo-1, dy, 6-9, 0, 0)).getTime() / 1000);
+            // 음수 방지: 전날 21:00 UTC
+            if (useCutoff < 0) useCutoff = Math.floor(new Date(Date.UTC(yr, mo-1, dy-1, 21, 0, 0)).getTime() / 1000);
+          }
+        }
 
-        // 현재 시각 기준 최신값
+        const filteredBars = item.bars.filter(b => b.ts < useCutoff);
+        const lastBar = filteredBars[filteredBars.length - 1];
+        // 전일 종가: 국내는 전일 15:30, 미국은 전전일 마감
+        const prevBars = isKorean && mode === 'sim' && simDate
+          ? item.bars.filter(b => {
+              const [yr, mo, dy] = simDate.split('-').map(Number);
+              const dayStart = Math.floor(new Date(Date.UTC(yr, mo-1, dy, 0, 0, 0)).getTime() / 1000);
+              return b.ts < dayStart;
+            })
+          : filteredBars.slice(0, -1);
+        const prevBar = prevBars[prevBars.length - 1];
+
         const currentPrice = lastBar?.c ?? null;
         const prevClose = prevBar?.c ?? item.prev ?? null;
         const chgPct = (currentPrice && prevClose) ? ((currentPrice - prevClose) / prevClose * 100) : null;
@@ -692,7 +755,6 @@ const server = http.createServer(async (req, res) => {
           lastUpdated: lastTs ? new Date(lastTs * 1000).toISOString() : null,
           lastUpdatedKST: lastTs ? new Date((lastTs + KST_OFFSET) * 1000).toISOString().replace('T', ' ').substring(0, 19) + ' KST' : null,
           barsCount: filteredBars.length,
-          // 모의투자에서 차트 표시용 전체 봉 데이터 (cutoff 이전만)
           bars: mode === 'sim' ? filteredBars.map(b => ({ ts: b.ts, c: b.c, o: b.o, h: b.h, l: b.l })) : [],
         };
       }
