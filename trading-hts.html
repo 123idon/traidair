@@ -1903,14 +1903,10 @@ function drawChart(){
   const parent=canvas.parentElement;
   const W=parent?Math.round(parent.getBoundingClientRect().width)||parent.offsetWidth||600:600;
   const H=parent?Math.round(parent.getBoundingClientRect().height)||parent.offsetHeight||400:400;
-  // 디버그: 크기 표시
-  const ci=document.getElementById('cinfo');
-  if(ci)ci.textContent=`W=${W} H=${H}`;
   if(W<20||H<20){
     requestAnimationFrame(()=>drawChart());
     return;
   }
-  // canvas 픽셀 크기 설정 (변경 시에만 — 변경하면 canvas 내용 초기화됨)
   if(canvas.width!==W){canvas.width=W;}
   if(canvas.height!==H){canvas.height=H;}
   const ctx=canvas.getContext("2d");
@@ -1918,7 +1914,7 @@ function drawChart(){
   const cs=_cvCs();
   // 디버그: cinfo에 실제 상태 표시
   const ci=document.getElementById('cinfo');
-  if(ci)ci.textContent=`W=${W} H=${H} 봉=${cs.length} tf=${sim.tf} idx=${sim.idx}`;
+  if(ci)ci.textContent=`W=${W} H=${H} 봉=${cs.length} tf=${sim.tf}`;
   if(!cs.length){ctx.clearRect(0,0,W,H);return;}
   const cls=cs.map(c=>c.c),vls=cs.map(c=>c.v);
 
