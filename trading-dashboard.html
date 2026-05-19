@@ -668,14 +668,18 @@ async function autoLoadMarketData(){
     // HTS에 실제 점수 전달
     try { if(window.parent.setDashData) window.parent.setDashData({score: Math.round(score), date: curDate, realData: true}); } catch(e){}
 
-    // 저장 (실제 데이터)
-    saveDashData({
-      kospi: idx.kospi?.price, kosdqVal: idx.kosdq?.price,
-      usd: idx.usdkrw?.price, nasdaq: idx.nasdaq?.price,
-      sp500: idx.sp500?.price, vix: idx.vix?.price,
-      score: Math.round(score), summary, realData: true,
-      fetchedAt: data.fetchedAt,
-    });
+    // 시장 데이터 로컬 캐시 저장
+    try {
+      const dashCache = {
+        date: curDate,
+        kospi: idx.kospi?.price, kosdq: idx.kosdq?.price,
+        usd: idx.usdkrw?.price, nasdaq: idx.nasdaq?.price,
+        sp500: idx.sp500?.price, vix: idx.vix?.price,
+        score: Math.round(score), summary, realData: true,
+        fetchedAt: data.fetchedAt,
+      };
+      localStorage.setItem('dashCache_' + curDate, JSON.stringify(dashCache));
+    } catch(e) {}
 
   } catch(e) {
     console.error('시장 데이터 로드 실패:', e.message);
