@@ -4828,6 +4828,7 @@ async function saveKisConfig(){
     const d = await r.json();
     if(d.ok){
       updateKisStatus();
+      _applyModeToHTS(mode);
       showAlert('✅ 저장 완료', '서버에 영구 저장되었습니다.\n재배포 후에도 유지됩니다.');
     } else {
       throw new Error(d.error || '저장 실패');
@@ -4835,8 +4836,42 @@ async function saveKisConfig(){
   } catch(e) {
     // 서버 저장 실패해도 localStorage는 저장됨
     updateKisStatus();
+    _applyModeToHTS(mode);
     showAlert('⚠ 부분 저장', `서버 저장 실패: ${e.message}\n브라우저 로컬에는 저장되었습니다.`);
   }
+}
+
+// HTS 모드 전환 (실거래 ↔ 모의투자)
+function _applyModeToHTS(mode){
+  const badge = document.getElementById('modeBadge');
+  const text = document.getElementById('modeText');
+  const mockBar = document.querySelector('.mock-bar');
+  const playBtn = document.getElementById('playBtn');
+  const endBtn = document.querySelector('.ibtn.red[onclick*="endMock"]');
+
+  if(mode === 'real'){
+    // ── 실거래 모드 ──
+    if(badge){ badge.className = 'badge live'; }
+    if(text){ text.textContent = '실거래'; }
+    // 모의투자 컨트롤 숨김 (날짜/배속/재생 바)
+    if(mockBar){ mockBar.style.display = 'none'; }
+    // 종료 버튼 텍스트 변경
+    if(endBtn){ endBtn.textContent = '모의투자'; endBtn.onclick = ()=>{ _applyModeToHTS('mock'); kisConfig.mode='mock'; localStorage.setItem(KIS_CFG_KEY, JSON.stringify(kisConfig)); }; }
+    // 실시간 시세 즉시 갱신 시작
+    kisRefreshPrice(activeTk);
+    syncKisBalance();
+    // 실거래 안내 메시지
+    addMsg('ai', `🔴 실거래 모드 전환됨\n계좌: ${kisConfig.account}\n\n• 주문 즉시 실제 체결됩니다\n• 손절가 반드시 설정하세요\n• 잔고/보유종목 자동 동기화됩니다`);
+    // 잔고 동기화 후 차트 갱신
+    setTimeout(()=>{ kisRefreshPrice(activeTk); drawChart(); }, 1000);
+  } else {
+    // ── 모의투자 모드 ──
+    if(badge){ badge.className = 'badge mock'; }
+    if(text){ text.textContent = '모의투자'; }
+    if(mockBar){ mockBar.style.display = ''; }
+    if(endBtn){ endBtn.textContent = '■ 종료'; endBtn.onclick = endMock; }
+  }
+  closeModal('settings');
 }
 
 async function loadKisConfig(){
