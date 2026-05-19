@@ -27,11 +27,9 @@
   --sar:env(safe-area-inset-right,0px);
   --sab:env(safe-area-inset-bottom,0px);
   --sal:env(safe-area-inset-left,0px);
-  /* mobile nav */
+  /* mobile nav — 데스크탑 기본 0, 모바일에서 56px로 override */
   --mob-nav:0px;
 }
-/* 모바일에서 하단 네비게이션 높이 적용 */
-@media(max-width:860px){:root{--mob-nav:56px;}}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
 html{-webkit-text-size-adjust:100%;text-size-adjust:100%;}
 html,body{height:100%;overflow:hidden;}
@@ -336,6 +334,7 @@ button{cursor:pointer;font-family:var(--sans);}
 .live-note{font-size:9px;color:var(--tm);text-align:center;margin-top:6px;font-family:var(--mono);}
 /* ── 태블릿 (860px 이하) ── */
 @media(max-width:860px){
+  :root{--mob-nav:56px;}
   .hts{grid-template-columns:0 1fr 0 0;grid-template-rows:1fr;}
   .lp,.rp,.brp{position:fixed;z-index:300;top:0;bottom:calc(var(--mob-nav) + var(--sab));background:var(--pan);box-shadow:var(--sh2);transition:transform .25s cubic-bezier(.4,0,.2,1);will-change:transform;}
   .lp{left:0;width:220px;transform:translateX(-100%);}
@@ -347,7 +346,7 @@ button{cursor:pointer;font-family:var(--sans);}
   .si,.clk{display:none;}
   .spd-btn:nth-child(n+5){display:none;}
   /* 모바일 하단 탭바 */
-  .mob-tabbar{display:flex;}
+  .mob-tabbar{display:flex!important;}
   /* 차트 영역이 하단 탭바 위까지만 */
   .page{padding-bottom:calc(var(--mob-nav) + var(--sab));}
   .page#page-dash,.page#page-stats,.page#page-journal{padding-bottom:calc(var(--mob-nav) + var(--sab));}
