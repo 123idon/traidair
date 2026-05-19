@@ -121,7 +121,7 @@ button{cursor:pointer;font-family:var(--sans);}
 .vsep{width:1px;height:11px;background:var(--br);flex-shrink:0;}
 .cinfo{font-family:var(--mono);font-size:9px;color:var(--ts);}
 .chart-area{flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0;}
-.chart-main{flex:1;position:relative;min-height:0;background:var(--pan);}
+.chart-main{flex:1;position:relative;min-height:0;background:var(--pan);touch-action:none;user-select:none;}
 .chart-main canvas{position:absolute;inset:0;}
 .subc{height:58px;border-top:1px solid var(--br);position:relative;flex-shrink:0;}
 .subc.hide{display:none;}
@@ -1976,30 +1976,36 @@ function initChart(){
 
   if(mChart){mChart.destroy();mChart=null;}
 
-  // datasets — 모두 type 명시 (Chart.js 4.x 혼합차트 필수)
+  // datasets — 캔들은 플러그인이 그리므로 종가 라인은 좌표 참조용으로만 (숨김)
   const ds=[];
 
-  // 종가 라인 (캔들 플러그인이 위에 그림)
-  ds.push({type:"line",label:"종가",data:cls,borderColor:"rgba(0,0,0,0)",borderWidth:0,pointRadius:0,fill:false,yAxisID:"y",order:2});
+  // 종가 — 캔들 플러그인이 Y축 스케일 참조용으로 필요, 화면에는 안 보임
+  ds.push({type:"line",label:"종가",data:cls,
+    borderColor:"rgba(0,0,0,0)",backgroundColor:"rgba(0,0,0,0)",
+    borderWidth:0,pointRadius:0,fill:false,yAxisID:"y",order:99,
+    tension:0,showLine:false});
 
   // 이동평균선
   if(inds.ma){
     [["MA5","#f59e0b",5],["MA20","#10b981",20],["MA60","#ef4444",60]].forEach(([l,col,n])=>{
-      const maData=calcMA(cls,n);
-      ds.push({type:"line",label:l,data:maData,borderColor:col,borderWidth:1.5,pointRadius:0,fill:false,yAxisID:"y",order:3,tension:.05,spanGaps:true});
+      ds.push({type:"line",label:l,data:calcMA(cls,n),borderColor:col,
+        borderWidth:1.5,pointRadius:0,fill:false,yAxisID:"y",order:3,tension:.05,spanGaps:true});
     });
   }
 
   // 볼린저밴드
   if(inds.bb){
     const{upper,lower}=calcBB(cls,20,2);
-    ds.push({type:"line",label:"BB상단",data:upper,borderColor:"rgba(139,92,246,.5)",borderWidth:1,borderDash:[4,3],pointRadius:0,fill:false,yAxisID:"y",order:3,spanGaps:true});
-    ds.push({type:"line",label:"BB하단",data:lower,borderColor:"rgba(139,92,246,.5)",borderWidth:1,borderDash:[4,3],pointRadius:0,fill:false,yAxisID:"y",order:3,spanGaps:true});
+    ds.push({type:"line",label:"BB상단",data:upper,borderColor:"rgba(139,92,246,.5)",
+      borderWidth:1,borderDash:[4,3],pointRadius:0,fill:false,yAxisID:"y",order:3,spanGaps:true});
+    ds.push({type:"line",label:"BB하단",data:lower,borderColor:"rgba(139,92,246,.5)",
+      borderWidth:1,borderDash:[4,3],pointRadius:0,fill:false,yAxisID:"y",order:3,spanGaps:true});
   }
 
   // VWAP
   if(inds.vwap){
-    ds.push({type:"line",label:"VWAP",data:calcVWAP(cs),borderColor:"#06b6d4",borderWidth:1.5,borderDash:[5,3],pointRadius:0,fill:false,yAxisID:"y",order:3,spanGaps:true});
+    ds.push({type:"line",label:"VWAP",data:calcVWAP(cs),borderColor:"#06b6d4",
+      borderWidth:1.5,borderDash:[5,3],pointRadius:0,fill:false,yAxisID:"y",order:3,spanGaps:true});
   }
 
   // 거래량 바
@@ -2008,6 +2014,11 @@ function initChart(){
       backgroundColor:cs.map(c=>c.c>=c.o?"rgba(220,38,38,.35)":"rgba(37,99,235,.35)"),
       yAxisID:"y2",order:10});
   }
+
+  // Y축 범위 - 캔들 OHLC 기반으로 명시적 설정
+  const allPrices=cs.flatMap(c=>[c.h,c.l,c.o,c.c]).filter(v=>v>0);
+  const yMin=allPrices.length?Math.min(...allPrices)*0.998:0;
+  const yMax=allPrices.length?Math.max(...allPrices)*1.002:100;
 
   const canvas=document.getElementById("mainChart");
   if(!canvas){console.error("mainChart canvas 없음");return;}
@@ -2019,8 +2030,10 @@ function initChart(){
     },
     y:{
       position:"right",
+      min:yMin,
+      max:yMax,
       grid:{color:"rgba(0,0,0,.04)"},
-      ticks:{color:"#8c9db5",font:{family:"JetBrains Mono",size:8},callback:v=>v>=1000?(v/1000).toFixed(0)+"k":v}
+      ticks:{color:"#8c9db5",font:{family:"JetBrains Mono",size:8},callback:v=>v>=1000?Math.round(v/100)/10+"k":v}
     }
   };
   // 거래량 Y축은 거래량 표시할 때만 추가
@@ -3808,7 +3821,7 @@ async function detectTechnique(cs, stk){
   else if(isFirstBar&&lc.c>lc.o&&volRatio>=1.5){technique="첫봉";score=3;}
   else if(isPullback){technique="눌림목";score=3;}
   else if(isMomentum&&volRatio>=2){technique="이슈테마";score=3;}
-  else if(parseFloat(lrsi)<=30&&lc.c>lc.o&&(lc.c-lc.l)>(lc.h-lc.c)*1.5){
+  else if(rsi<=30&&lc.c>lc.o&&(lc.c-lc.l)>(lc.h-lc.c)*1.5){
     // RSI 30이하 + 망치형(아래꼬리가 윗꼬리의 1.5배 이상) → 역추세
     technique="역추세";score=2;
   }
