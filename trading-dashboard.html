@@ -2,7 +2,10 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#ffffff">
 <title>TraidAIr 대시보드</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
@@ -14,8 +17,11 @@
   --mono:"JetBrains Mono",monospace;--sans:"Noto Sans KR",sans-serif;
   --sh0:0 1px 3px rgba(0,0,0,.08);
 }
-*{box-sizing:border-box;margin:0;padding:0;}
-html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--tp);font-family:var(--sans);font-size:12px;}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--tp);font-family:var(--sans);font-size:12px;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-left:env(safe-area-inset-left,0px);
+  padding-right:env(safe-area-inset-right,0px);}
 ::-webkit-scrollbar{width:4px;} ::-webkit-scrollbar-thumb{background:var(--brb);border-radius:4px;}
 .cu{color:var(--g);}.cd{color:var(--r);}
 /* 탭 전환 */
@@ -124,6 +130,29 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;heigh
 /* 장후 */
 .review-item{background:var(--bg);border-radius:9px;padding:9px 11px;margin-bottom:7px;}
 .ri-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;}
+
+/* ── 입력 폼 iOS 줌 방지 ── */
+input,select,textarea{-webkit-appearance:none;appearance:none;}
+button,a,[onclick]{touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
+/* ── 스크롤 최적화 ── */
+.panel,.ri-scroll,.pre-cards,.post-cards{-webkit-overflow-scrolling:touch;overscroll-behavior:contain;}
+/* ── 태블릿 (768px 이하) ── */
+@media(max-width:768px){
+  .layout{grid-template-columns:1fr!important;overflow-y:auto;}
+  .right-col{display:none;}
+  .stats-4{grid-template-columns:1fr 1fr!important;}
+  .btn-row{gap:6px;}
+  .btn-row button{font-size:10px;padding:4px 8px;}
+}
+/* ── 모바일 (520px 이하) ── */
+@media(max-width:520px){
+  .dash-hdr{padding:0 10px;height:44px;}
+  .tab-bar .tab{padding:3px 8px;font-size:10px;}
+  .card{padding:10px 12px;}
+  .stats-4{grid-template-columns:1fr 1fr!important;}
+  .checklist-item{font-size:10px;}
+  .market-grid{grid-template-columns:1fr!important;}
+}
 </style>
 </head>
 <body style="display:flex;flex-direction:column;height:100%;">

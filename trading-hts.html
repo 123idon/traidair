@@ -2,7 +2,11 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#ffffff">
 <title>TraidAIr HTS</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
@@ -18,10 +22,20 @@
   --sh0:0 1px 3px rgba(0,0,0,.08);
   --sh1:0 4px 16px rgba(0,0,0,.1);
   --sh2:0 8px 32px rgba(0,0,0,.14);
+  /* safe area */
+  --sat:env(safe-area-inset-top,0px);
+  --sar:env(safe-area-inset-right,0px);
+  --sab:env(safe-area-inset-bottom,0px);
+  --sal:env(safe-area-inset-left,0px);
+  /* mobile nav */
+  --mob-nav:0px;
 }
-*{box-sizing:border-box;margin:0;padding:0;}
+/* 모바일에서 하단 네비게이션 높이 적용 */
+@media(max-width:860px){:root{--mob-nav:56px;}}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%;}
 html,body{height:100%;overflow:hidden;}
-body{background:var(--bg);color:var(--tp);font-family:var(--sans);font-size:12px;line-height:1.4;display:flex;flex-direction:column;}
+body{background:var(--bg);color:var(--tp);font-family:var(--sans);font-size:12px;line-height:1.4;display:flex;flex-direction:column;padding-top:var(--sat);padding-left:var(--sal);padding-right:var(--sar);}
 ::-webkit-scrollbar{width:4px;height:4px;}
 ::-webkit-scrollbar-track{background:transparent;}
 ::-webkit-scrollbar-thumb{background:var(--brb);border-radius:4px;}
@@ -320,19 +334,81 @@ button{cursor:pointer;font-family:var(--sans);}
 .live-i:disabled{opacity:.38;cursor:not-allowed;}
 .live-sub{width:100%;padding:9px;border-radius:6px;border:none;background:var(--g);color:#000;font-size:12px;font-weight:700;opacity:.55;cursor:not-allowed;margin-top:4px;}
 .live-note{font-size:9px;color:var(--tm);text-align:center;margin-top:6px;font-family:var(--mono);}
+/* ── 태블릿 (860px 이하) ── */
 @media(max-width:860px){
-  .hts{grid-template-columns:0 1fr 0 0;grid-template-rows:1fr 80px 80px;}
-  .lp,.rp,.brp{display:none;}
+  .hts{grid-template-columns:0 1fr 0 0;grid-template-rows:1fr;}
+  .lp,.rp,.brp{position:fixed;z-index:300;top:0;bottom:calc(var(--mob-nav) + var(--sab));background:var(--pan);box-shadow:var(--sh2);transition:transform .25s cubic-bezier(.4,0,.2,1);will-change:transform;}
+  .lp{left:0;width:220px;transform:translateX(-100%);}
+  .rp{right:0;width:200px;transform:translateX(100%);}
+  .brp{right:0;width:240px;transform:translateX(100%);}
+  .lp.mob-open,.rp.mob-open,.brp.mob-open{transform:translateX(0);}
+  .mob-overlay{display:block;}
   .mock-bar{flex-wrap:wrap;height:auto;gap:4px;}
   .si,.clk{display:none;}
   .spd-btn:nth-child(n+5){display:none;}
+  /* 모바일 하단 탭바 */
+  .mob-tabbar{display:flex;}
+  /* 차트 영역이 하단 탭바 위까지만 */
+  .page{padding-bottom:calc(var(--mob-nav) + var(--sab));}
+  .page#page-dash,.page#page-stats,.page#page-journal{padding-bottom:calc(var(--mob-nav) + var(--sab));}
 }
+/* ── 모바일 (520px 이하) ── */
 @media(max-width:520px){
   .bar{gap:4px;padding:0 7px;}
-  .tab{padding:2px 6px;font-size:10px;}
-  .ibtn{font-size:10px;padding:2px 6px;}
+  .tab{padding:3px 7px;font-size:10px;min-height:32px;}
+  .ibtn{font-size:10px;padding:3px 7px;min-height:32px;}
   .stats-grid{grid-template-columns:1fr 1fr;}
+  .lp{width:85vw;max-width:300px;}
+  .rp{width:85vw;max-width:280px;}
+  .brp{width:90vw;max-width:320px;}
 }
+/* ── 소형 모바일 (380px 이하) ── */
+@media(max-width:380px){
+  .bar{padding:0 6px;height:44px;}
+  .logo{font-size:12px;}
+  .tabs{gap:1px;padding:2px;}
+  .tab{padding:2px 5px;font-size:9px;}
+}
+/* ── 모바일 오버레이 (패널 열릴 때 배경) ── */
+.mob-overlay{
+  display:none;position:fixed;inset:0;z-index:299;
+  background:rgba(0,0,0,.4);backdrop-filter:blur(2px);
+  -webkit-backdrop-filter:blur(2px);
+}
+/* ── 모바일 하단 탭바 ── */
+.mob-tabbar{
+  display:none;position:fixed;bottom:0;left:0;right:0;
+  height:calc(var(--mob-nav) + var(--sab));
+  padding-bottom:var(--sab);
+  background:var(--pan);
+  border-top:1px solid var(--br);
+  box-shadow:0 -2px 12px rgba(0,0,0,.08);
+  z-index:400;
+  align-items:stretch;
+  justify-content:space-around;
+}
+.mob-tab{
+  flex:1;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:2px;
+  background:none;border:none;cursor:pointer;
+  color:var(--tm);font-size:9px;font-family:var(--sans);
+  padding:6px 2px;min-width:0;transition:color .12s;
+  -webkit-tap-highlight-color:transparent;
+  touch-action:manipulation;
+}
+.mob-tab.active{color:var(--b);}
+.mob-tab .mob-icon{font-size:20px;line-height:1;}
+.mob-tab .mob-label{font-size:9px;font-weight:500;white-space:nowrap;}
+/* ── 모바일 패널 드래그 핸들 ── */
+.mob-handle{
+  width:36px;height:4px;background:var(--brb);border-radius:2px;
+  margin:8px auto 4px;flex-shrink:0;
+}
+/* ── 터치 최적화 ── */
+button,a,[onclick]{touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
+input,select,textarea{-webkit-appearance:none;appearance:none;font-size:16px;} /* 16px: iOS 줌 방지 */
+/* ── 스크롤 성능 최적화 ── */
+.wg-body,.lpb,.brpb,.jpage,.stats-page{-webkit-overflow-scrolling:touch;overscroll-behavior:contain;}
 </style>
 </head>
 <body>
@@ -372,6 +448,33 @@ button{cursor:pointer;font-family:var(--sans);}
     <button class="ibtn pur" onclick="openModal('autotrade')" id="autoBtn">🤖 자동매매</button>
   </div>
 </header>
+
+<!-- ── 모바일 오버레이 ── -->
+<div class="mob-overlay" id="mobOverlay" onclick="closeMobPanels()"></div>
+
+<!-- ── 모바일 하단 탭바 ── -->
+<nav class="mob-tabbar" id="mobTabbar">
+  <button class="mob-tab active" id="mbt-chart" onclick="mobTab('chart',this)">
+    <span class="mob-icon">📈</span>
+    <span class="mob-label">차트</span>
+  </button>
+  <button class="mob-tab" id="mbt-order" onclick="mobTab('order',this)">
+    <span class="mob-icon">💰</span>
+    <span class="mob-label">주문</span>
+  </button>
+  <button class="mob-tab" id="mbt-watchlist" onclick="mobTab('watchlist',this)">
+    <span class="mob-icon">👀</span>
+    <span class="mob-label">관심</span>
+  </button>
+  <button class="mob-tab" id="mbt-hoga" onclick="mobTab('hoga',this)">
+    <span class="mob-icon">📊</span>
+    <span class="mob-label">호가</span>
+  </button>
+  <button class="mob-tab" id="mbt-ai" onclick="mobTab('ai',this)">
+    <span class="mob-icon">🤖</span>
+    <span class="mob-label">AI</span>
+  </button>
+</nav>
 
 <!-- ── DASHBOARD PAGE ── -->
 <div class="page" id="page-dash" style="overflow:hidden;">
@@ -1940,13 +2043,15 @@ function updPrice(c){
   const stk=STOCKS.find(s=>s.tk===activeTk)||STOCKS[0];
   const pr=c?c.c:stk.pr;
   const ca=pr-stk.base,cp=((ca/stk.base)*100).toFixed(2),up=ca>=0;
-  document.getElementById("siPr").textContent=pr.toLocaleString();
-  document.getElementById("siPr").className="si-pr "+(up?"cu":"cd");
-  document.getElementById("siCh").textContent=(up?"+":"")+ca.toLocaleString()+" ("+(up?"+":"")+cp+"%)";
-  document.getElementById("siCh").className="si-ch "+(up?"cu":"cd");
-  document.getElementById("obPr").textContent=pr.toLocaleString();
-  document.getElementById("obPr").className="ob-cur-p "+(up?"cu":"cd");
-  document.getElementById("obInfo").textContent=(up?"+":"")+ca.toLocaleString()+" ("+cp+"%)";
+  const cls=up?"cu":"cd";
+  const siPr=document.getElementById("siPr");
+  if(siPr){siPr.textContent=pr.toLocaleString();siPr.className="si-pr "+cls;}
+  const siCh=document.getElementById("siCh");
+  if(siCh){siCh.textContent=(up?"+":"")+ca.toLocaleString()+" ("+(up?"+":"")+cp+"%)";siCh.className="si-ch "+cls;}
+  const obPr=document.getElementById("obPr");
+  if(obPr){obPr.textContent=pr.toLocaleString();obPr.className="ob-cur-p "+cls;}
+  const obInfo=document.getElementById("obInfo");
+  if(obInfo)obInfo.textContent=(up?"+":"")+ca.toLocaleString()+" ("+cp+"%)";
   // 체결강도 (100이상=매수우세, 150이상=강한매수)
   const strength=Math.round(95+Math.random()*60);
   const strEl=document.getElementById("obStrength");
@@ -1955,7 +2060,8 @@ function updPrice(c){
   const buyEl=document.getElementById("obBuyTotal");
   if(buyEl)buyEl.textContent=Math.round(20000+Math.random()*50000).toLocaleString();
   stk.pr=pr;
-  document.getElementById("ofPr").value=pr;
+  const ofPr=document.getElementById("ofPr");
+  if(ofPr)ofPr.value=pr;
   updOSum(); updPnl();
 }
 function updPnl(){
@@ -2202,6 +2308,7 @@ function submitOrder(autoExec){
 // STOP ORDER MONITOR
 // ═══════════════════════════════
 function checkStopOrders(){
+  if(document.hidden)return; // 탭 비활성 시 스킵
   Object.entries(stopOrders).forEach(([tk,so])=>{
     const stk=STOCKS.find(s=>s.tk===tk);if(!stk)return;
     const pos=mock.positions[tk];if(!pos||pos.qty<=0){delete stopOrders[tk];return;}
@@ -4351,6 +4458,7 @@ function togInd(nm,el){inds[nm]=!inds[nm];el.classList.toggle("on",inds[nm]);if(
 // LIVE UPDATE
 // ═══════════════════════════════
 function liveUpdate(){
+  if(document.hidden)return; // 탭 비활성 시 스킵
   if(sim.playing)return;
   STOCKS.forEach(s=>{const c=(Math.random()-.499)*.002;s.pr=Math.max(s.base*.7,Math.round(s.pr*(1+c)));});
   const stk=STOCKS.find(s=>s.tk===activeTk)||STOCKS[0];
@@ -4442,6 +4550,7 @@ let overnightAlerted=false;
 // 초기 페이지 상태
 window._curPage = "hts";
 function tick(){
+  if(document.hidden)return; // 탭 비활성 시 스킵
   const n=new Date();
   document.getElementById("clk").textContent=[n.getHours(),n.getMinutes(),n.getSeconds()].map(v=>v.toString().padStart(2,"0")).join(":");
   // 오버나잇 체크리스트 15:20 자동 팝업 (Phase 9-7)
@@ -4501,6 +4610,94 @@ function quickSwitch(){
   if(icon)icon.textContent=isDash?"📊":"🏠";
   if(txt)txt.textContent=isDash?"대시보드":"HTS";
 }
+
+// ── 모바일 패널 제어 ──
+function isMobile(){return window.innerWidth<=860;}
+function openMobPanel(panel){
+  // panel: 'lp' | 'rp' | 'brp'
+  closeMobPanels();
+  const el=document.querySelector('.'+panel);
+  if(el){el.classList.add('mob-open');}
+  const ov=document.getElementById('mobOverlay');
+  if(ov)ov.style.display='block';
+}
+function closeMobPanels(){
+  document.querySelectorAll('.lp,.rp,.brp').forEach(el=>el.classList.remove('mob-open'));
+  const ov=document.getElementById('mobOverlay');
+  if(ov)ov.style.display='none';
+}
+function mobTab(name,btn){
+  if(!isMobile())return;
+  // 먼저 HTS 페이지로 전환
+  const htsTab=document.getElementById('tab-hts');
+  goPage('hts',htsTab);
+  // 모든 탭 비활성화
+  document.querySelectorAll('.mob-tab').forEach(b=>b.classList.remove('active'));
+  if(btn)btn.classList.add('active');
+  closeMobPanels();
+  if(name==='chart'){
+    // 차트만 보임 (기본)
+  } else if(name==='order'){
+    openMobPanel('brp');
+    // brp 주문 탭 활성화
+    const orderTab=document.querySelector('.brpt[onclick*="order"]');
+    if(orderTab){brTab(orderTab,'brpb-order');}
+  } else if(name==='watchlist'){
+    openMobPanel('lp');
+    // lp 관심 탭 활성화
+    const wlTab=document.querySelector('.lpt[onclick*="lpb-w"]');
+    if(wlTab){lTab(wlTab,'lpb-w');}
+  } else if(name==='hoga'){
+    openMobPanel('rp');
+  } else if(name==='ai'){
+    openMobPanel('brp');
+    const aiTab=document.querySelector('.brpt[onclick*="ai"]');
+    if(aiTab){brTab(aiTab,'brpb-ai');}
+  }
+}
+
+// ── 스와이프 제스처 ──
+(function(){
+  let sx=0,sy=0,startTime=0;
+  const MIN_DIST=60,MAX_TIME=400,MAX_VERT=80;
+  document.addEventListener('touchstart',e=>{
+    if(!isMobile())return;
+    sx=e.touches[0].clientX;sy=e.touches[0].clientY;startTime=Date.now();
+  },{passive:true});
+  document.addEventListener('touchend',e=>{
+    if(!isMobile())return;
+    const dx=e.changedTouches[0].clientX-sx;
+    const dy=e.changedTouches[0].clientY-sy;
+    const dt=Date.now()-startTime;
+    if(dt>MAX_TIME||Math.abs(dy)>MAX_VERT||Math.abs(dx)<MIN_DIST)return;
+    // 우→좌 스와이프: 관심목록 열기
+    if(dx>MIN_DIST&&sx<60){
+      const htsPage=document.getElementById('page-hts');
+      if(htsPage&&htsPage.classList.contains('on')){
+        openMobPanel('lp');
+        document.querySelectorAll('.mob-tab').forEach(b=>b.classList.remove('active'));
+        const wlBtn=document.getElementById('mbt-watchlist');
+        if(wlBtn)wlBtn.classList.add('active');
+      }
+    }
+    // 좌→우 스와이프 (오른쪽 끝에서): 호가창 열기
+    if(dx<-MIN_DIST&&sx>window.innerWidth-60){
+      const htsPage=document.getElementById('page-hts');
+      if(htsPage&&htsPage.classList.contains('on')){
+        openMobPanel('rp');
+        document.querySelectorAll('.mob-tab').forEach(b=>b.classList.remove('active'));
+        const hgBtn=document.getElementById('mbt-hoga');
+        if(hgBtn)hgBtn.classList.add('active');
+      }
+    }
+  },{passive:true});
+})();
+
+// ── 화면 크기 변경 시 처리 ──
+window.addEventListener('resize',()=>{
+  if(!isMobile())closeMobPanels();
+},false);
+
 function lTab(el,id){document.querySelectorAll(".lpt").forEach(t=>t.classList.remove("on"));el.classList.add("on");document.querySelectorAll(".lpb").forEach(b=>{b.classList.remove("on");b.style.display="none";});const t=document.getElementById(id);if(t){t.style.display="block";t.classList.add("on");}}
 function rTab(el,id){document.querySelectorAll(".rpt").forEach(t=>t.classList.remove("on"));el.classList.add("on");document.querySelectorAll(".rpb").forEach(b=>{b.classList.remove("on");b.style.display="none";});const t=document.getElementById(id);if(t){t.style.display="block";t.classList.add("on");}}
 function brTab(el,id){document.querySelectorAll(".brpt").forEach(t=>t.classList.remove("on"));el.classList.add("on");document.querySelectorAll(".brpb").forEach(b=>{b.classList.remove("on");b.style.display="none";});const t=document.getElementById(id);if(t){t.style.display=id==="brpb-ai"?"flex":"block";t.classList.add("on");}}
