@@ -1916,6 +1916,9 @@ function drawChart(){
   const ctx=canvas.getContext("2d");
 
   const cs=_cvCs();
+  // 디버그: cinfo에 실제 상태 표시
+  const ci=document.getElementById('cinfo');
+  if(ci)ci.textContent=`W=${W} H=${H} 봉=${cs.length} tf=${sim.tf} idx=${sim.idx}`;
   if(!cs.length){ctx.clearRect(0,0,W,H);return;}
   const cls=cs.map(c=>c.c),vls=cs.map(c=>c.v);
 
