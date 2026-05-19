@@ -1966,7 +1966,7 @@ function genCandles(tk,dt){
 }
 
 // ── 추가 전역 변수/함수 ──
-let BAN_LIST=safeParseJSON(localStorage.getItem("htsBan"), '[]');
+let BAN_LIST=safeParseJSON(localStorage.getItem("htsBan"), []);
 function addBanCurrent(){const stk=STOCKS.find(s=>s.tk===activeTk)||STOCKS[0];if(!BAN_LIST.includes(activeTk)){BAN_LIST.push(activeTk);saveBan();renderBanList();showAlert("매매금지 추가",stk.nm+" 매매금지 등록됨");}}
 function addPending(tk,nm,side,price,qty){const id=Date.now();pendingOrders.push({id,tk,nm,side,price,qty,time:new Date().toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"})});renderPending();return id;}
 let autoState={running:false,level:0,cfg:{rr:1.5,pos:15,stop:3,t1:3,t2:5,trail:"off",brk:true,explain:true}};
@@ -3622,7 +3622,7 @@ const MASTER_CL = {
     'HTS 종료'
   ]
 };
-let masterCLState = safeParseJSON(localStorage.getItem('masterCL'), '{}');
+let masterCLState = safeParseJSON(localStorage.getItem('masterCL'), {});
 function renderMasterChecklist(){
   const sections={pre:'mcl-pre',entry:'mcl-entry',hold:'mcl-hold',post:'mcl-post'};
   Object.entries(sections).forEach(([key,id])=>{
@@ -3677,8 +3677,8 @@ function checkRealReadiness(){
   const total=trades.length;
   const wins=trades.filter(t=>t.pnl>0).length;
   const wr=total>0?wins/total:0;
-  const journals=safeParseJSON(localStorage.getItem('manualJournals'), '[]');
-  const rules=safeParseJSON(localStorage.getItem('personalRules'), '{}');
+  const journals=safeParseJSON(localStorage.getItem('manualJournals'), []);
+  const rules=safeParseJSON(localStorage.getItem('personalRules'), {});
   const items=[
     {txt:"Phase 0~12 전체 완료",done:true},
     {txt:`소액 실전 20회 이상 (현재 ${total}회)`,done:total>=20},
@@ -3715,7 +3715,7 @@ function savePersonalRules(){
   if(el){el.textContent='✅ 저장됨: '+new Date().toLocaleTimeString('ko-KR');el.style.color='var(--g)';}
 }
 function loadPersonalRules(){
-  const r=safeParseJSON(localStorage.getItem('personalRules'), '{}');
+  const r=safeParseJSON(localStorage.getItem('personalRules'), {});
   ['strength','weakness','time','avoid','size','maxpos','stop','weekly'].forEach(k=>{
     const el=document.getElementById('pr-'+k);
     if(el&&r[k])el.value=r[k];
@@ -3772,7 +3772,7 @@ function saveJournalForm(){
     repeat:document.getElementById('jf-repeat')?.value||'none',
     ts:Date.now()
   };
-  const journals=safeParseJSON(localStorage.getItem('manualJournals'), '[]');
+  const journals=safeParseJSON(localStorage.getItem('manualJournals'), []);
   journals.push(entry);
   localStorage.setItem('manualJournals',JSON.stringify(journals));
   // mock.trades에도 repeat 기록
@@ -6297,7 +6297,12 @@ function refreshAllData(){
 
 function safeParseJSON(str, fallback){
   if(str===null||str===undefined) return fallback;
-  try{return JSON.parse(str);}catch(e){return fallback;}
+  try{
+    const r=JSON.parse(str);
+    // 타입 검증: fallback이 배열이면 배열, 객체면 객체여야 함
+    if(Array.isArray(fallback)&&!Array.isArray(r)) return fallback;
+    return r;
+  }catch(e){return fallback;}
 }
 const _analysisCache={};
 function _getCachedAnalysis(key){
