@@ -1620,8 +1620,17 @@ input,select,textarea{-webkit-appearance:none;appearance:none;}
 window.onerror=function(msg,src,line,col,err){
   const el=document.getElementById('cinfo');
   if(el)el.textContent='JS오류 L'+line+': '+msg;
+  // 상단에 큰 알림
+  let dbg=document.getElementById('_dbg');
+  if(!dbg){dbg=document.createElement('div');dbg.id='_dbg';dbg.style.cssText='position:fixed;top:0;left:0;right:0;background:red;color:#fff;font-size:13px;padding:8px;z-index:99999;font-family:monospace;';document.body.appendChild(dbg);}
+  dbg.textContent='ERROR L'+line+': '+msg+(err?' | '+err.stack?.split('\n')[0]:'');
   return false;
 };
+window.addEventListener('unhandledrejection',e=>{
+  let dbg=document.getElementById('_dbg');
+  if(!dbg){dbg=document.createElement('div');dbg.id='_dbg';dbg.style.cssText='position:fixed;top:0;left:0;right:0;background:red;color:#fff;font-size:13px;padding:8px;z-index:99999;font-family:monospace;';document.body.appendChild(dbg);}
+  dbg.textContent='PROMISE ERROR: '+(e.reason?.message||e.reason||'unknown');
+});
 
 // ═══════════════════════════════
 // DATA
@@ -1960,7 +1969,6 @@ function initChart(){
   const allCs=sim.candles.slice(0,Math.max(sim.idx+1,10));
   if(!allCs.length)return;
 
-  // 뷰 범위 보정
   chartViewCount=Math.max(10,Math.min(chartViewCount,allCs.length));
   chartViewStart=Math.max(0,Math.min(chartViewStart,allCs.length-chartViewCount));
   const cs=allCs.slice(chartViewStart,chartViewStart+chartViewCount);
@@ -1968,50 +1976,116 @@ function initChart(){
 
   if(mChart){mChart.destroy();mChart=null;}
 
-  const ds=[{label:"종가",type:"line",data:cls,borderColor:"#dc2626",borderWidth:1.5,pointRadius:0,fill:false,yAxisID:"y",tension:.08}];
-  if(inds.ma){[["MA5","#ffb800",5],["MA20","#00d97e",20],["MA60","#ff4757",60]].forEach(([l,col,n])=>
-    ds.push({label:l,type:"line",data:calcMA(cls,n),borderColor:col,borderWidth:1,pointRadius:0,fill:false,yAxisID:"y",tension:.08}));}
-  if(inds.bb){const{upper,lower}=calcBB(cls,20,2);
-    ds.push({label:"BB상단",type:"line",data:upper,borderColor:"rgba(167,139,250,.4)",borderWidth:1,borderDash:[3,3],pointRadius:0,fill:false,yAxisID:"y"},
-            {label:"BB하단",type:"line",data:lower,borderColor:"rgba(167,139,250,.4)",borderWidth:1,borderDash:[3,3],pointRadius:0,fill:false,yAxisID:"y"});}
-  if(inds.vwap)ds.push({label:"VWAP",type:"line",data:calcVWAP(cs),borderColor:"#2dd4bf",borderWidth:1.5,borderDash:[4,2],pointRadius:0,fill:false,yAxisID:"y"});
-  if(inds.vol) ds.push({label:"거래량",type:"bar",data:vls,backgroundColor:cs.map(c=>c.c>=c.o?"rgba(220,38,38,.75)":"rgba(37,99,235,.75)"),yAxisID:"y2",order:10});
+  // datasets — 모두 type 명시 (Chart.js 4.x 혼합차트 필수)
+  const ds=[];
+
+  // 종가 라인 (캔들 플러그인이 위에 그림)
+  ds.push({type:"line",label:"종가",data:cls,borderColor:"rgba(0,0,0,0)",borderWidth:0,pointRadius:0,fill:false,yAxisID:"y",order:2});
+
+  // 이동평균선
+  if(inds.ma){
+    [["MA5","#f59e0b",5],["MA20","#10b981",20],["MA60","#ef4444",60]].forEach(([l,col,n])=>{
+      const maData=calcMA(cls,n);
+      ds.push({type:"line",label:l,data:maData,borderColor:col,borderWidth:1.5,pointRadius:0,fill:false,yAxisID:"y",order:3,tension:.05,spanGaps:true});
+    });
+  }
+
+  // 볼린저밴드
+  if(inds.bb){
+    const{upper,lower}=calcBB(cls,20,2);
+    ds.push({type:"line",label:"BB상단",data:upper,borderColor:"rgba(139,92,246,.5)",borderWidth:1,borderDash:[4,3],pointRadius:0,fill:false,yAxisID:"y",order:3,spanGaps:true});
+    ds.push({type:"line",label:"BB하단",data:lower,borderColor:"rgba(139,92,246,.5)",borderWidth:1,borderDash:[4,3],pointRadius:0,fill:false,yAxisID:"y",order:3,spanGaps:true});
+  }
+
+  // VWAP
+  if(inds.vwap){
+    ds.push({type:"line",label:"VWAP",data:calcVWAP(cs),borderColor:"#06b6d4",borderWidth:1.5,borderDash:[5,3],pointRadius:0,fill:false,yAxisID:"y",order:3,spanGaps:true});
+  }
+
+  // 거래량 바
+  if(inds.vol){
+    ds.push({type:"bar",label:"거래량",data:vls,
+      backgroundColor:cs.map(c=>c.c>=c.o?"rgba(220,38,38,.35)":"rgba(37,99,235,.35)"),
+      yAxisID:"y2",order:10});
+  }
 
   const canvas=document.getElementById("mainChart");
+  if(!canvas){console.error("mainChart canvas 없음");return;}
+
+  const scales={
+    x:{
+      grid:{color:"rgba(0,0,0,.05)"},
+      ticks:{color:"#8c9db5",font:{family:"JetBrains Mono",size:8},maxTicksLimit:12}
+    },
+    y:{
+      position:"right",
+      grid:{color:"rgba(0,0,0,.04)"},
+      ticks:{color:"#8c9db5",font:{family:"JetBrains Mono",size:8},callback:v=>v>=1000?(v/1000).toFixed(0)+"k":v}
+    }
+  };
+  // 거래량 Y축은 거래량 표시할 때만 추가
+  if(inds.vol){
+    scales.y2={position:"left",display:true,grid:{display:false},ticks:{display:false},
+      max:vls.length?Math.max(...vls)*6:1000000};
+  }
+
   mChart=new Chart(canvas.getContext("2d"),{
     type:"bar",
     data:{labels:lbls,datasets:ds},
     plugins:[drawCandlePlugin(),crosshairPlugin()],
     options:{
-      responsive:true,maintainAspectRatio:false,animation:false,
+      responsive:true,
+      maintainAspectRatio:false,
+      animation:false,
+      interaction:{mode:"index",intersect:false},
       plugins:{
         legend:{display:false},
-        tooltip:{mode:"index",intersect:false,backgroundColor:"#fff",borderColor:"rgba(0,0,0,.1)",
-          titleColor:"#6b7684",bodyColor:"#191f28",borderWidth:1,
-          titleFont:{family:"JetBrains Mono",size:9},bodyFont:{family:"JetBrains Mono",size:10},padding:6,
-          callbacks:{title:it=>it[0].label,
-            label:it=>it.dataset.label==="거래량"?"거량:"+it.parsed.y.toLocaleString():it.dataset.label+":"+Math.round(it.parsed.y).toLocaleString()}}
+        tooltip:{
+          backgroundColor:"#fff",borderColor:"rgba(0,0,0,.12)",borderWidth:1,
+          titleColor:"#6b7684",bodyColor:"#191f28",
+          titleFont:{family:"JetBrains Mono",size:9},
+          bodyFont:{family:"JetBrains Mono",size:10},padding:8,
+          filter:item=>item.dataset.label!=="종가"||!inds.ma,
+          callbacks:{
+            title:items=>items[0]?.label||"",
+            label:item=>{
+              if(item.dataset.label==="거래량")return "거래량:"+Math.round(item.parsed.y).toLocaleString();
+              if(item.dataset.label==="종가")return "";
+              return item.dataset.label+":"+Math.round(item.parsed.y).toLocaleString();
+            }
+          }
+        }
       },
-      scales:{
-        x:{grid:{color:"rgba(0,0,0,.05)"},ticks:{color:"#8c9db5",font:{family:"JetBrains Mono",size:8},maxTicksLimit:10}},
-        y:{position:"right",grid:{color:"rgba(0,0,0,.04)"},ticks:{color:"#8c9db5",font:{family:"JetBrains Mono",size:8},callback:v=>v.toLocaleString()}},
-        y2:{position:"left",display:inds.vol,grid:{display:false},ticks:{display:false},max:vls.length?Math.max(...vls)*5:100000}
-      },
+      scales,
       onHover:(e,items)=>{
         if(!mChart||!e.native)return;
-        const r=canvas.getBoundingClientRect();
-        mChart._cx=e.native.clientX-r.left;
-        mChart._cy=e.native.clientY-r.top;
-        mChart.draw();
-        if(items.length){const c=cs[items[0].dataIndex];
-          if(c)document.getElementById("cinfo").textContent=`O${c.o.toLocaleString()} H${c.h.toLocaleString()} L${c.l.toLocaleString()} C${c.c.toLocaleString()} V${c.v.toLocaleString()}`;}
+        try{
+          const r=canvas.getBoundingClientRect();
+          mChart._cx=e.native.clientX-r.left;
+          mChart._cy=e.native.clientY-r.top;
+          mChart.draw();
+          if(items.length){
+            const idx=items[0].dataIndex;
+            const c=cs[idx];
+            if(c)document.getElementById("cinfo").textContent=
+              `O${c.o.toLocaleString()} H${c.h.toLocaleString()} L${c.l.toLocaleString()} C${c.c.toLocaleString()} V${c.v.toLocaleString()}`;
+          }
+        }catch(ex){}
       }
     }
   });
 
   if(inds.rsi)initSub("rsi",calcRSI(cls,14),"#a78bfa",lbls);
   if(inds.macd){const{ml,sig}=calcMACD(cls);initSubMACD(lbls,ml,sig);}
-  }catch(e){document.getElementById("cinfo").textContent="차트오류:"+e.message;throw e;}
+
+  }catch(e){
+    const ci=document.getElementById("cinfo");
+    if(ci)ci.textContent="차트오류:"+e.message;
+    let dbg=document.getElementById('_dbg');
+    if(!dbg){dbg=document.createElement('div');dbg.id='_dbg';dbg.style.cssText='position:fixed;top:48px;left:0;right:0;background:#dc2626;color:#fff;font-size:12px;padding:6px 12px;z-index:99999;font-family:monospace;';document.body.appendChild(dbg);}
+    dbg.textContent='initChart 오류: '+e.message;
+    console.error('initChart error:',e);
+  }
 }
 
 // ── 차트 이벤트 (window.onload에서 1회만 등록) ──
@@ -2130,7 +2204,7 @@ function updChartToIdx(){
   if(inds.ma){[["MA5",5],["MA20",20],["MA60",60]].forEach(([l,n])=>{const d=fd(l);if(d)d.data=calcMA(cls,n);});}
   if(inds.bb){const{upper,lower}=calcBB(cls,20,2);if(fd("BB상단"))fd("BB상단").data=upper;if(fd("BB하단"))fd("BB하단").data=lower;}
   if(inds.vwap&&fd("VWAP"))fd("VWAP").data=calcVWAP(cs);
-  if(inds.vol&&fd("거래량")){const d=fd("거래량");d.data=vls;d.backgroundColor=cs.map(c=>c.c>=c.o?"rgba(220,38,38,.75)":"rgba(37,99,235,.75)");mChart.options.scales.y2.max=vls.length?Math.max(...vls)*5:100000;}
+  if(inds.vol&&fd("거래량")){const d=fd("거래량");d.data=vls;d.backgroundColor=cs.map(c=>c.c>=c.o?"rgba(220,38,38,.35)":"rgba(37,99,235,.35)");if(mChart.options.scales.y2)mChart.options.scales.y2.max=vls.length?Math.max(...vls)*6:1000000;}
   mChart.update("none");
   const cur=cs[cs.length-1]; updPrice(cur);
   document.getElementById("msBar").textContent=sim.idx+1;
