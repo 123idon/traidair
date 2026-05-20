@@ -524,6 +524,8 @@ canvas{image-rendering:pixelated;}
     <button class="ibtn red" onclick="endMock()">■ 종료</button>
     <button class="ibtn pri" onclick="openModal('journal')">📓</button>
     <button class="ibtn pur" onclick="openModal('autotrade')" id="autoBtn">🤖 자동매매</button>
+    <button class="ibtn" id="pauseBtnHdr" onclick="pauseAuto()" style="display:none;background:#f59e0b;color:#fff;border-color:#f59e0b;font-weight:700;">⏸ 일시정지</button>
+    <button class="ibtn red" id="stopBtnHdr" onclick="stopAuto()" style="display:none;font-weight:700;">⏹ 정지</button>
     <button class="ibtn" onclick="refreshAllData()" title="전체 새로고침" style="background:var(--g);color:#fff;border-color:var(--g);">↺</button>
   </div>
 </header>
@@ -7294,201 +7296,90 @@ window.onload=()=>{
 // AI 종목 선택 시스템 (강의 기준 기반)
 // ══════════════════════════════════════════════
 // 대시보드 진입후보 → 관심종목 자동 추가
-async function syncCandidatesToWatchlist(){
-  try{
-    const dashFrame = document.getElementById('dashFrame');
-    if(!dashFrame||!dashFrame.contentWindow) return;
-    // 대시보드의 진입후보 카드에서 종목 추출
-    const candCards = dashFrame.contentWindow.document.querySelectorAll('.cand-card,[data-tk]');
-    const tks = [];
-    candCards.forEach(function(el){
-      const tk = el.dataset.tk || el.getAttribute('data-tk');
-      if(tk && /^\d{6}$/.test(tk)) tks.push(tk);
-    });
-    // 대시보드 AI 분석 결과에서도 추출 (텍스트에서 종목코드 파싱)
-    const aiText = dashFrame.contentWindow.document.querySelector('#aiResult,#aiAnalysis,.ai-result');
-    if(aiText){
-      const matches = aiText.textContent.match(/\d{6}/g)||[];
-      matches.forEach(function(tk){ if(!tks.includes(tk)) tks.push(tk); });
-    }
-    if(!tks.length) return;
-    // WGS[1] (모니터링 그룹)에 추가 (이미 있으면 skip)
-    if(!WGS[1]) WGS[1]=[];
-    let added=0;
-    tks.forEach(function(tk){
-      if(!WGS[0].includes(tk)&&!WGS[1].includes(tk)){
-        WGS[1].push(tk); added++;
-      }
-    });
-    if(added>0){
-      saveWGS();
-      renderWLGroup();
-      addMsg('ai','📋 대시보드 진입후보 '+added+'종목 관심목록에 자동 추가됨');
-    }
-  }catch(e){ console.warn('관심종목 동기화 실패:',e.message); }
-}
+
+
 
 async function autoSelectBestStock(){
-  const allTks=[...(WGS[0]||[]),...(WGS[1]||[]),...(WGS[2]||[])].filter(function(v,i,a){return a.indexOf(v)===i&&v;});
-  if(!allTks.length){addMsg('ai','관심종목이 없습니다.');return null;}
-  const candidates=[];
-  for(const tk of allTks){
-    const stk=STOCKS.find(function(s){return s.tk===tk;});
-    if(!stk)continue;
-    if(mock.positions[tk]&&mock.positions[tk].qty>0)continue;
-    const cs=sim.candles,cls=cs.map(function(c){return c.c;}),vls=cs.map(function(c){return c.v;});
-    if(cls.length<10)continue;
-    const lc=cs[cs.length-1],pc=cs[cs.length-2]||lc,pc2=cs[cs.length-3]||pc;
-    const ma5=calcMA(cls,5),ma20=calcMA(cls,20);
-    const lma5=ma5[ma5.length-1]||0,lma20=ma20[ma20.length-1]||0;
-    const lrsi=parseFloat((calcRSI(cls,14).slice(-1)[0]||50).toFixed(1));
-    const volR=vls.length>=2?vls[vls.length-1]/vls[vls.length-2]:1;
-    let score=0;const tags=[];
-    if(lma5>lma20){score+=3;tags.push('MA정배열');}
-    if(lc.c>lma5){score+=2;tags.push('5MA위');}
-    if(lc.c>lc.o){score+=1;tags.push('양봉');}
-    if(volR>=1.5){score+=3;tags.push('거래량x'+volR.toFixed(1));}
-    else if(volR>=1.2){score+=1;tags.push('거래량+'+(((volR-1)*100).toFixed(0))+'%');}
-    if(lrsi>=50&&lrsi<=65){score+=2;tags.push('RSI'+lrsi);}
-    else if(lrsi>=40&&lrsi<50){score+=1;tags.push('RSI'+lrsi+'(회복)');}
-    if(lc.c<lma5&&lma5<lma20){score-=5;tags.push('하락추세');}
-    if(lc.c<lc.o&&pc.c<pc.o&&pc2.c<pc2.o){score-=3;tags.push('3연속음봉');}
-    candidates.push({tk:tk,stk:stk,score:score,tags:tags});
+  var allTks=[...(WGS[0]||[]),...(WGS[1]||[])].filter(function(v,i,a){return a.indexOf(v)===i&&v;});
+  if(!allTks.length){addMsg("ai","관심종목이 없습니다.");return null;}
+  var tradeable=allTks.filter(function(tk){return !(mock.positions[tk]&&mock.positions[tk].qty>0);});
+  if(!tradeable.length){addMsg("ai","모든 관심종목 보유 중");return null;}
+  var candidates=[];
+  for(var ii=0;ii<tradeable.length;ii++){
+    var tk=tradeable[ii];
+    var stk=STOCKS.find(function(s){return s.tk===tk;});
+    if(!stk) continue;
+    var cls,vls,lc,pc,pc2;
+    if(kisConfig.appKey&&kisConfig.appSecret){
+      try{
+        var rr=await fetch("/api/kis/chart",{method:"POST",headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({appKey:kisConfig.appKey,appSecret:kisConfig.appSecret,mode:kisConfig.mode||"real",code:tk,date:sim.date,tf:sim.tf||"5"})});
+        var dd=await rr.json();
+        if(dd.ok&&dd.candles&&dd.candles.length>=10){
+          cls=dd.candles.map(function(c){return c.c;});
+          vls=dd.candles.map(function(c){return c.v;});
+          lc=dd.candles[dd.candles.length-1];pc=dd.candles[dd.candles.length-2]||lc;pc2=dd.candles[dd.candles.length-3]||pc;
+        }
+      }catch(e2){}
+    }
+    if(!cls){
+      if(tk!==activeTk) continue;
+      var cs2=sim.candles;
+      if(cs2.length<10) continue;
+      cls=cs2.map(function(c){return c.c;});vls=cs2.map(function(c){return c.v;});
+      lc=cs2[cs2.length-1];pc=cs2[cs2.length-2]||lc;pc2=cs2[cs2.length-3]||pc;
+    }
+    var res2=checkLeaderConditions(cls,vls,lc,pc,pc2);
+    candidates.push({tk:tk,stk:stk,score:res2.score,pass:res2.pass,fails:res2.fails,lc:lc});
   }
-  if(!candidates.length){addMsg('ai','분석 가능한 관심종목이 없습니다.');return null;}
-  candidates.sort(function(a,b){return b.score-a.score;});
-  const best=candidates[0];
-  const topList=candidates.slice(0,3).map(function(c,i){return (i+1)+'. '+c.stk.nm+'('+c.tk+') '+c.score+'점 '+c.tags.join(' ');}).join('\n');
-  if(best.score<4){addMsg('ai','스크리닝 결과\n'+topList+'\n\n전 종목 진입조건 미달('+best.score+'/11). 관망');return null;}
-  addMsg('ai','AI 종목 선택\n'+topList+'\n\n-> '+best.stk.nm+' 선택 ('+best.score+'/11점)');
-  if(best.tk!==activeTk){setActiveTk(best.tk);await new Promise(function(r){setTimeout(r,500);});}
+  if(!candidates.length){addMsg("ai","분석 가능 종목 없음");return null;}
+  candidates.sort(function(a,b){if(a.pass!==b.pass)return b.pass-a.pass;return b.score-a.score;});
+  var best=candidates[0];
+  var topList=candidates.slice(0,3).map(function(c,i){return (i+1)+". "+c.stk.nm+"("+c.tk+") "+(c.pass?"✅":"❌")+" "+c.score+"/6점";}).join("\n");
+  if(!best.pass){addMsg("ai","대장주조건 충족종목없음\n"+topList+"\n\n관망.");return null;}
+  addMsg("ai","AI종목선택\n"+topList+"\n\n-> "+best.stk.nm+" 선택("+best.score+"/6점)");
+  addDecisionLog("종목선택: "+best.stk.nm,best.lc.c.toLocaleString()+"원","대장주조건통과");
+  if(best.tk!==activeTk){setActiveTk(best.tk);await new Promise(function(r3){setTimeout(r3,600);});}
   return best;
 }
 
-// ══════════════════════════════════════════════
-// 매매일지 AI 자동 작성 + Notion 저장
-// ══════════════════════════════════════════════
-// 장 시간 필터 (09:00~15:30)
-function isMarketHourTrade(trade){
-  // time 필드가 있으면 그 기준, 없으면 포함
-  if(!trade.time) return true;
+function checkLeaderConditions(cls,vls,lc,pc,pc2){
+  if(cls.length<20) return {pass:false,score:0,fails:["데이터부족"]};
+  var ma5=calcMA(cls,5),ma20=calcMA(cls,20),ma60=calcMA(cls,60);
+  var lma5=ma5[ma5.length-1]||0,lma20=ma20[ma20.length-1]||0,lma60=ma60[ma60.length-1]||0;
+  var lrsi=parseFloat((calcRSI(cls,14).slice(-1)[0]||50).toFixed(1));
+  var avg5v=vls.slice(-6,-1).reduce(function(a,b){return a+b;},0)/5||1;
+  var volR=vls[vls.length-1]/avg5v;
+  var fails=[];
+  if(!(lma5>lma20&&lma20>lma60)) fails.push("MA정배열미충족");
+  if(lc.c<=lma5) fails.push("현재가5MA아래");
+  if(lc.c<lc.o) fails.push("음봉");
+  if(volR<1.2) fails.push("거래량부족");
+  if(lrsi<45||lrsi>72) fails.push("RSI범위벗어남");
+  if(lc.c<pc.c&&pc.c<pc2.c) fails.push("3봉연속하락");
+  return {pass:fails.length===0,score:6-fails.length,fails:fails};
+}
+
+async function syncCandidatesToWatchlist(){
   try{
-    const [h,m] = trade.time.split(':').map(Number);
-    const mins = h*60+m;
-    return mins >= 9*60 && mins <= 15*60+30;
-  }catch(e){ return true; }
-}
-function getMarketTrades(date){
-  const all = mock.trades.filter(t=>t.date===(date||sim.date));
-  return all.filter(isMarketHourTrade);
-}
-
-async function autoSaveJournalOnTrade(){
-  const date=sim.date;
-  const tt=(mock.trades||[]).filter(function(t){return t.date===date&&isMarketHourTrade(t);}); // 장시간 기준
-  if(!tt.length)return;
-  const sells=tt.filter(function(t){return t.side==='sell';});
-  const pnl=sells.reduce(function(a,t){return a+t.pnl;},0);
-  const wins=sells.filter(function(t){return t.pnl>0;}).length;
-  const total=sells.length;
-  const str=tt.map(function(t){return (t.side==='buy'?'매수':'매도')+' '+t.nm+' '+t.qty+'주 @'+t.price.toLocaleString()+(t.pnl!==undefined?' ('+(t.pnl>=0?'+':'')+Math.round(t.pnl).toLocaleString()+'원)':'');}).join('\n');
-  const baseEntry={summary:date+' 매매 '+tt.length+'건 / '+(pnl>=0?'+':'')+pnl.toLocaleString()+'원',why_bought:'AI분석중',why_sold:'AI분석중',mistakes:'-',psychology:'-',phase_check:'-',improvement:'-',aiGenerated:false,trades:str};
-  saveJEntry(date,baseEntry,pnl,wins,total,str);
-  try{
-    const logs=(window._decisionLog||[]).slice(-20).map(function(d){return '['+(d.phase||'')+'] '+d.title+': '+(d.body||'');}).join('\n');
-    const prompt='단타 트레이딩 멘토. 오늘 매매 분석해서 매매일지 작성해줘.\n날짜: '+date+'\n매매내역:\n'+str+'\n\nAI결정로그:\n'+(logs||'없음')+'\n\n손익: '+(pnl>=0?'+':'')+pnl.toLocaleString()+'원 ('+total+'건 중 '+wins+'건 수익)\n\n강의 Phase 기준으로 평가해줘. JSON만:\n{"why_bought":"매수이유","why_sold":"청산이유","good":"잘한점","bad":"반성할점(구체적으로)","psychology":"심리평가","improvement":"개선행동","phase_check":"적용Phase와준수여부","mentor_comment":"멘토한마디(직접적으로)"}';
-    const res=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:800,messages:[{role:'user',content:prompt}]})});
-    const data=await res.json();
-    const text=(data.content&&data.content[0]&&data.content[0].text)||'{}';
-    const m=text.match(/\{[\s\S]*\}/);
-    if(!m)throw new Error('JSON파싱실패');
-    const ai=JSON.parse(m[0]);
-    const aiEntry={summary:date+' 매매 '+tt.length+'건 / '+(pnl>=0?'+':'')+pnl.toLocaleString()+'원',why_bought:ai.why_bought||'-',why_sold:ai.why_sold||'-',good:ai.good||'-',bad:ai.bad||'-',psychology:ai.psychology||'-',improvement:ai.improvement||'-',phase_check:ai.phase_check||'-',mentor_comment:ai.mentor_comment||'-',aiGenerated:true,trades:str};
-    saveJEntry(date,aiEntry,pnl,wins,total,str);
-    addMsg('ai','📓 매매일지 자동 작성 완료\n\n'+date+' '+(pnl>=0?'+':'')+pnl.toLocaleString()+'원\n\n✅ 잘한점: '+ai.good+'\n\n🔴 반성: '+ai.bad+'\n\n💡 개선: '+ai.improvement+'\n\n🎯 멘토: '+ai.mentor_comment);
-    const nPageId=localStorage.getItem('notionJournalPageId');
-    if(nPageId)await _saveJournalToNotion(date,aiEntry,pnl,str);
-  }catch(e){
-    console.warn('AI일지실패:',e.message);
-    addMsg('ai','📓 기본 일지 저장 완료 (AI실패: '+e.message+')');
-  }
-}
-
-async function _saveJournalToNotion(date,entry,pnl,trades){
-  try{
-    const nPageId=localStorage.getItem('notionJournalPageId');
-    if(!nPageId)return;
-    const body='## '+date+' 매매일지\n\n**손익**: '+(pnl>=0?'+':'')+pnl.toLocaleString()+'원\n\n**매매내역**:\n'+trades+'\n\n**매수이유**: '+entry.why_bought+'\n**청산이유**: '+entry.why_sold+'\n**잘한점**: '+(entry.good||'-')+'\n**반성**: '+(entry.bad||'-')+'\n**심리**: '+(entry.psychology||'-')+'\n**개선**: '+(entry.improvement||'-')+'\n**멘토**: '+(entry.mentor_comment||'-');
-    await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:200,mcp_servers:[{type:'url',url:'https://mcp.notion.com/mcp',name:'notion'}],messages:[{role:'user',content:'Notion 페이지('+nPageId+')에 아래 내용을 추가해줘.\n\n'+body}]})});
-    addMsg('ai','📝 Notion 일지 저장 완료');
-  }catch(e){console.warn('Notion저장실패:',e.message);}
-}
-
-// scheduleScreening에 종목 선택 통합
-async function scheduleScreening(){
-  if(!autoState.running)return;
-  const now=Date.now();
-  if(!scheduleScreening._lastSelect||now-scheduleScreening._lastSelect>30000){
-    scheduleScreening._lastSelect=now;
-    await syncCandidatesToWatchlist();
-    await autoSelectBestStock();
-    await new Promise(function(r){setTimeout(r,300);});
-  }
-  runScreening();
-  autoTimer=setTimeout(scheduleScreening,5000);
-}
-
-
-// ─── AI 실시간 사고 패널 ───
-function updAIThought(s){
-  var dot=document.getElementById('aiThoughtDot');
-  var ttl=document.getElementById('aiThoughtTitle');
-  var tel=document.getElementById('aiThoughtTime');
-  var con=document.getElementById('aiThoughtConclusion');
-  if(!dot||!ttl)return;
-  var cols={analyzing:'#3b82f6',blocking:'#ef4444',waiting:'#f97316',buy:'#22c55e',pass:'#94a3b8',running:'#a855f7'};
-  var col=cols[s.type]||'#94a3b8';
-  dot.style.background=col; dot.style.boxShadow='0 0 5px '+col;
-  ttl.textContent=s.title||'대기중'; ttl.style.color=col;
-  if(tel)tel.textContent=new Date().toLocaleTimeString('ko',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
-  ['trend','entry','risk','decision'].forEach(function(k){
-    var el=document.getElementById('ts-'+k);
-    if(!el)return;
-    var v=s[k];
-    if(v){el.style.display='block';el.className='thought-step '+(v.type||'info');el.innerHTML='<b>'+v.label+'</b> '+v.text;}
-    else{el.style.display='none';}
-  });
-  if(con){
-    if(s.conclusion){
-      con.style.display='block';
-      var bg=s.type==='buy'?'rgba(34,197,94,.12)':s.type==='blocking'?'rgba(239,68,68,.12)':'rgba(59,130,246,.08)';
-      var fc=s.type==='buy'?'#22c55e':s.type==='blocking'?'#ef4444':'#3b82f6';
-      con.style.background=bg;con.style.color=fc;con.style.borderLeft='3px solid '+fc;
-      con.textContent=s.conclusion;
-    }else{con.style.display='none';}
-  }
-}
-function _showThought_blocking(r,d){updAIThought({type:'blocking',title:'매수 차단',trend:{type:'bad',label:'⛔ 추세:',text:r},conclusion:'매수 불가 - '+d});}
-function _showThought_analyzing(n,sc,rs){updAIThought({type:'analyzing',title:'AI 분석 중 - '+n,trend:{type:'info',label:'1단계:',text:'기술 '+sc+'/6점 ('+rs.slice(0,2).join(', ')+')'},entry:{type:'info',label:'2단계:',text:'Claude AI 심층 검토중...'},conclusion:null});}
-function _showThought_pass(n,r,w){updAIThought({type:'pass',title:'관망 - '+n,trend:{type:'warn',label:'AI 판단:',text:r},entry:{type:'info',label:'기다릴것:',text:w||'추세 전환 확인'},conclusion:'지금은 아님 - '+r});}
-function _showThought_buy(n,p,sp,t1,rr,cf,r){updAIThought({type:'buy',title:'매수 결정 - '+n,trend:{type:'ok',label:'진입근거:',text:r},entry:{type:'ok',label:'타점:',text:p.toLocaleString()+'원 신뢰도 '+cf+'%'},risk:{type:'info',label:'리스크:',text:'손절 '+sp.toLocaleString()+' 목표 '+t1.toLocaleString()+' R/R 1:'+rr},decision:{type:'ok',label:'결정:',text:'자동 매수 실행'},conclusion:'매수 - '+n+' '+p.toLocaleString()+'원 ('+cf+'%)'});}
-function _showThought_idle(n){updAIThought({type:'waiting',title:'모니터링 - '+(n||''),trend:{type:'info',label:'상태:',text:'자동매매 실행중 5초마다 스크리닝'},conclusion:null});}
-
-
-
-function resetBalance(){
-  const cur=(cfg.capital||10000000).toString().replace(/,/g,"");
-  const newCap=prompt("초기 자본금 입력 (원)",cur);
-  if(newCap===null)return;
-  const amt=parseInt(String(newCap).replace(/,/g,""));
-  if(isNaN(amt)||amt<100000){showAlert("입력 오류","100,000원 이상 입력하세요.");return;}
-  if(!confirm(amt.toLocaleString()+"원으로 리셋하시겠습니까?"))return;
-  cfg.capital=amt;mock.cash=amt;mock.positions={};mock.trades=[];
-  mock.todayPnl=0;mock.totalPnl=0;mock.lossSeries=0;mock.wins=0;mock.losses=0;
-  mock.creditUsed=0;mock.marginUsed=0;
-  saveMock();saveCfg();updCash();updPnl();renderPort();renderTradeLog();
-  addMsg("ai","잔고 "+amt.toLocaleString()+"원으로 리셋 완료");
-  showAlert("리셋 완료",amt.toLocaleString()+"원으로 리셋되었습니다.");
+    var allTks2=[...(WGS[0]||[]),...(WGS[1]||[]),...(WGS[2]||[])].filter(function(v,i,a){return a.indexOf(v)===i&&v;});
+    if(!allTks2.length) return;
+    var pInfo=allTks2.map(function(tk){var stk=STOCKS.find(function(s){return s.tk===tk;});return stk?(stk.nm+"("+tk+") "+stk.sec):tk;}).join(", ");
+    var p2="단타 트레이딩 멘토. 강세 섹터 대장주 선정해줘.\n관심종목: "+pInfo+"\n지금 매매 가능한 종목만 (MA정배열+거래량+RSI 전부 충족). JSON만: {\"sectors\":[{\"name\":\"이름\",\"reason\":\"이유\"}],\"leaders\":[\"코드\"],\"excluded\":[\"코드\"],\"summary\":\"요약\"}";
+    var rs=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-5",max_tokens:400,messages:[{role:"user",content:p2}]})});
+    var dd=await rs.json();
+    var tx=(dd.content&&dd.content[0]&&dd.content[0].text)||"{}";
+    var mm=tx.match(/\{[\s\S]*\}/);
+    var ai2=mm?JSON.parse(mm[0]):{};
+    var ldr=ai2.leaders||[],excl=ai2.excluded||[];
+    var chg=0;
+    allTks2.forEach(function(tk){
+      if(ldr.indexOf(tk)>=0&&!WGS[0].includes(tk)){WGS[0].push(tk);WGS[1]=WGS[1].filter(function(t){return t!==tk;});chg++;}
+      else if(excl.indexOf(tk)>=0&&WGS[0].includes(tk)){WGS[0]=WGS[0].filter(function(t){return t!==tk;});if(!WGS[1].includes(tk))WGS[1].push(tk);chg++;}
+    });
+    if(chg>0){saveWGS();renderWLGroup();}
+    addDecisionLog("섹터대장주","강세: "+(ai2.sectors||[]).map(function(s){return s.name;}).join(","),ai2.summary||"");
+  }catch(e3){console.warn("섹터선정실패:",e3.message);}
 }
 </script>
 
