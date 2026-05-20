@@ -611,6 +611,24 @@ input,select,textarea{-webkit-appearance:none;appearance:none;}
           <div style="padding:4px 8px;border-bottom:1px solid var(--br);">
             <div style="font-size:8px;color:var(--tm);margin-bottom:3px;">AI 추천 후보</div>
             <div id="candList"></div>
+<!-- ── AI 현황 패널 ── -->
+<div style="border-top:2px solid var(--br);margin-top:4px;">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px 4px;">
+    <span style="font-size:9px;font-weight:700;color:var(--b);">🤖 AI 현황</span>
+    <span id="aiStatusDot" style="width:7px;height:7px;border-radius:50%;background:var(--tm);display:inline-block;transition:background .3s;"></span>
+  </div>
+  <div id="aiStatusBox" style="margin:0 8px 4px;padding:6px 8px;background:var(--card);border-radius:7px;border:1px solid var(--br);">
+    <div id="aiStatusLabel" style="font-size:9px;font-weight:700;color:var(--tm);margin-bottom:2px;">대기 중</div>
+    <div id="aiStatusMsg" style="font-size:9px;color:var(--ts);line-height:1.5;">자동매매 시작하면 AI 판단이 여기 표시됩니다</div>
+  </div>
+  <div style="padding:0 8px 6px;">
+    <div style="font-size:8px;color:var(--tm);margin-bottom:3px;">최근 판단 로그</div>
+    <div id="aiDecisionLog" style="max-height:130px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;">
+      <div style="font-size:8px;color:var(--tm);padding:2px 4px;">아직 판단 없음</div>
+    </div>
+  </div>
+</div>
+
           </div>
           <div id="wlList0"></div>
         </div>
@@ -1016,7 +1034,15 @@ input,select,textarea{-webkit-appearance:none;appearance:none;}
 
       <!-- 보유 패널 -->
       <div class="brpb" id="brpb-port">
-        <div class="cash-row"><span class="cash-lbl">모의잔고</span><span class="cash-val" id="cashVal">10,000,000원</span></div>
+        <!-- 잔고 헤더 -->
+        <div style="padding:8px 10px 4px;border-bottom:1px solid var(--br);">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+            <span style="font-size:10px;color:var(--tm);font-family:var(--mono);">모의잔고</span>
+            <button onclick="resetBalance()" style="font-size:9px;padding:2px 8px;border-radius:5px;border:1px solid var(--br);background:var(--card);color:var(--ts);cursor:pointer;">↺ 리셋</button>
+          </div>
+          <div id="cashVal" style="font-family:var(--mono);font-size:18px;font-weight:700;color:var(--ts);">10,000,000원</div>
+          <div id="cashPnlRow" style="font-size:10px;margin-top:2px;color:var(--tm);">오늘손익 <span id="todayPnlDisp" style="font-weight:600;">+0원</span></div>
+        </div>
         <div class="cash-row"><span class="cash-lbl">신용/미수한도</span><span style="font-family:var(--mono);font-size:9px;color:var(--a);" id="credLim">-</span></div>
         <!-- 처분효과·과잉확신 경고 배너 -->
         <div id="psychWarningBanner" style="display:none;margin:4px 8px;padding:5px 8px;border-radius:6px;font-size:9px;line-height:1.6;"></div>
@@ -4111,6 +4137,43 @@ function stopAuto(){
   addMsg("ai","⏹ AI 자동매매 중지.");
 }
 function scheduleScreening(){if(!autoState.running)return;runScreening();autoTimer=setTimeout(scheduleScreening,5000);}
+function addDecisionLog(title, body, phase){
+  // 전역 로그 배열
+  if(!window._decisionLog) window._decisionLog=[];
+  const entry = {title, body, phase, time: new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',second:'2-digit'})};
+  window._decisionLog.push(entry);
+  if(window._decisionLog.length > 50) window._decisionLog.shift();
+  // UI 업데이트
+  _updateAIStatusPanel(entry);
+}
+function _updateAIStatusPanel(entry){
+  const logEl = document.getElementById('aiDecisionLog');
+  const msgEl = document.getElementById('aiStatusMsg');
+  const lblEl = document.getElementById('aiStatusLabel');
+  const dotEl = document.getElementById('aiStatusDot');
+  if(!logEl) return;
+  // 상태 색상
+  const isBuy = entry.title.includes('매수') || entry.title.includes('BUY');
+  const isBlock = entry.title.includes('차단') || entry.title.includes('관망') || entry.title.includes('PASS');
+  const isActive = entry.title.includes('분석') || entry.title.includes('검토') || entry.title.includes('스크리닝');
+  if(dotEl) dotEl.style.background = isBuy?'var(--g)':isBlock?'var(--r)':isActive?'var(--a)':'var(--b)';
+  if(lblEl) lblEl.textContent = entry.phase||entry.title.slice(0,20);
+  if(lblEl) lblEl.style.color = isBuy?'var(--g)':isBlock?'var(--r)':isActive?'var(--a)':'var(--b)';
+  if(msgEl){ msgEl.textContent = entry.body||entry.title; msgEl.style.color = isBuy?'var(--g)':isBlock?'var(--r)':'var(--ts)'; }
+  // 로그 추가
+  const item = document.createElement('div');
+  item.style.cssText='font-size:8px;padding:3px 6px;background:var(--bg);border-radius:4px;border-left:2px solid '+(isBuy?'var(--g)':isBlock?'var(--r)':'var(--b)')+';line-height:1.4;';
+  item.innerHTML='<span style="color:var(--tm);">'+entry.time+'</span> <b>'+entry.title.slice(0,20)+'</b>';
+  if(entry.body) item.innerHTML += '<br><span style="color:var(--ts);">'+entry.body.slice(0,50)+'</span>';
+  logEl.prepend(item);
+  // 최대 8개
+  while(logEl.children.length>8) logEl.removeChild(logEl.lastChild);
+}
+function updAdvBoxes(title, body){
+  // AI 현황 패널 직접 업데이트
+  const entry={title, body, phase:title, time:new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',second:'2-digit'})};
+  _updateAIStatusPanel(entry);
+}
 function addDecisionLog(action,reason,phase){
   const log=document.getElementById("aiDecisionLog");
   const now=new Date().toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
@@ -5640,7 +5703,18 @@ function autoResize(el){el.style.height="auto";el.style.height=Math.min(el.scrol
 // ═══════════════════════════════
 // PORTFOLIO
 // ═══════════════════════════════
-function updCash(){document.getElementById("cashVal").textContent=mock.cash.toLocaleString()+"원";}
+function updCash(){
+  // 오늘 손익 표시
+  const tpEl = document.getElementById('todayPnlDisp');
+  if(tpEl){
+    const tp = mock.todayPnl||0;
+    tpEl.textContent = (tp>=0?'+':'')+Math.round(tp).toLocaleString()+'원';
+    tpEl.style.color = tp>0?'var(--g)':tp<0?'var(--r)':'var(--tm)';
+  }
+  // cashVal도 갱신
+  const cv = document.getElementById('cashVal');
+  if(cv && mock.cash !== undefined) cv.textContent = Math.round(mock.cash).toLocaleString()+'원';
+document.getElementById("cashVal").textContent=mock.cash.toLocaleString()+"원";}
 function switchToSell(){
   // 보유 종목 클릭 시 주문탭 + 매도 자동 선택
   const orderTab=document.querySelector(".brp-tabs .brpt:first-child");
