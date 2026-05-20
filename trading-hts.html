@@ -4289,7 +4289,7 @@ function setTrailMA5(){
 }
 function startAuto(){
   autoState.running=true;autoState.level=autoLevel;
-  autoState.cfg={rr:parseFloat(document.getElementById("auto-rr").value)||1.5,pos:parseFloat(document.getElementById("auto-pos").value)||15,stop:parseFloat(document.getElementById("auto-stop").value)||3,t1:parseFloat(document.getElementById("auto-t1").value)||3,t2:parseFloat(document.getElementById("auto-t2").value)||5,trail:document.getElementById("auto-trail").value,brk:document.getElementById("auto-brk").checked,explain:document.getElementById("auto-explain").checked};
+  autoState.cfg={rr:parseFloat((document.getElementById("auto-rr")||{value:"1.5"}).value)||1.5,pos:parseFloat((document.getElementById("auto-pos")||{value:"15"}).value)||15,stop:parseFloat((document.getElementById("auto-stop")||{value:"3"}).value)||3,t1:parseFloat((document.getElementById("auto-t1")||{value:"3"}).value)||3,t2:parseFloat((document.getElementById("auto-t2")||{value:"5"}).value)||5,trail:(document.getElementById("auto-trail")||{value:"none"}).value,brk:(document.getElementById("auto-brk")||{checked:false}).checked,explain:(document.getElementById("auto-explain")||{checked:true}).checked};
   document.getElementById("modeBadge").className="badge auto";
   document.getElementById("modeText").textContent=`AI Lv${autoState.level}`;
   document.getElementById("autoStopBtn").style.display="";
@@ -7436,8 +7436,25 @@ window.onload=()=>{
   updateKisStatus();
   renderAll();
   genCandles(); // ★ genCandles 내부에서 idx=0 설정됨 (미래 데이터 참조 금지)
-  chartViewCount=Math.min(80,sim.candles.length);
+  chartViewCount=60;
   chartViewStart=0;
+  // ★ 전일 분봉 포함 KIS 실제 데이터 초기 로드
+  setTimeout(async function(){
+    if(!kisConfig.appKey||!kisConfig.appSecret) return;
+    try{
+      var _ic=await _fetchKisCandles(activeTk,sim.date,sim.tf||"5");
+      if(_ic&&_ic.length>0){
+        sim.candles=_ic;
+        sim.idx=_ic.length-1;
+        chartViewCount=Math.min(60,_ic.length);
+        chartViewStart=0;
+        updPrice(_ic[_ic.length-1]);
+        drawChart();
+        var _ci2=document.getElementById("cinfo");
+        if(_ci2) _ci2.textContent="✅ "+_ic.length+"봉 | 전일"+(_kisChartMeta.prevCount||0)+"봉+당일"+(_kisChartMeta.todayCount||0)+"봉";
+      }
+    }catch(_ie){console.warn("초기KIS로드실패:",_ie.message);}
+  },2500);
   // 레이아웃 완성 후 차트 렌더 (requestAnimationFrame 중첩으로 보장)
   requestAnimationFrame(()=>requestAnimationFrame(()=>{
     drawChart();
