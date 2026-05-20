@@ -1404,9 +1404,10 @@ input,select,textarea{-webkit-appearance:none;appearance:none;}
       </div>
     </div>
     <div class="modal-ft">
-      <button class="ibtn red" id="autoStopBtn" onclick="stopAuto()" style="display:none;">⏹ 중지</button>
       <button class="ibtn" onclick="closeModal('autotrade')">닫기</button>
-      <button class="ibtn pur" onclick="startAuto()">▶ 자동매매 시작</button>
+      <button class="ibtn pur" onclick="startAuto()" id="autoStartBtn">▶ 자동매매 시작</button>
+      <button class="ibtn" id="pauseBtn" onclick="pauseAuto()" style="display:none;background:#f59e0b;color:#fff;border-color:#f59e0b;">⏸ 일시정지</button>
+      <button class="ibtn red" id="stopBtn2" onclick="stopAuto();closeModal('autotrade');" style="display:none;">⏹ 정지</button>
     </div>
   </div>
 </div>
@@ -3393,7 +3394,7 @@ async function runMySetupAI(){
 }
 
 function renderStatsEnhanced(){
-  const trades=mock.trades||[];
+  const trades=(mock.trades||[]).filter(isMarketHourTrade); // 장시간(09:00~15:30) 기준
   // 수익/손실 패턴
   const wins=trades.filter(t=>t.pnl>0);
   const losses=trades.filter(t=>t.pnl<0);
@@ -4068,13 +4069,43 @@ function startAuto(){
   document.getElementById("modeText").textContent=`AI Lv${autoState.level}`;
   document.getElementById("autoStopBtn").style.display="";
   document.getElementById("autoBtn").classList.add("on");
-  document.getElementById("aiModeBadge").textContent=`Lv${autoState.level} 실행중`;
+  document.getElementById("aiModeBadge").textContent='Lv'+autoState.level+' 실행중';
+  // 일시정지/정지 버튼 표시
+  const pBtn=document.getElementById('pauseBtn'), sBtn=document.getElementById('stopBtn2');
+  if(pBtn) pBtn.style.display='';
+  if(sBtn) sBtn.style.display='';
+  const startBtn=document.querySelector('.modal-content .ibtn.pur[onclick="startAuto()"]');
+  if(startBtn) startBtn.style.display='none';
   closeModal("autotrade");
   addMsg("ai",`🤖 AI 자동매매 시작 (레벨 ${autoState.level})\n모드: ${["완전수동","종목선정","진입신호","진입자동","완전자동"][autoState.level]}\n\n설정값:\n• 최소 R/R: 1:${autoState.cfg.rr}\n• 자동 손절: -${autoState.cfg.stop}%\n• 1차 익절: +${autoState.cfg.t1}% (50%)\n• 2차 익절: +${autoState.cfg.t2}% (30%)\n\n[Phase 8: 매수 전 통합 점검 프로세스 적용]`);
   if(autoState.level>=1)scheduleScreening();
 }
+function pauseAuto(){
+  if(!autoState.running) return;
+  autoState.paused = !autoState.paused;
+  if(autoState.paused){
+    clearTimeout(autoTimer); autoTimer=null;
+    const btn = document.getElementById('pauseBtn');
+    if(btn){btn.textContent='▶ 재개';btn.style.background='var(--g)';}
+    addMsg('ai','⏸ 자동매매 일시정지 — 재개하려면 버튼을 다시 누르세요.');
+  } else {
+    autoState.paused=false;
+    const btn=document.getElementById('pauseBtn');
+    if(btn){btn.textContent='⏸ 일시정지';btn.style.background='';}
+    scheduleScreening();
+    addMsg('ai','▶ 자동매매 재개');
+  }
+}
 function stopAuto(){
-  autoState.running=false;if(autoTimer){clearTimeout(autoTimer);autoTimer=null;}
+  autoState.running=false;autoState.paused=false;if(autoTimer){clearTimeout(autoTimer);autoTimer=null;}
+  // 버튼 UI 복원
+  const pBtn=document.getElementById('pauseBtn'), sBtn=document.getElementById('stopBtn2');
+  if(pBtn){pBtn.style.display='none';pBtn.textContent='⏸ 일시정지';pBtn.style.background='';}
+  if(sBtn) sBtn.style.display='none';
+  const startBtn=document.querySelector('.modal-content .ibtn.pur[onclick="startAuto()"]');
+  if(startBtn) startBtn.style.display='';
+  document.getElementById("autoBtn").classList.remove("on");
+  document.getElementById("aiModeBadge").textContent='';
   activateMockMode();document.getElementById("autoStopBtn").style.display="none";
   document.getElementById("autoBtn").classList.remove("on");document.getElementById("aiModeBadge").textContent="대기중";
   addMsg("ai","⏹ AI 자동매매 중지.");
@@ -7155,9 +7186,24 @@ async function autoSelectBestStock(){
 // ══════════════════════════════════════════════
 // 매매일지 AI 자동 작성 + Notion 저장
 // ══════════════════════════════════════════════
+// 장 시간 필터 (09:00~15:30)
+function isMarketHourTrade(trade){
+  // time 필드가 있으면 그 기준, 없으면 포함
+  if(!trade.time) return true;
+  try{
+    const [h,m] = trade.time.split(':').map(Number);
+    const mins = h*60+m;
+    return mins >= 9*60 && mins <= 15*60+30;
+  }catch(e){ return true; }
+}
+function getMarketTrades(date){
+  const all = mock.trades.filter(t=>t.date===(date||sim.date));
+  return all.filter(isMarketHourTrade);
+}
+
 async function autoSaveJournalOnTrade(){
   const date=sim.date;
-  const tt=mock.trades.filter(function(t){return t.date===date;});
+  const tt=(mock.trades||[]).filter(function(t){return t.date===date&&isMarketHourTrade(t);}); // 장시간 기준
   if(!tt.length)return;
   const sells=tt.filter(function(t){return t.side==='sell';});
   const pnl=sells.reduce(function(a,t){return a+t.pnl;},0);
