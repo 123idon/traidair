@@ -798,6 +798,12 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // 버전 확인 엔드포인트
+  if(url==="/api/version"){
+    res.writeHead(200,{"Content-Type":"application/json",...CORS});
+    res.end(JSON.stringify({version:"6511dbe",ts:Date.now()}));
+    return;
+  }
   // 정적 파일
   let filePath = req.url === '/' ? '/trading-hts.html' : req.url.split('?')[0];
   filePath = path.join(__dirname, filePath);
