@@ -801,7 +801,7 @@ const server = http.createServer(async (req, res) => {
   // 버전 확인 엔드포인트
   if(url==="/api/version"){
     res.writeHead(200,{"Content-Type":"application/json",...CORS});
-    res.end(JSON.stringify({version:"6511dbe",ts:Date.now()}));
+    const _hp=require("path").join(__dirname,"trading-hts.html");const _hs=require("fs").statSync(_hp,{throwIfNoEntry:false});res.end(JSON.stringify({version:"1.0.3-debug",htmlSize:_hs?_hs.size:0,ts:Date.now()}));
     return;
   }
   // 정적 파일
