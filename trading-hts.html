@@ -523,8 +523,9 @@ canvas{image-rendering:pixelated;}
     <button class="ibtn" onclick="openModal('settings')">⚙</button>
     <button class="ibtn red" onclick="endMock()">■ 종료</button>
     <button class="ibtn pri" onclick="openModal('journal')">📓</button>
-    <button class="ibtn pur" onclick="openModal('autotrade')" id="autoBtn">🤖 자동매매</button>
-    <button class="ibtn" id="pauseBtnHdr" onclick="pauseAuto()" style="display:none;background:#f59e0b;color:#fff;border-color:#f59e0b;font-weight:700;">⏸ 일시정지</button>
+    <button class="ibtn" onclick="openModal('autotrade')" id="autoSettingBtn" title="자동매매 설정">⚙</button>
+    <button class="ibtn pur" onclick="toggleAutoTrade()" id="autoBtn" title="자동매매 시작/중지">▶ 자동매매</button>
+    <button class="ibtn" id="pauseBtnHdr" onclick="pauseAuto()" style="display:none;background:#f59e0b;color:#fff;border-color:#f59e0b;font-weight:700;" title="일시정지/재개">⏸</button>
     <button class="ibtn red" id="stopBtnHdr" onclick="stopAuto()" style="display:none;font-weight:700;">⏹ 정지</button>
     <button class="ibtn" id="pauseBtnHdr" onclick="pauseAuto()" style="display:none;background:#f59e0b;color:#fff;border-color:#f59e0b;font-weight:700;">⏸ 일시정지</button>
     <button class="ibtn red" id="stopBtnHdr" onclick="stopAuto()" style="display:none;font-weight:700;">⏹ 정지</button>
@@ -635,6 +636,7 @@ canvas{image-rendering:pixelated;}
 <div style="border-top:2px solid var(--br);margin-top:4px;">
   <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px 4px;">
     <span style="font-size:9px;font-weight:700;color:var(--b);">🤖 AI 현황</span>
+    <span id="aiCurrentTk" style="font-size:8px;font-family:var(--mono);color:var(--b);background:rgba(49,130,246,.1);padding:1px 5px;border-radius:4px;"></span>
     <span id="aiStatusDot" style="width:7px;height:7px;border-radius:50%;background:var(--tm);display:inline-block;transition:background .3s;"></span>
   </div>
   <div id="aiStatusBox" style="margin:0 8px 4px;padding:6px 8px;background:var(--card);border-radius:7px;border:1px solid var(--br);">
@@ -1841,10 +1843,7 @@ function renderWLGroup(){
       const col=g===2?"var(--r)":g===0?"var(--b)":"var(--ts)";
       return`<div style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:7px;cursor:pointer;transition:background .1s;margin-bottom:1px;" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''">
         <div onclick="selectStk('${tk}')" style="disace:nowrap;">${s.nm}</div>
-          <div style="font-family:var(--mono);font-size:9px;${up?"color:var(--g)":"color:var(--r);"};">${up?"+":""}${c}%</div>
-        </div>
-        <div style="display:flex;gap:2px;flex-shrink:0;">
-          ${g!==2?`<button onclick="moveToWG(${g},'${tk}',2)" title="매매금지로 이동" style="background:none;border:none;font-size:9px;cursor:pointer;color:var(--tm);padding:0 1px;">🚫</button>`:""}
+          <div style="font-family:var(--mono);font-size:9px;${up?"color:var(--g)":"color:var(--r);"};">${up?"+":""동" style="background:none;border:none;font-size:9px;cursor:pointer;color:var(--tm);padding:0 1px;">🚫</button>`:""}
           <button onclick="removeFromWG(${g},'${tk}')" style="background:none;border:none;font-size:11px;cursor:pointer;color:var(--tm);padding:0 1px;">×</button>
         </div>
       </div>`;
@@ -4140,6 +4139,11 @@ function startAuto(){
   var _phd=document.getElementById("pauseBtnHdr"),_shd=document.getElementById("stopBtnHdr");
   if(_phd){_phd.style.display="";_phd.textContent="⏸ 일시정지";_phd.style.background="#f59e0b";}
   if(_shd) _shd.style.display="";
+  // 자동매매 버튼 → 중지 상태로 토글
+  var ab=document.getElementById("autoBtn");
+  if(ab){ab.textContent="⏹ 중지";ab.style.background="var(--r)";ab.style.borderColor="var(--r)";ab.style.color="#fff";}
+  var ph=document.getElementById("pauseBtnHdr");
+  if(ph){ph.style.display="";ph.textContent="⏸";ph.style.background="#f59e0b";}
   document.getElementById("autoBtn").classList.add("on");
   document.getElementById("aiModeBadge").textContent='Lv'+autoState.level+' 실행중';
   // 일시정지/정지 버튼 표시
@@ -4180,6 +4184,11 @@ function stopAuto(){
   if(sBtn) sBtn.style.display='none';
   const startBtn=document.querySelector('.modal-content .ibtn.pur[onclick="startAuto()"]');
   if(startBtn) startBtn.style.display='';
+  // 자동매매 버튼 → 실행 상태로 복원
+  var ab2=document.getElementById("autoBtn");
+  if(ab2){ab2.textContent="▶ 자동매매";ab2.style.background="";ab2.style.borderColor="";ab2.style.color="";}
+  var ph2=document.getElementById("pauseBtnHdr");
+  if(ph2){ph2.style.display="none";ph2.textContent="⏸";ph2.style.background="#f59e0b";}
   document.getElementById("autoBtn").classList.remove("on");
   var _pH2_=document.getElementById("pauseBtnHdr"),_sH2_=document.getElementById("stopBtnHdr");
   if(_pH2_)_pH2_.style.display="none";if(_sH2_)_sH2_.style.display="none";
@@ -4200,6 +4209,32 @@ async function scheduleScreening(){
   autoTimer=setTimeout(scheduleScreening,5000);
 }
 function addDecisionLog(title, body, phase){
+  // 현재 종목 표시 추가
+  const stk=STOCKS.find(s=>s.tk===activeTk)||{nm:activeTk};
+  const tkInfo="["+stk.nm+"("+activeTk+")] ";
+  title = title.startsWith("[") ? title : tkInfo+title;
+  _updateAIStatusNow(title, body, phase);
+  if(!window._decisionLog) window._decisionLog=[];
+  const entry={title,body,phase,time:new Date().toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit",second:"2-digit"})};
+  window._decisionLog.push(entry);
+  if(window._decisionLog.length>50) window._decisionLog.shift();
+  _updateAIStatusPanel(entry);
+}
+function _updateAIStatusNow(title,body,phase){
+  const stk=STOCKS.find(s=>s.tk===activeTk)||{nm:activeTk,sec:""};
+  const lbl=document.getElementById("aiStatusLabel");
+  const msg=document.getElementById("aiStatusMsg");
+  const dot=document.getElementById("aiStatusDot");
+  const tkBadge=document.getElementById("aiCurrentTk");
+  if(tkBadge) tkBadge.textContent=stk.nm+"("+activeTk+")";
+  const isBuy=title.includes("매수")||title.includes("BUY");
+  const isBlock=title.includes("차단")||title.includes("관망")||title.includes("PASS")||title.includes("미달");
+  const col=isBuy?"var(--g)":isBlock?"var(--r)":"var(--b)";
+  if(lbl){lbl.textContent=phase||title.slice(0,24);lbl.style.color=col;}
+  if(msg){msg.textContent=(body||title).slice(0,80);msg.style.color=isBuy?"var(--g)":isBlock?"var(--r)":"var(--ts)";}
+  if(dot){dot.style.background=col;}
+}
+
   // 전역 로그 배열
   if(!window._decisionLog) window._decisionLog=[];
   const entry = {title, body, phase, time: new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',second:'2-digit'})};
@@ -5897,6 +5932,17 @@ function renderNews(){
     </div>`;
   }).join("");
 }
+function setActiveTk(tk){
+  selectStk(tk);
+  // AI 현황 패널 업데이트
+  const stk=STOCKS.find(s=>s.tk===tk)||{nm:tk};
+  const lbl=document.getElementById("aiStatusLabel");
+  const msg=document.getElementById("aiStatusMsg");
+  if(lbl){lbl.textContent="종목 전환: "+stk.nm;lbl.style.color="var(--b)";}
+  if(msg){msg.textContent=tk+" | "+stk.sec+" | 분석 준비 중...";}
+  const dot=document.getElementById("aiStatusDot");
+  if(dot){dot.style.background="var(--b)";}
+}
 function selectStk(tk){activeTk=tk;const s=STOCKS.find(s=>s.tk===tk)||STOCKS[0];document.getElementById("siNm").textContent=s.nm;// 관심종목 자동 추가 제거 (수동으로 그룹 선택 후 추가)
   const tkEl=document.getElementById("obTkName");if(tkEl)tkEl.textContent=s.nm;document.getElementById("srchIn").value="";hideSrch();renderWL();genCandles(tk,sim.date);initChart();renderOB();renderTH();
   const atk=document.getElementById("analysisTk");if(atk)atk.textContent=s.nm;
@@ -7422,3 +7468,13 @@ async function syncCandidatesToWatchlist(){
 <span id="mktStrScore" style="display:none;"></span>
 </body>
 </html>
+function toggleAutoTrade(){
+  if(autoState.running){
+    stopAuto();
+  } else {
+    // 설정값 자동 적용 후 시작
+    var lvl = parseInt(document.getElementById("auto-lv-sel")&&document.getElementById("auto-lv-sel").value||autoLevel||4);
+    autoLevel = lvl;
+    startAuto();
+  }
+}
