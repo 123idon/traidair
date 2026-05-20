@@ -4105,6 +4105,9 @@ function startAuto(){
   document.getElementById("modeBadge").className="badge auto";
   document.getElementById("modeText").textContent=`AI Lv${autoState.level}`;
   document.getElementById("autoStopBtn").style.display="";
+  var _ab=document.getElementById("autoBtn");
+  if(_ab){_ab.textContent="⏹ 중지";_ab.style.background="var(--r)";_ab.style.borderColor="var(--r)";_ab.style.color="#fff";}
+  var _ph=document.getElementById("pauseBtnHdr");if(_ph)_ph.style.display="";
   document.getElementById("autoBtn").classList.add("on");
   document.getElementById("aiModeBadge").textContent='Lv'+autoState.level+' 실행중';
   // 일시정지/정지 버튼 표시
@@ -4142,6 +4145,8 @@ function stopAuto(){
   const startBtn=document.querySelector('.modal-content .ibtn.pur[onclick="startAuto()"]');
   if(startBtn) startBtn.style.display='';
   document.getElementById("autoBtn").classList.remove("on");
+  var _ab2=document.getElementById("autoBtn");
+  if(_ab2){_ab2.textContent="▶ 자동매매";_ab2.style.background="";_ab2.style.borderColor="";_ab2.style.color="";}
   document.getElementById("aiModeBadge").textContent='';
   activateMockMode();document.getElementById("autoStopBtn").style.display="none";
   document.getElementById("autoBtn").classList.remove("on");document.getElementById("aiModeBadge").textContent="대기중";
