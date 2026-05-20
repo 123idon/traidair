@@ -151,7 +151,7 @@ button{cursor:pointer;font-family:var(--sans);}
 .rpt.on{color:var(--b);border-bottom-color:var(--b);font-weight:700;}
 .rpb{flex:1;overflow-y:auto;display:none;}
 .rpb.on{display:block;}
-.ob-r{display:flex;align-items:center;padding:3px 8px;position:relative;cursor:pointer;border-bottom:1px solid var(--br);}
+.ob-r{display:flex;align-items:center;padding:5px 10px;position:relative;cursor:pointer;border-bottom:1px solid var(--br);min-height:26px;}
 .ob-r:hover{opacity:.75;}
 .ob-bg{position:absolute;top:0;bottom:0;border-radius:0;opacity:.12;}
 .ob-bg.s{right:0;background:var(--r);opacity:.1;}
@@ -4131,6 +4131,9 @@ function startAuto(){
   document.getElementById("modeBadge").className="badge auto";
   document.getElementById("modeText").textContent=`AI Lv${autoState.level}`;
   document.getElementById("autoStopBtn").style.display="";
+  var _phd=document.getElementById("pauseBtnHdr"),_shd=document.getElementById("stopBtnHdr");
+  if(_phd){_phd.style.display="";_phd.textContent="⏸ 일시정지";_phd.style.background="#f59e0b";}
+  if(_shd) _shd.style.display="";
   document.getElementById("autoBtn").classList.add("on");
   document.getElementById("aiModeBadge").textContent='Lv'+autoState.level+' 실행중';
   // 일시정지/정지 버튼 표시
@@ -4139,6 +4142,10 @@ function startAuto(){
   if(sBtn) sBtn.style.display='';
   const startBtn=document.querySelector('.modal-content .ibtn.pur[onclick="startAuto()"]');
   if(startBtn) startBtn.style.display='none';
+  var _pHdr_=document.getElementById("pauseBtnHdr");
+  var _sHdr_=document.getElementById("stopBtnHdr");
+  if(_pHdr_){_pHdr_.style.display="";_pHdr_.textContent="⏸ 일시정지";_pHdr_.style.background="#f59e0b";_pHdr_.style.color="#fff";}
+  if(_sHdr_){_sHdr_.style.display="";_sHdr_.style.background="#ef4444";_sHdr_.style.color="#fff";}
   closeModal("autotrade");
   addMsg("ai",`🤖 AI 자동매매 시작 (레벨 ${autoState.level})\n모드: ${["완전수동","종목선정","진입신호","진입자동","완전자동"][autoState.level]}\n\n설정값:\n• 최소 R/R: 1:${autoState.cfg.rr}\n• 자동 손절: -${autoState.cfg.stop}%\n• 1차 익절: +${autoState.cfg.t1}% (50%)\n• 2차 익절: +${autoState.cfg.t2}% (30%)\n\n[Phase 8: 매수 전 통합 점검 프로세스 적용]`);
   if(autoState.level>=1)scheduleScreening();
@@ -4168,12 +4175,24 @@ function stopAuto(){
   const startBtn=document.querySelector('.modal-content .ibtn.pur[onclick="startAuto()"]');
   if(startBtn) startBtn.style.display='';
   document.getElementById("autoBtn").classList.remove("on");
+  var _pH2_=document.getElementById("pauseBtnHdr"),_sH2_=document.getElementById("stopBtnHdr");
+  if(_pH2_)_pH2_.style.display="none";if(_sH2_)_sH2_.style.display="none";
   document.getElementById("aiModeBadge").textContent='';
   activateMockMode();document.getElementById("autoStopBtn").style.display="none";
   document.getElementById("autoBtn").classList.remove("on");document.getElementById("aiModeBadge").textContent="대기중";
   addMsg("ai","⏹ AI 자동매매 중지.");
 }
-function scheduleScreening(){if(!autoState.running)return;runScreening();autoTimer=setTimeout(scheduleScreening,5000);}
+async function scheduleScreening(){
+  if(!autoState.running)return;
+  const now=Date.now();
+  if(!scheduleScreening._lastSel||now-scheduleScreening._lastSel>30000){
+    scheduleScreening._lastSel=now;
+    try{await syncCandidatesToWatchlist();await autoSelectBestStock();}catch(e){}
+    await new Promise(function(r){setTimeout(r,300);});
+  }
+  runScreening();
+  autoTimer=setTimeout(scheduleScreening,5000);
+}
 function addDecisionLog(title, body, phase){
   // 전역 로그 배열
   if(!window._decisionLog) window._decisionLog=[];
@@ -7117,8 +7136,10 @@ function renderCands(){
   if(!el) return;
   el.innerHTML=sorted.map((c,i)=>{
     const s=STOCKS.find(s=>s.tk===c.tk)||{nm:c.tk,pr:0,base:1};
-    const sc=c.score||70;
-    const col=sc>=80?'var(--g)':sc>=65?'var(--a)':'var(--r)';
+    let _sc=c.score||0;
+    if(activeTk===c.tk&&sim.candles.length>=10){const _cls=sim.candles.map(x=>x.c),_vls=sim.candles.map(x=>x.v);const _lc=sim.candles[sim.candles.length-1],_pc=sim.candles[sim.candles.length-2]||_lc,_pc2=sim.candles[sim.candles.length-3]||_pc;const _ma5=calcMA(_cls,5),_ma20=calcMA(_cls,20),_ma60=calcMA(_cls,60);const _lma5=_ma5[_ma5.length-1]||0,_lma20=_ma20[_ma20.length-1]||0,_lma60=_ma60[_ma60.length-1]||0;const _lrsi=parseFloat((calcRSI(_cls,14).slice(-1)[0]||50).toFixed(1));const _avg5v=_vls.slice(-6,-1).reduce((a,b)=>a+b,0)/5||1,_volR=_vls[_vls.length-1]/_avg5v;_sc=0;if(_lma5>_lma20&&_lma20>_lma60)_sc+=25;else if(_lma5>_lma20)_sc+=10;if(_lc.c>_lma5)_sc+=20;else if(_lc.c>_lma20)_sc+=8;if(_lc.c>_lc.o)_sc+=10;if(_volR>=1.5)_sc+=20;else if(_volR>=1.2)_sc+=10;if(_lrsi>=50&&_lrsi<=65)_sc+=15;else if(_lrsi>=45&&_lrsi<=72)_sc+=8;if(_lc.c>_pc.c&&_pc.c>_pc2.c)_sc+=10;if(_lma5<_lma20)_sc-=15;if(_lc.c<_lc.o&&_pc.c<_pc.o)_sc-=10;_sc=Math.max(5,Math.min(99,_sc));c.score=_sc;}else if(!_sc)_sc=50;
+    const sc=_sc;
+    const col=sc>=75?'var(--g)':sc>=55?'var(--a)':'var(--r)';
     const chg=((s.pr-s.base)/s.base*100).toFixed(2);
     const up=parseFloat(chg)>=0;
     return `<div onclick="showCandDetail('${c.tk}')" style="padding:7px 6px;border-radius:8px;cursor:pointer;border-bottom:1px solid var(--br);" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='none'">
@@ -7143,8 +7164,10 @@ function renderCands(){
 function showCandDetail(tk){
   const c=CANDS.find(c=>c.tk===tk)||{tk,why:'',score:70};
   const s=STOCKS.find(s=>s.tk===tk)||{nm:tk,pr:0,base:1};
-  const sc=c.score||70;
-  const col=sc>=80?'var(--g)':sc>=65?'var(--a)':'var(--r)';
+  let _sc=c.score||0;
+    if(activeTk===c.tk&&sim.candles.length>=10){const _cls=sim.candles.map(x=>x.c),_vls=sim.candles.map(x=>x.v);const _lc=sim.candles[sim.candles.length-1],_pc=sim.candles[sim.candles.length-2]||_lc,_pc2=sim.candles[sim.candles.length-3]||_pc;const _ma5=calcMA(_cls,5),_ma20=calcMA(_cls,20),_ma60=calcMA(_cls,60);const _lma5=_ma5[_ma5.length-1]||0,_lma20=_ma20[_ma20.length-1]||0,_lma60=_ma60[_ma60.length-1]||0;const _lrsi=parseFloat((calcRSI(_cls,14).slice(-1)[0]||50).toFixed(1));const _avg5v=_vls.slice(-6,-1).reduce((a,b)=>a+b,0)/5||1,_volR=_vls[_vls.length-1]/_avg5v;_sc=0;if(_lma5>_lma20&&_lma20>_lma60)_sc+=25;else if(_lma5>_lma20)_sc+=10;if(_lc.c>_lma5)_sc+=20;else if(_lc.c>_lma20)_sc+=8;if(_lc.c>_lc.o)_sc+=10;if(_volR>=1.5)_sc+=20;else if(_volR>=1.2)_sc+=10;if(_lrsi>=50&&_lrsi<=65)_sc+=15;else if(_lrsi>=45&&_lrsi<=72)_sc+=8;if(_lc.c>_pc.c&&_pc.c>_pc2.c)_sc+=10;if(_lma5<_lma20)_sc-=15;if(_lc.c<_lc.o&&_pc.c<_pc.o)_sc-=10;_sc=Math.max(5,Math.min(99,_sc));c.score=_sc;}else if(!_sc)_sc=50;
+    const sc=_sc;
+  const col=sc>=75?'var(--g)':sc>=55?'var(--a)':'var(--r)';
   let popup=document.getElementById('_candPopup');
   if(!popup){ popup=document.createElement('div'); popup.id='_candPopup';
     popup.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9999;background:var(--pan);border-radius:14px;box-shadow:0 8px 40px rgba(0,0,0,.2);padding:18px;width:300px;max-width:92vw;';
@@ -7239,6 +7262,7 @@ window.onload=()=>{
   }
   _initResizeObserver();
   initChartRightClick();
+  setTimeout(function(){if(sim.candles.length<5){genCandles(activeTk,sim.date);initChart();}},800);
   // 장중 체크 자동 실행
   setTimeout(runIntraCheck, 1500);
   // ★ 서버에서 저장된 API 설정 로드 (재배포 후에도 유지)
