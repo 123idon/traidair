@@ -1840,6 +1840,369 @@ function renderWLGroup(){
       return`<div style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:7px;cursor:pointer;transition:background .1s;margin-bottom:1px;" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''">
         <div onclick="selectStk('${tk}')" style="display:flex;align-items:center;gap:5px;flex:1;min-width:0;">
           <div style="font-family:var(--mono);font-size:9px;font-weight:600;color:${col};width:34px;flex-shrink:0;">${tk.slice(-4)}</div>
+          <div style="font-size:9px;flex:1;overflow:hidden;text-overflow:ellipsis;white-sp
+// ═══════════════════════════════
+// DATA══════════════
+// DATA
+// ═══════════════════════════════
+const STOCKS=[
+  // 코스피 대형주
+  {tk:"005930",nm:"삼성전자",pr:71500,base:71500,sec:"반도체",cap:"대형"},
+  {tk:"000660",nm:"SK하이닉스",pr:189300,base:189300,sec:"반도체",cap:"대형"},
+  {tk:"005380",nm:"현대차",pr:212000,base:212000,sec:"자동차",cap:"대형"},
+  {tk:"005490",nm:"POSCO홀딩스",pr:312000,base:312000,sec:"철강",cap:"대형"},
+  {tk:"035420",nm:"NAVER",pr:182200,base:182200,sec:"인터넷",cap:"대형"},
+  {tk:"051910",nm:"LG화학",pr:318500,base:318500,sec:"화학",cap:"대형"},
+  {tk:"006400",nm:"삼성SDI",pr:285000,base:285000,sec:"2차전지",cap:"대형"},
+  {tk:"003550",nm:"LG",pr:78500,base:78500,sec:"지주",cap:"대형"},
+  {tk:"028260",nm:"삼성물산",pr:138500,base:138500,sec:"건설",cap:"대형"},
+  {tk:"012330",nm:"현대모비스",pr:248500,base:248500,sec:"자동차부품",cap:"대형"},
+  {tk:"066570",nm:"LG전자",pr:95800,base:95800,sec:"가전",cap:"대형"},
+  {tk:"032830",nm:"삼성생명",pr:91800,base:91800,sec:"보험",cap:"대형"},
+  {tk:"055550",nm:"신한지주",pr:45350,base:45350,sec:"금융",cap:"대형"},
+  {tk:"105560",nm:"KB금융",pr:78200,base:78200,sec:"금융",cap:"대형"},
+  {tk:"000270",nm:"기아",pr:98100,base:98100,sec:"자동차",cap:"대형"},
+  {tk:"096770",nm:"SK이노베이션",pr:115500,base:115500,sec:"에너지",cap:"대형"},
+  {tk:"003670",nm:"포스코퓨처엠",pr:198000,base:198000,sec:"2차전지",cap:"중형"},
+  {tk:"247540",nm:"에코프로비엠",pr:152000,base:152000,sec:"2차전지",cap:"중형"},
+  // 코스닥
+  {tk:"373220",nm:"LG에너지솔루션",pr:298500,base:298500,sec:"2차전지",cap:"대형"},
+  {tk:"207940",nm:"삼성바이오로직스",pr:831000,base:831000,sec:"바이오",cap:"대형"},
+  {tk:"068270",nm:"셀트리온",pr:186500,base:186500,sec:"바이오",cap:"대형"},
+  {tk:"035720",nm:"카카오",pr:42350,base:42350,sec:"인터넷",cap:"대형"},
+  {tk:"000810",nm:"삼성화재",pr:335000,base:335000,sec:"보험",cap:"대형"},
+  {tk:"086520",nm:"에코프로",pr:68500,base:68500,sec:"2차전지",cap:"중형"},
+  {tk:"091990",nm:"셀트리온헬스케어",pr:45200,base:45200,sec:"바이오",cap:"중형"},
+  {tk:"263750",nm:"펄어비스",pr:32500,base:32500,sec:"게임",cap:"중형"},
+  {tk:"041510",nm:"에스엠",pr:58700,base:58700,sec:"엔터",cap:"중형"},
+  {tk:"035900",nm:"JYP Ent.",pr:47800,base:47800,sec:"엔터",cap:"중형"},
+  {tk:"122870",nm:"YG엔터테인먼트",pr:38900,base:38900,sec:"엔터",cap:"중형"},
+  {tk:"278530",nm:"HLB",pr:52300,base:52300,sec:"바이오",cap:"중형"},
+  {tk:"950130",nm:"엑세스바이오",pr:8500,base:8500,sec:"바이오",cap:"소형"},
+  {tk:"196170",nm:"알테오젠",pr:285000,base:285000,sec:"바이오",cap:"중형"},
+  {tk:"145020",nm:"휴젤",pr:198000,base:198000,sec:"바이오",cap:"중형"},
+  {tk:"048260",nm:"오스템임플란트",pr:178500,base:178500,sec:"의료기기",cap:"중형"},
+  {tk:"215600",nm:"신라젠",pr:3240,base:3240,sec:"바이오",cap:"소형"},
+  {tk:"039030",nm:"이오테크닉스",pr:89500,base:89500,sec:"반도체장비",cap:"중형"},
+  {tk:"042700",nm:"한미반도체",pr:68500,base:68500,sec:"반도체장비",cap:"중형"},
+  {tk:"357780",nm:"솔브레인",pr:295000,base:295000,sec:"반도체소재",cap:"중형"},
+  {tk:"095340",nm:"ISC",pr:42500,base:42500,sec:"반도체",cap:"소형"},
+  {tk:"009150",nm:"삼성전기",pr:155000,base:155000,sec:"전자부품",cap:"중형"},
+  {tk:"010130",nm:"고려아연",pr:498000,base:498000,sec:"비철금속",cap:"중형"},
+  {tk:"326030",nm:"SK바이오팜",pr:78500,base:78500,sec:"바이오",cap:"중형"},
+  {tk:"011200",nm:"HMM",pr:18250,base:18250,sec:"해운",cap:"중형"},
+  {tk:"000120",nm:"CJ대한통운",pr:98500,base:98500,sec:"물류",cap:"중형"},
+  {tk:"180640",nm:"한진칼",pr:62400,base:62400,sec:"항공",cap:"중형"},
+  {tk:"003490",nm:"대한항공",pr:21500,base:21500,sec:"항공",cap:"중형"},
+  {tk:"021240",nm:"코웨이",pr:52300,base:52300,sec:"가전",cap:"중형"},
+  {tk:"259960",nm:"크래프톤",pr:218000,base:218000,sec:"게임",cap:"대형"},
+];
+// Phase 3-9: 관심종목 5그룹
+const WG_LABELS = ['🎯 오늘 진입 후보','📊 모니터링','🚫 매매금지','🔥 테마/이슈','📝 복기 대상'];
+const WG_MAX = [3, 10, 999, 10, 5];
+let WGS = (()=>{try{return JSON.parse(localStorage.getItem("htsWGS")||JSON.stringify([
+  ["005930","000660"],["373220","035420"],[]  ,[],[]]))}catch(e){return [[],[],[],[],[]];}})();
+let curWG = 0;
+// 구버전 WL 호환
+let WL = WGS[0];
+function saveWL(){WGS[0]=WL;const v=JSON.stringify(WGS);localStorage.setItem("htsWGS",v);saveToServer("htsWGS",v);}
+function saveWGS(){const v=JSON.stringify(WGS);localStorage.setItem("htsWGS",v);saveToServer("htsWGS",v);}
+function addToWL(tk){if(!WL.includes(tk)){WL.push(tk);saveWL();renderWLGroup();}}
+function removeFromWL(tk){WL=WL.filter(w=>w!==tk);WGS[0]=WL;saveWGS();renderWLGroup();}
+
+function selWG(el,id){
+  document.querySelectorAll(".wg-tab").forEach(t=>t.classList.remove("on"));
+  el.classList.add("on");
+  curWG=parseInt(id.replace("wg",""));
+  document.querySelectorAll(".wg-body").forEach(b=>b.style.display="none");
+  document.getElementById(id).style.display="block";
+  const lbl=document.getElementById("wgTitle");
+  const cnt=document.getElementById("wgCount");
+  if(lbl)lbl.textContent=WG_LABELS[curWG];
+  const cur=WGS[curWG]||[];
+  const max=WG_MAX[curWG];
+  if(cnt)cnt.textContent=max===999?cur.length+"개":cur.length+"/"+max;
+  renderWLGroup();
+}
+function addCurrentToWG(){
+  const tk=activeTk;
+  const grp=WGS[curWG]||(WGS[curWG]=[]);
+  if(grp.includes(tk)){showAlert("중복","이미 이 그룹에 있습니다.");return;}
+  if(curWG===0&&grp.length>=3){showAlert("초과","진입 후보는 최대 3개입니다. (Phase 3-9)");return;}
+  grp.push(tk);saveWGS();renderWLGroup();
+  const stk=STOCKS.find(s=>s.tk===tk);
+  addDecisionLog("["+WG_LABELS[curWG]+"] "+stk?.nm+" 추가","","Phase 3-9");
+}
+function removeFromWG(gIdx,tk){
+  WGS[gIdx]=WGS[gIdx].filter(w=>w!==tk);
+  if(gIdx===0)WL=WGS[0];
+  saveWGS();renderWLGroup();
+}
+function moveToWG(fromG,tk,toG){
+  WGS[fromG]=WGS[fromG].filter(w=>w!==tk);
+  if(!WGS[toG])WGS[toG]=[];
+  if(!WGS[toG].includes(tk))WGS[toG].push(tk);
+  if(toG===0)WL=WGS[0];
+  saveWGS();renderWLGroup();
+}
+
+function renderWLGroup(){
+  // 각 그룹 렌더링
+  for(let g=0;g<5;g++){
+    const listId=g===2?"banList":"wlList"+g;
+    const el=document.getElementById(listId);
+    if(!el)continue;
+    const grp=WGS[g]||[];
+    if(g===2&&!grp.length){el.textContent="없음";continue;}
+    el.innerHTML=grp.map(tk=>{
+      const s=STOCKS.find(s=>s.tk===tk)||{tk,nm:tk,pr:0,base:1,sec:""};
+      const c=((s.pr-s.base)/s.base*100).toFixed(2),up=parseFloat(c)>=0;
+      const col=g===2?"var(--r)":g===0?"var(--b)":"var(--ts)";
+      return`<div style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:7px;cursor:pointer;transition:background .1s;margin-bottom:1px;" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''">
+        <div onclick="selectStk('${tk}')" style="display:flex;align-items:center;gap:5px;flex:1;min-width:0;">
+          <div style="font-family:var(--mono);font-size:9px;font-weight:600;color:${col};width:34px;flex-shrink:0;">${tk.slice(-4)}</div>
+          <div style="font-size:9px;flex:1;overflow:hidden;text-overflow:ellipsis;white-sp
+// ═══════════════════════════════
+// DATA══════════════
+// DATA
+// ═══════════════════════════════
+const STOCKS=[
+  // 코스피 대형주
+  {tk:"005930",nm:"삼성전자",pr:71500,base:71500,sec:"반도체",cap:"대형"},
+  {tk:"000660",nm:"SK하이닉스",pr:189300,base:189300,sec:"반도체",cap:"대형"},
+  {tk:"005380",nm:"현대차",pr:212000,base:212000,sec:"자동차",cap:"대형"},
+  {tk:"005490",nm:"POSCO홀딩스",pr:312000,base:312000,sec:"철강",cap:"대형"},
+  {tk:"035420",nm:"NAVER",pr:182200,base:182200,sec:"인터넷",cap:"대형"},
+  {tk:"051910",nm:"LG화학",pr:318500,base:318500,sec:"화학",cap:"대형"},
+  {tk:"006400",nm:"삼성SDI",pr:285000,base:285000,sec:"2차전지",cap:"대형"},
+  {tk:"003550",nm:"LG",pr:78500,base:78500,sec:"지주",cap:"대형"},
+  {tk:"028260",nm:"삼성물산",pr:138500,base:138500,sec:"건설",cap:"대형"},
+  {tk:"012330",nm:"현대모비스",pr:248500,base:248500,sec:"자동차부품",cap:"대형"},
+  {tk:"066570",nm:"LG전자",pr:95800,base:95800,sec:"가전",cap:"대형"},
+  {tk:"032830",nm:"삼성생명",pr:91800,base:91800,sec:"보험",cap:"대형"},
+  {tk:"055550",nm:"신한지주",pr:45350,base:45350,sec:"금융",cap:"대형"},
+  {tk:"105560",nm:"KB금융",pr:78200,base:78200,sec:"금융",cap:"대형"},
+  {tk:"000270",nm:"기아",pr:98100,base:98100,sec:"자동차",cap:"대형"},
+  {tk:"096770",nm:"SK이노베이션",pr:115500,base:115500,sec:"에너지",cap:"대형"},
+  {tk:"003670",nm:"포스코퓨처엠",pr:198000,base:198000,sec:"2차전지",cap:"중형"},
+  {tk:"247540",nm:"에코프로비엠",pr:152000,base:152000,sec:"2차전지",cap:"중형"},
+  // 코스닥
+  {tk:"373220",nm:"LG에너지솔루션",pr:298500,base:298500,sec:"2차전지",cap:"대형"},
+  {tk:"207940",nm:"삼성바이오로직스",pr:831000,base:831000,sec:"바이오",cap:"대형"},
+  {tk:"068270",nm:"셀트리온",pr:186500,base:186500,sec:"바이오",cap:"대형"},
+  {tk:"035720",nm:"카카오",pr:42350,base:42350,sec:"인터넷",cap:"대형"},
+  {tk:"000810",nm:"삼성화재",pr:335000,base:335000,sec:"보험",cap:"대형"},
+  {tk:"086520",nm:"에코프로",pr:68500,base:68500,sec:"2차전지",cap:"중형"},
+  {tk:"091990",nm:"셀트리온헬스케어",pr:45200,base:45200,sec:"바이오",cap:"중형"},
+  {tk:"263750",nm:"펄어비스",pr:32500,base:32500,sec:"게임",cap:"중형"},
+  {tk:"041510",nm:"에스엠",pr:58700,base:58700,sec:"엔터",cap:"중형"},
+  {tk:"035900",nm:"JYP Ent.",pr:47800,base:47800,sec:"엔터",cap:"중형"},
+  {tk:"122870",nm:"YG엔터테인먼트",pr:38900,base:38900,sec:"엔터",cap:"중형"},
+  {tk:"278530",nm:"HLB",pr:52300,base:52300,sec:"바이오",cap:"중형"},
+  {tk:"950130",nm:"엑세스바이오",pr:8500,base:8500,sec:"바이오",cap:"소형"},
+  {tk:"196170",nm:"알테오젠",pr:285000,base:285000,sec:"바이오",cap:"중형"},
+  {tk:"145020",nm:"휴젤",pr:198000,base:198000,sec:"바이오",cap:"중형"},
+  {tk:"048260",nm:"오스템임플란트",pr:178500,base:178500,sec:"의료기기",cap:"중형"},
+  {tk:"215600",nm:"신라젠",pr:3240,base:3240,sec:"바이오",cap:"소형"},
+  {tk:"039030",nm:"이오테크닉스",pr:89500,base:89500,sec:"반도체장비",cap:"중형"},
+  {tk:"042700",nm:"한미반도체",pr:68500,base:68500,sec:"반도체장비",cap:"중형"},
+  {tk:"357780",nm:"솔브레인",pr:295000,base:295000,sec:"반도체소재",cap:"중형"},
+  {tk:"095340",nm:"ISC",pr:42500,base:42500,sec:"반도체",cap:"소형"},
+  {tk:"009150",nm:"삼성전기",pr:155000,base:155000,sec:"전자부품",cap:"중형"},
+  {tk:"010130",nm:"고려아연",pr:498000,base:498000,sec:"비철금속",cap:"중형"},
+  {tk:"326030",nm:"SK바이오팜",pr:78500,base:78500,sec:"바이오",cap:"중형"},
+  {tk:"011200",nm:"HMM",pr:18250,base:18250,sec:"해운",cap:"중형"},
+  {tk:"000120",nm:"CJ대한통운",pr:98500,base:98500,sec:"물류",cap:"중형"},
+  {tk:"180640",nm:"한진칼",pr:62400,base:62400,sec:"항공",cap:"중형"},
+  {tk:"003490",nm:"대한항공",pr:21500,base:21500,sec:"항공",cap:"중형"},
+  {tk:"021240",nm:"코웨이",pr:52300,base:52300,sec:"가전",cap:"중형"},
+  {tk:"259960",nm:"크래프톤",pr:218000,base:218000,sec:"게임",cap:"대형"},
+];
+// Phase 3-9: 관심종목 5그룹
+const WG_LABELS = ['🎯 오늘 진입 후보','📊 모니터링','🚫 매매금지','🔥 테마/이슈','📝 복기 대상'];
+const WG_MAX = [3, 10, 999, 10, 5];
+let WGS = (()=>{try{return JSON.parse(localStorage.getItem("htsWGS")||JSON.stringify([
+  ["005930","000660"],["373220","035420"],[]  ,[],[]]))}catch(e){return [[],[],[],[],[]];}})();
+let curWG = 0;
+// 구버전 WL 호환
+let WL = WGS[0];
+function saveWL(){WGS[0]=WL;const v=JSON.stringify(WGS);localStorage.setItem("htsWGS",v);saveToServer("htsWGS",v);}
+function saveWGS(){const v=JSON.stringify(WGS);localStorage.setItem("htsWGS",v);saveToServer("htsWGS",v);}
+function addToWL(tk){if(!WL.includes(tk)){WL.push(tk);saveWL();renderWLGroup();}}
+function removeFromWL(tk){WL=WL.filter(w=>w!==tk);WGS[0]=WL;saveWGS();renderWLGroup();}
+
+function selWG(el,id){
+  document.querySelectorAll(".wg-tab").forEach(t=>t.classList.remove("on"));
+  el.classList.add("on");
+  curWG=parseInt(id.replace("wg",""));
+  document.querySelectorAll(".wg-body").forEach(b=>b.style.display="none");
+  document.getElementById(id).style.display="block";
+  const lbl=document.getElementById("wgTitle");
+  const cnt=document.getElementById("wgCount");
+  if(lbl)lbl.textContent=WG_LABELS[curWG];
+  const cur=WGS[curWG]||[];
+  const max=WG_MAX[curWG];
+  if(cnt)cnt.textContent=max===999?cur.length+"개":cur.length+"/"+max;
+  renderWLGroup();
+}
+function addCurrentToWG(){
+  const tk=activeTk;
+  const grp=WGS[curWG]||(WGS[curWG]=[]);
+  if(grp.includes(tk)){showAlert("중복","이미 이 그룹에 있습니다.");return;}
+  if(curWG===0&&grp.length>=3){showAlert("초과","진입 후보는 최대 3개입니다. (Phase 3-9)");return;}
+  grp.push(tk);saveWGS();renderWLGroup();
+  const stk=STOCKS.find(s=>s.tk===tk);
+  addDecisionLog("["+WG_LABELS[curWG]+"] "+stk?.nm+" 추가","","Phase 3-9");
+}
+function removeFromWG(gIdx,tk){
+  WGS[gIdx]=WGS[gIdx].filter(w=>w!==tk);
+  if(gIdx===0)WL=WGS[0];
+  saveWGS();renderWLGroup();
+}
+function moveToWG(fromG,tk,toG){
+  WGS[fromG]=WGS[fromG].filter(w=>w!==tk);
+  if(!WGS[toG])WGS[toG]=[];
+  if(!WGS[toG].includes(tk))WGS[toG].push(tk);
+  if(toG===0)WL=WGS[0];
+  saveWGS();renderWLGroup();
+}
+
+function renderWLGroup(){
+  // 각 그룹 렌더링
+  for(let g=0;g<5;g++){
+    const listId=g===2?"banList":"wlList"+g;
+    const el=document.getElementById(listId);
+    if(!el)continue;
+    const grp=WGS[g]||[];
+    if(g===2&&!grp.length){el.textContent="없음";continue;}
+    el.innerHTML=grp.map(tk=>{
+      const s=STOCKS.find(s=>s.tk===tk)||{tk,nm:tk,pr:0,base:1,sec:""};
+      const c=((s.pr-s.base)/s.base*100).toFixed(2),up=parseFloat(c)>=0;
+      const col=g===2?"var(--r)":g===0?"var(--b)":"var(--ts)";
+      return`<div style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:7px;cursor:pointer;transition:background .1s;margin-bottom:1px;" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''">
+        <div onclick="selectStk('${tk}')" style="display:flex;align-items:center;gap:5px;flex:1;min-width:0;">
+          <div style="font-family:var(--mono);font-size:9px;font-weight:600;color:${col};width:34px;flex-shrink:0;">${tk.slice(-4)}</div>
+          <div style="font-size:9px;flex:1;overflow:hidden;text-overflow:ellipsis;white-sp
+// ═══════════════════════════════
+// DATA══════════════
+// DATA
+// ═══════════════════════════════
+const STOCKS=[
+  // 코스피 대형주
+  {tk:"005930",nm:"삼성전자",pr:71500,base:71500,sec:"반도체",cap:"대형"},
+  {tk:"000660",nm:"SK하이닉스",pr:189300,base:189300,sec:"반도체",cap:"대형"},
+  {tk:"005380",nm:"현대차",pr:212000,base:212000,sec:"자동차",cap:"대형"},
+  {tk:"005490",nm:"POSCO홀딩스",pr:312000,base:312000,sec:"철강",cap:"대형"},
+  {tk:"035420",nm:"NAVER",pr:182200,base:182200,sec:"인터넷",cap:"대형"},
+  {tk:"051910",nm:"LG화학",pr:318500,base:318500,sec:"화학",cap:"대형"},
+  {tk:"006400",nm:"삼성SDI",pr:285000,base:285000,sec:"2차전지",cap:"대형"},
+  {tk:"003550",nm:"LG",pr:78500,base:78500,sec:"지주",cap:"대형"},
+  {tk:"028260",nm:"삼성물산",pr:138500,base:138500,sec:"건설",cap:"대형"},
+  {tk:"012330",nm:"현대모비스",pr:248500,base:248500,sec:"자동차부품",cap:"대형"},
+  {tk:"066570",nm:"LG전자",pr:95800,base:95800,sec:"가전",cap:"대형"},
+  {tk:"032830",nm:"삼성생명",pr:91800,base:91800,sec:"보험",cap:"대형"},
+  {tk:"055550",nm:"신한지주",pr:45350,base:45350,sec:"금융",cap:"대형"},
+  {tk:"105560",nm:"KB금융",pr:78200,base:78200,sec:"금융",cap:"대형"},
+  {tk:"000270",nm:"기아",pr:98100,base:98100,sec:"자동차",cap:"대형"},
+  {tk:"096770",nm:"SK이노베이션",pr:115500,base:115500,sec:"에너지",cap:"대형"},
+  {tk:"003670",nm:"포스코퓨처엠",pr:198000,base:198000,sec:"2차전지",cap:"중형"},
+  {tk:"247540",nm:"에코프로비엠",pr:152000,base:152000,sec:"2차전지",cap:"중형"},
+  // 코스닥
+  {tk:"373220",nm:"LG에너지솔루션",pr:298500,base:298500,sec:"2차전지",cap:"대형"},
+  {tk:"207940",nm:"삼성바이오로직스",pr:831000,base:831000,sec:"바이오",cap:"대형"},
+  {tk:"068270",nm:"셀트리온",pr:186500,base:186500,sec:"바이오",cap:"대형"},
+  {tk:"035720",nm:"카카오",pr:42350,base:42350,sec:"인터넷",cap:"대형"},
+  {tk:"000810",nm:"삼성화재",pr:335000,base:335000,sec:"보험",cap:"대형"},
+  {tk:"086520",nm:"에코프로",pr:68500,base:68500,sec:"2차전지",cap:"중형"},
+  {tk:"091990",nm:"셀트리온헬스케어",pr:45200,base:45200,sec:"바이오",cap:"중형"},
+  {tk:"263750",nm:"펄어비스",pr:32500,base:32500,sec:"게임",cap:"중형"},
+  {tk:"041510",nm:"에스엠",pr:58700,base:58700,sec:"엔터",cap:"중형"},
+  {tk:"035900",nm:"JYP Ent.",pr:47800,base:47800,sec:"엔터",cap:"중형"},
+  {tk:"122870",nm:"YG엔터테인먼트",pr:38900,base:38900,sec:"엔터",cap:"중형"},
+  {tk:"278530",nm:"HLB",pr:52300,base:52300,sec:"바이오",cap:"중형"},
+  {tk:"950130",nm:"엑세스바이오",pr:8500,base:8500,sec:"바이오",cap:"소형"},
+  {tk:"196170",nm:"알테오젠",pr:285000,base:285000,sec:"바이오",cap:"중형"},
+  {tk:"145020",nm:"휴젤",pr:198000,base:198000,sec:"바이오",cap:"중형"},
+  {tk:"048260",nm:"오스템임플란트",pr:178500,base:178500,sec:"의료기기",cap:"중형"},
+  {tk:"215600",nm:"신라젠",pr:3240,base:3240,sec:"바이오",cap:"소형"},
+  {tk:"039030",nm:"이오테크닉스",pr:89500,base:89500,sec:"반도체장비",cap:"중형"},
+  {tk:"042700",nm:"한미반도체",pr:68500,base:68500,sec:"반도체장비",cap:"중형"},
+  {tk:"357780",nm:"솔브레인",pr:295000,base:295000,sec:"반도체소재",cap:"중형"},
+  {tk:"095340",nm:"ISC",pr:42500,base:42500,sec:"반도체",cap:"소형"},
+  {tk:"009150",nm:"삼성전기",pr:155000,base:155000,sec:"전자부품",cap:"중형"},
+  {tk:"010130",nm:"고려아연",pr:498000,base:498000,sec:"비철금속",cap:"중형"},
+  {tk:"326030",nm:"SK바이오팜",pr:78500,base:78500,sec:"바이오",cap:"중형"},
+  {tk:"011200",nm:"HMM",pr:18250,base:18250,sec:"해운",cap:"중형"},
+  {tk:"000120",nm:"CJ대한통운",pr:98500,base:98500,sec:"물류",cap:"중형"},
+  {tk:"180640",nm:"한진칼",pr:62400,base:62400,sec:"항공",cap:"중형"},
+  {tk:"003490",nm:"대한항공",pr:21500,base:21500,sec:"항공",cap:"중형"},
+  {tk:"021240",nm:"코웨이",pr:52300,base:52300,sec:"가전",cap:"중형"},
+  {tk:"259960",nm:"크래프톤",pr:218000,base:218000,sec:"게임",cap:"대형"},
+];
+// Phase 3-9: 관심종목 5그룹
+const WG_LABELS = ['🎯 오늘 진입 후보','📊 모니터링','🚫 매매금지','🔥 테마/이슈','📝 복기 대상'];
+const WG_MAX = [3, 10, 999, 10, 5];
+let WGS = (()=>{try{return JSON.parse(localStorage.getItem("htsWGS")||JSON.stringify([
+  ["005930","000660"],["373220","035420"],[]  ,[],[]]))}catch(e){return [[],[],[],[],[]];}})();
+let curWG = 0;
+// 구버전 WL 호환
+let WL = WGS[0];
+function saveWL(){WGS[0]=WL;const v=JSON.stringify(WGS);localStorage.setItem("htsWGS",v);saveToServer("htsWGS",v);}
+function saveWGS(){const v=JSON.stringify(WGS);localStorage.setItem("htsWGS",v);saveToServer("htsWGS",v);}
+function addToWL(tk){if(!WL.includes(tk)){WL.push(tk);saveWL();renderWLGroup();}}
+function removeFromWL(tk){WL=WL.filter(w=>w!==tk);WGS[0]=WL;saveWGS();renderWLGroup();}
+
+function selWG(el,id){
+  document.querySelectorAll(".wg-tab").forEach(t=>t.classList.remove("on"));
+  el.classList.add("on");
+  curWG=parseInt(id.replace("wg",""));
+  document.querySelectorAll(".wg-body").forEach(b=>b.style.display="none");
+  document.getElementById(id).style.display="block";
+  const lbl=document.getElementById("wgTitle");
+  const cnt=document.getElementById("wgCount");
+  if(lbl)lbl.textContent=WG_LABELS[curWG];
+  const cur=WGS[curWG]||[];
+  const max=WG_MAX[curWG];
+  if(cnt)cnt.textContent=max===999?cur.length+"개":cur.length+"/"+max;
+  renderWLGroup();
+}
+function addCurrentToWG(){
+  const tk=activeTk;
+  const grp=WGS[curWG]||(WGS[curWG]=[]);
+  if(grp.includes(tk)){showAlert("중복","이미 이 그룹에 있습니다.");return;}
+  if(curWG===0&&grp.length>=3){showAlert("초과","진입 후보는 최대 3개입니다. (Phase 3-9)");return;}
+  grp.push(tk);saveWGS();renderWLGroup();
+  const stk=STOCKS.find(s=>s.tk===tk);
+  addDecisionLog("["+WG_LABELS[curWG]+"] "+stk?.nm+" 추가","","Phase 3-9");
+}
+function removeFromWG(gIdx,tk){
+  WGS[gIdx]=WGS[gIdx].filter(w=>w!==tk);
+  if(gIdx===0)WL=WGS[0];
+  saveWGS();renderWLGroup();
+}
+function moveToWG(fromG,tk,toG){
+  WGS[fromG]=WGS[fromG].filter(w=>w!==tk);
+  if(!WGS[toG])WGS[toG]=[];
+  if(!WGS[toG].includes(tk))WGS[toG].push(tk);
+  if(toG===0)WL=WGS[0];
+  saveWGS();renderWLGroup();
+}
+
+function renderWLGroup(){
+  // 각 그룹 렌더링
+  for(let g=0;g<5;g++){
+    const listId=g===2?"banList":"wlList"+g;
+    const el=document.getElementById(listId);
+    if(!el)continue;
+    const grp=WGS[g]||[];
+    if(g===2&&!grp.length){el.textContent="없음";continue;}
+    el.innerHTML=grp.map(tk=>{
+      const s=STOCKS.find(s=>s.tk===tk)||{tk,nm:tk,pr:0,base:1,sec:""};
+      const c=((s.pr-s.base)/s.base*100).toFixed(2),up=parseFloat(c)>=0;
+      const col=g===2?"var(--r)":g===0?"var(--b)":"var(--ts)";
+      return`<div style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:7px;cursor:pointer;transition:background .1s;margin-bottom:1px;" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''">
+        <div onclick="selectStk('${tk}')" style="display:flex;align-items:center;gap:5px;flex:1;min-width:0;">
+          <div style="font-family:var(--mono);font-size:9px;font-weight:600;color:${col};width:34px;flex-shrink:0;">${tk.slice(-4)}</div>
           <div style="font-size:9px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${s.nm}</div>
           <div style="font-family:var(--mono);font-size:9px;${up?"color:var(--g)":"color:var(--r);"};">${up?"+":""}${c}%</div>
         </div>
@@ -2777,6 +3140,23 @@ function onDateChange(){
   mock.todayPnl=0;mock.todayTrades=0;mock.lossSeries=0;
   if(sim.date<todayStr())activateMockMode();
   genCandles(activeTk,sim.date);initChart();
+  // 전일 분봉 포함 실제 데이터 강제 로드 (비동기)
+  if(kisConfig.appKey&&kisConfig.appSecret){
+    setTimeout(function(){
+      _fetchKisCandles(activeTk,sim.date,sim.tf).then(function(candles){
+        if(!candles||candles.length<5) return;
+        sim.candles=candles;
+        var prevCount=_kisChartMeta._prevCount||0;
+        sim.idx=prevCount>0?prevCount-1:0;
+        chartViewCount=Math.min(Math.max(prevCount+20,80),candles.length);
+        chartViewStart=Math.max(0,candles.length-chartViewCount);
+        if(candles.length>0) updPrice(candles[sim.idx]);
+        drawChart();
+        var ci=document.getElementById("cinfo");
+        if(ci) ci.textContent="✅ 실제 "+candles.length+"봉 | 전일"+((_kisChartMeta.prevCount)||0)+"봉+당일"+((_kisChartMeta.todayCount)||0)+"봉";
+      }).catch(function(){});
+    },800);
+  }
   // ── 대시보드 날짜 동기화 ──
   _syncDateToDashboard(sim.date);
 }
@@ -4134,6 +4514,10 @@ function startAuto(){
   var _phd=document.getElementById("pauseBtnHdr"),_shd=document.getElementById("stopBtnHdr");
   if(_phd){_phd.style.display="";_phd.textContent="⏸ 일시정지";_phd.style.background="#f59e0b";}
   if(_shd) _shd.style.display="";
+
+  var _phd=document.getElementById("pauseBtnHdr"),_shd=document.getElementById("stopBtnHdr");
+  if(_phd){_phd.style.display="";_phd.textContent="⏸ 일시정지";_phd.style.background="#f59e0b";}
+  if(_shd) _shd.style.display="";
   document.getElementById("autoBtn").classList.add("on");
   document.getElementById("aiModeBadge").textContent='Lv'+autoState.level+' 실행중';
   // 일시정지/정지 버튼 표시
@@ -4181,18 +4565,23 @@ function stopAuto(){
   activateMockMode();document.getElementById("autoStopBtn").style.display="none";
   document.getElementById("autoBtn").classList.remove("on");document.getElementById("aiModeBadge").textContent="대기중";
   addMsg("ai","⏹ AI 자동매매 중지.");
+
+  var _ph2=document.getElementById("pauseBtnHdr"),_sh2=document.getElementById("stopBtnHdr");
+  if(_ph2){_ph2.style.display="none";_ph2.textContent="⏸ 일시정지";_ph2.style.background="#f59e0b";}
+  if(_sh2) _sh2.style.display="none";
 }
-async function scheduleScreening(){
+async async function scheduleScreening(){
   if(!autoState.running)return;
   const now=Date.now();
   if(!scheduleScreening._lastSel||now-scheduleScreening._lastSel>30000){
     scheduleScreening._lastSel=now;
-    try{await syncCandidatesToWatchlist();await autoSelectBestStock();}catch(e){}
+    try{await syncCandidatesToWatchlist();await autoSelectBestStock();}catch(e){console.warn("선정실패",e);}
     await new Promise(function(r){setTimeout(r,300);});
   }
   runScreening();
   autoTimer=setTimeout(scheduleScreening,5000);
 }
+
 function addDecisionLog(title, body, phase){
   // 전역 로그 배열
   if(!window._decisionLog) window._decisionLog=[];
@@ -7405,14 +7794,3 @@ async function syncCandidatesToWatchlist(){
     addDecisionLog("섹터대장주","강세: "+(ai2.sectors||[]).map(function(s){return s.name;}).join(","),ai2.summary||"");
   }catch(e3){console.warn("섹터선정실패:",e3.message);}
 }
-</script>
-
-<!-- 동적 참조 요소 -->
-<span id="mentalResetStatus" style="display:none;"></span>
-<span id="bd_warning" style="display:none;"></span>
-<span id="bd_reentry" style="display:none;"></span>
-<span id="trustAutoLimit" style="display:none;"></span>
-<span id="trustScoreDesc" style="display:none;"></span>
-<span id="mktStrScore" style="display:none;"></span>
-</body>
-</html>
