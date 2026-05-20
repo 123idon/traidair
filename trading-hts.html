@@ -4188,7 +4188,7 @@ function stopAuto(){
   document.getElementById("autoBtn").classList.remove("on");document.getElementById("aiModeBadge").textContent="대기중";
   addMsg("ai","⏹ AI 자동매매 중지.");
 }
-async async function scheduleScreening(){
+async function scheduleScreening(){
   if(!autoState.running)return;
   const now=Date.now();
   if(!scheduleScreening._lastSel||now-scheduleScreening._lastSel>30000){
