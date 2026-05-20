@@ -80,7 +80,7 @@ button{cursor:pointer;font-family:var(--sans);}
   flex:1;
   display:grid;
   grid-template-columns:162px 1fr 186px 232px;
-  grid-template-rows:1fr 90px 76px;
+  grid-template-rows:minmax(0,1fr) 90px 76px;
   overflow:hidden;
   position:relative;
   background:var(--bg);
@@ -113,7 +113,7 @@ button{cursor:pointer;font-family:var(--sans);}
 .fi-d{width:5px;height:5px;border-radius:50%;flex-shrink:0;}
 .fi-t{font-size:9px;color:var(--ts);flex:1;}
 .fi.on .fi-t{color:var(--tp);}
-.cp{grid-column:2;grid-row:1;display:flex;flex-direction:column;overflow:hidden;background:var(--pan);border-right:1px solid var(--br);min-height:0;}
+.cp{grid-column:2;grid-row:1;display:flex;flex-direction:column;overflow:hidden;background:var(--pan);border-right:1px solid var(--br);min-height:0;max-height:45vh;}
 .cp-head{display:flex;align-items:center;gap:5px;padding:6px 10px;background:var(--pan);border-bottom:1px solid var(--br);flex-shrink:0;flex-wrap:wrap;row-gap:3px;box-shadow:var(--sh0);}
 .tf-btn,.ind-btn{padding:3px 7px;border-radius:6px;border:1.5px solid transparent;background:transparent;color:var(--ts);font-size:9px;font-family:var(--mono);transition:all .12s;font-weight:500;}
 .tf-btn.on{background:var(--b);border-color:var(--b);color:#fff;font-weight:700;}
@@ -355,7 +355,7 @@ input,select,textarea{-webkit-appearance:none;appearance:none;}
 /* ── 태블릿 / 폴드 펼침 (768px ~ 1023px) ── */
 @media(max-width:1023px){
   /* 그리드: 호가창(.rp) 숨기고 3컬럼으로 */
-  .hts{grid-template-columns:0 1fr 0 232px;grid-template-rows:1fr 90px 76px;}
+  .hts{grid-template-columns:0 1fr 0 232px;grid-template-rows:minmax(200px,45vh) 82px 72px;}
   /* 관심목록 슬라이드 패널로 전환 */
   .lp{
     position:fixed;z-index:300;
@@ -459,6 +459,22 @@ input,select,textarea{-webkit-appearance:none;appearance:none;}
   .ibtn{padding:2px 5px;font-size:9px;}
   .mob-tabbar button{font-size:9px;}
 }
+
+/* ── UI 최적화 ── */
+.ibtn{transition:background .12s,color .12s;}
+@media(max-width:520px){
+  #quickSwitchBtn .ibtn{display:none;}
+  button[onclick="openModal('shortcuts')"].ibtn{display:none;}
+}
+/* AI 현황 패널 스크롤바 */
+#aiDecisionLog::-webkit-scrollbar{width:3px;}
+#aiDecisionLog::-webkit-scrollbar-thumb{background:var(--br);border-radius:2px;}
+/* 잔고 패널 강조 */
+#cashVal{letter-spacing:-.5px;}
+/* 차트 캔버스 부드럽게 */
+canvas{image-rendering:pixelated;}
+/* 하단 탭바 자동매매 버튼 강조 */
+#mbt-auto{flex-shrink:0;min-width:52px;}
 </style>
 </head>
 <body>
@@ -6107,18 +6123,44 @@ ${posList}
     else hint.textContent="장 마감";
   }
 }
-function goPage(p,el){document.querySelectorAll(".page").forEach(d=>d.classList.remove("on"));document.querySelectorAll(".tab").forEach(t=>t.classList.remove("on"));document.getElementById("page-"+p).classList.add("on");if(el)el.classList.add("on");if(p==="stats")renderStats();if(p==="journal")renderJPage();}
-function quickSwitch(){
-  const dashPage=document.getElementById("page-dash");
-  const isDash=dashPage&&dashPage.classList.contains("on");
-  const target=isDash?"hts":"dash";
-  const tabEl=document.getElementById("tab-"+target);
-  goPage(target,tabEl);
-  const icon=document.getElementById("quickSwitchIcon");
-  const txt=document.getElementById("quickSwitchTxt");
-  if(icon)icon.textContent=isDash?"📊":"🏠";
-  if(txt)txt.textContent=isDash?"대시보드":"HTS";
+function goPage(p,el){
+  document.querySelectorAll(".page").forEach(d=>d.classList.remove("on"));
+  const pg=document.getElementById("page-"+p);
+  if(pg) pg.classList.add("on");
+  document.querySelectorAll(".tab").forEach(t=>t.classList.remove("on"));
+  if(el) el.classList.add("on");
+  // ── 날짜 동기화 ──
+  if(p==="hts"){
+    // 대시보드 → HTS: 대시보드 날짜를 HTS에 반영
+    const dashFrame=document.getElementById("dashFrame");
+    if(dashFrame&&dashFrame.contentWindow){
+      try{
+        const dashDate=dashFrame.contentWindow.curDate;
+        if(dashDate&&dashDate!==sim.date){
+          sim.date=dashDate;
+          const mockDateEl=document.getElementById("mockDate");
+          if(mockDateEl) mockDateEl.value=dashDate;
+          genCandles(activeTk,sim.date);
+          initChart();
+        }
+      }catch(e){}
+    }
+  } else if(p==="dash"){
+    // HTS → 대시보드: HTS 날짜를 대시보드에 반영
+    const dashFrame=document.getElementById("dashFrame");
+    if(dashFrame&&dashFrame.contentWindow){
+      try{
+        if(dashFrame.contentWindow.curDate!==sim.date){
+          dashFrame.contentWindow.curDate=sim.date;
+          const dashDateEl=dashFrame.contentWindow.document.getElementById("dashDate");
+          if(dashDateEl){ dashDateEl.value=sim.date; dashFrame.contentWindow.loadDashData&&dashFrame.contentWindow.loadDashData(); }
+          dashFrame.contentWindow.autoLoadMarketData&&dashFrame.contentWindow.autoLoadMarketData();
+        }
+      }catch(e){}
+    }
+  }
 }
+
 
 // ── 모바일 패널 제어 ──
 function isMobile(){return window.innerWidth<=767;}
@@ -7220,6 +7262,41 @@ window.onload=()=>{
 // ══════════════════════════════════════════════
 // AI 종목 선택 시스템 (강의 기준 기반)
 // ══════════════════════════════════════════════
+// 대시보드 진입후보 → 관심종목 자동 추가
+async function syncCandidatesToWatchlist(){
+  try{
+    const dashFrame = document.getElementById('dashFrame');
+    if(!dashFrame||!dashFrame.contentWindow) return;
+    // 대시보드의 진입후보 카드에서 종목 추출
+    const candCards = dashFrame.contentWindow.document.querySelectorAll('.cand-card,[data-tk]');
+    const tks = [];
+    candCards.forEach(function(el){
+      const tk = el.dataset.tk || el.getAttribute('data-tk');
+      if(tk && /^\d{6}$/.test(tk)) tks.push(tk);
+    });
+    // 대시보드 AI 분석 결과에서도 추출 (텍스트에서 종목코드 파싱)
+    const aiText = dashFrame.contentWindow.document.querySelector('#aiResult,#aiAnalysis,.ai-result');
+    if(aiText){
+      const matches = aiText.textContent.match(/\d{6}/g)||[];
+      matches.forEach(function(tk){ if(!tks.includes(tk)) tks.push(tk); });
+    }
+    if(!tks.length) return;
+    // WGS[1] (모니터링 그룹)에 추가 (이미 있으면 skip)
+    if(!WGS[1]) WGS[1]=[];
+    let added=0;
+    tks.forEach(function(tk){
+      if(!WGS[0].includes(tk)&&!WGS[1].includes(tk)){
+        WGS[1].push(tk); added++;
+      }
+    });
+    if(added>0){
+      saveWGS();
+      renderWLGroup();
+      addMsg('ai','📋 대시보드 진입후보 '+added+'종목 관심목록에 자동 추가됨');
+    }
+  }catch(e){ console.warn('관심종목 동기화 실패:',e.message); }
+}
+
 async function autoSelectBestStock(){
   const allTks=[...(WGS[0]||[]),...(WGS[1]||[]),...(WGS[2]||[])].filter(function(v,i,a){return a.indexOf(v)===i&&v;});
   if(!allTks.length){addMsg('ai','관심종목이 없습니다.');return null;}
@@ -7322,6 +7399,7 @@ async function scheduleScreening(){
   const now=Date.now();
   if(!scheduleScreening._lastSelect||now-scheduleScreening._lastSelect>30000){
     scheduleScreening._lastSelect=now;
+    await syncCandidatesToWatchlist();
     await autoSelectBestStock();
     await new Promise(function(r){setTimeout(r,300);});
   }
@@ -7365,6 +7443,22 @@ function _showThought_pass(n,r,w){updAIThought({type:'pass',title:'관망 - '+n,
 function _showThought_buy(n,p,sp,t1,rr,cf,r){updAIThought({type:'buy',title:'매수 결정 - '+n,trend:{type:'ok',label:'진입근거:',text:r},entry:{type:'ok',label:'타점:',text:p.toLocaleString()+'원 신뢰도 '+cf+'%'},risk:{type:'info',label:'리스크:',text:'손절 '+sp.toLocaleString()+' 목표 '+t1.toLocaleString()+' R/R 1:'+rr},decision:{type:'ok',label:'결정:',text:'자동 매수 실행'},conclusion:'매수 - '+n+' '+p.toLocaleString()+'원 ('+cf+'%)'});}
 function _showThought_idle(n){updAIThought({type:'waiting',title:'모니터링 - '+(n||''),trend:{type:'info',label:'상태:',text:'자동매매 실행중 5초마다 스크리닝'},conclusion:null});}
 
+
+
+function resetBalance(){
+  const cur=(cfg.capital||10000000).toString().replace(/,/g,"");
+  const newCap=prompt("초기 자본금 입력 (원)",cur);
+  if(newCap===null)return;
+  const amt=parseInt(String(newCap).replace(/,/g,""));
+  if(isNaN(amt)||amt<100000){showAlert("입력 오류","100,000원 이상 입력하세요.");return;}
+  if(!confirm(amt.toLocaleString()+"원으로 리셋하시겠습니까?"))return;
+  cfg.capital=amt;mock.cash=amt;mock.positions={};mock.trades=[];
+  mock.todayPnl=0;mock.totalPnl=0;mock.lossSeries=0;mock.wins=0;mock.losses=0;
+  mock.creditUsed=0;mock.marginUsed=0;
+  saveMock();saveCfg();updCash();updPnl();renderPort();renderTradeLog();
+  addMsg("ai","잔고 "+amt.toLocaleString()+"원으로 리셋 완료");
+  showAlert("리셋 완료",amt.toLocaleString()+"원으로 리셋되었습니다.");
+}
 </script>
 
 <!-- 동적 참조 요소 -->
