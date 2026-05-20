@@ -1777,8 +1777,22 @@ const STOCKS=[
 // Phase 3-9: 관심종목 5그룹
 const WG_LABELS = ['🎯 오늘 진입 후보','📊 모니터링','🚫 매매금지','🔥 테마/이슈','📝 복기 대상'];
 const WG_MAX = [3, 10, 999, 10, 5];
-let WGS = (()=>{try{return JSON.parse(localStorage.getItem("htsWGS")||JSON.stringify([
-  [],[],[],[],[]]))}catch(e){return [[],[],[],[],[]];}})();
+let WGS = (()=>{
+  try{
+    const _raw = localStorage.getItem("htsWGS");
+    if(_raw){
+      const _p = JSON.parse(_raw);
+      const _all = [].concat(..._p);
+      // 005930/000660만 있으면 구버전 - 초기화
+      if(_all.length>0 && _all.every(t=>["005930","000660","373220","035420"].includes(t))){
+        localStorage.removeItem("htsWGS");
+        return [[],[],[],[],[]];
+      }
+      return _p;
+    }
+    return [[],[],[],[],[]];
+  }catch(e){return [[],[],[],[],[]];}
+})();
 let curWG = 0;
 // 구버전 WL 호환
 let WL = WGS[0];
