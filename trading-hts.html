@@ -1915,17 +1915,16 @@ function renderWLGroup(){
       const s=STOCKS.find(s=>s.tk===tk)||{tk,nm:tk,pr:0,base:1,sec:""};
       const c=((s.pr-s.base)/s.base*100).toFixed(2),up=parseFloat(c)>=0;
       const col=g===2?"var(--r)":g===0?"var(--b)":"var(--ts)";
-      return`<div style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:7px;cursor:pointer;transition:background .1s;margin-bottom:1px;" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''">
-        <div onclick="selectStk('${tk}')" style="display:flex;align-items:center;gap:5px;flex:1;min-width:0;">
-          <div style="font-family:var(--mono);font-size:9px;font-weight:600;color:${col};width:34px;flex-shrink:0;">${tk.slice(-4)}</div>
-          <div style="font-size:9px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${s.nm}</div>
-          <div style="font-family:var(--mono);font-size:9px;${up?"color:var(--g)":"color:var(--r);"};">${up?"+":""}${c}%</div>
-        </div>
-        <div style="display:flex;gap:2px;flex-shrink:0;">
-          ${g!==2?`<button onclick="moveToWG(${g},'${tk}',2)" title="매매금지로 이동" style="background:none;border:none;font-size:9px;cursor:pointer;color:var(--tm);padding:0 1px;">🚫</button>`:""}
-          <button onclick="removeFromWG(${g},'${tk}')" style="background:none;border:none;font-size:11px;cursor:pointer;color:var(--tm);padding:0 1px;">×</button>
-        </div>
-      </div>`;
+      var _html='<div style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:7px;cursor:pointer;margin-bottom:1px;" onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'">'
+        +'<div onclick="selectStk(\''+tk+'\')" style="display:flex;align-items:center;gap:5px;flex:1;min-width:0;">'
+        +'<div style="font-family:var(--mono);font-size:9px;color:'+col+';width:34px;flex-shrink:0;">'+tk.slice(-4)+'</div>'
+        +'<div style="font-size:9px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+s.nm+'</div>'
+        +'</div><div style="display:flex;gap:2px;flex-shrink:0;">'
+        +(g!==2?'<button onclick="moveToWG('+g+",\'"+tk+"\'"+',2)" style="background:none;border:none;font-size:9px;cursor:pointer;color:var(--tm);">🚫</button>':'')
+        +'<button onclick="removeFromWG('+g+",\'"+tk+"\'"+')" style="background:none;border:none;font-size:11px;cursor:pointer;color:var(--tm);">×</button>'
+        +'</div></div>';
+      return _html;
+
     }).join("");
   }
   // wgCount 업데이트
