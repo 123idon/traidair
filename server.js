@@ -811,7 +811,9 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     const ext = path.extname(filePath);
-    res.writeHead(200, { 'Content-Type': MIME[ext] || 'text/plain; charset=utf-8', ...CORS });
+    const mimeType = MIME[ext] || 'text/plain; charset=utf-8';
+    const cacheHeader = ext === '.html' ? {'Cache-Control':'no-cache, no-store, must-revalidate','Pragma':'no-cache','Expires':'0'} : {};
+    res.writeHead(200, { 'Content-Type': mimeType, ...CORS, ...cacheHeader });
     res.end(data);
   });
 });
