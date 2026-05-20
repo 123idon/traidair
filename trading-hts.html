@@ -1917,7 +1917,7 @@ function renderWLGroup(){
       const col=g===2?"var(--r)":g===0?"var(--b)":"var(--ts)";
       return`<div style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:7px;cursor:pointer;transition:background .1s;margin-bottom:1px;" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''">
         <div onclick="selectStk('${tk}')" style="display:flex;align-items:center;gap:5px;flex:1;min-width:0;">
-          <div style="style="font-family:var(--mono);font-size:9px;font-weight:600;color:${col};width:34px;flex-shrink:0;">${tk.slice(-4)}</div>
+          <div style="font-family:var(--mono);font-size:9px;font-weight:600;color:${col};width:34px;flex-shrink:0;">${tk.slice(-4)}</div>
           <div style="font-size:9px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${s.nm}</div>
           <div style="font-family:var(--mono);font-size:9px;${up?"color:var(--g)":"color:var(--r);"};">${up?"+":""}${c}%</div>
         </div>
@@ -4007,7 +4007,7 @@ function printChecklist(){
     });
   });
   var w=window.open('','_blank');
-  w.document.write('<html><head><meta charset="UTF-8"><style>body{font-family:sans-serif;font-size:12px;padding:24px;}h1{font-size:16px;margin-bottom:16px;}h2{font-size:13px;margin-top:16px;margin-bottom:8px;border-bottom:1px solid #ddd;padding-bottom:4px;}</style></head><body>'+body+'</script>
+  w.document.write('<html><head><meta charset="UTF-8"><style>body{font-family:sans-serif;font-size:12px;padding:24px;}h1{font-size:16px;margin-bottom:16px;}h2{font-size:13px;margin-top:16px;margin-bottom:8px;border-bottom:1px solid #ddd;padding-bottom:4px;}</style></head><body>'+body+'<\/script>
 
 </body></html>');
   w.document.close();w.print();
@@ -7438,3 +7438,6 @@ function setActiveTk(tk){
     var _d=document.getElementById("aiStatusDot");if(_d)_d.style.background="var(--b)";
   }catch(_e){}
 }
+</script>
+</body>
+</html>
