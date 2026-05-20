@@ -754,8 +754,8 @@ canvas{image-rendering:pixelated;}
         <button class="ind-btn" onclick="chartReset()" title="리셋">↺</button>
         <select id="candleCount" onchange="chartSetCount(this.value)" style="font-size:9px;font-family:var(--mono);border:1.5px solid var(--br);border-radius:6px;background:var(--pan);color:var(--ts);padding:2px 4px;cursor:pointer;">
           <option value="30">30봉</option>
-          <option value="60">60봉</option>
-          <option value="100" selected>100봉</option>
+          <option value="60" selected>60봉</option>
+          <option value="100">100봉</option>
           <option value="200">200봉</option>
         </select>
       </div>
@@ -2244,7 +2244,7 @@ let inds={ma:true,vol:true,rsi:false,macd:false,bb:false,vwap:false};
 // ═══════════════════════════════════════════════
 
 let mChart=null,rsiChart=null,macdChart=null,pnlChart=null;
-let chartViewStart=0,chartViewCount=80;
+let chartViewStart=0,chartViewCount=60;
 let _chartRaf=null;
 
 // 뷰 상태
@@ -2662,7 +2662,7 @@ function chartZoom(f){
 function chartReset(){
   const a=_cvAll();
   const sel=document.getElementById('candleCount');
-  chartViewCount=Math.min(parseInt(sel?.value||80),a.length)||a.length;
+  chartViewCount=Math.min(parseInt(sel?.value||60),a.length)||a.length;
   chartViewStart=Math.max(0,a.length-chartViewCount);
   drawChart();
 }
@@ -2755,7 +2755,7 @@ function setTF(el,tf){
     const isDaily = tf==='D'||tf.startsWith('D');
     if(!isDaily){
       sim.idx=0;
-      chartViewCount=Math.min(80,sim.candles.length);
+      chartViewCount=Math.min(60,sim.candles.length);
       chartViewStart=0;
     }
     drawChart();
@@ -4225,157 +4225,147 @@ function runScreening(){
 }
 
 async function _runScreeningAsync(){
-  const stk = STOCKS.find(s=>s.tk===activeTk)||STOCKS[0];
-  const cs = getCandles(30);
-  if(cs.length < 10){ return; }
-
-  const cls = cs.map(c=>c.c), vls = cs.map(c=>c.v);
-  const lc = cs[cs.length-1];
-  const pc = cs[cs.length-2]||lc;
-  const pc2 = cs[cs.length-3]||pc;
-
-  // ── 1단계: 기술적 사전 필터 (로컬, 빠름) ──
-  const ma5 = calcMA(cls,5), ma20 = calcMA(cls,20), ma60 = calcMA(cls,60);
-  const lma5 = ma5[ma5.length-1]||0;
-  const lma20 = ma20[ma20.length-1]||0;
-  const lma60 = ma60[ma60.length-1]||0;
-  const rsiArr = calcRSI(cls,14);
-  const lrsi = parseFloat((rsiArr[rsiArr.length-1]||50).toFixed(1));
-  const volR = vls.length>=2 ? vls[vls.length-1]/vls[vls.length-2] : 1;
-
-  // ★ 하락 추세 즉시 차단 (이게 핵심)
-  const isDownTrend = lc.c < lma5 && lma5 < lma20; // 5MA < 20MA: 하락
-  const isConsecutiveDown = lc.c<lc.o && pc.c<pc.o && pc2.c<pc2.o; // 3연속 음봉
-  const isRSIWeak = lrsi < 40; // RSI 40 미만: 약세
-  const isPriceFalling = lc.c < pc.c && pc.c < pc2.c; // 3봉 연속 하락
-
-  if(isDownTrend || isConsecutiveDown || isPriceFalling){
-    const reason = isDownTrend ? '하락추세(5MA<20MA)' : isConsecutiveDown ? '3연속 음봉' : '3봉 연속 하락';
-    addDecisionLog(`[${stk.nm}] ⛔ 매수 차단`, reason, 'Phase 8: 추세 역방향 진입 금지');
-    updAdvBoxes(`⛔ 매수 차단 — ${stk.nm}`, `${reason}
-하락 중 매수는 절대 안 됨`);
-    return;
-    _showThought_blocking(reason, '하락 중 매수는 절대 안 됨 (Phase 8)');
+  // ── 관심종목 전체 순환 분석 ──
+  var allTks=[...(WGS[0]||[]),...(WGS[1]||[]),...(WGS[3]||[])].filter(function(v,i,a){return a.indexOf(v)===i&&v;});
+  if(!allTks.length){
+    // 관심종목 없으면 현재 종목만
+    allTks=[activeTk];
   }
 
-  // 보유 중이면 추가 매수 금지 (피라미딩은 수동으로)
-  if(mock.positions[activeTk]?.qty > 0){
-    addDecisionLog(`[${stk.nm}] 이미 보유 중`, '추가매수 금지 — 현 포지션 관리에 집중', 'Phase 9');
+  // 일일 손실/연속손절 체크
+  var dayLossRate=-mock.todayPnl/cfg.capital*100;
+  if(dayLossRate>=cfg.dayloss*0.8){
+    addDecisionLog('⚠ 일손실 한도 80%','오늘 손실 '+dayLossRate.toFixed(1)+'%','NOGO');
+    return;
+  }
+  if(mock.lossSeries>=3&&autoState.cfg.brk){
+    addDecisionLog('⚠ 연속손절 '+mock.lossSeries+'회','매매 중단','Phase11');
     return;
   }
 
-  // 일일 손실 한도 체크
-  const dayLossRate = -mock.todayPnl / cfg.capital * 100;
-  if(dayLossRate >= cfg.dayloss * 0.8){
-    addDecisionLog(`[${stk.nm}] ⚠ 일손실 한도 80% 도달`, `오늘 손실 ${dayLossRate.toFixed(1)}%`, 'Phase 8-9: NOGO');
-    return;
-  }
+  // ── 각 종목 기술적 점수 계산 ──
+  var scored=[];
+  for(var _ti=0;_ti<allTks.length;_ti++){
+    var tk=allTks[_ti];
+    var stk=STOCKS.find(function(s){return s.tk===tk;})||{nm:tk,pr:0,base:1,sec:''};
+    if(mock.positions[tk]&&mock.positions[tk].qty>0) continue; // 보유 중 skip
 
-  // 연속 손절 체크
-  if(mock.lossSeries >= 3 && autoState.cfg.brk){
-    addDecisionLog(`[${stk.nm}] ⚠ 연속 손절 ${mock.lossSeries}회`, '매매 중단', 'Phase 11: 뇌동매매 방지');
-    return;
-  }
-
-  // 기본 조건 점수
-  let preScore = 0;
-  const preReasons = [];
-  if(lc.c > lma5){ preScore++; preReasons.push('5MA위'); }
-  if(lc.c > lma20){ preScore++; preReasons.push('20MA위'); }
-  if(lrsi >= 45 && lrsi <= 72){ preScore++; preReasons.push(`RSI${lrsi}`); }
-  if(volR >= 1.2){ preScore++; preReasons.push(`거래량×${volR.toFixed(1)}`); }
-  if(lc.c > lc.o){ preScore++; preReasons.push('양봉'); }
-  if(lma5 > lma20){ preScore++; preReasons.push('MA정배열'); }
-
-  // 사전 필터: 3점 미만은 AI 호출 없이 즉시 관망
-  if(preScore < 3){
-    updAdvBoxes(`관망 — ${stk.nm} (${preScore}/6점)`, `기술적 조건 미달
-${preReasons.join(' · ')||'매수 조건 없음'}`);
-    addDecisionLog(`[${stk.nm}] 관망`, `사전필터 ${preScore}/6점`, '1단계');
-    return;
-  }
-
-  addDecisionLog(`[${stk.nm}] 1단계 통과 (${preScore}/6점)`, preReasons.join(' · '), '2단계 AI 검토 시작');
-  updAdvBoxes(`🔍 AI 검토 중 — ${stk.nm}`, `1단계: ${preScore}/6점
-Claude가 심층 분석 중...`);
-  _showThought_analyzing(stk.nm, preScore, preReasons);
-
-  // ── 2단계: Claude AI 심층 분석 ──
-  if(autoState.level >= 3){
-    try{
-      const recentPrices = cls.slice(-5).map(p=>p.toLocaleString()).join('→');
-      const trend5 = ((lc.c-cls[cls.length-5]||lc.c)/( cls[cls.length-5]||lc.c)*100).toFixed(2);
-      const stopPr = Math.round(lc.c*(1-autoState.cfg.stop/100));
-      const t1Pr = Math.round(lc.c*(1+autoState.cfg.t1/100));
-      const rr = ((t1Pr-lc.c)/(lc.c-stopPr)).toFixed(2);
-
-      const prompt = `단타 트레이딩 멘토. 자동매매 최종 진입 여부를 결정해줘.
-
-종목: ${stk.nm}(${activeTk}) ${stk.sec||''}
-현재가: ${lc.c.toLocaleString()}원
-5봉 추세: ${recentPrices} (${trend5>=0?'+':''}${trend5}%)
-RSI: ${lrsi} | 5MA: ${Math.round(lma5).toLocaleString()} | 20MA: ${Math.round(lma20).toLocaleString()} | 60MA: ${Math.round(lma60).toLocaleString()}
-거래량: 전봉 대비 ${(volR*100).toFixed(0)}%
-현재봉: ${lc.c>lc.o?'양봉':'음봉'} O${lc.o.toLocaleString()} H${lc.h.toLocaleString()} L${lc.l.toLocaleString()} C${lc.c.toLocaleString()}
-손절가: ${stopPr.toLocaleString()} | 1차목표: ${t1Pr.toLocaleString()} | R/R: 1:${rr}
-오늘손익: ${mock.todayPnl>=0?'+':''}${mock.todayPnl.toLocaleString()}원 | 연속손절: ${mock.lossSeries}회
-
-Phase 8 기준으로 판단:
-1. 지금 추세 방향이 진입에 우호적인가?
-2. 타점이 적절한가 (고점 추격 아닌가)?
-3. R/R이 충분한가?
-4. 뇌동매매 신호 없는가?
-
-JSON만: {"decision":"BUY"또는"PASS","confidence":0-100,"reason":"2줄 이내","risk":"주요 리스크 1줄","waitFor":"PASS시 기다려야 할 조건"}`;
-
-      const res = await fetch('/api/claude', {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({model:'claude-sonnet-4-5', max_tokens:300,
-          messages:[{role:'user', content:prompt}]})
-      });
-      const data = await res.json();
-      const text = data.content?.[0]?.text||'{}';
-      const m = text.match(/\{[\s\S]*\}/);
-      const ai = m ? JSON.parse(m[0]) : {};
-
-      if(ai.decision === 'BUY' && ai.confidence >= 65){
-        // ── 3단계: 최종 실행 ──
-        addDecisionLog(
-          `[${stk.nm}] ✅ AI 매수 결정 (신뢰도 ${ai.confidence}%)`,
-          `${ai.reason}\n타점: ${lc.c.toLocaleString()} 손절: ${stopPr.toLocaleString()} 목표: ${t1Pr.toLocaleString()} R/R:1:${rr}`,
-          'Phase 8: 3단계 검토 통과'
-        );
-        addMsg('ai', `🤖 AI 자동매수 결정\n\n종목: ${stk.nm} ${lc.c.toLocaleString()}원\n신뢰도: ${ai.confidence}%\n\n✅ 이유: ${ai.reason}\n⚠ 리스크: ${ai.risk}\n\n손절: ${stopPr.toLocaleString()} | 목표: ${t1Pr.toLocaleString()} | R/R 1:${rr}`);
-        updAdvBoxes(`✅ 매수 결정 — ${stk.nm}`, `신뢰도 ${ai.confidence}%\n${ai.reason}`);
-        _showThought_buy(stk.nm, lc.c, stopPr, t1Pr, rr, ai.confidence, (ai.entry_type||'')+' '+ai.reason);
-        await execAutoBuy(lc.c, stk);
-      } else {
-        // AI가 PASS 결정
-        addDecisionLog(
-          `[${stk.nm}] ⏸ AI 관망 결정 (신뢰도 ${ai.confidence||0}%)`,
-          `${ai.reason||'조건 미충족'}`,
-          'Phase 8: 2단계에서 차단'
-        );
-        updAdvBoxes(
-          `⏸ AI 관망 — ${stk.nm}`,
-          `${ai.reason||'조건 미충족'}\n기다려야 할 것: ${ai.waitFor||'추세 확인'}`
-        );
-        _showThought_pass(stk.nm, ai.reason||'조건 미충족', ai.waitFor||'추세 전환 확인');
-      }
-    } catch(e){
-      addDecisionLog(`[${stk.nm}] AI 분석 실패`, e.message, '폴백: 관망');
-      updAdvBoxes(`⚠ AI 분석 오류 — 관망`, e.message);
+    var cs=[];
+    // KIS 연결 시: 각 종목 개별 조회
+    if(kisConfig.appKey&&kisConfig.appSecret&&tk!==activeTk){
+      try{
+        var _rr=await fetch('/api/kis/chart',{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({appKey:kisConfig.appKey,appSecret:kisConfig.appSecret,
+            mode:kisConfig.mode||'real',code:tk,date:sim.date,tf:sim.tf||'5'})});
+        var _dd=await _rr.json();
+        if(_dd.ok&&_dd.candles&&_dd.candles.length>=10) cs=_dd.candles;
+      }catch(_e){}
     }
-  } else if(autoState.level === 2){
-    // 레벨 2: 신호만 표시, 직접 실행
-    const stopPr = Math.round(lc.c*(1-autoState.cfg.stop/100));
-    const t1Pr = Math.round(lc.c*(1+autoState.cfg.t1/100));
-    const rr = ((t1Pr-lc.c)/(lc.c-stopPr)).toFixed(2);
-    updAdvBoxes(
-      `📊 진입 신호 — ${stk.nm}`,
-      `${preReasons.join(' · ')}\n진입: ${lc.c.toLocaleString()} 손절: ${stopPr.toLocaleString()} 목표: ${t1Pr.toLocaleString()} R/R:1:${rr}\n⚡ 직접 주문창에서 실행하세요`
-    );
-    addDecisionLog(`[${stk.nm}] 진입 신호 (Lv2)`, `${preScore}/6점 | R/R 1:${rr}`, 'Phase 8');
+    // 현재 활성 종목은 sim.candles 사용
+    if(!cs.length){
+      if(tk===activeTk) cs=getCandles(20);
+      else continue; // KIS 없으면 현재 종목만
+    }
+    if(cs.length<10) continue;
+
+    var cls=cs.map(function(c){return c.c;}),vls=cs.map(function(c){return c.v;});
+    var lc=cs[cs.length-1],pc=cs[cs.length-2]||lc,pc2=cs[cs.length-3]||pc;
+    var ma5=calcMA(cls,5),ma20=calcMA(cls,20),ma60=calcMA(cls,60);
+    var lma5=ma5[ma5.length-1]||0,lma20=ma20[ma20.length-1]||0,lma60=ma60[ma60.length-1]||0;
+    var lrsi=parseFloat((calcRSI(cls,14).slice(-1)[0]||50).toFixed(1));
+    var avg5v=vls.slice(-6,-1).reduce(function(a,b){return a+b;},0)/5||1;
+    var volR=vls[vls.length-1]/avg5v;
+
+    // 하락추세 차단
+    if(lc.c<lma5&&lma5<lma20) continue;
+    if(lc.c<lc.o&&pc.c<pc.o&&pc2.c<pc2.o) continue;
+
+    var score=0,tags=[];
+    if(lma5>lma20&&lma20>lma60){score+=3;tags.push('MA정배열');}
+    if(lc.c>lma5){score+=2;tags.push('5MA위');}
+    if(lc.c>lc.o){score+=1;tags.push('양봉');}
+    if(volR>=1.5){score+=3;tags.push('거래량x'+volR.toFixed(1));}
+    else if(volR>=1.2){score+=1;tags.push('거래량+'+(((volR-1)*100).toFixed(0))+'%');}
+    if(lrsi>=45&&lrsi<=72){score+=2;tags.push('RSI'+lrsi);}
+
+    scored.push({tk:tk,stk:stk,score:score,tags:tags,lc:lc,lma5:lma5,lrsi:lrsi,volR:volR});
+  }
+
+  if(!scored.length){
+    addDecisionLog('전종목 조건미달','관심종목 모두 하락추세 또는 데이터없음','관망');
+    return;
+  }
+
+  // 점수 순 정렬
+  scored.sort(function(a,b){return b.score-a.score;});
+  var best=scored[0];
+  var topList=scored.slice(0,3).map(function(c,i){
+    return (i+1)+'. '+c.stk.nm+'('+c.tk+') '+c.score+'점 ['+c.tags.join(' ')+']';
+  }).join('\n');
+
+  // CANDS 실시간 업데이트
+  var newCands=scored.slice(0,3).map(function(c){
+    return {tk:c.tk,why:c.tags.join(' '),score:Math.min(99,Math.max(10,50+c.score*5))};
+  });
+  if(newCands.length){CANDS=newCands;renderCands();}
+
+  addDecisionLog('[중앙AI] 스크리닝',topList,'종목선정');
+
+  // 최적 종목으로 전환
+  if(best.tk!==activeTk){
+    setActiveTk(best.tk);
+    await new Promise(function(r){setTimeout(r,800);});
+  }
+
+  if(best.score<3){
+    addDecisionLog('['+best.stk.nm+'] 관망',best.tags.join(' ')||'조건미달','관망');
+    updAdvBoxes('관망 — '+best.stk.nm+' ('+best.score+'점)','기술적 조건 미달');
+    return;
+  }
+
+  addDecisionLog('['+best.stk.nm+'] 1단계 통과 ('+best.score+'점)',best.tags.join(' '),'2단계 AI 검토');
+  updAdvBoxes('🔍 AI 검토 중 — '+best.stk.nm,'1단계: '+best.score+'점\nClaude 심층 분석 중...');
+
+  // ── Claude AI 심층 분석 (레벨3 이상) ──
+  if(autoState.level>=3){
+    try{
+      var lc2=best.lc;
+      var stopPr=Math.round(lc2.c*(1-autoState.cfg.stop/100));
+      var t1Pr=Math.round(lc2.c*(1+autoState.cfg.t1/100));
+      var rr=((t1Pr-lc2.c)/(lc2.c-stopPr)).toFixed(2);
+      var prompt='단타 트레이딩 멘토. 자동매매 최종 진입 여부.\n\n'+
+        '종목: '+best.stk.nm+'('+best.tk+') '+best.stk.sec+'\n'+
+        '현재가: '+lc2.c.toLocaleString()+'원\n'+
+        'RSI: '+best.lrsi+' | 거래량: 평균x'+best.volR.toFixed(1)+'\n'+
+        '조건: '+best.tags.join(' · ')+'\n'+
+        '손절: '+stopPr.toLocaleString()+' | 목표: '+t1Pr.toLocaleString()+' | R/R 1:'+rr+'\n\n'+
+        'JSON만: {"decision":"BUY"또는"PASS","confidence":0-100,"reason":"2줄이내","risk":"리스크1줄","waitFor":"PASS시조건"}';
+      var res=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:300,messages:[{role:'user',content:prompt}]})});
+      var data=await res.json();
+      var text=(data.content&&data.content[0]&&data.content[0].text)||'{}';
+      var m=text.match(/\{[\s\S]*\}/);
+      var ai=m?JSON.parse(m[0]):{};
+      if(ai.decision==='BUY'&&ai.confidence>=65){
+        addDecisionLog('['+best.stk.nm+'] ✅ AI매수 (신뢰도'+ai.confidence+'%)',ai.reason,'Phase8통과');
+        addMsg('ai','🤖 AI자동매수\n\n종목: '+best.stk.nm+' '+lc2.c.toLocaleString()+'원\n신뢰도: '+ai.confidence+'%\n\n✅ '+ai.reason+'\n⚠ '+ai.risk+'\n\n손절: '+stopPr.toLocaleString()+' | 목표: '+t1Pr.toLocaleString()+' | R/R 1:'+rr);
+        updAdvBoxes('✅ 매수결정 — '+best.stk.nm,'신뢰도 '+ai.confidence+'%\n'+ai.reason);
+        await execAutoBuy(lc2.c,best.stk);
+      }else{
+        addDecisionLog('['+best.stk.nm+'] ⏸ AI관망',ai.reason||'조건미충족','2단계차단');
+        updAdvBoxes('⏸ AI관망 — '+best.stk.nm,(ai.reason||'조건미충족')+'\n기다릴것: '+(ai.waitFor||'추세확인'));
+      }
+    }catch(_e2){
+      addDecisionLog('['+best.stk.nm+'] AI분석실패',_e2.message,'관망');
+      updAdvBoxes('⚠ AI오류 — 관망',_e2.message);
+    }
+  }else if(autoState.level===2){
+    var lc3=best.lc;
+    var stopPr2=Math.round(lc3.c*(1-autoState.cfg.stop/100));
+    var t1Pr2=Math.round(lc3.c*(1+autoState.cfg.t1/100));
+    var rr2=((t1Pr2-lc3.c)/(lc3.c-stopPr2)).toFixed(2);
+    updAdvBoxes('📊 진입신호 — '+best.stk.nm,best.tags.join(' · ')+'\n진입: '+lc3.c.toLocaleString()+' 손절: '+stopPr2.toLocaleString()+' 목표: '+t1Pr2.toLocaleString()+' R/R:1:'+rr2+'\n⚡ 직접 주문창에서 실행');
+    addDecisionLog('['+best.stk.nm+'] 진입신호(Lv2)',best.score+'/12점 | R/R 1:'+rr2,'Phase8');
   }
 }
 
@@ -4555,7 +4545,7 @@ async function detectTechnique(cs, stk){
   if(!cs||cs.length<10) return null;
   // 사용자가 매매기법 직접 선택한 경우 그대로 사용
   if(userTechnique && userTechnique !== 'auto'){
-    const t = TECHNIQUES[userTechnique]||TECHNIQUES["스캘핑"];
+    const t = TECHNIQUES[userTechnique]||TECHNIQUES["눌림목"];
     const cls=cs.map(c=>c.c);
     const lc=cs[cs.length-1];
     const ma20=(calcMA(cls,20).slice(-1)[0]||lc.c);
@@ -4587,10 +4577,10 @@ async function detectTechnique(cs, stk){
     // RSI 30이하 + 망치형(아래꼬리가 윗꼬리의 1.5배 이상) → 역추세
     technique="역추세";score=2;
   }
-  else{technique="스캘핑";score=2;}
-  const t=TECHNIQUES[technique]||TECHNIQUES["스캘핑"];;
+  else{technique="눌림목";score=2;}
+  const t=TECHNIQUES[technique]||TECHNIQUES["눌림목"];
   const entryPr=lc.c;
-  const stopPr=technique==="스캘핑"?Math.round(entryPr*0.997):Math.round(lma20*0.995);
+  const stopPr=Math.round(lma20*0.995||entryPr*0.97);
   const rr=2;
   const targetPr=Math.round(entryPr+(entryPr-stopPr)*rr);
   return {technique,score,phase:t.phase,cond:t.cond,entry:entryPr,stop:stopPr,target:targetPr,rr,ma5:Math.round(lma5),ma20:Math.round(lma20),rsi:rsi.toFixed(0),volRatio:volRatio.toFixed(1)};
@@ -7230,7 +7220,7 @@ window.onload=()=>{
   genCandles(); // ★ genCandles 내부에서 idx=0 설정됨 (미래 데이터 참조 금지)
   chartViewCount=60;
   chartViewStart=0;
-  setTimeout(async function(){if(!kisConfig.appKey||!kisConfig.appSecret)return;try{var _ic=await _fetchKisCandles(activeTk,sim.date,sim.tf||"5");if(_ic&&_ic.length>0){sim.candles=_ic;sim.idx=_ic.length-1;chartViewCount=Math.min(60,_ic.length);chartViewStart=0;updPrice(_ic[_ic.length-1]);drawChart();var _ci=document.getElementById("cinfo");if(_ci)_ci.textContent="✅ "+_ic.length+"봉 전일"+(_kisChartMeta.prevCount||0)+"봉+당일"+(_kisChartMeta.todayCount||0)+"봉";}}catch(_e){console.warn("KIS초기:",_e.message);}},2500);
+  setTimeout(async function(){if(!kisConfig.appKey||!kisConfig.appSecret)return;try{var _ic=await _fetchKisCandles(activeTk,sim.date,sim.tf||"5");if(_ic&&_ic.length>0){sim.candles=_ic;var _pc=_kisChartMeta.prevCount||0;sim.idx=_pc>0?_pc-1:_ic.length-1;chartViewCount=Math.min(60,_ic.length);chartViewStart=Math.max(0,_ic.length-chartViewCount);updPrice(_ic[sim.idx]);drawChart();var _ci=document.getElementById("cinfo");if(_ci)_ci.textContent="✅ "+_ic.length+"봉 전일"+(_kisChartMeta.prevCount||0)+"봉+당일"+(_kisChartMeta.todayCount||0)+"봉";}}catch(_e){console.warn("KIS초기:",_e.message);}},2500);
   // 레이아웃 완성 후 차트 렌더 (requestAnimationFrame 중첩으로 보장)
   requestAnimationFrame(()=>requestAnimationFrame(()=>{
     drawChart();
