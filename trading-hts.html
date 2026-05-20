@@ -2775,6 +2775,21 @@ function onDateChange(){
   mock.todayPnl=0;mock.todayTrades=0;mock.lossSeries=0;
   if(sim.date<todayStr())activateMockMode();
   genCandles(activeTk,sim.date);initChart();
+  // ── 대시보드 날짜 동기화 ──
+  _syncDateToDashboard(sim.date);
+}
+function _syncDateToDashboard(date){
+  try{
+    const f=document.getElementById("dashFrame");
+    if(!f||!f.contentWindow) return;
+    f.contentWindow.curDate=date;
+    const el=f.contentWindow.document.getElementById("dashDate");
+    if(el && el.value!==date){
+      el.value=date;
+      f.contentWindow.loadDashData&&f.contentWindow.loadDashData();
+      f.contentWindow.autoLoadMarketData&&f.contentWindow.autoLoadMarketData();
+    }
+  }catch(e){}
 }
 function adjDate(d){const dt=new Date(sim.date);dt.setDate(dt.getDate()+d);sim.date=dt.toISOString().slice(0,10);document.getElementById("mockDate").value=sim.date;onDateChange();}
 function activateMockMode(){document.getElementById("modeBadge").className="badge mock";document.getElementById("modeText").textContent="모의투자";}
