@@ -703,7 +703,14 @@ const server = http.createServer(async (req, res) => {
         kospi200: '^KS200',
       };
 
-      const interval = tf <= 5 ? '5m' : tf <= 60 ? '60m' : '1d';
+      // 과거 날짜(60일 이상)는 5분봉 없음 → 1d 인터벌 사용
+    const isHistorical = (() => {
+      if (mode !== 'sim' || !simDate) return false;
+      const simMs = new Date(simDate).getTime();
+      const nowMs = Date.now();
+      return (nowMs - simMs) > 55 * 24 * 3600 * 1000; // 55일 이상 과거
+    })();
+    const interval = isHistorical ? '1d' : tf <= 5 ? '5m' : tf <= 60 ? '60m' : '1d';
       const fetchAll = Object.entries(SYMBOLS).map(([key, sym]) =>
         fetchYahoo(sym, period1, period2, interval)
           .then(r => ({ key, ...r }))

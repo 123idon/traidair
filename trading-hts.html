@@ -2834,7 +2834,7 @@ function onDateChange(){
   if(sim.date<todayStr())activateMockMode();
   genCandles(activeTk,sim.date);initChart();
   // 전일 분봉 포함 실시간 데이터 강제 로드
-  if(kisConfig.appKey&&kisConfig.appSecret){setTimeout(async function(){try{var _c=await _fetchKisCandles(activeTk,sim.date,sim.tf||"1");if(_c&&_c.length>0){sim.candles=_c;chartViewCount=Math.min(30,_c.length);chartViewStart=Math.max(0,_c.length-chartViewCount);if(_c.length>0)updPrice(_c[_c.length-1]);drawChart();var _ci=document.getElementById("cinfo");if(_ci)_ci.textContent="✅ 실제"+_c.length+"봉 | 전일"+(_kisChartMeta.prevCount||0)+"봉+당일"+(_kisChartMeta.todayCount||0)+"봉";}}catch(_ek){}},1500);}
+  if(kisConfig.appKey&&kisConfig.appSecret){setTimeout(async function(){try{var _c=await _fetchKisCandles(activeTk,sim.date,sim.tf||"5");if(_c&&_c.length>0){sim.candles=_c;var _prevCnt=_kisChartMeta.prevCount||0;var _todCnt=_kisChartMeta.todayCount||_c.length;chartViewCount=Math.min(Math.max(_prevCnt+_todCnt,30),_c.length);chartViewStart=0;if(_c.length>0)updPrice(_c[_c.length-1]);drawChart();var _ci=document.getElementById("cinfo");if(_ci)_ci.textContent="✅ 실제"+_c.length+"봉 | 전일"+(_kisChartMeta.prevCount||0)+"봉+당일"+(_kisChartMeta.todayCount||0)+"봉";}}catch(_ek){}},1500);}
 
 }
 function adjDate(d){const dt=new Date(sim.date);dt.setDate(dt.getDate()+d);sim.date=dt.toISOString().slice(0,10);document.getElementById("mockDate").value=sim.date;onDateChange();}
