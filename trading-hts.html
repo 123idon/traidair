@@ -1778,7 +1778,7 @@ const STOCKS=[
 const WG_LABELS = ['🎯 오늘 진입 후보','📊 모니터링','🚫 매매금지','🔥 테마/이슈','📝 복기 대상'];
 const WG_MAX = [3, 10, 999, 10, 5];
 let WGS = (()=>{try{return JSON.parse(localStorage.getItem("htsWGS")||JSON.stringify([
-  ["005930","000660"],["373220","035420"],[]  ,[],[]]))}catch(e){return [[],[],[],[],[]];}})();
+  [],[],[],[],[]]))}catch(e){return [[],[],[],[],[]];}})();
 let curWG = 0;
 // 구버전 WL 호환
 let WL = WGS[0];
@@ -7387,13 +7387,6 @@ async function _saveJournalToNotion(date,entry,pnl,trades){
 // scheduleScreening에 종목 선택 통합
 async function scheduleScreening(){
   if(!autoState.running)return;
-  const now=Date.now();
-  if(!scheduleScreening._lastSelect||now-scheduleScreening._lastSelect>30000){
-    scheduleScreening._lastSelect=now;
-    await syncCandidatesToWatchlist();
-    await autoSelectBestStock();
-    await new Promise(function(r){setTimeout(r,300);});
-  }
   runScreening();
   autoTimer=setTimeout(scheduleScreening,5000);
 }
