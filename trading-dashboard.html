@@ -244,24 +244,27 @@ function failDashProgress(label){
 
 // ── 날짜 설정 ──
 const today = new Date();
-let curDate = today.toISOString().slice(0,10);
+// HTS sim.date 우선, 없으면 오늘
+let curDate = (function(){
+  try{ if(window.parent&&window.parent.sim&&window.parent.sim.date) return window.parent.sim.date; }catch(e){}
+  return today.toISOString().slice(0,10);
+})();
 document.getElementById('dashDate').value = curDate;
 
 function onDateChange(){
   curDate = document.getElementById('dashDate').value;
-  // ── HTS 날짜 동기화 ──
-  try{
-    if(window.parent && window.parent.sim){
-      window.parent.sim.date = curDate;
-      const mockEl = window.parent.document.getElementById('mockDate');
-      if(mockEl && mockEl.value !== curDate){
-        mockEl.value = curDate;
-        // HTS 차트 갱신
+  // ── HTS 날짜 동기화 (루프 방지: _skipHtsSync 체크) ──
+  if(!window._skipHtsSync){
+    try{
+      if(window.parent && window.parent.sim){
+        window.parent.sim.date = curDate;
+        const mockEl = window.parent.document.getElementById('mockDate');
+        if(mockEl){ mockEl.value = curDate; }
         window.parent.genCandles && window.parent.genCandles(window.parent.activeTk, curDate);
         window.parent.initChart && window.parent.initChart();
       }
-    }
-  }catch(e){}
+    }catch(e){}
+  }
   loadDashData();
   autoLoadMarketData(); // 날짜 바꾸면 해당 날짜 데이터 자동 로드
 }

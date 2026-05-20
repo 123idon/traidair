@@ -2782,14 +2782,18 @@ function _syncDateToDashboard(date){
   try{
     const f=document.getElementById("dashFrame");
     if(!f||!f.contentWindow) return;
-    f.contentWindow.curDate=date;
-    const el=f.contentWindow.document.getElementById("dashDate");
-    if(el && el.value!==date){
-      el.value=date;
-      f.contentWindow.loadDashData&&f.contentWindow.loadDashData();
-      f.contentWindow.autoLoadMarketData&&f.contentWindow.autoLoadMarketData();
+    // curDate 직접 덮어쓰기 (조건 없이)
+    f.contentWindow.curDate = date;
+    const el = f.contentWindow.document.getElementById("dashDate");
+    if(el){
+      el.value = date;
+      // dispatchEvent로 onchange 강제 트리거 (단, HTS 역동기화 루프 방지)
+      f.contentWindow._skipHtsSync = true;
+      f.contentWindow.loadDashData && f.contentWindow.loadDashData();
+      f.contentWindow.autoLoadMarketData && f.contentWindow.autoLoadMarketData();
+      setTimeout(function(){ f.contentWindow._skipHtsSync = false; }, 500);
     }
-  }catch(e){}
+  }catch(e){ console.warn("날짜동기화 실패:", e.message); }
 }
 function adjDate(d){const dt=new Date(sim.date);dt.setDate(dt.getDate()+d);sim.date=dt.toISOString().slice(0,10);document.getElementById("mockDate").value=sim.date;onDateChange();}
 function activateMockMode(){document.getElementById("modeBadge").className="badge mock";document.getElementById("modeText").textContent="모의투자";}
@@ -6151,12 +6155,15 @@ function goPage(p,el){
     if(dashFrame&&dashFrame.contentWindow){
       try{
         const dashDate=dashFrame.contentWindow.curDate;
-        if(dashDate&&dashDate!==sim.date){
-          sim.date=dashDate;
-          const mockDateEl=document.getElementById("mockDate");
-          if(mockDateEl) mockDateEl.value=dashDate;
-          genCandles(activeTk,sim.date);
+        if(dashDate && dashDate !== sim.date){
+          sim.date = dashDate;
+          const mockDateEl = document.getElementById("mockDate");
+          if(mockDateEl) mockDateEl.value = dashDate;
+          genCandles(activeTk, sim.date);
           initChart();
+        } else if(!dashDate){
+          // 대시보드 날짜 없으면 HTS→대시보드 동기화
+          _syncDateToDashboard(sim.date);
         }
       }catch(e){}
     }
@@ -7216,9 +7223,18 @@ function collectMarketCtx(){
 
 window.onload=()=>{
   loadState();
+  // mockDate 초기값 설정 (sim.date 기준)
+  const _md = document.getElementById("mockDate");
+  if(_md){ _md.value = sim.date; }
   goPage('hts',document.getElementById('tab-hts'));
-  document.getElementById("mockDate").value=sim.date;
   initChartEvents();
+  // 대시보드 iframe 로드 완료 후 날짜 동기화
+  const _df = document.getElementById("dashFrame");
+  if(_df){
+    _df.addEventListener('load', function(){
+      setTimeout(function(){ _syncDateToDashboard(sim.date); }, 300);
+    });
+  }
   _initResizeObserver();
   initChartRightClick();
   // 장중 체크 자동 실행
