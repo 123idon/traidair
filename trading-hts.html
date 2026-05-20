@@ -2467,6 +2467,49 @@ function drawChart(){
   _drawMACD(cs,cls);
 
   mChart={_ok:true};
+  // ── 매수/매도 체결 마커 ──
+  try{
+    var _trds=(mock.trades||[]).filter(function(t){return t.date===sim.date;});
+    var _canvas=document.getElementById('chartMain');
+    var _ctx=_canvas?_canvas.getContext('2d'):null;
+    if(_ctx&&_trds.length>0){
+      var _H=_canvas.height,_W=_canvas.width;
+      var _PR=54,_PL=4,_PT=8,_PB=22,_SB=60,_vlH=Math.round(_H*0.18);
+      var _mH=_H-_PT-_PB-_vlH-_SB;
+      var _cw=_W-_PL-_PR;
+      var _cs=cs.slice(chartViewStart,chartViewStart+chartViewCount);
+      if(_cs.length>0){
+        var _highs=_cs.map(function(c){return c.h;}),_lows=_cs.map(function(c){return c.l;});
+        var _yMax=Math.max.apply(null,_highs),_yMin=Math.min.apply(null,_lows);
+        var _yR=_yMax-_yMin||1;
+        var _toX=function(i){return _PL+(i+0.5)*(_cw/_cs.length);};
+        var _toY=function(v){return _PT+_mH*(1-(v-_yMin)/_yR);};
+        _trds.forEach(function(t){
+          if(!t.price)return;
+          var _tidx=_cs.findIndex(function(c){
+            return c.t&&t.time&&c.t.slice(0,5)===t.time.slice(0,5);
+          });
+          if(_tidx<0)return;
+          var _vx=_toX(_tidx),_vy=_toY(t.price);
+          var _isBuy=t.side==='buy';
+          _ctx.save();
+          _ctx.fillStyle=_isBuy?'rgba(5,192,114,0.95)':'rgba(239,68,68,0.95)';
+          _ctx.strokeStyle='#fff';_ctx.lineWidth=1;
+          _ctx.beginPath();
+          if(_isBuy){
+            _ctx.moveTo(_vx,_vy-10);_ctx.lineTo(_vx-6,_vy);_ctx.lineTo(_vx+6,_vy);
+          }else{
+            _ctx.moveTo(_vx,_vy+10);_ctx.lineTo(_vx-6,_vy);_ctx.lineTo(_vx+6,_vy);
+          }
+          _ctx.closePath();_ctx.fill();_ctx.stroke();
+          _ctx.fillStyle='#fff';_ctx.font='bold 7px sans-serif';
+          _ctx.textAlign='center';_ctx.textBaseline='middle';
+          _ctx.fillText(_isBuy?'B':'S',_vx,_isBuy?_vy-4:_vy+4);
+          _ctx.restore();
+        });
+      }
+    }
+  }catch(_me){}
   // AI 타점 오버레이
   drawSignalOverlay();
 }
@@ -4126,7 +4169,7 @@ function startAuto(){
   document.getElementById("modeText").textContent=`AI Lv${autoState.level}`;
   document.getElementById("autoStopBtn").style.display="";
   var _ab=document.getElementById("autoBtn");
-  if(_ab){_ab.textContent="\u23f9 중지";_ab.style.background="var(--r)";_ab.style.borderColor="var(--r)";_ab.style.color="#fff";}
+  if(_ab){_ab.textContent="⏹ 중지";_ab.style.background="var(--r)";_ab.style.borderColor="var(--r)";_ab.style.color="#fff";}
   var _ph=document.getElementById("pauseBtnHdr");if(_ph)_ph.style.display="";
     document.getElementById("autoBtn").classList.add("on");
   document.getElementById("aiModeBadge").textContent='Lv'+autoState.level+' 실행중';
@@ -4168,12 +4211,12 @@ function stopAuto(){
   if(startBtn) startBtn.style.display='';
   document.getElementById("autoBtn").classList.remove("on");
   var _ab2=document.getElementById("autoBtn");
-  if(_ab2){_ab2.textContent="\u25b6 자동매매";_ab2.style.background="";_ab2.style.borderColor="";_ab2.style.color="";}
+  if(_ab2){_ab2.textContent="▶ 자동매매";_ab2.style.background="";_ab2.style.borderColor="";_ab2.style.color="";}
   var _ph2=document.getElementById("pauseBtnHdr");if(_ph2)_ph2.style.display="none";
   var _ab2=document.getElementById("autoBtn");
-  if(_ab2){_ab2.textContent="\u25b6 자동매매";_ab2.style.background="";_ab2.style.borderColor="";_ab2.style.color="";}
+  if(_ab2){_ab2.textContent="▶ 자동매매";_ab2.style.background="";_ab2.style.borderColor="";_ab2.style.color="";}
   var _ph2=document.getElementById("pauseBtnHdr");if(_ph2)_ph2.style.display="none";
-  var _ab2=document.getElementById("autoBtn");if(_ab2){_ab2.textContent="\u25b6 자동매매";_ab2.style.background="";_ab2.style.borderColor="";_ab2.style.color="";}
+  var _ab2=document.getElementById("autoBtn");if(_ab2){_ab2.textContent="▶ 자동매매";_ab2.style.background="";_ab2.style.borderColor="";_ab2.style.color="";}
   var _ph2=document.getElementById("pauseBtnHdr");if(_ph2)_ph2.style.display="none";
   document.getElementById("aiModeBadge").textContent='';
   activateMockMode();document.getElementById("autoStopBtn").style.display="none";
@@ -4183,6 +4226,8 @@ function stopAuto(){
 }
 function scheduleScreening(){if(!autoState.running)return;runScreening();autoTimer=setTimeout(scheduleScreening,5000);}
 function addDecisionLog(title, body, phase){
+  var _entry={title:title||"",body:body||"",phase:phase||"",time:new Date().toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit",second:"2-digit"})};
+  _updateAIStatusPanel(_entry);
   try{var _stk=STOCKS.find(function(s){return s.tk===activeTk;})||{nm:activeTk||""};var _b2=document.getElementById("aiCurrentTk");if(_b2)_b2.textContent=_stk.nm+"("+activeTk+")";var _ib=title.indexOf("매수")>=0;var _bl=title.indexOf("차단")>=0||title.indexOf("관망")>=0;var _cl=_ib?"var(--g)":_bl?"var(--r)":"var(--b)";var _l2=document.getElementById("aiStatusLabel");if(_l2){_l2.textContent=(phase||title||"").slice(0,28);_l2.style.color=_cl;}var _m2=document.getElementById("aiStatusMsg");if(_m2)_m2.textContent=(body||title||"").slice(0,78);var _d2=document.getElementById("aiStatusDot");if(_d2)_d2.style.background=_cl;}catch(_e2){}
   // 전역 로그 배열
   if(!window._decisionLog) window._decisionLog=[];
@@ -4193,6 +4238,12 @@ function addDecisionLog(title, body, phase){
   _updateAIStatusPanel(entry);
 }
 function _updateAIStatusPanel(entry){
+  // 현재 종목 배지 업데이트
+  var _tkBadge=document.getElementById("aiCurrentTk");
+  if(_tkBadge&&activeTk){
+    var _stk=STOCKS.find(function(s){return s.tk===activeTk;})||{nm:activeTk};
+    _tkBadge.textContent=_stk.nm+"("+activeTk+")";
+  }
   const logEl = document.getElementById('aiDecisionLog');
   const msgEl = document.getElementById('aiStatusMsg');
   const lblEl = document.getElementById('aiStatusLabel');
@@ -7328,39 +7379,71 @@ async function syncCandidatesToWatchlist(){
 }
 
 async function autoSelectBestStock(){
-  const allTks=[...(WGS[0]||[]),...(WGS[1]||[]),...(WGS[2]||[])].filter(function(v,i,a){return a.indexOf(v)===i&&v;});
-  if(!allTks.length){addMsg('ai','관심종목이 없습니다.');return null;}
+  const allTks=[...(WGS[0]||[]),...(WGS[1]||[])].filter(function(v,i,a){return a.indexOf(v)===i&&v;});
+  if(!allTks.length){addMsg('ai','관심종목 없음. 종목을 추가하세요.');return null;}
+  const tradeable=allTks.filter(function(tk){return !(mock.positions[tk]&&mock.positions[tk].qty>0);});
+  if(!tradeable.length){addMsg('ai','모든 관심종목 보유 중.');return null;}
   const candidates=[];
-  for(const tk of allTks){
-    const stk=STOCKS.find(function(s){return s.tk===tk;});
+  for(var _i=0;_i<tradeable.length;_i++){
+    var tk=tradeable[_i];
+    var stk=STOCKS.find(function(s){return s.tk===tk;});
     if(!stk)continue;
-    if(mock.positions[tk]&&mock.positions[tk].qty>0)continue;
-    const cs=sim.candles,cls=cs.map(function(c){return c.c;}),vls=cs.map(function(c){return c.v;});
-    if(cls.length<10)continue;
-    const lc=cs[cs.length-1],pc=cs[cs.length-2]||lc,pc2=cs[cs.length-3]||pc;
-    const ma5=calcMA(cls,5),ma20=calcMA(cls,20);
-    const lma5=ma5[ma5.length-1]||0,lma20=ma20[ma20.length-1]||0;
-    const lrsi=parseFloat((calcRSI(cls,14).slice(-1)[0]||50).toFixed(1));
-    const volR=vls.length>=2?vls[vls.length-1]/vls[vls.length-2]:1;
-    let score=0;const tags=[];
+    var cls,vls,lc,pc,pc2;
+    // KIS 연결 시: 각 종목 개별 실시간 데이터 조회
+    if(kisConfig.appKey&&kisConfig.appSecret){
+      try{
+        var _r=await fetch('/api/kis/chart',{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({appKey:kisConfig.appKey,appSecret:kisConfig.appSecret,
+            mode:kisConfig.mode||'real',code:tk,date:sim.date,tf:sim.tf||'5'})});
+        var _d=await _r.json();
+        if(_d.ok&&_d.candles&&_d.candles.length>=10){
+          cls=_d.candles.map(function(c){return c.c;});
+          vls=_d.candles.map(function(c){return c.v;});
+          lc=_d.candles[_d.candles.length-1];
+          pc=_d.candles[_d.candles.length-2]||lc;
+          pc2=_d.candles[_d.candles.length-3]||pc;
+        }
+      }catch(_e){}
+    }
+    // KIS 없거나 실패: 현재 활성 종목만 sim.candles 사용
+    if(!cls){
+      if(tk!==activeTk)continue;
+      var _cs=sim.candles;
+      if(_cs.length<10)continue;
+      cls=_cs.map(function(c){return c.c;});
+      vls=_cs.map(function(c){return c.v;});
+      lc=_cs[_cs.length-1];pc=_cs[_cs.length-2]||lc;pc2=_cs[_cs.length-3]||pc;
+    }
+    var ma5=calcMA(cls,5),ma20=calcMA(cls,20);
+    var lma5=ma5[ma5.length-1]||0,lma20=ma20[ma20.length-1]||0;
+    var lrsi=parseFloat((calcRSI(cls,14).slice(-1)[0]||50).toFixed(1));
+    var avg5v=vls.slice(-6,-1).reduce(function(a,b){return a+b;},0)/5||1;
+    var volR=vls[vls.length-1]/avg5v;
+    var score=0,tags=[];
     if(lma5>lma20){score+=3;tags.push('MA정배열');}
     if(lc.c>lma5){score+=2;tags.push('5MA위');}
     if(lc.c>lc.o){score+=1;tags.push('양봉');}
     if(volR>=1.5){score+=3;tags.push('거래량x'+volR.toFixed(1));}
     else if(volR>=1.2){score+=1;tags.push('거래량+'+(((volR-1)*100).toFixed(0))+'%');}
-    if(lrsi>=50&&lrsi<=65){score+=2;tags.push('RSI'+lrsi);}
-    else if(lrsi>=40&&lrsi<50){score+=1;tags.push('RSI'+lrsi+'(회복)');}
+    if(lrsi>=45&&lrsi<=70){score+=2;tags.push('RSI'+lrsi);}
     if(lc.c<lma5&&lma5<lma20){score-=5;tags.push('하락추세');}
     if(lc.c<lc.o&&pc.c<pc.o&&pc2.c<pc2.o){score-=3;tags.push('3연속음봉');}
-    candidates.push({tk:tk,stk:stk,score:score,tags:tags});
+    candidates.push({tk:tk,stk:stk,score:score,tags:tags,lc:lc});
   }
-  if(!candidates.length){addMsg('ai','분석 가능한 관심종목이 없습니다.');return null;}
+  if(!candidates.length){addMsg('ai','분석 가능 종목 없음 (KIS 연결 시 전 종목 분석)');return null;}
   candidates.sort(function(a,b){return b.score-a.score;});
-  const best=candidates[0];
-  const topList=candidates.slice(0,3).map(function(c,i){return (i+1)+'. '+c.stk.nm+'('+c.tk+') '+c.score+'점 '+c.tags.join(' ');}).join('\n');
-  if(best.score<4){addMsg('ai','스크리닝 결과\n'+topList+'\n\n전 종목 진입조건 미달('+best.score+'/11). 관망');return null;}
-  addMsg('ai','AI 종목 선택\n'+topList+'\n\n-> '+best.stk.nm+' 선택 ('+best.score+'/11점)');
-  if(best.tk!==activeTk){setActiveTk(best.tk);await new Promise(function(r){setTimeout(r,500);});}
+  var best=candidates[0];
+  var topList=candidates.slice(0,3).map(function(c,i){
+    return (i+1)+'. '+c.stk.nm+'('+c.tk+') '+c.score+'점 ['+c.tags.join(' ')+']';
+  }).join('\n');
+  if(best.score<3){
+    addMsg('ai','AI 스크리닝\n'+topList+'\n\n전 종목 조건 미달('+best.score+'점). 관망.');
+    addDecisionLog('전종목조건미달',best.tags.join(', '),'Phase8: 진입불가');
+    return null;
+  }
+  addMsg('ai','AI 종목선택\n'+topList+'\n\n→ '+best.stk.nm+' ('+best.score+'점)');
+  addDecisionLog('종목선택: '+best.stk.nm,best.lc.c.toLocaleString()+'원','대장주조건통과');
+  if(best.tk!==activeTk){setActiveTk(best.tk);await new Promise(function(r){setTimeout(r,600);});}
   return best;
 }
 
