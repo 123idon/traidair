@@ -523,9 +523,10 @@ canvas{image-rendering:pixelated;}
     <button class="ibtn" onclick="openModal('settings')">⚙</button>
     <button class="ibtn red" onclick="endMock()">■ 종료</button>
     <button class="ibtn pri" onclick="openModal('journal')">📓</button>
-    <button class="ibtn" onclick="openModal('autotrade')" id="autoSettingBtn" title="자동매매 설정">⚙</button>
-    <button class="ibtn pur" onclick="toggleAutoTrade()" id="autoBtn" title="자동매매 시작/중지">▶ 자동매매</button>
-    <button class="ibtn" id="pauseBtnHdr" onclick="pauseAuto()" style="display:none;background:#f59e0b;color:#fff;border-color:#f59e0b;font-weight:700;" title="일시정지/재개">⏸</button>
+    <button class="ibtn" onclick="openModal('autotrade')" title="설정">⚙</button>
+    <button class="ibtn pur" onclick="toggleAutoTrade()" id="autoBtn">▶ 자동매매</button>
+    <button class="ibtn" id="pauseBtnHdr" onclick="pauseAuto()" style="display:none;background:#f59e0b;color:#fff;border-color:#f59e0b;font-weight:700;">⏸</button>
+    <button class="ibtn" id="pauseBtnHdr" onclick="pauseAuto()" style="display:none;background:#f59e0b;color:#fff;border-color:#f59e0b;font-weight:700;">⏸ 일시정지</button>
     <button class="ibtn red" id="stopBtnHdr" onclick="stopAuto()" style="display:none;font-weight:700;">⏹ 정지</button>
     <button class="ibtn" id="pauseBtnHdr" onclick="pauseAuto()" style="display:none;background:#f59e0b;color:#fff;border-color:#f59e0b;font-weight:700;">⏸ 일시정지</button>
     <button class="ibtn red" id="stopBtnHdr" onclick="stopAuto()" style="display:none;font-weight:700;">⏹ 정지</button>
@@ -636,7 +637,7 @@ canvas{image-rendering:pixelated;}
 <div style="border-top:2px solid var(--br);margin-top:4px;">
   <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px 4px;">
     <span style="font-size:9px;font-weight:700;color:var(--b);">🤖 AI 현황</span>
-    <span id="aiCurrentTk" style="font-size:8px;font-family:var(--mono);color:var(--b);background:rgba(49,130,246,.1);padding:1px 5px;border-radius:4px;"></span>
+    <span id="aiCurrentTk" style="font-size:8px;color:var(--b);background:rgba(49,130,246,.1);padding:1px 5px;border-radius:4px;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
     <span id="aiStatusDot" style="width:7px;height:7px;border-radius:50%;background:var(--tm);display:inline-block;transition:background .3s;"></span>
   </div>
   <div id="aiStatusBox" style="margin:0 8px 4px;padding:6px 8px;background:var(--card);border-radius:7px;border:1px solid var(--br);">
@@ -1841,9 +1842,130 @@ function renderWLGroup(){
       const s=STOCKS.find(s=>s.tk===tk)||{tk,nm:tk,pr:0,base:1,sec:""};
       const c=((s.pr-s.base)/s.base*100).toFixed(2),up=parseFloat(c)>=0;
       const col=g===2?"var(--r)":g===0?"var(--b)":"var(--ts)";
+      return`<div style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:7px;cursor:pointer;transition:background .1s;margin-botto
+// ═══════════════════════════════
+// DATA══════════════
+// DATA
+// ═══════════════════════════════
+const STOCKS=[
+  // 코스피 대형주
+  {tk:"005930",nm:"삼성전자",pr:71500,base:71500,sec:"반도체",cap:"대형"},
+  {tk:"000660",nm:"SK하이닉스",pr:189300,base:189300,sec:"반도체",cap:"대형"},
+  {tk:"005380",nm:"현대차",pr:212000,base:212000,sec:"자동차",cap:"대형"},
+  {tk:"005490",nm:"POSCO홀딩스",pr:312000,base:312000,sec:"철강",cap:"대형"},
+  {tk:"035420",nm:"NAVER",pr:182200,base:182200,sec:"인터넷",cap:"대형"},
+  {tk:"051910",nm:"LG화학",pr:318500,base:318500,sec:"화학",cap:"대형"},
+  {tk:"006400",nm:"삼성SDI",pr:285000,base:285000,sec:"2차전지",cap:"대형"},
+  {tk:"003550",nm:"LG",pr:78500,base:78500,sec:"지주",cap:"대형"},
+  {tk:"028260",nm:"삼성물산",pr:138500,base:138500,sec:"건설",cap:"대형"},
+  {tk:"012330",nm:"현대모비스",pr:248500,base:248500,sec:"자동차부품",cap:"대형"},
+  {tk:"066570",nm:"LG전자",pr:95800,base:95800,sec:"가전",cap:"대형"},
+  {tk:"032830",nm:"삼성생명",pr:91800,base:91800,sec:"보험",cap:"대형"},
+  {tk:"055550",nm:"신한지주",pr:45350,base:45350,sec:"금융",cap:"대형"},
+  {tk:"105560",nm:"KB금융",pr:78200,base:78200,sec:"금융",cap:"대형"},
+  {tk:"000270",nm:"기아",pr:98100,base:98100,sec:"자동차",cap:"대형"},
+  {tk:"096770",nm:"SK이노베이션",pr:115500,base:115500,sec:"에너지",cap:"대형"},
+  {tk:"003670",nm:"포스코퓨처엠",pr:198000,base:198000,sec:"2차전지",cap:"중형"},
+  {tk:"247540",nm:"에코프로비엠",pr:152000,base:152000,sec:"2차전지",cap:"중형"},
+  // 코스닥
+  {tk:"373220",nm:"LG에너지솔루션",pr:298500,base:298500,sec:"2차전지",cap:"대형"},
+  {tk:"207940",nm:"삼성바이오로직스",pr:831000,base:831000,sec:"바이오",cap:"대형"},
+  {tk:"068270",nm:"셀트리온",pr:186500,base:186500,sec:"바이오",cap:"대형"},
+  {tk:"035720",nm:"카카오",pr:42350,base:42350,sec:"인터넷",cap:"대형"},
+  {tk:"000810",nm:"삼성화재",pr:335000,base:335000,sec:"보험",cap:"대형"},
+  {tk:"086520",nm:"에코프로",pr:68500,base:68500,sec:"2차전지",cap:"중형"},
+  {tk:"091990",nm:"셀트리온헬스케어",pr:45200,base:45200,sec:"바이오",cap:"중형"},
+  {tk:"263750",nm:"펄어비스",pr:32500,base:32500,sec:"게임",cap:"중형"},
+  {tk:"041510",nm:"에스엠",pr:58700,base:58700,sec:"엔터",cap:"중형"},
+  {tk:"035900",nm:"JYP Ent.",pr:47800,base:47800,sec:"엔터",cap:"중형"},
+  {tk:"122870",nm:"YG엔터테인먼트",pr:38900,base:38900,sec:"엔터",cap:"중형"},
+  {tk:"278530",nm:"HLB",pr:52300,base:52300,sec:"바이오",cap:"중형"},
+  {tk:"950130",nm:"엑세스바이오",pr:8500,base:8500,sec:"바이오",cap:"소형"},
+  {tk:"196170",nm:"알테오젠",pr:285000,base:285000,sec:"바이오",cap:"중형"},
+  {tk:"145020",nm:"휴젤",pr:198000,base:198000,sec:"바이오",cap:"중형"},
+  {tk:"048260",nm:"오스템임플란트",pr:178500,base:178500,sec:"의료기기",cap:"중형"},
+  {tk:"215600",nm:"신라젠",pr:3240,base:3240,sec:"바이오",cap:"소형"},
+  {tk:"039030",nm:"이오테크닉스",pr:89500,base:89500,sec:"반도체장비",cap:"중형"},
+  {tk:"042700",nm:"한미반도체",pr:68500,base:68500,sec:"반도체장비",cap:"중형"},
+  {tk:"357780",nm:"솔브레인",pr:295000,base:295000,sec:"반도체소재",cap:"중형"},
+  {tk:"095340",nm:"ISC",pr:42500,base:42500,sec:"반도체",cap:"소형"},
+  {tk:"009150",nm:"삼성전기",pr:155000,base:155000,sec:"전자부품",cap:"중형"},
+  {tk:"010130",nm:"고려아연",pr:498000,base:498000,sec:"비철금속",cap:"중형"},
+  {tk:"326030",nm:"SK바이오팜",pr:78500,base:78500,sec:"바이오",cap:"중형"},
+  {tk:"011200",nm:"HMM",pr:18250,base:18250,sec:"해운",cap:"중형"},
+  {tk:"000120",nm:"CJ대한통운",pr:98500,base:98500,sec:"물류",cap:"중형"},
+  {tk:"180640",nm:"한진칼",pr:62400,base:62400,sec:"항공",cap:"중형"},
+  {tk:"003490",nm:"대한항공",pr:21500,base:21500,sec:"항공",cap:"중형"},
+  {tk:"021240",nm:"코웨이",pr:52300,base:52300,sec:"가전",cap:"중형"},
+  {tk:"259960",nm:"크래프톤",pr:218000,base:218000,sec:"게임",cap:"대형"},
+];
+// Phase 3-9: 관심종목 5그룹
+const WG_LABELS = ['🎯 오늘 진입 후보','📊 모니터링','🚫 매매금지','🔥 테마/이슈','📝 복기 대상'];
+const WG_MAX = [3, 10, 999, 10, 5];
+let WGS = (()=>{try{return JSON.parse(localStorage.getItem("htsWGS")||JSON.stringify([
+  ["005930","000660"],["373220","035420"],[]  ,[],[]]))}catch(e){return [[],[],[],[],[]];}})();
+let curWG = 0;
+// 구버전 WL 호환
+let WL = WGS[0];
+function saveWL(){WGS[0]=WL;const v=JSON.stringify(WGS);localStorage.setItem("htsWGS",v);saveToServer("htsWGS",v);}
+function saveWGS(){const v=JSON.stringify(WGS);localStorage.setItem("htsWGS",v);saveToServer("htsWGS",v);}
+function addToWL(tk){if(!WL.includes(tk)){WL.push(tk);saveWL();renderWLGroup();}}
+function removeFromWL(tk){WL=WL.filter(w=>w!==tk);WGS[0]=WL;saveWGS();renderWLGroup();}
+
+function selWG(el,id){
+  document.querySelectorAll(".wg-tab").forEach(t=>t.classList.remove("on"));
+  el.classList.add("on");
+  curWG=parseInt(id.replace("wg",""));
+  document.querySelectorAll(".wg-body").forEach(b=>b.style.display="none");
+  document.getElementById(id).style.display="block";
+  const lbl=document.getElementById("wgTitle");
+  const cnt=document.getElementById("wgCount");
+  if(lbl)lbl.textContent=WG_LABELS[curWG];
+  const cur=WGS[curWG]||[];
+  const max=WG_MAX[curWG];
+  if(cnt)cnt.textContent=max===999?cur.length+"개":cur.length+"/"+max;
+  renderWLGroup();
+}
+function addCurrentToWG(){
+  const tk=activeTk;
+  const grp=WGS[curWG]||(WGS[curWG]=[]);
+  if(grp.includes(tk)){showAlert("중복","이미 이 그룹에 있습니다.");return;}
+  if(curWG===0&&grp.length>=3){showAlert("초과","진입 후보는 최대 3개입니다. (Phase 3-9)");return;}
+  grp.push(tk);saveWGS();renderWLGroup();
+  const stk=STOCKS.find(s=>s.tk===tk);
+  addDecisionLog("["+WG_LABELS[curWG]+"] "+stk?.nm+" 추가","","Phase 3-9");
+}
+function removeFromWG(gIdx,tk){
+  WGS[gIdx]=WGS[gIdx].filter(w=>w!==tk);
+  if(gIdx===0)WL=WGS[0];
+  saveWGS();renderWLGroup();
+}
+function moveToWG(fromG,tk,toG){
+  WGS[fromG]=WGS[fromG].filter(w=>w!==tk);
+  if(!WGS[toG])WGS[toG]=[];
+  if(!WGS[toG].includes(tk))WGS[toG].push(tk);
+  if(toG===0)WL=WGS[0];
+  saveWGS();renderWLGroup();
+}
+
+function renderWLGroup(){
+  // 각 그룹 렌더링
+  for(let g=0;g<5;g++){
+    const listId=g===2?"banList":"wlList"+g;
+    const el=document.getElementById(listId);
+    if(!el)continue;
+    const grp=WGS[g]||[];
+    if(g===2&&!grp.length){el.textContent="없음";continue;}
+    el.innerHTML=grp.map(tk=>{
+      const s=STOCKS.find(s=>s.tk===tk)||{tk,nm:tk,pr:0,base:1,sec:""};
+      const c=((s.pr-s.base)/s.base*100).toFixed(2),up=parseFloat(c)>=0;
+      const col=g===2?"var(--r)":g===0?"var(--b)":"var(--ts)";
       return`<div style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:7px;cursor:pointer;transition:background .1s;margin-bottom:1px;" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''">
         <div onclick="selectStk('${tk}')" style="disace:nowrap;">${s.nm}</div>
-          <div style="font-family:var(--mono);font-size:9px;${up?"color:var(--g)":"color:var(--r);"};">${up?"+":""동" style="background:none;border:none;font-size:9px;cursor:pointer;color:var(--tm);padding:0 1px;">🚫</button>`:""}
+          <div style="font-family:var(--mono);font-size:9px;${up?"color:var(--g)":"color:var(--r);"};">${up?"+":""}${c}%</div>
+        </div>
+        <div style="display:flex;gap:2px;flex-shrink:0;">
+          ${g!==2?`<button onclick="moveToWG(${g},'${tk}',2)" title="매매금지로 이동" style="background:none;border:none;font-size:9px;cursor:pointer;color:var(--tm);padding:0 1px;">🚫</button>`:""}
           <button onclick="removeFromWG(${g},'${tk}')" style="background:none;border:none;font-size:11px;cursor:pointer;color:var(--tm);padding:0 1px;">×</button>
         </div>
       </div>`;
@@ -4139,12 +4261,12 @@ function startAuto(){
   var _phd=document.getElementById("pauseBtnHdr"),_shd=document.getElementById("stopBtnHdr");
   if(_phd){_phd.style.display="";_phd.textContent="⏸ 일시정지";_phd.style.background="#f59e0b";}
   if(_shd) _shd.style.display="";
-  // 자동매매 버튼 → 중지 상태로 토글
-  var ab=document.getElementById("autoBtn");
-  if(ab){ab.textContent="⏹ 중지";ab.style.background="var(--r)";ab.style.borderColor="var(--r)";ab.style.color="#fff";}
-  var ph=document.getElementById("pauseBtnHdr");
-  if(ph){ph.style.display="";ph.textContent="⏸";ph.style.background="#f59e0b";}
   document.getElementById("autoBtn").classList.add("on");
+  var _ab=document.getElementById("autoBtn");
+  if(_ab){_ab.textContent="\u23f9 중지";_ab.style.background="var(--r)";_ab.style.borderColor="var(--r)";_ab.style.color="#fff";}
+  var _ph=document.getElementById("pauseBtnHdr");
+  if(_ph)_ph.style.display="";
+
   document.getElementById("aiModeBadge").textContent='Lv'+autoState.level+' 실행중';
   // 일시정지/정지 버튼 표시
   const pBtn=document.getElementById('pauseBtn'), sBtn=document.getElementById('stopBtn2');
@@ -4184,12 +4306,12 @@ function stopAuto(){
   if(sBtn) sBtn.style.display='none';
   const startBtn=document.querySelector('.modal-content .ibtn.pur[onclick="startAuto()"]');
   if(startBtn) startBtn.style.display='';
-  // 자동매매 버튼 → 실행 상태로 복원
-  var ab2=document.getElementById("autoBtn");
-  if(ab2){ab2.textContent="▶ 자동매매";ab2.style.background="";ab2.style.borderColor="";ab2.style.color="";}
-  var ph2=document.getElementById("pauseBtnHdr");
-  if(ph2){ph2.style.display="none";ph2.textContent="⏸";ph2.style.background="#f59e0b";}
   document.getElementById("autoBtn").classList.remove("on");
+  var _ab2=document.getElementById("autoBtn");
+  if(_ab2){_ab2.textContent="\u25b6 자동매매";_ab2.style.background="";_ab2.style.borderColor="";_ab2.style.color="";}
+  var _ph2=document.getElementById("pauseBtnHdr");
+  if(_ph2){_ph2.style.display="none";}
+
   var _pH2_=document.getElementById("pauseBtnHdr"),_sH2_=document.getElementById("stopBtnHdr");
   if(_pH2_)_pH2_.style.display="none";if(_sH2_)_sH2_.style.display="none";
   document.getElementById("aiModeBadge").textContent='';
@@ -4209,32 +4331,14 @@ async function scheduleScreening(){
   autoTimer=setTimeout(scheduleScreening,5000);
 }
 function addDecisionLog(title, body, phase){
-  // 현재 종목 표시 추가
-  const stk=STOCKS.find(s=>s.tk===activeTk)||{nm:activeTk};
-  const tkInfo="["+stk.nm+"("+activeTk+")] ";
-  title = title.startsWith("[") ? title : tkInfo+title;
-  _updateAIStatusNow(title, body, phase);
-  if(!window._decisionLog) window._decisionLog=[];
-  const entry={title,body,phase,time:new Date().toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit",second:"2-digit"})};
-  window._decisionLog.push(entry);
-  if(window._decisionLog.length>50) window._decisionLog.shift();
-  _updateAIStatusPanel(entry);
-}
-function _updateAIStatusNow(title,body,phase){
-  const stk=STOCKS.find(s=>s.tk===activeTk)||{nm:activeTk,sec:""};
-  const lbl=document.getElementById("aiStatusLabel");
-  const msg=document.getElementById("aiStatusMsg");
-  const dot=document.getElementById("aiStatusDot");
-  const tkBadge=document.getElementById("aiCurrentTk");
-  if(tkBadge) tkBadge.textContent=stk.nm+"("+activeTk+")";
-  const isBuy=title.includes("매수")||title.includes("BUY");
-  const isBlock=title.includes("차단")||title.includes("관망")||title.includes("PASS")||title.includes("미달");
-  const col=isBuy?"var(--g)":isBlock?"var(--r)":"var(--b)";
-  if(lbl){lbl.textContent=phase||title.slice(0,24);lbl.style.color=col;}
-  if(msg){msg.textContent=(body||title).slice(0,80);msg.style.color=isBuy?"var(--g)":isBlock?"var(--r)":"var(--ts)";}
-  if(dot){dot.style.background=col;}
-}
-
+  try{var stk=STOCKS.find(function(s){return s.tk===activeTk;})||{nm:activeTk||""};
+    var b2=document.getElementById("aiCurrentTk");if(b2)b2.textContent=stk.nm+"("+activeTk+")";
+    var isBuy=title.indexOf("매수")>=0;var isBlk=title.indexOf("차단")>=0||title.indexOf("관망")>=0;
+    var col=isBuy?"var(--g)":isBlk?"var(--r)":"var(--b)";
+    var l2=document.getElementById("aiStatusLabel");if(l2){l2.textContent=(phase||title).slice(0,28);l2.style.color=col;}
+    var m2=document.getElementById("aiStatusMsg");if(m2){m2.textContent=(body||title).slice(0,78);}
+    var d2=document.getElementById("aiStatusDot");if(d2)d2.style.background=col;
+  }catch(e){}
   // 전역 로그 배열
   if(!window._decisionLog) window._decisionLog=[];
   const entry = {title, body, phase, time: new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',second:'2-digit'})};
@@ -5932,17 +6036,6 @@ function renderNews(){
     </div>`;
   }).join("");
 }
-function setActiveTk(tk){
-  selectStk(tk);
-  // AI 현황 패널 업데이트
-  const stk=STOCKS.find(s=>s.tk===tk)||{nm:tk};
-  const lbl=document.getElementById("aiStatusLabel");
-  const msg=document.getElementById("aiStatusMsg");
-  if(lbl){lbl.textContent="종목 전환: "+stk.nm;lbl.style.color="var(--b)";}
-  if(msg){msg.textContent=tk+" | "+stk.sec+" | 분석 준비 중...";}
-  const dot=document.getElementById("aiStatusDot");
-  if(dot){dot.style.background="var(--b)";}
-}
 function selectStk(tk){activeTk=tk;const s=STOCKS.find(s=>s.tk===tk)||STOCKS[0];document.getElementById("siNm").textContent=s.nm;// 관심종목 자동 추가 제거 (수동으로 그룹 선택 후 추가)
   const tkEl=document.getElementById("obTkName");if(tkEl)tkEl.textContent=s.nm;document.getElementById("srchIn").value="";hideSrch();renderWL();genCandles(tk,sim.date);initChart();renderOB();renderTH();
   const atk=document.getElementById("analysisTk");if(atk)atk.textContent=s.nm;
@@ -7457,24 +7550,16 @@ async function syncCandidatesToWatchlist(){
     addDecisionLog("섹터대장주","강세: "+(ai2.sectors||[]).map(function(s){return s.name;}).join(","),ai2.summary||"");
   }catch(e3){console.warn("섹터선정실패:",e3.message);}
 }
-</script>
-
-<!-- 동적 참조 요소 -->
-<span id="mentalResetStatus" style="display:none;"></span>
-<span id="bd_warning" style="display:none;"></span>
-<span id="bd_reentry" style="display:none;"></span>
-<span id="trustAutoLimit" style="display:none;"></span>
-<span id="trustScoreDesc" style="display:none;"></span>
-<span id="mktStrScore" style="display:none;"></span>
-</body>
-</html>
-function toggleAutoTrade(){
-  if(autoState.running){
-    stopAuto();
-  } else {
-    // 설정값 자동 적용 후 시작
-    var lvl = parseInt(document.getElementById("auto-lv-sel")&&document.getElementById("auto-lv-sel").value||autoLevel||4);
-    autoLevel = lvl;
-    startAuto();
-  }
+function toggleAutoTrade(){if(autoState.running){stopAuto();}else{startAuto();}}
+function setActiveTk(tk){
+  selectStk(tk);
+  try{
+    var stk=STOCKS.find(function(s){return s.tk===tk;})||{nm:tk,sec:""};
+    var badge=document.getElementById("aiCurrentTk");
+    if(badge)badge.textContent=stk.nm+"("+tk+")";
+    var lbl=document.getElementById("aiStatusLabel");
+    if(lbl){lbl.textContent="종목전환: "+stk.nm;lbl.style.color="var(--b)";}
+    var dot=document.getElementById("aiStatusDot");
+    if(dot)dot.style.background="var(--b)";
+  }catch(e){}
 }
