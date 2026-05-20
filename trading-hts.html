@@ -1795,7 +1795,129 @@ const STOCKS=[
 const WG_LABELS = ['🎯 오늘 진입 후보','📊 모니터링','🚫 매매금지','🔥 테마/이슈','📝 복기 대상'];
 const WG_MAX = [3, 10, 999, 10, 5];
 let WGS = (()=>{try{return JSON.parse(localStorage.getItem("htsWGS")||JSON.stringify([
-  ["005930","000660"],["373220","035420"],[]  ,[],[]]))}catch(e){return [[],[],[],[],[]];}})();
+  [],[],[],[],[]]))}catch(e){return [[],[],[],[],[]];}})();
+let curWG = 0;
+// 구버전 WL 호환
+let WL = WGS[0];
+function saveWL(){WGS[0]=WL;const v=JSON.stringify(WGS);localStorage.setItem("htsWGS",v);saveToServer("htsWGS",v);}
+function saveWGS(){const v=JSON.stringify(WGS);localStorage.setItem("htsWGS",v);saveToServer("htsWGS",v);}
+function addToWL(tk){if(!WL.includes(tk)){WL.push(tk);saveWL();renderWLGroup();}}
+function removeFromWL(tk){WL=WL.filter(w=>w!==tk);WGS[0]=WL;saveWGS();renderWLGroup();}
+
+function selWG(el,id){
+  document.querySelectorAll(".wg-tab").forEach(t=>t.classList.remove("on"));
+  el.classList.add("on");
+  curWG=parseInt(id.replace("wg",""));
+  document.querySelectorAll(".wg-body").forEach(b=>b.style.display="none");
+  document.getElementById(id).style.display="block";
+  const lbl=document.getElementById("wgTitle");
+  const cnt=document.getElementById("wgCount");
+  if(lbl)lbl.textContent=WG_LABELS[curWG];
+  const cur=WGS[curWG]||[];
+  const max=WG_MAX[curWG];
+  if(cnt)cnt.textContent=max===999?cur.length+"개":cur.length+"/"+max;
+  renderWLGroup();
+}
+function addCurrentToWG(){
+  const tk=activeTk;
+  const grp=WGS[curWG]||(WGS[curWG]=[]);
+  if(grp.includes(tk)){showAlert("중복","이미 이 그룹에 있습니다.");return;}
+  if(curWG===0&&grp.length>=3){showAlert("초과","진입 후보는 최대 3개입니다. (Phase 3-9)");return;}
+  grp.push(tk);saveWGS();renderWLGroup();
+  const stk=STOCKS.find(s=>s.tk===tk);
+  addDecisionLog("["+WG_LABELS[curWG]+"] "+stk?.nm+" 추가","","Phase 3-9");
+}
+function removeFromWG(gIdx,tk){
+  WGS[gIdx]=WGS[gIdx].filter(w=>w!==tk);
+  if(gIdx===0)WL=WGS[0];
+  saveWGS();renderWLGroup();
+}
+function moveToWG(fromG,tk,toG){
+  WGS[fromG]=WGS[fromG].filter(w=>w!==tk);
+  if(!WGS[toG])WGS[toG]=[];
+  if(!WGS[toG].includes(tk))WGS[toG].push(tk);
+  if(toG===0)WL=WGS[0];
+  saveWGS();renderWLGroup();
+}
+
+function renderWLGroup(){
+  // 각 그룹 렌더링
+  for(let g=0;g<5;g++){
+    const listId=g===2?"banList":"wlList"+g;
+    const el=document.getElementById(listId);
+    if(!el)continue;
+    const grp=WGS[g]||[];
+    if(g===2&&!grp.length){el.textContent="없음";continue;}
+    el.innerHTML=grp.map(tk=>{
+      const s=STOCKS.find(s=>s.tk===tk)||{tk,nm:tk,pr:0,base:1,sec:""};
+      const c=((s.pr-s.base)/s.base*100).toFixed(2),up=parseFloat(c)>=0;
+      const col=g===2?"var(--r)":g===0?"var(--b)":"var(--ts)";
+      var _wlbtn=g!==2?'<button onclick="moveToWG('+g+',\''+tk+'\',2)" style="background:none;border:none;font-size:9px;cursor:pointer;color:var(--tm);">🚫</button>':'';
+      var _wlh='<div style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:7px;cursor:pointer;margin-bottom:1px;" onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'">';
+      _wlh+='<div onclick="selectStk(\''+tk+'\'" style="display:flex;align-items:center;gap:5px;flex:1;min-width:0;">';
+      _wlh+='<div style="font-family:var(--mono);font-sizent-size:9px;color:'+col+';width:34px;">'+tk.slice(-4)+'</div>';
+      _wlh+='<div style="font-size:9px;flex:1;overflow:
+// ═══════════════════════════════
+// DATA══════════════
+// DATA
+// ═══════════════════════════════
+const STOCKS=[
+  // 코스피 대형주
+  {tk:"005930",nm:"삼성전자",pr:71500,base:71500,sec:"반도체",cap:"대형"},
+  {tk:"000660",nm:"SK하이닉스",pr:189300,base:189300,sec:"반도체",cap:"대형"},
+  {tk:"005380",nm:"현대차",pr:212000,base:212000,sec:"자동차",cap:"대형"},
+  {tk:"005490",nm:"POSCO홀딩스",pr:312000,base:312000,sec:"철강",cap:"대형"},
+  {tk:"035420",nm:"NAVER",pr:182200,base:182200,sec:"인터넷",cap:"대형"},
+  {tk:"051910",nm:"LG화학",pr:318500,base:318500,sec:"화학",cap:"대형"},
+  {tk:"006400",nm:"삼성SDI",pr:285000,base:285000,sec:"2차전지",cap:"대형"},
+  {tk:"003550",nm:"LG",pr:78500,base:78500,sec:"지주",cap:"대형"},
+  {tk:"028260",nm:"삼성물산",pr:138500,base:138500,sec:"건설",cap:"대형"},
+  {tk:"012330",nm:"현대모비스",pr:248500,base:248500,sec:"자동차부품",cap:"대형"},
+  {tk:"066570",nm:"LG전자",pr:95800,base:95800,sec:"가전",cap:"대형"},
+  {tk:"032830",nm:"삼성생명",pr:91800,base:91800,sec:"보험",cap:"대형"},
+  {tk:"055550",nm:"신한지주",pr:45350,base:45350,sec:"금융",cap:"대형"},
+  {tk:"105560",nm:"KB금융",pr:78200,base:78200,sec:"금융",cap:"대형"},
+  {tk:"000270",nm:"기아",pr:98100,base:98100,sec:"자동차",cap:"대형"},
+  {tk:"096770",nm:"SK이노베이션",pr:115500,base:115500,sec:"에너지",cap:"대형"},
+  {tk:"003670",nm:"포스코퓨처엠",pr:198000,base:198000,sec:"2차전지",cap:"중형"},
+  {tk:"247540",nm:"에코프로비엠",pr:152000,base:152000,sec:"2차전지",cap:"중형"},
+  // 코스닥
+  {tk:"373220",nm:"LG에너지솔루션",pr:298500,base:298500,sec:"2차전지",cap:"대형"},
+  {tk:"207940",nm:"삼성바이오로직스",pr:831000,base:831000,sec:"바이오",cap:"대형"},
+  {tk:"068270",nm:"셀트리온",pr:186500,base:186500,sec:"바이오",cap:"대형"},
+  {tk:"035720",nm:"카카오",pr:42350,base:42350,sec:"인터넷",cap:"대형"},
+  {tk:"000810",nm:"삼성화재",pr:335000,base:335000,sec:"보험",cap:"대형"},
+  {tk:"086520",nm:"에코프로",pr:68500,base:68500,sec:"2차전지",cap:"중형"},
+  {tk:"091990",nm:"셀트리온헬스케어",pr:45200,base:45200,sec:"바이오",cap:"중형"},
+  {tk:"263750",nm:"펄어비스",pr:32500,base:32500,sec:"게임",cap:"중형"},
+  {tk:"041510",nm:"에스엠",pr:58700,base:58700,sec:"엔터",cap:"중형"},
+  {tk:"035900",nm:"JYP Ent.",pr:47800,base:47800,sec:"엔터",cap:"중형"},
+  {tk:"122870",nm:"YG엔터테인먼트",pr:38900,base:38900,sec:"엔터",cap:"중형"},
+  {tk:"278530",nm:"HLB",pr:52300,base:52300,sec:"바이오",cap:"중형"},
+  {tk:"950130",nm:"엑세스바이오",pr:8500,base:8500,sec:"바이오",cap:"소형"},
+  {tk:"196170",nm:"알테오젠",pr:285000,base:285000,sec:"바이오",cap:"중형"},
+  {tk:"145020",nm:"휴젤",pr:198000,base:198000,sec:"바이오",cap:"중형"},
+  {tk:"048260",nm:"오스템임플란트",pr:178500,base:178500,sec:"의료기기",cap:"중형"},
+  {tk:"215600",nm:"신라젠",pr:3240,base:3240,sec:"바이오",cap:"소형"},
+  {tk:"039030",nm:"이오테크닉스",pr:89500,base:89500,sec:"반도체장비",cap:"중형"},
+  {tk:"042700",nm:"한미반도체",pr:68500,base:68500,sec:"반도체장비",cap:"중형"},
+  {tk:"357780",nm:"솔브레인",pr:295000,base:295000,sec:"반도체소재",cap:"중형"},
+  {tk:"095340",nm:"ISC",pr:42500,base:42500,sec:"반도체",cap:"소형"},
+  {tk:"009150",nm:"삼성전기",pr:155000,base:155000,sec:"전자부품",cap:"중형"},
+  {tk:"010130",nm:"고려아연",pr:498000,base:498000,sec:"비철금속",cap:"중형"},
+  {tk:"326030",nm:"SK바이오팜",pr:78500,base:78500,sec:"바이오",cap:"중형"},
+  {tk:"011200",nm:"HMM",pr:18250,base:18250,sec:"해운",cap:"중형"},
+  {tk:"000120",nm:"CJ대한통운",pr:98500,base:98500,sec:"물류",cap:"중형"},
+  {tk:"180640",nm:"한진칼",pr:62400,base:62400,sec:"항공",cap:"중형"},
+  {tk:"003490",nm:"대한항공",pr:21500,base:21500,sec:"항공",cap:"중형"},
+  {tk:"021240",nm:"코웨이",pr:52300,base:52300,sec:"가전",cap:"중형"},
+  {tk:"259960",nm:"크래프톤",pr:218000,base:218000,sec:"게임",cap:"대형"},
+];
+// Phase 3-9: 관심종목 5그룹
+const WG_LABELS = ['🎯 오늘 진입 후보','📊 모니터링','🚫 매매금지','🔥 테마/이슈','📝 복기 대상'];
+const WG_MAX = [3, 10, 999, 10, 5];
+let WGS = (()=>{try{return JSON.parse(localStorage.getItem("htsWGS")||JSON.stringify([
+  [],[],[],[],[]]))}catch(e){return [[],[],[],[],[]];}})();
 let curWG = 0;
 // 구버전 WL 호환
 let WL = WGS[0];
@@ -2025,7 +2147,7 @@ function genCandles(tk,dt){
         const todayCount = _kisChartMeta.todayCount || candles.length;
         // sim.idx: 전일 마지막 봉에서 시작 (전일 분봉 끝 + 오늘 첫 봉 전)
         // 오늘 봉이 있으면 전일 마지막 봉에서 멈춤, 없으면 끝에서 시작
-        sim.idx = prevCount > 0 ? prevCount - 1 : 0;
+        sim.idx = candles.length - 1; // 전일+당일 전체 표시
         chartViewCount = Math.min(30, candles.length);
         chartViewStart = Math.max(0, candles.length - chartViewCount);
         if(candles.length > 0) updPrice(candles[sim.idx]);
@@ -2264,7 +2386,7 @@ let inds={ma:true,vol:true,rsi:false,macd:false,bb:false,vwap:false};
 // ═══════════════════════════════════════════════
 
 let mChart=null,rsiChart=null,macdChart=null,pnlChart=null;
-let chartViewStart=0,chartViewCount=30;
+let chartViewStart=0,chartViewCount=60;
 let _chartRaf=null;
 
 // 뷰 상태
@@ -2318,7 +2440,7 @@ function drawChart(){
 
   const toX=i=>PL+(i+0.5)*(cw/cs.length);
   const toY=v=>PT+mainH*(1-(v-yMin)/yR);
-  const bw=Math.max(3,Math.min(24,cw/cs.length*0.82));
+  const bw=Math.max(2,Math.min(14,cw/cs.length*0.75));
 
   // 배경
   ctx.clearRect(0,0,W,H);
@@ -2834,7 +2956,7 @@ function onDateChange(){
   if(sim.date<todayStr())activateMockMode();
   genCandles(activeTk,sim.date);initChart();
   // 전일 분봉 포함 실시간 데이터 강제 로드
-  if(kisConfig.appKey&&kisConfig.appSecret){setTimeout(async function(){try{var _c=await _fetchKisCandles(activeTk,sim.date,sim.tf||"5");if(_c&&_c.length>0){sim.candles=_c;var _prevCnt=_kisChartMeta.prevCount||0;var _todCnt=_kisChartMeta.todayCount||_c.length;chartViewCount=Math.min(Math.max(_prevCnt+_todCnt,30),_c.length);chartViewStart=0;if(_c.length>0)updPrice(_c[_c.length-1]);drawChart();var _ci=document.getElementById("cinfo");if(_ci)_ci.textContent="✅ 실제"+_c.length+"봉 | 전일"+(_kisChartMeta.prevCount||0)+"봉+당일"+(_kisChartMeta.todayCount||0)+"봉";}}catch(_ek){}},1500);}
+  if(kisConfig.appKey&&kisConfig.appSecret){setTimeout(async function(){try{var _c=await _fetchKisCandles(activeTk,sim.date,sim.tf||"5");if(_c&&_c.length>0){sim.candles=_c;sim.idx=_c.length-1;var _prevCnt=_kisChartMeta.prevCount||0;var _todCnt=_kisChartMeta.todayCount||_c.length;chartViewCount=Math.min(60,_c.length);chartViewStart=0;if(_c.length>0)updPrice(_c[_c.length-1]);drawChart();var _ci=document.getElementById("cinfo");if(_ci)_ci.textContent="✅ 실제"+_c.length+"봉 | 전일"+(_kisChartMeta.prevCount||0)+"봉+당일"+(_kisChartMeta.todayCount||0)+"봉";}}catch(_ek){}},1500);}
 
 }
 function adjDate(d){const dt=new Date(sim.date);dt.setDate(dt.getDate()+d);sim.date=dt.toISOString().slice(0,10);document.getElementById("mockDate").value=sim.date;onDateChange();}
@@ -5299,6 +5421,16 @@ const KIS_CFG_KEY = 'traidair_api_config_v2';
 
 // ★ 하드코딩 기본값 — 만료 시 설정창에서 업데이트
 // 기본값은 서버 /api/get-config에서 로드 (window.onload에서 수행)
+  // localStorage WGS 초기화 (구버전 삼성전자 고착 방지)
+  try{
+    const _savedWGS=JSON.parse(localStorage.getItem("htsWGS")||"[]");
+    const _allTks=[].concat.apply([],_savedWGS);
+    if(_allTks.length<=2&&_allTks.every(function(t){return["005930","000660"].indexOf(t)>=0})){
+      localStorage.removeItem("htsWGS");
+      WGS=[[],[],[],[],[]];
+    }
+  }catch(_we){}
+
 const _DEFAULT_CFG = { appKey:'', appSecret:'', account:'47400138-01', mode:'real', dartKey:'', claudeKey:'' };
 
 function loadKisCfgFromStorage(){
@@ -7340,37 +7472,73 @@ window.onload=()=>{
 // ══════════════════════════════════════════════
 // 대시보드 진입후보 → 관심종목 자동 추가
 async function syncCandidatesToWatchlist(){
+  // ── 실시간 섹터 강도 분석 → 대장주 WGS 자동 구성 ──
+  // 30초마다만 실행
+  const now=Date.now();
+  if(syncCandidatesToWatchlist._last && now-syncCandidatesToWatchlist._last<30000) return;
+  syncCandidatesToWatchlist._last=now;
+
   try{
-    const dashFrame = document.getElementById('dashFrame');
-    if(!dashFrame||!dashFrame.contentWindow) return;
-    // 대시보드의 진입후보 카드에서 종목 추출
-    const candCards = dashFrame.contentWindow.document.querySelectorAll('.cand-card,[data-tk]');
-    const tks = [];
-    candCards.forEach(function(el){
-      const tk = el.dataset.tk || el.getAttribute('data-tk');
-      if(tk && /^\d{6}$/.test(tk)) tks.push(tk);
+    // 현재 시장 상황 파악 (STOCKS 기반 섹터별 그룹)
+    const sectors={};
+    STOCKS.forEach(function(s){
+      if(!s.sec)return;
+      if(!sectors[s.sec]) sectors[s.sec]=[];
+      sectors[s.sec].push(s);
     });
-    // 대시보드 AI 분석 결과에서도 추출 (텍스트에서 종목코드 파싱)
-    const aiText = dashFrame.contentWindow.document.querySelector('#aiResult,#aiAnalysis,.ai-result');
-    if(aiText){
-      const matches = aiText.textContent.match(/\d{6}/g)||[];
-      matches.forEach(function(tk){ if(!tks.includes(tk)) tks.push(tk); });
-    }
-    if(!tks.length) return;
-    // WGS[1] (모니터링 그룹)에 추가 (이미 있으면 skip)
-    if(!WGS[1]) WGS[1]=[];
-    let added=0;
-    tks.forEach(function(tk){
-      if(!WGS[0].includes(tk)&&!WGS[1].includes(tk)){
-        WGS[1].push(tk); added++;
+
+    // Claude AI에게 현재 강세 섹터 + 대장주 선정 요청
+    const secList=Object.keys(sectors).slice(0,15).join(', ');
+    const timeStr=new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'});
+    const prompt='단타 트레이딩 멘토. 지금 '+timeStr+' 장중 실시간 강세 섹터와 대장주를 선정해줘.\n\n'+
+      '분석 가능 섹터: '+secList+'\n\n'+
+      '각 섹터에서 대장주 조건 (MA정배열, 거래량 급증, RSI 45-72, 양봉) 충족 예상 종목을 뽑아줘.\n'+
+      '오늘 시장 흐름(외국인 수급, 테마, 뉴스) 고려해서 실제 매매 가능한 종목 최대 5개만.\n\n'+
+      'JSON만: {"leaders":[{"tk":"종목코드6자리","nm":"종목명","sec":"섹터","reason":"선정이유","score":1-10}],"strongSectors":["섹터1","섹터2"],"summary":"한줄요약"}';
+
+    const res=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:500,
+        messages:[{role:'user',content:prompt}]})});
+    const data=await res.json();
+    const text=(data.content&&data.content[0]&&data.content[0].text)||'{}';
+    const m=text.match(/\{[\s\S]*\}/);
+    const ai=m?JSON.parse(m[0]):{leaders:[]};
+
+    if(!ai.leaders||!ai.leaders.length) return;
+
+    // AI 추천 종목들을 STOCKS에서 확인 후 WGS[0]에 추가
+    const newTks=[];
+    ai.leaders.forEach(function(l){
+      const tk=String(l.tk||'').replace(/\D/g,'');
+      if(!/^\d{6}$/.test(tk)) return;
+      // STOCKS에 없으면 동적 추가
+      if(!STOCKS.find(function(s){return s.tk===tk;})){
+        STOCKS.push({tk:tk,nm:l.nm||tk,pr:0,base:1,sec:l.sec||'기타',cap:'중형'});
       }
+      newTks.push(tk);
     });
-    if(added>0){
+
+    // WGS[0]을 AI 추천 대장주로 완전 교체
+    if(newTks.length>0){
+      WGS[0]=newTks;
       saveWGS();
       renderWLGroup();
-      addMsg('ai','📋 대시보드 진입후보 '+added+'종목 관심목록에 자동 추가됨');
+      addDecisionLog('[중앙AI] 섹터대장주 선정',
+        (ai.strongSectors||[]).join(',')+' | '+newTks.join(','),
+        ai.summary||'대장주 WGS 갱신');
     }
-  }catch(e){ console.warn('관심종목 동기화 실패:',e.message); }
+
+    // CANDS도 업데이트
+    if(ai.leaders.length>0){
+      CANDS=ai.leaders.slice(0,3).map(function(l){
+        return {tk:String(l.tk||''),why:l.reason||l.sec||'',score:Math.min(99,Math.max(10,(l.score||5)*10))};
+      });
+      renderCands();
+    }
+
+  }catch(e){
+    console.warn('syncCandidatesToWatchlist 실패:',e.message);
+  }
 }
 
 async function autoSelectBestStock(){
@@ -7614,14 +7782,3 @@ function toggleSectorPanel(){var b=document.getElementById("sectorPanelBody");if
 var _sectorTimer=null;
 function startSectorMonitor(){refreshSectorStrength();_sectorTimer=setInterval(refreshSectorStrength,30000);}
 function stopSectorMonitor(){if(_sectorTimer){clearInterval(_sectorTimer);_sectorTimer=null;}}
-</script>
-
-<!-- 동적 참조 요소 -->
-<span id="mentalResetStatus" style="display:none;"></span>
-<span id="bd_warning" style="display:none;"></span>
-<span id="bd_reentry" style="display:none;"></span>
-<span id="trustAutoLimit" style="display:none;"></span>
-<span id="trustScoreDesc" style="display:none;"></span>
-<span id="mktStrScore" style="display:none;"></span>
-</body>
-</html>
