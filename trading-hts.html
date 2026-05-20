@@ -342,6 +342,11 @@ button{cursor:pointer;font-family:var(--sans);}
 .mob-tab.active{color:var(--b);}
 .mob-tab .mob-icon{font-size:20px;line-height:1;}
 .mob-tab .mob-label{font-size:9px;font-weight:500;white-space:nowrap;}
+.thought-step{padding:3px 6px;border-radius:5px;font-size:9px;line-height:1.5;border-left:2px solid var(--br);margin-bottom:2px;}
+.thought-step.ok{border-color:#22c55e;background:rgba(34,197,94,.06);}
+.thought-step.warn{border-color:#f97316;background:rgba(249,115,22,.06);}
+.thought-step.bad{border-color:#ef4444;background:rgba(239,68,68,.06);}
+.thought-step.info{border-color:#3b82f6;background:rgba(59,130,246,.06);}
 .mob-handle{width:36px;height:4px;background:var(--brb);border-radius:2px;margin:8px auto 4px;flex-shrink:0;}
 button,a{touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
 input,select,textarea{-webkit-appearance:none;appearance:none;}
@@ -1035,15 +1040,21 @@ input,select,textarea{-webkit-appearance:none;appearance:none;}
           <div class="ai-adv-t"><div class="ai-dot"></div>AI 실시간 조언</div>
           <div class="ai-mb" id="aiModeBadge">대기중</div>
         </div>
-        <div class="adv-boxes" id="advBoxes">
-          <div class="adv-box">
-            <div class="adv-box-t">📊 현재 상황</div>
-            <div class="adv-txt ld" id="advNow">종목 선택 시 분석 시작</div>
+        <div id="aiThoughtPanel" style="flex-shrink:0;padding:6px 8px;border-bottom:1px solid var(--br);">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+            <div id="aiThoughtDot" style="width:8px;height:8px;border-radius:50%;background:#94a3b8;flex-shrink:0;"></div>
+            <span id="aiThoughtTitle" style="font-weight:700;font-size:10px;color:#94a3b8;">대기중</span>
+            <span id="aiThoughtTime" style="color:var(--tm);font-size:8px;margin-left:auto;"></span>
           </div>
-          <div class="adv-box">
-            <div class="adv-box-t">🎯 진입/청산 조언</div>
-            <div class="adv-txt ld" id="advAction">분석 대기중...</div>
-          </div>
+          <div id="ts-trend" class="thought-step" style="display:none;"></div>
+          <div id="ts-entry" class="thought-step" style="display:none;"></div>
+          <div id="ts-risk"  class="thought-step" style="display:none;"></div>
+          <div id="ts-decision" class="thought-step" style="display:none;"></div>
+          <div id="aiThoughtConclusion" style="display:none;margin-top:4px;padding:4px 7px;border-radius:5px;font-size:10px;font-weight:700;"></div>
+        </div>
+        <div class="adv-boxes" id="advBoxes" style="display:none;">
+          <div class="adv-box"><div class="adv-txt ld" id="advNow">-</div></div>
+          <div class="adv-box"><div class="adv-txt ld" id="advAction">-</div></div>
         </div>
         <div class="ai-msgs" id="aiMsgs" style="flex:1;min-height:0;overflow-y:auto;">
           <div class="ai-msg">
@@ -2503,7 +2514,7 @@ function initChartEvents(){
 
   // 드래그 팬
   let dragX=null,dragBase=0;
-  wrap.addEventListener('mousedown',e=>{dragX=e.clientX;dragBase=chartViewStart;});
+  wrap.addEventListener('mousedown',e=>{dragX=e.clientX;dragBase=chartViewStart;window._chartUserDragging=true;});
   window.addEventListener('mousemove',e=>{
     if(dragX===null)return;
     const a=_cvAll();if(!a.length)return;
@@ -2556,7 +2567,7 @@ function initChartEvents(){
       const SB=8;
       if(ly>=cvH-SB-4){
         // 스크롤바 영역 터치
-        sbTouch=true; sbTouchX=e.touches[0].clientX; sbTouchBase=chartViewStart;
+        sbTouch=true; sbTouchX=e.touches[0].clientX; sbTouchBase=chartViewStart; window._chartUserDragging=true;
       } else {
         sbTouch=false;
         tx=e.touches[0].clientX; txBase=chartViewStart; txStartY=e.touches[0].clientY;
@@ -4134,6 +4145,7 @@ async function _runScreeningAsync(){
     updAdvBoxes(`⛔ 매수 차단 — ${stk.nm}`, `${reason}
 하락 중 매수는 절대 안 됨`);
     return;
+    _showThought_blocking(reason, '하락 중 매수는 절대 안 됨 (Phase 8)');
   }
 
   // 보유 중이면 추가 매수 금지 (피라미딩은 수동으로)
@@ -4176,6 +4188,7 @@ ${preReasons.join(' · ')||'매수 조건 없음'}`);
   addDecisionLog(`[${stk.nm}] 1단계 통과 (${preScore}/6점)`, preReasons.join(' · '), '2단계 AI 검토 시작');
   updAdvBoxes(`🔍 AI 검토 중 — ${stk.nm}`, `1단계: ${preScore}/6점
 Claude가 심층 분석 중...`);
+  _showThought_analyzing(stk.nm, preScore, preReasons);
 
   // ── 2단계: Claude AI 심층 분석 ──
   if(autoState.level >= 3){
@@ -4224,6 +4237,7 @@ JSON만: {"decision":"BUY"또는"PASS","confidence":0-100,"reason":"2줄 이내"
         );
         addMsg('ai', `🤖 AI 자동매수 결정\n\n종목: ${stk.nm} ${lc.c.toLocaleString()}원\n신뢰도: ${ai.confidence}%\n\n✅ 이유: ${ai.reason}\n⚠ 리스크: ${ai.risk}\n\n손절: ${stopPr.toLocaleString()} | 목표: ${t1Pr.toLocaleString()} | R/R 1:${rr}`);
         updAdvBoxes(`✅ 매수 결정 — ${stk.nm}`, `신뢰도 ${ai.confidence}%\n${ai.reason}`);
+        _showThought_buy(stk.nm, lc.c, stopPr, t1Pr, rr, ai.confidence, (ai.entry_type||'')+' '+ai.reason);
         await execAutoBuy(lc.c, stk);
       } else {
         // AI가 PASS 결정
@@ -4236,6 +4250,7 @@ JSON만: {"decision":"BUY"또는"PASS","confidence":0-100,"reason":"2줄 이내"
           `⏸ AI 관망 — ${stk.nm}`,
           `${ai.reason||'조건 미충족'}\n기다려야 할 것: ${ai.waitFor||'추세 확인'}`
         );
+        _showThought_pass(stk.nm, ai.reason||'조건 미충족', ai.waitFor||'추세 전환 확인');
       }
     } catch(e){
       addDecisionLog(`[${stk.nm}] AI 분석 실패`, e.message, '폴백: 관망');
@@ -6637,6 +6652,13 @@ function updChartToIdx(){
   if(msBar) msBar.textContent = sim.idx;
   const msTime = document.getElementById('msTime');
   if(msTime && lc) msTime.textContent = lc.t || '--:--';
+  // 자동 우측 스크롤 (드래그 중 아닐 때만)
+  if(!window._chartUserDragging){
+    const viewEnd = chartViewStart + chartViewCount;
+    if(sim.idx >= viewEnd - 2 || sim.idx >= sim.candles.length - 4){
+      chartViewStart = Math.max(0, sim.idx - Math.floor(chartViewCount * 0.75));
+    }
+  }
   drawChart();
   // 2. 자동매매 step 체크 (Level 4 마감청산)
   if(autoState.running){
@@ -7186,6 +7208,42 @@ async function scheduleScreening(){
   runScreening();
   autoTimer=setTimeout(scheduleScreening,5000);
 }
+
+
+// ─── AI 실시간 사고 패널 ───
+function updAIThought(s){
+  var dot=document.getElementById('aiThoughtDot');
+  var ttl=document.getElementById('aiThoughtTitle');
+  var tel=document.getElementById('aiThoughtTime');
+  var con=document.getElementById('aiThoughtConclusion');
+  if(!dot||!ttl)return;
+  var cols={analyzing:'#3b82f6',blocking:'#ef4444',waiting:'#f97316',buy:'#22c55e',pass:'#94a3b8',running:'#a855f7'};
+  var col=cols[s.type]||'#94a3b8';
+  dot.style.background=col; dot.style.boxShadow='0 0 5px '+col;
+  ttl.textContent=s.title||'대기중'; ttl.style.color=col;
+  if(tel)tel.textContent=new Date().toLocaleTimeString('ko',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  ['trend','entry','risk','decision'].forEach(function(k){
+    var el=document.getElementById('ts-'+k);
+    if(!el)return;
+    var v=s[k];
+    if(v){el.style.display='block';el.className='thought-step '+(v.type||'info');el.innerHTML='<b>'+v.label+'</b> '+v.text;}
+    else{el.style.display='none';}
+  });
+  if(con){
+    if(s.conclusion){
+      con.style.display='block';
+      var bg=s.type==='buy'?'rgba(34,197,94,.12)':s.type==='blocking'?'rgba(239,68,68,.12)':'rgba(59,130,246,.08)';
+      var fc=s.type==='buy'?'#22c55e':s.type==='blocking'?'#ef4444':'#3b82f6';
+      con.style.background=bg;con.style.color=fc;con.style.borderLeft='3px solid '+fc;
+      con.textContent=s.conclusion;
+    }else{con.style.display='none';}
+  }
+}
+function _showThought_blocking(r,d){updAIThought({type:'blocking',title:'매수 차단',trend:{type:'bad',label:'⛔ 추세:',text:r},conclusion:'매수 불가 - '+d});}
+function _showThought_analyzing(n,sc,rs){updAIThought({type:'analyzing',title:'AI 분석 중 - '+n,trend:{type:'info',label:'1단계:',text:'기술 '+sc+'/6점 ('+rs.slice(0,2).join(', ')+')'},entry:{type:'info',label:'2단계:',text:'Claude AI 심층 검토중...'},conclusion:null});}
+function _showThought_pass(n,r,w){updAIThought({type:'pass',title:'관망 - '+n,trend:{type:'warn',label:'AI 판단:',text:r},entry:{type:'info',label:'기다릴것:',text:w||'추세 전환 확인'},conclusion:'지금은 아님 - '+r});}
+function _showThought_buy(n,p,sp,t1,rr,cf,r){updAIThought({type:'buy',title:'매수 결정 - '+n,trend:{type:'ok',label:'진입근거:',text:r},entry:{type:'ok',label:'타점:',text:p.toLocaleString()+'원 신뢰도 '+cf+'%'},risk:{type:'info',label:'리스크:',text:'손절 '+sp.toLocaleString()+' 목표 '+t1.toLocaleString()+' R/R 1:'+rr},decision:{type:'ok',label:'결정:',text:'자동 매수 실행'},conclusion:'매수 - '+n+' '+p.toLocaleString()+'원 ('+cf+'%)'});}
+function _showThought_idle(n){updAIThought({type:'waiting',title:'모니터링 - '+(n||''),trend:{type:'info',label:'상태:',text:'자동매매 실행중 5초마다 스크리닝'},conclusion:null});}
 
 </script>
 
