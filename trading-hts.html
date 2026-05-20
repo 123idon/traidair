@@ -1963,36 +1963,36 @@ function moveToWG(fromG,tk,toG){
 }
 
 function renderWLGroup(){
-  // 각 그룹 렌더링
-  for(let g=0;g<5;g++){
-    const listId=g===2?"banList":"wlList"+g;
-    const el=document.getElementById(listId);
-    if(!el)continue;
-    const grp=WGS[g]||[];
-    if(g===2&&!grp.length){el.textContent="없음";continue;}
-    el.innerHTML=grp.map(tk=>{
-      const s=STOCKS.find(s=>s.tk===tk)||{tk,nm:tk,pr:0,base:1,sec:""};
-      const c=((s.pr-s.base)/s.base*100).toFixed(2),up=parseFloat(c)>=0;
-      const col=g===2?"var(--r)":g===0?"var(--b)":"var(--ts)";
-      var _wlbtn=g!==2?'<button onclick="moveToWG('+g+',\''+tk+'\',2)" style="background:none;border:none;font-size:9px;cursor:pointer;color:var(--tm);">🚫</button>':'';
-      var _wlh='<div style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:7px;cursor:pointer;margin-bottom:1px;" onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'">';
-      _wlh+='<div onclick="selectStk(\''+tk+'\'" style="display:flex;align-items:center;gap:5px;flex:1;min-width:0;">';
-      _wlh+='<div style="font-family:var(--mono);font-sizent-size:9px;color:'+col+';width:34px;">'+tk.slice(-4)+'</div>';
-      _wlh+='<div style="font-size:9px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+s.nm+'</div>';
-      _wlh+='<div style="font-size:9px;color:'+(up?'var(--g)':'var(--r)')+';">'+(up?'+ ':'')+ c+'%</div>';
-      _wlh+='</div><div style="display:flex;gap:2px;flex-shrink:0;">'+_wlbtn;
-      _wlh+='<button onclick="removeFromWG('+g+',\''+tk+'\')" style="background:none;border:none;font-size:11px;cursor:pointer;color:var(--tm);">×</button></div></div>';
-      return _wlh;
+  for(var _g=0;_g<5;_g++){
+    var _lid=_g===2?"banList":"wlList"+_g;
+    var _el=document.getElementById(_lid);
+    if(!_el)continue;
+    var _grp=WGS[_g]||[];
+    if(_g===2&&!_grp.length){_el.textContent="없음";continue;}
+    _el.innerHTML=_grp.map(function(_tk){
+      var _s=STOCKS.find(function(s){return s.tk===_tk;})||{tk:_tk,nm:_tk,pr:0,base:1,sec:""};
+      var _chg=((_s.pr-_s.base)/_s.base*100).toFixed(2);
+      var _up=parseFloat(_chg)>=0;
+      var _col=_g===2?"var(--r)":_g===0?"var(--b)":"var(--ts)";
+      var _h="";
+      _h+='<div style="display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:7px;cursor:pointer;margin-bottom:1px;">';
+      _h+='<div onclick="selectStk(\''+_tk+'\')" style="display:flex;align-items:center;gap:5px;flex:1;min-width:0;">';
+      _h+='<div style="font-family:var(--mono);font-size:9px;color:'+_col+';width:34px;flex-shrink:0;">'+_tk.slice(-4)+'</div>';
+      _h+='<div style="font-size:9px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+_s.nm+'</div>';
+      _h+='<div style="font-size:9px;color:'+(_up?"var(--g)":"var(--r)")+';width:42px;text-align:right;flex-shrink:0;">'+(_up?"+":"")+_chg+"%</div>";
+      _h+='</div>';
+      _h+='<div style="display:flex;gap:2px;flex-shrink:0;">';
+      if(_g!==2){
+        _h+='<button onclick="moveToWG('+_g+',\''+_tk+'\',2)" title="매매금지" style="background:none;border:none;font-size:9px;cursor:pointer;color:var(--tm);padding:0 2px;">🚫</button>';
+      }
+      _h+='<button onclick="removeFromWG('+_g+',\''+_tk+'\')" style="background:none;border:none;font-size:11px;cursor:pointer;color:var(--tm);padding:0 2px;">×</button>';
+      _h+='</div></div>';
+      return _h;
     }).join("");
+    // wgCount 업데이트
+    var _cnt=document.getElementById("wgCount");
+    if(_cnt&&_g===0){_cnt.textContent=(WGS[0]||[]).length+"/3";_cnt.style.color=(WGS[0]||[]).length>=3?"var(--r)":"var(--ts)";}
   }
-  // wgCount 업데이트
-  const cnt=document.getElementById("wgCount");
-  if(cnt){const cur=WGS[curWG]||[];const max=WG_MAX[curWG];cnt.textContent=max===999?cur.length+"개":cur.length+"/"+max;}
-  // 구버전 wlList 호환
-  const oldWl=document.getElementById("wlList");
-  if(oldWl)oldWl.innerHTML="";
-  renderBanList();
-  renderCands();
 }
 function renderWL(){renderWLGroup();}
 // CANDS: 진입후보 — 점수(score) 포함, 대시보드에서 업데이트됨
