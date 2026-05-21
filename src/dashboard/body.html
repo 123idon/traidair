@@ -1,0 +1,95 @@
+
+
+<div class="dash-hdr">
+  <h2>📊 장 전 분석</h2>
+  <input type="date" id="dashDate" class="date-pick" onchange="onDateChange()">
+  <div id="marketScore" class="score-badge" style="background:rgba(255,147,0,.1);color:var(--a);">시장 --/10</div>
+  <div style="margin-left:auto;display:flex;gap:6px;">
+    <button class="hdr-btn sec" onclick="autoLoadMarketData()">↺ 새로고침</button>
+    <button class="hdr-btn" onclick="runFullAIAnalysis()">🤖 AI 전체 분석</button>
+  </div>
+</div>
+
+<div class="dash-body">
+
+  <!-- 시장 체크 -->
+  <div class="card" style="grid-column:1/2;">
+    <div class="card-t">📈 시장 현황 <span id="mktUpdated"></span></div>
+    <div class="mkt-grid" id="mktGrid">
+      <div class="mkt-item"><div class="mkt-lbl">코스피선물</div><div class="mkt-val neu" id="m-kospi">--</div><div class="mkt-chg neu" id="mc-kospi">--</div></div>
+      <div class="mkt-item"><div class="mkt-lbl">코스닥선물</div><div class="mkt-val neu" id="m-kosdq">--</div><div class="mkt-chg neu" id="mc-kosdq">--</div></div>
+      <div class="mkt-item"><div class="mkt-lbl">원/달러</div><div class="mkt-val neu" id="m-usd">--</div><div class="mkt-chg neu" id="mc-usd">--</div></div>
+      <div class="mkt-item"><div class="mkt-lbl">나스닥</div><div class="mkt-val neu" id="m-nasdaq">--</div><div class="mkt-chg neu" id="mc-nasdaq">--</div></div>
+      <div class="mkt-item"><div class="mkt-lbl">S&P500</div><div class="mkt-val neu" id="m-sp500">--</div><div class="mkt-chg neu" id="mc-sp500">--</div></div>
+      <div class="mkt-item"><div class="mkt-lbl">VIX</div><div class="mkt-val neu" id="m-vix">--</div><div class="mkt-chg neu" id="mc-vix">--</div></div>
+      <div class="mkt-item"><div class="mkt-lbl">미국10년채</div><div class="mkt-val neu" id="m-bond">--</div><div class="mkt-chg neu" id="mc-bond">--</div></div>
+      <div class="mkt-item"><div class="mkt-lbl">야간선물</div><div class="mkt-val neu" id="m-night">--</div><div class="mkt-chg neu" id="mc-night">--</div></div>
+    </div>
+    <div class="verdict neutral" id="marketVerdict">📊 데이터를 입력하거나 AI 분석을 실행하세요</div>
+  </div>
+
+  <!-- AI 분석 결과 -->
+  <div class="card" style="grid-column:2/3;">
+    <div class="card-t">🤖 AI 시장 분석 <span id="aiAnalyzed"></span></div>
+    <div class="ai-section" id="aiSection">
+      <div class="ai-row">
+        <div class="label">📊 시장 방향</div>
+        <div class="val" id="ai-direction">AI 분석 버튼을 눌러주세요</div>
+      </div>
+      <div class="ai-row">
+        <div class="label">🔥 강세 섹터 TOP3</div>
+        <div class="val" id="ai-sectors">--</div>
+      </div>
+      <div class="ai-row">
+        <div class="label">⚠️ 오늘 주요 리스크</div>
+        <div class="val" id="ai-risks">--</div>
+      </div>
+      <div class="ai-row">
+        <div class="label">💡 오늘 매매 전략</div>
+        <div class="val" id="ai-strategy">--</div>
+      </div>
+      <div class="ai-row">
+        <div class="label">👁 외국인/기관 수급</div>
+        <div class="val" id="ai-flow">--</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 오늘 진입 후보 -->
+  <div class="card" style="grid-column:1/3;">
+    <div class="card-t">🎯 오늘 진입 후보 <span id="candUpdated"></span></div>
+    <div class="cand-list" id="candList">
+      <div class="loading"><div class="dot"></div><div class="dot"></div><div class="dot"></div> AI 분석 버튼을 눌러 후보 종목을 받아오세요</div>
+    </div>
+  </div>
+
+  <!-- HTS 차트 미니뷰 -->
+  <div class="card" style="grid-column:1/3;padding:10px 14px;">
+    <div class="card-t">📊 차트 <span id="chartTkName">— HTS에서 종목 선택 시 표시</span>
+      <button onclick="refreshChartFromHTS()" style="padding:2px 8px;border-radius:5px;border:none;background:var(--b);color:#fff;font-size:9px;cursor:pointer;">↺ 새로고침</button>
+    </div>
+    <canvas id="dashChart" style="width:100%;height:160px;display:block;border-radius:6px;background:var(--bg);"></canvas>
+    <div id="dashChartEmpty" style="text-align:center;padding:40px;color:var(--tm);font-size:11px;">HTS에서 종목을 선택하면 차트가 표시됩니다</div>
+  </div>
+
+  <!-- AI 채팅 -->
+  <div class="card chat-wrap">
+    <div class="card-t">💬 AI 트레이딩 멘토</div>
+    <div class="chat-msgs" id="chatMsgs">
+      <div class="msg ai">안녕하세요! 오늘 매매 준비를 도와드릴게요.<br>AI 전체 분석 버튼을 누르면 시장 분석부터 진입 후보까지 한 번에 알려드려요 🚀</div>
+    </div>
+    <div class="quick-btns">
+      <button class="qbtn" onclick="quickQ('오늘 시장 방향은?')">시장방향</button>
+      <button class="qbtn" onclick="quickQ('강세 섹터 알려줘')">강세섹터</button>
+      <button class="qbtn" onclick="quickQ('오늘 진입 후보 종목 추천해줘')">후보종목</button>
+      <button class="qbtn" onclick="quickQ('수급 예상해줘')">수급예상</button>
+      <button class="qbtn" onclick="quickQ('지금 매매하면 될까?')">매매가능?</button>
+    </div>
+    <div class="chat-inp">
+      <input id="chatInput" placeholder="질문 입력... (Enter 전송)" onkeydown="if(event.key==='Enter')sendChat()">
+      <button onclick="sendChat()">↑</button>
+    </div>
+  </div>
+
+</div>
+
