@@ -2110,7 +2110,9 @@ function submitOrder(autoExec){
     else if(credType==="margin")mock.marginUsed+=credN;
     if(!mock.positions[activeTk])mock.positions[activeTk]={qty:0,avgPrice:0,creditType:"cash",creditAmt:0};
     const pos=mock.positions[activeTk];
-    pos.avgPrice=(pos.avgPrice*pos.qty+pr*qty)/(pos.qty+qty);
+    // 평단에 매수 수수료 포함 (정확한 손익 계산을 위해)
+    const _newCost = pos.avgPrice*pos.qty + pr*qty + fee;
+    pos.avgPrice = _newCost / (pos.qty+qty);
     pos.qty+=qty;
     if(credType!=="cash"){pos.creditType=credType;pos.creditAmt=(pos.creditAmt||0)+credN;}
     // Register stop/target orders
@@ -3548,17 +3550,17 @@ async function _runScreeningAsync(){
         return;
       }
     }
-    // ★ 진입 등급제 (완화 + 명확한 등급)
-    // - 강한신호 (score>=8): 즉시 매수
-    // - 보통 (score 5~7): 확정시그널 있으면 매수
-    // - 약한 (score<5): 관망
+    // 진입 등급:
+    // - score≥7: 강한 신호 (BUY)
+    // - score≥4 + 확정시그널: BUY
+    // - score≥3: 관찰
     const hasConfirm = best.tags.indexOf('확정시그널') !== -1;
-    if(best.score >= 8 || (best.score >= 5 && hasConfirm)){
+    if(best.score >= 7 || (best.score >= 4 && hasConfirm)){
       var lcQ=best.lc;
-      addDecisionLog('['+best.stk.nm+'] ✅ 진입 ('+best.score+'점)', best.tags.join(' · '), best.score>=8?'강한신호':'확정시그널');
+      addDecisionLog('['+best.stk.nm+'] ✅ 진입 ('+best.score+'점)', best.tags.join(' · '), best.score>=7?'강한신호':'확정시그널');
       try{ await execAutoBuy(lcQ.c, best.stk, best.score); }catch(_e){}
-    } else if(best.score >= 4){
-      addDecisionLog('['+best.stk.nm+'] 👀 관찰 ('+best.score+'점)', '시그널 확정 대기 — '+best.tags.join(' · '), '대기');
+    } else if(best.score >= 3){
+      addDecisionLog('['+best.stk.nm+'] 👀 관찰 ('+best.score+'점)', best.tags.join(' · '), '대기');
     } else {
       addDecisionLog('['+best.stk.nm+'] ⏸ 약함 ('+best.score+'점)', best.tags.join(' · ')||'조건 불충분', '관망');
     }
