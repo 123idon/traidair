@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#ffffff">
-<meta name="build-ts" content="1779379554770">
+<meta name="build-ts" content="1779379943616">
 <title>TraidAIr HTS</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 
@@ -1844,7 +1844,67 @@ canvas{image-rendering:pixelated;}
     <div class="modal-ftr"><button class="mbtn" onclick="closeModal('alert')">확인</button></div>
   </div>
 </div>
-<script>
+<script>// ═══════════════════════════════
+// 멘토 페르소나 — 모든 Claude 호출 system 프롬프트로 사용
+// ═══════════════════════════════
+const MENTOR_SYSTEM_PROMPT = `당신은 주식 단타 전문 트레이딩 멘토이자 실전 파트너다. 20년 이상의 단타 경험을 가진 전문가로서 학습·분석·실전 조언을 모두 제공한다. 수익보다 손실 방어를 항상 우선하고 틀린 판단은 직접적으로 지적한다.
+
+# 행동 원칙
+- 틀린 판단은 직접 틀렸다고 한다. 애매한 표현 금지.
+- 좋은 점보다 리스크와 문제점을 먼저 짚는다.
+- 추측은 "(추정)", 확인 불가는 "확인 불가"로 명시.
+- 결론 먼저, 근거는 그 다음.
+- 수익보다 손실 방어가 우선.
+- 단순 동조 없이 논리로 반박. 사용자 판단이 감정적으로 보이면 뇌동매매 경고를 먼저 발동.
+- 투자 조언임을 인지하고 최종 판단은 본인이 내림을 전제.
+
+# 사용자 현황
+- 단타 경험 중급, 당일매매·스윙 해본 적 있음, 스캘핑은 학습 필요
+- 주된 방식: 이슈/수급 기반 타점 진입 후 목표가 도달 시 익절
+- 기술적 분석 보완 필요
+
+# 리스크 기본값 (사용자가 수정 가능)
+- 1회 매매 최대 비중: 자산의 20% 이하
+- 종목당 최대 손실: 진입가 대비 -3%
+- 일일 최대 손실: 자산의 -2%
+
+# 매매 시간대 특성
+- 스캘핑: 수초~수분, 목표 0.3~1%, 호가창·체결강도 핵심, 수수료 부담
+- 당일매매: 수분~당일청산, 목표 1~5%, 장중 이슈·수급, 마감 전 청산 필수
+- 스윙: 2일~수주, 목표 5~20%, 추세·이슈 지속성, 갭하락 리스크
+
+# 보조지표 기본
+- RSI 70+ 과매수 / 30- 과매도, 단타는 60 돌파 모멘텀
+- MACD 12/26/9, 골든크로스 진입
+- 볼린저 20/2σ, 수축 후 확장 시 돌파
+- MA: 스캘핑 5/10, 당일 20/60, 스윙 60/120
+- 거래량 전일 대비 300%+면 강한 수급
+
+# 뇌동매매 감지
+"빨리 들어가야 할 것 같아", "다들 사고 있는 것 같아", "본전만 오면 팔게", "물타야 할 것 같아", 손실 중 추가매수 요청, 손절 기준 낮추기, 연속 손실 후 즉각 재진입 — 이런 신호 감지되면 분석 전에 경고 먼저.
+
+# 면책
+모든 분석은 참고용. 최종 판단은 본인. 원금 손실 가능. 과거 수익이 미래를 보장 안 함.`;
+
+// 노션 강의 페이지 ID (사용자 제공)
+const NOTION_LECTURE_PAGE_ID_DEFAULT = '35a0717882e381ce8fc3d257a5c24e4b';
+
+// Claude 호출 헬퍼 — 모든 호출에 멘토 시스템 프롬프트 자동 첨부
+async function claudeAsk(opts){
+  const body = {
+    model: opts.model || 'claude-sonnet-4-5',
+    max_tokens: opts.max_tokens || 600,
+    system: MENTOR_SYSTEM_PROMPT,
+    messages: opts.messages || [{role:'user', content: opts.prompt || ''}],
+  };
+  const r = await fetch('/api/claude', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(body),
+  });
+  return await r.json();
+}
+
 // ═══════════════════════════════
 // DATA══════════════
 // DATA
@@ -3036,7 +3096,8 @@ async function refreshLecture(force){
   // 6시간 캐시 (force=true면 무시)
   if(!force && now - lectureUpdatedAt < 6*60*60*1000 && lectureContent) return lectureContent;
   try{
-    const r = await fetch('/api/notion-lecture', {cache:'no-store'});
+    // 기본 강의 페이지 ID 자동 첨부 (env 설정돼 있으면 서버가 그쪽 우선)
+    const r = await fetch('/api/notion-lecture?pageId=' + encodeURIComponent(NOTION_LECTURE_PAGE_ID_DEFAULT||''), {cache:'no-store'});
     const d = await r.json();
     if(d.ok && d.content){
       window.lectureContent = d.content;
@@ -6517,12 +6578,36 @@ ${exitCtx}
 4. 추측은 "(추정)"으로 표시, 확인불가는 "확인불가"
 5. 한국어, 간결하게`;
 }
+// 뇌동매매 키워드 패턴 (지침 기반)
+const BRAIN_DONG_PATTERNS = [
+  /빨리\s*들어가야/, /다들\s*사고\s*있/, /오를?\s*것?\s*같/,
+  /본전만/, /조금만\s*더\s*기다리/, /물타/, /추가\s*매수/,
+  /손절\s*못하/, /손절\s*기준\s*낮추/, /손절\s*안\s*하/,
+  /느낌/, /감/i
+];
+function _detectBrainDongInChat(text){
+  if(!text) return null;
+  for(const p of BRAIN_DONG_PATTERNS){
+    if(p.test(text)) return text.match(p)[0];
+  }
+  return null;
+}
+
 async function sendChat(txt){
   if(chatBusy)return;
   const inp=document.getElementById("aiIn");
   const msg=txt||inp.value.trim();if(!msg)return;
   inp.value="";autoResize(inp);
   addMsg("me",msg);chatHist.push({role:"user",content:msg});
+  // 뇌동매매 키워드 감지 시 경고 메시지 먼저
+  const _bdHit = _detectBrainDongInChat(msg);
+  if(_bdHit){
+    const warn = `🚨 뇌동매매 경고\n━━━━━━━━━━━━━━━━━━━━\n감지된 신호: "${_bdHit}"\n지금 상태: 감정적 판단 가능성\n\n멘토 판단:\n이 문장이 분석 요청이 아니라 본인 결정 후 동의 구하기로 보인다. 그건 매매 사고의 첫 신호다.\n\n지금 해야 할 것:\n1. 즉시 매매 중단\n2. 차트 끄고 5분 휴식\n3. 다시 본다면 "왜 이 가격에 사야 하는가"를 수치로 작성\n━━━━━━━━━━━━━━━━━━━━\n계속 진행하려면 "본인 판단으로 진행합니다"라고 입력하세요.`;
+    addMsg('ai', warn);
+    chatHist.push({role:'assistant', content: warn});
+    chatBusy=false;
+    return;
+  }
   appendTyping();chatBusy=true;document.getElementById("sendBtn").disabled=true;
   try{
     const res=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-5",max_tokens:500,system:buildSys(),messages:chatHist.slice(-10)})});
@@ -8370,7 +8455,7 @@ function collectMarketCtx(){
 (function(){
   const meta = document.querySelector('meta[name="build-ts"]');
   const myBuildTs = meta ? meta.getAttribute('content') : '';
-  if(!myBuildTs || myBuildTs === '1779379554770') return; // 로컬 빌드 안 한 경우
+  if(!myBuildTs || myBuildTs === '1779379943616') return; // 로컬 빌드 안 한 경우
   let reloaded = false;
   async function check(){
     if(reloaded) return;
