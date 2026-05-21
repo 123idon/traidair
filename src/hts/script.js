@@ -1529,23 +1529,11 @@ async function _backtestEndOfDay(){
   // 백테스트는 매일 매매일지 무조건 자동 작성 (학습 누적용)
   if(todayTrades.length > 0 && typeof autoSaveJournalOnTrade === 'function'){
     addDecisionLog(`📓 ${dt} 일지 작성`, sim.speed>=300?'백그라운드 (빠른 배속)':'AI 평가 대기 중', '학습');
-    // sim.date가 다음날로 넘어가도 이날 매매 기준으로 평가하도록 dt를 클로저로 캡쳐
-    const _journalDay = dt;
-    const _origDate = sim.date;
-    const _p = (async function(){
-      try{
-        // autoSaveJournalOnTrade는 sim.date를 기준으로 동작 — 잠깐 그날로 되돌렸다가 복귀
-        sim.date = _journalDay;
-        await autoSaveJournalOnTrade();
-      }catch(e){ console.warn('일지:', e.message); }
-      finally{ sim.date = _origDate; }
-    })();
+    const _p = autoSaveJournalOnTrade(dt).catch(e=>console.warn('일지:', e.message));
     backtest.pendingJournals.push(_p);
     if(sim.speed < 300){
-      // 느린 배속에서는 일지 끝까지 기다림 (학습 노트 다음날 즉시 반영)
       try{ sim.playing=false; _syncPlayBtn(); await _p; }catch(e){}
     }
-    // 빠른 배속에서는 await 안 함 — stopBacktest에서 모두 await
   }
   // 다음 영업일?
   if(backtest.dayIdx >= backtest.totalDays){
@@ -3058,7 +3046,7 @@ function setTrailMA5(){
 }
 function startAuto(){
   autoState.running=true;autoState.level=autoLevel;
-  autoState.cfg={rr:parseFloat((document.getElementById("auto-rr")||{value:"1.5"}).value)||1.5,pos:parseFloat((document.getElementById("auto-pos")||{value:"15"}).value)||15,stop:parseFloat((document.getElementById("auto-stop")||{value:"3"}).value)||3,t1:parseFloat((document.getElementById("auto-t1")||{value:"3"}).value)||3,t2:parseFloat((document.getElementById("auto-t2")||{value:"5"}).value)||5,trail:(document.getElementById("auto-trail")||{value:"none"}).value,brk:(document.getElementById("auto-brk")||{checked:false}).checked,explain:(document.getElementById("auto-explain")||{checked:true}).checked};
+  autoState.cfg={rr:parseFloat((document.getElementById("auto-rr")||{value:"1.5"}).value)||1.5,pos:parseFloat((document.getElementById("auto-pos")||{value:"50"}).value)||50,stop:parseFloat((document.getElementById("auto-stop")||{value:"3"}).value)||3,t1:parseFloat((document.getElementById("auto-t1")||{value:"3"}).value)||3,t2:parseFloat((document.getElementById("auto-t2")||{value:"5"}).value)||5,trail:(document.getElementById("auto-trail")||{value:"none"}).value,brk:(document.getElementById("auto-brk")||{checked:false}).checked,explain:(document.getElementById("auto-explain")||{checked:true}).checked};
   document.getElementById("modeBadge").className="badge auto";
   document.getElementById("modeText").textContent=`AI Lv${autoState.level}`;
   document.getElementById("autoStopBtn").style.display="";
@@ -5308,7 +5296,10 @@ function renderJPage(){
     return `<div class="jday">
       <div class="jd-hdr">
         <span class="jd-dt">${e.date} ${savedTag}</span>
-        <span class="jd-pnl ${(e.pnl||0)>=0?"cu":"cd"}">${(e.pnl||0)>=0?"+":""}${(e.pnl||0).toLocaleString()}원</span>
+        <span style="display:flex;align-items:center;gap:8px;">
+          <span class="jd-pnl ${(e.pnl||0)>=0?"cu":"cd"}">${(e.pnl||0)>=0?"+":""}${(e.pnl||0).toLocaleString()}원</span>
+          <button onclick="delJEntry('${e.date}')" title="삭제" style="background:none;border:none;color:var(--tm);font-size:14px;cursor:pointer;padding:0 4px;line-height:1;">&times;</button>
+        </span>
       </div>
       <div class="jd-sub">${e.total||0}건 ${aiTag}${manTag} · 승률${e.total?Math.round(e.wins/e.total*100):0}%</div>
       ${e.summary?`<b style="font-size:12px;">${e.summary}</b>`:e.trades?`<div style="font-size:10px;color:var(--tm);">매매 ${e.total||0}건 기록됨</div>`:''}
@@ -5549,19 +5540,35 @@ JSON만:
 }
 
 async function genAllJournals(){
-  showAlert("생성 중","AI 일지를 생성합니다. 잠시 후 확인하세요.");
-  const bd={};mock.trades.forEach(t=>{if(!bd[t.date])bd[t.date]=[];bd[t.date].push(t);});
-  for(const [date,tt] of Object.entries(bd)){
-    const pnl=tt.filter(t=>t.side==="sell").reduce((a,t)=>a+t.pnl,0);
-    const wins=tt.filter(t=>t.side==="sell"&&t.pnl>0).length,total=tt.filter(t=>t.side==="sell").length;
-    const str=tt.map(t=>`${t.side==="buy"?"매수":"매도"} ${t.nm} @${t.price.toLocaleString()} ${t.qty}주 ${t.auto?"[AI]":""}`).join(", ");
-    try{
-      const res=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-5",max_tokens:400,messages:[{role:"user",content:`${str}\n손익${pnl>=0?"+":""}${pnl}원 승률${total?Math.round(wins/total*100):0}%\nJSON: {"summary":"...","analysis":"...","mistakes":"...","tomorrow":"...","score":"..."} 한국어`}]})});
-      const data=await res.json();
-      let p;try{const m=(data.content?.[0]?.text||"{}").match(/\{[\s\S]*\}/);p=JSON.parse(m?m[0]:"{}"); }catch(e){p={};}
-      saveJEntry(date,p,pnl,wins,total,str);await new Promise(r=>setTimeout(r,400));
-    }catch(e){}
+  // 매매가 있고 아직 aiGenerated 안 된 날짜만 작성
+  const bd={};
+  (mock.trades||[]).forEach(t=>{ if(!bd[t.date]) bd[t.date]=[]; bd[t.date].push(t); });
+  const dates = Object.keys(bd).sort();
+  if(!dates.length){ showAlert('일지 생성','매매 내역이 없습니다'); return; }
+  const existing = safeParseJSON(localStorage.getItem('htsJournals'), '{}');
+  const todo = dates.filter(d => !(existing[d] && existing[d].aiGenerated));
+  if(!todo.length){ showAlert('일지 생성','모든 거래일의 AI 일지가 이미 작성돼 있습니다.'); return; }
+  // 진행률 토스트
+  let toast = document.getElementById('genJToast');
+  if(!toast){
+    toast = document.createElement('div');
+    toast.id = 'genJToast';
+    toast.style.cssText = 'position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:9999;background:var(--pan);border:1px solid var(--br);border-radius:10px;padding:8px 14px;box-shadow:0 4px 20px rgba(0,0,0,.15);font-size:11px;display:flex;align-items:center;gap:10px;';
+    document.body.appendChild(toast);
   }
+  let done = 0, fail = 0;
+  toast.innerHTML = `🤖 일지 작성 중 0 / ${todo.length}`;
+  for(const date of todo){
+    toast.innerHTML = `🤖 일지 작성 중 ${date} (${done+1} / ${todo.length})`;
+    try{
+      await autoSaveJournalOnTrade(date);
+      done++;
+    }catch(e){ fail++; }
+    renderJPage();
+    await new Promise(r=>setTimeout(r,200));
+  }
+  toast.innerHTML = `✅ 일지 ${done}건 작성 완료 ${fail?'('+fail+'건 실패)':''}`;
+  setTimeout(()=>{ try{toast.remove();}catch(e){} }, 3500);
   renderJPage();
 }
 
@@ -6395,6 +6402,28 @@ function addToWG(g, tk){
 // ═══════════════════════════════
 // 매매일지 AI 매매 구분 표시
 // ═══════════════════════════════
+// 일지 단건 삭제
+function delJEntry(date){
+  if(!confirm(date+' 일지를 삭제할까요?')) return;
+  try{
+    const js = safeParseJSON(localStorage.getItem('htsJournals'), '{}');
+    delete js[date];
+    const v = JSON.stringify(js);
+    localStorage.setItem('htsJournals', v);
+    saveToServer('htsJournals', v);
+    renderJPage();
+  }catch(e){ console.warn('일지삭제:', e.message); }
+}
+// 모든 일지 삭제
+function clearAllJournals(){
+  if(!confirm('⚠ 매매일지를 모두 삭제할까요?\n복구할 수 없습니다.')) return;
+  if(!confirm('정말로 모두 삭제? 한 번 더 확인.')) return;
+  localStorage.setItem('htsJournals', '{}');
+  saveToServer('htsJournals', '{}');
+  renderJPage();
+  showAlert('삭제 완료', '모든 매매일지를 삭제했습니다');
+}
+
 function saveJEntry(date,p,pnl,wins,total,str){
   const js2=safeParseJSON(localStorage.getItem("htsJournals"), "{}");
   // AI 매매 통계 추가
@@ -6426,22 +6455,7 @@ function saveJEntry(date,p,pnl,wins,total,str){
 }
 
 // 거래 발생 시 즉시 기본 일지 저장 (AI 없이도 항상 기록)
-function autoSaveJournalOnTrade(){
-  const date=sim.date;
-  const tt=mock.trades.filter(t=>t.date===date);
-  if(!tt.length) return;
-  const pnl=tt.filter(t=>t.side==="sell").reduce((a,t)=>a+t.pnl,0);
-  const wins=tt.filter(t=>t.side==="sell"&&t.pnl>0).length;
-  const total=tt.filter(t=>t.side==="sell").length;
-  const str=tt.map(t=>`${t.side==="buy"?"매수":"매도"} ${t.nm} ${t.qty}주 @${t.price.toLocaleString()}${t.pnl?` 손익${t.pnl>=0?"+":""}${t.pnl.toLocaleString()}원`:""} [${t.time||''}] ${t.auto?"[AI]":""}`).join("\n");
-  const baseEntry={
-    summary:`${date} 매매 ${tt.length}건 / ${pnl>=0?'+':''}${pnl.toLocaleString()}원`,
-    why_bought:'매매 기록됨 (AI 일지 버튼으로 상세 분석 가능)',
-    why_sold:'-', mistakes:'-', psychology:'-', phase_check:'-', improvement:'-',
-    aiGenerated:false, trades:str,
-  };
-  saveJEntry(date, baseEntry, pnl, wins, total, str);
-}
+// autoSaveJournalOnTrade는 아래 async 버전에서 정의됨 (Claude AI 평가 + 학습 누적 포함)
 
 // ═══════════════════════════════════════════════════
 // 🤖 AI 파트너 — 장중 자동 체크 + 섹터수급 + 진입후보
@@ -7002,8 +7016,8 @@ function getMarketTrades(date){
   return all.filter(isMarketHourTrade);
 }
 
-async function autoSaveJournalOnTrade(){
-  const date=sim.date;
+async function autoSaveJournalOnTrade(forceDate){
+  const date=forceDate||sim.date;
   const tt=(mock.trades||[]).filter(function(t){return t.date===date&&isMarketHourTrade(t);}); // 장시간 기준
   if(!tt.length)return;
   const sells=tt.filter(function(t){return t.side==='sell';});
