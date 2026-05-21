@@ -1467,11 +1467,28 @@ async function stopBacktest(){
   }
   _backtestReport();
 }
-function _backtestLoadDay(dateStr){
+async function _backtestLoadDay(dateStr){
   backtest.currentDate=dateStr;
   sim.date=dateStr;
   const md=document.getElementById('mockDate'); if(md) md.value=dateStr;
   mock.todayPnl=0; mock.todayTrades=0; mock.lossSeries=0;
+  // 대시보드 iframe에 날짜 전파 (백테스트 매일 데이터 갱신)
+  try{
+    const _df=document.getElementById("dashFrame");
+    if(_df&&_df.contentWindow){
+      _df.contentWindow._skipHtsSync=true;
+      _df.contentWindow.curDate=dateStr;
+      const _de=_df.contentWindow.document.getElementById("dashDate");
+      if(_de)_de.value=dateStr;
+      _df.contentWindow.loadDashData&&_df.contentWindow.loadDashData();
+      _df.contentWindow.autoLoadMarketData&&_df.contentWindow.autoLoadMarketData();
+      setTimeout(()=>{try{_df.contentWindow._skipHtsSync=false;}catch(e){}},100);
+    }
+  }catch(_e){}
+  // 매일 강세섹터 새로 가져오기 (장중 변동 반영) — 너무 자주는 부담이라 3일에 한 번
+  if((backtest.dayIdx % 3) === 0 && typeof refreshHotSectors==='function'){
+    try{ await refreshHotSectors(true); }catch(_e){}
+  }
   // 종목 자동 전환: 강세 1위 종목 우선, 없으면 WGS[0] 첫 종목
   try{
     const si = window._sectorInfo || {};
@@ -1480,11 +1497,11 @@ function _backtestLoadDay(dateStr){
     const candidate = rank1 || (WGS[0]||[])[0] || (WGS[1]||[])[0];
     if(candidate && candidate !== activeTk && typeof setActiveTk==='function'){
       setActiveTk(candidate);
+      addDecisionLog('📅 '+dateStr+' 시작', '강세 1위 '+(STOCKS.find(s=>s.tk===candidate)||{nm:candidate}).nm+'로 차트 전환', '백테스트');
     }
   }catch(_e){}
   // 캔들 로드 — KIS 있으면 실데이터, 없으면 시뮬
   genCandles(activeTk, dateStr);
-  // KIS 비동기 대기: 배속이 빠를수록 더 짧게 (실제로는 시뮬이면 즉시)
   const _wait = sim.speed>=300 ? 150 : sim.speed>=60 ? 300 : 600;
   setTimeout(()=>{
     chartViewCount=Math.min(120, sim.candles.length||60);
@@ -3344,6 +3361,31 @@ async function _runScreeningAsync(){
 
   addDecisionLog('[중앙AI] 스크리닝',topList,'종목선정');
 
+  // ── 장중 갈아타기 로직 ──
+  // 현재 보유 종목이 있고, 그 종목보다 훨씬 좋은 종목이 발견되면 청산 후 갈아타기
+  try{
+    const heldPos = Object.entries(mock.positions||{}).find(([tk,p])=>p&&p.qty>0);
+    if(heldPos && best.tk !== heldPos[0]){
+      const [heldTk, pos] = heldPos;
+      const heldScored = scored.find(s=>s.tk===heldTk);
+      const heldScore = heldScored ? heldScored.score : 0;
+      // 차이 5점 이상 + 보유 종목 수익이거나 미세 손실 (-1% 이내)
+      const heldStk = STOCKS.find(s=>s.tk===heldTk);
+      const curPr = heldStk ? heldStk.pr : (pos.avg||0);
+      const heldPnlPct = pos.avg ? ((curPr-pos.avg)/pos.avg*100) : 0;
+      if(best.score - heldScore >= 5 && heldPnlPct > -1.5){
+        addDecisionLog(`🔄 갈아타기 신호`, `${heldStk?.nm||heldTk}(${heldScore}점, ${heldPnlPct.toFixed(1)}%) → ${best.stk.nm}(${best.score}점)`, '백테스트');
+        // 보유 전량 매도
+        const sv=activeTk,svSide=oSide,svType=oType,svCred=credType;
+        activeTk=heldTk;oSide="sell";oType="market";credType="cash";
+        document.getElementById("ofQty").value=pos.qty;
+        submitOrder(true);
+        activeTk=sv;oSide=svSide;oType=svType;credType=svCred;
+        await new Promise(r=>setTimeout(r,200));
+      }
+    }
+  }catch(_swap){}
+
   // 최적 종목으로 전환
   if(best.tk!==activeTk){
     setActiveTk(best.tk);
@@ -3365,14 +3407,12 @@ async function _runScreeningAsync(){
   // ── 빠른 배속(>=300): Claude 우회 + 다층 필터 기반 진입 ──
   if(autoState.level>=3 && (sim&&sim.speed>=300)){
     // 필수 게이트는 이미 위에서 통과 (gateFails 없는 종목만 scored에 들어옴)
-    // 같은 종목 매매 후 N봉 쿨다운 — 단순 시간이 아닌 봉 단위
-    const _lastSame = (mock.trades||[]).filter(t=>t.tk===best.tk && t.date===sim.date).pop();
+    // 같은 봉 사이클에서 같은 종목 재진입만 차단 (갈아타기는 허용)
+    const _lastSame = (mock.trades||[]).filter(t=>t.tk===best.tk && t.date===sim.date && t.side==='buy').pop();
     if(_lastSame && _lastSame.ts){
-      // 매봉 약 1분(=시뮬 시간)이라 가정. 같은 날 같은 종목 매매 후 10봉(약10분) 쿨다운
-      // (sim 시간 진행이 빠르니 ts diff 작아도 봉 차이는 큼)
       const elapsedMs = Date.now() - _lastSame.ts;
-      if(elapsedMs < 1000){ // 1초 = 봉 진행 직후 → 무조건 스킵
-        addDecisionLog('['+best.stk.nm+'] 직전 매매','같은 봉 사이클 진입 금지','신중');
+      if(elapsedMs < 1000){
+        addDecisionLog('['+best.stk.nm+'] 직전 매매','같은 봉 사이클 재진입 차단','신중');
         return;
       }
     }
@@ -3384,7 +3424,7 @@ async function _runScreeningAsync(){
     if(best.score >= 10 || (best.score >= 7 && hasConfirm)){
       var lcQ=best.lc;
       addDecisionLog('['+best.stk.nm+'] ✅ 진입 ('+best.score+'점)', best.tags.join(' · '), '확신매수');
-      try{ await execAutoBuy(lcQ.c, best.stk); }catch(_e){}
+      try{ await execAutoBuy(lcQ.c, best.stk, best.score); }catch(_e){}
     } else if(best.score >= 5){
       addDecisionLog('['+best.stk.nm+'] 👀 관찰 ('+best.score+'점)', '시그널 미확정 — '+best.tags.join(' · '), '대기');
     } else {
@@ -3430,7 +3470,7 @@ async function _runScreeningAsync(){
         addDecisionLog('['+best.stk.nm+'] ✅ AI매수 (신뢰도'+ai.confidence+'%)',ai.reason+(ai.factors?(' | '+ai.factors):''),'Phase8통과');
         addMsg('ai','🤖 AI자동매수\n\n종목: '+best.stk.nm+' '+lc2.c.toLocaleString()+'원\n신뢰도: '+ai.confidence+'%\n\n✅ '+ai.reason+'\n'+_factorsTxt+'⚠ '+ai.risk+'\n\n손절: '+stopPr.toLocaleString()+' | 목표: '+t1Pr.toLocaleString()+' | R/R 1:'+rr);
         updAdvBoxes('✅ 매수결정 — '+best.stk.nm,'신뢰도 '+ai.confidence+'%\n'+ai.reason+(ai.factors?('\n근거: '+ai.factors):''));
-        await execAutoBuy(lc2.c,best.stk);
+        await execAutoBuy(lc2.c, best.stk, best.score);
       }else{
         var _factorsTxt2 = ai.factors ? (' | '+ai.factors) : '';
         addDecisionLog('['+best.stk.nm+'] ⏸ AI관망',(ai.reason||'조건미충족')+_factorsTxt2,'2단계차단');
@@ -3452,6 +3492,13 @@ async function _runScreeningAsync(){
 
 function runAutoStep(cs){
   if(!autoState.running)return;
+  // 백테스트 중 봉 단위 강세섹터 갱신 (시뮬 시간 기준 60봉마다 = 약 1시간)
+  if(window.backtest&&backtest.running && (sim.idx % 60 === 0) && sim.idx > 0){
+    if(typeof refreshHotSectors==='function' && !window._sectorRefreshing){
+      window._sectorRefreshing = true;
+      refreshHotSectors(false).finally(()=>{ window._sectorRefreshing = false; });
+    }
+  }
   // Level 4: 15:20 auto-close
   if(autoState.level>=4){
     const cur=cs[cs.length-1];
@@ -3494,14 +3541,30 @@ function runAutoStep(cs){
     }catch(_e){}
   }
 }
-async function execAutoBuy(pr,stk){
+async function execAutoBuy(pr, stk, score){
   if(!autoState.running||autoState.level<3)return;
   if(mock.lossSeries>=3&&autoState.cfg.brk){addMsg("ai","⏸ 연속 손절 3회 — 자동매매 일시정지\n[Phase 11: 뇌동매매 방지]");stopAuto();return;}
-  // 잔고의 비중(autoState.cfg.pos %)으로 매수 — 일반인 거래처럼
-  const posPct = Math.max(5, Math.min(80, autoState.cfg.pos||30)); // 5~80% 범위
+  // 확신도(score)에 따라 비중 차등 — 타점 명확하면 화끈하게
+  // score>=12 강한신호 50% / >=10 강함 40% / >=8 보통 30% / 그 외 기본
+  let posPct;
+  if(typeof score==='number'){
+    if(score>=12) posPct=50;
+    else if(score>=10) posPct=40;
+    else if(score>=8) posPct=30;
+    else posPct=20;
+  }else{
+    posPct = Math.max(5, Math.min(80, autoState.cfg.pos||30));
+  }
+  // 사용자 cfg 상한 존중 (cfg.pos를 사용자가 60%로 올려놓았다면 그 이상은 안 감)
+  posPct = Math.min(posPct, Math.max(20, autoState.cfg.pos||50));
   const budget = Math.floor(mock.cash * (posPct/100));
-  const qty = Math.floor(budget / pr);
-  if(qty<=0){ addDecisionLog('['+stk.nm+'] 잔고 부족', '예산 '+budget.toLocaleString()+'원 < 1주('+pr.toLocaleString()+')', '관망'); return; }
+  let qty = Math.floor(budget / pr);
+  // 예산이 1주에 못 미치면 살 수 있는 만큼 (잔고 전체 한도 내에서)
+  if(qty<=0 && mock.cash >= pr){
+    qty = Math.floor(mock.cash / pr); // 잔고로 최대 살 수 있는 주
+    if(qty>0) addDecisionLog('['+stk.nm+'] 비중 보정', '예산 부족 — 잔고 한도로 '+qty+'주 매수', '백테스트');
+  }
+  if(qty<=0){ addDecisionLog('['+stk.nm+'] 잔고 부족', '예산 '+budget.toLocaleString()+'원, 잔고 '+mock.cash.toLocaleString()+'원 < 1주('+pr.toLocaleString()+')', '관망'); return; }
   document.getElementById("ofPr").value=pr;document.getElementById("ofQty").value=qty;
   document.getElementById("ofStop").value=Math.round(pr*(1-autoState.cfg.stop/100));
   document.getElementById("ofT1").value=Math.round(pr*(1+autoState.cfg.t1/100));
@@ -3509,7 +3572,8 @@ async function execAutoBuy(pr,stk){
   oSide="buy";oType="market";credType="cash";trailMode=autoState.cfg.trail;
   const ok=submitOrder(true);
   if(ok){
-    addDecisionLog(`[${stk.nm}] 자동 매수 실행`,`${pr.toLocaleString()}원 × ${qty}주 | 손절 ${Math.round(pr*(1-autoState.cfg.stop/100)).toLocaleString()} | 목표 ${Math.round(pr*(1+autoState.cfg.t1/100)).toLocaleString()}`,"Phase 9-4: 진입 즉시 손절 예약");
+    const _inv = (qty*pr).toLocaleString();
+    addDecisionLog(`[${stk.nm}] 자동 매수 (${posPct}% 비중)`,`${pr.toLocaleString()}원 × ${qty}주 = ${_inv}원 | 손절 ${Math.round(pr*(1-autoState.cfg.stop/100)).toLocaleString()} | 목표 ${Math.round(pr*(1+autoState.cfg.t1/100)).toLocaleString()}`,"Phase 9-4");
     if(autoState.cfg.explain)setTimeout(()=>explainAutoDecision(stk,pr,qty),600);
   }
 }
