@@ -47,7 +47,8 @@ button{cursor:pointer;font-family:var(--sans);}
 .si-nm{font-size:12px;font-weight:700;white-space:nowrap;}
 .si-pr{font-family:var(--mono);font-size:15px;font-weight:600;}
 .si-ch{font-family:var(--mono);font-size:11px;}
-.bar-r{display:flex;align-items:center;gap:4px;margin-left:auto;flex-shrink:0;overflow:hidden;}
+.bar-r{display:flex;align-items:center;gap:4px;margin-left:auto;flex-shrink:0;overflow-x:auto;overflow-y:hidden;flex-wrap:nowrap;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+.bar-r::-webkit-scrollbar{display:none;}
 .badge{display:flex;align-items:center;gap:4px;padding:2px 7px;border-radius:4px;font-family:var(--mono);font-size:10px;white-space:nowrap;}
 .badge.mock{border:none;background:rgba(255,153,0,.12);color:#cc7700;}
 .badge.live{border:none;background:rgba(5,192,114,.12);color:#048a52;}
@@ -123,7 +124,7 @@ button{cursor:pointer;font-family:var(--sans);}
 .subc.hide{display:none;}
 .subc canvas{position:absolute;inset:0;}
 .slbl{position:absolute;top:2px;left:6px;font-family:var(--mono);font-size:9px;color:var(--tm);z-index:2;pointer-events:none;}
-.mock-bar{grid-column:2;grid-row:3;background:var(--pan);border-top:1px solid var(--br);border-right:1px solid var(--br);padding:6px 10px;display:flex;align-items:center;gap:7px;flex-wrap:nowrap;overflow:hidden;flex-shrink:0;}
+.mock-bar{grid-column:2;grid-row:3;background:var(--pan);border-top:1px solid var(--br);border-right:1px solid var(--br);padding:6px 10px;display:flex;align-items:center;gap:7px;flex-wrap:wrap;row-gap:3px;overflow-x:auto;flex-shrink:0;}
 .dp{display:flex;align-items:center;gap:4px;flex-shrink:0;}
 .dp label{font-size:9px;color:var(--tm);font-family:var(--mono);}
 .dp input{background:var(--bg);border:1.5px solid var(--br);border-radius:8px;color:var(--tp);font-family:var(--mono);font-size:10px;padding:4px 8px;outline:none;width:108px;transition:border-color .12s;}
@@ -417,6 +418,18 @@ input,select,textarea{-webkit-appearance:none;appearance:none;}
 /* ── 태블릿 전용 퀵 접근 버튼 ── */
 @media(min-width:768px) and (max-width:1023px){
   .tab-quick-lp,.tab-quick-rp{display:flex !important;}
+  /* 폴드 펼침은 보통 884~960px — 상단바 컴팩트 + 시뮬바 wrap */
+  .ibtn{font-size:10px;padding:3px 7px;}
+  .clk{display:none;}
+  #idxBar{gap:4px;font-size:9px;padding:0 6px;}
+  .mock-bar{flex-wrap:wrap;row-gap:3px;}
+  .spd-btn{padding:3px 5px;font-size:9px;}
+  .spd-wrap{flex-wrap:wrap;}
+  /* nth-child 숨김 규칙 제거 (768~1023px에서는 모든 배속 버튼 보이도록) */
+  .spd-btn:nth-child(n+5){display:inline-flex !important;}
+  .chart-hdr{padding:5px 10px;gap:8px;}
+  .chart-hdr-nm{font-size:15px;}
+  .chart-hdr-pr{font-size:14px;}
 }
 /* ── 모바일 / 폴드 접힘 (≤767px) ── */
 @media(max-width:767px){
@@ -442,7 +455,7 @@ input,select,textarea{-webkit-appearance:none;appearance:none;}
   .mock-bar{flex-wrap:wrap;height:auto;gap:4px;padding:4px 8px;}
   /* 불필요 요소 숨김 */
   .si,.clk{display:none;}
-  .spd-btn:nth-child(n+5){display:none;}
+  /* 모바일에서도 배속 모두 표시 (wrap으로 줄바꿈) */
   /* 하단 여백 */
   .page{padding-bottom:calc(var(--mob-nav) + var(--sab));}
   /* 터치 최적화 */
