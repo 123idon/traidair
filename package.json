@@ -1,10 +1,13 @@
 {
   "name": "traidair",
   "version": "1.0.3",
-  "description": "TraidAIr - AI \ub2e8\ud0c0 \ud2b8\ub808\uc774\ub529 \ub300\uc2dc\ubcf4\ub4dc & HTS",
+  "description": "TraidAIr - AI 단타 트레이딩 대시보드 & HTS",
   "main": "server.js",
   "scripts": {
-    "start": "node build.js && node server.js"
+    "build": "node build.js",
+    "watch": "node scripts/watch.js",
+    "start": "node build.js && node server.js",
+    "dev": "node build.js && node server.js"
   },
   "engines": {
     "node": ">=18"

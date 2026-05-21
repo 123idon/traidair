@@ -1,0 +1,1261 @@
+
+
+<!-- ── TOPBAR ── -->
+<header class="bar">
+  <a class="logo" href="#">Trad<em>AI</em>r</a>
+  <div class="tabs">
+    <button class="tab" id="tab-dash" onclick="goPage('dash',this)">📊 대시보드</button>
+    <button class="tab on" id="tab-hts" onclick="goPage('hts',this)">📈 HTS</button>
+    <button class="tab" id="tab-stats" onclick="goPage('stats',this)">📉 통계</button>
+    <button class="tab" id="tab-journal" onclick="goPage('journal',this)">📓 일지</button>
+  </div>
+  <div class="srch-wrap">
+    <div class="srch-box">
+      <span style="color:var(--tm);font-size:11px;">⌕</span>
+      <input id="srchIn" placeholder="종목 검색" oninput="onSearch(this.value)" onblur="setTimeout(hideSrch,180)">
+    </div>
+    <div class="srch-drop" id="srchDrop"></div>
+  </div>
+  <div class="si">
+    <span class="si-nm" id="siNm">삼성전자</span>
+    <span class="si-pr cu" id="siPr">71,500</span>
+    <span class="si-ch cu" id="siCh">+1.24%</span>
+  </div>
+  <div class="bar-r">
+    <div class="badge mock" id="modeBadge"><div class="bdot"></div><span id="modeText">모의투자</span></div>
+    <div class="clk" id="clk">--:--:--</div>
+    <!-- 실시간 지수 표시 -->
+    <div id="idxBar" style="display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:10px;padding:0 8px;border-left:1px solid var(--br);border-right:1px solid var(--br);">
+      <span style="color:var(--tm);">KOSPI</span>
+      <span id="idx-kospi" style="font-weight:700;">--</span>
+      <span id="idx-kospi-chg" style="font-size:9px;">--</span>
+      <span style="color:var(--tm);margin-left:4px;">KOSDQ</span>
+      <span id="idx-kosdq" style="font-weight:700;">--</span>
+      <span id="idx-kosdq-chg" style="font-size:9px;">--</span>
+      <span id="idx-pred" style="font-size:9px;padding:1px 6px;border-radius:4px;margin-left:2px;font-weight:700;display:none;"></span>
+    </div>
+    <!-- 빠른 전환 버튼 -->
+    <button class="ibtn" id="quickSwitchBtn" onclick="quickSwitch()" title="대시보드 ↔ HTS 전환 (단축키: D)">
+      <span id="quickSwitchIcon">📊</span> <span id="quickSwitchTxt">대시보드</span>
+    </button>
+    <button class="ibtn" onclick="openModal('shortcuts')" title="단축키 도움말">⌨</button>
+    <button class="ibtn tab-quick-lp" onclick="openMobPanel('lp')" style="display:none;" title="관심종목">☰</button>
+    <button class="ibtn tab-quick-rp" onclick="openMobPanel('rp')" style="display:none;" title="호가창">📊</button>
+    <button class="ibtn" onclick="openModal('settings')">⚙</button>
+    <button class="ibtn red" onclick="endMock()">■ 종료</button>
+    <button class="ibtn pri" onclick="openModal('journal')">📓</button>
+    <button class="ibtn pur" onclick="openModal('autotrade')" id="autoBtn">🤖 자동매매</button>
+    <button class="ibtn" onclick="refreshAllData()" title="전체 새로고침" style="background:var(--g);color:#fff;border-color:var(--g);">↺</button>
+  </div>
+</header>
+
+<!-- ── 모바일 오버레이 ── -->
+<div class="mob-overlay" id="mobOverlay" onclick="closeMobPanels()"></div>
+
+<!-- ── 모바일 하단 탭바 ── -->
+<nav class="mob-tabbar" id="mobTabbar">
+  <button class="mob-tab active" id="mbt-chart" onclick="mobTab('chart',this)">
+    <span class="mob-icon">📈</span>
+    <span class="mob-label">차트</span>
+  </button>
+  <button class="mob-tab" id="mbt-order" onclick="mobTab('order',this)">
+    <span class="mob-icon">💰</span>
+    <span class="mob-label">주문</span>
+  </button>
+  <button class="mob-tab" id="mbt-watchlist" onclick="mobTab('watchlist',this)">
+    <span class="mob-icon">👀</span>
+    <span class="mob-label">관심</span>
+  </button>
+  <button class="mob-tab" id="mbt-hoga" onclick="mobTab('hoga',this)">
+    <span class="mob-icon">📊</span>
+    <span class="mob-label">호가</span>
+  </button>
+  <button class="mob-tab" id="mbt-ai" onclick="mobTab('ai',this)">
+    <span class="mob-icon">🤖</span>
+    <span class="mob-label">AI</span>
+  </button>
+  <button class="mob-tab" id="mbt-auto" onclick="openModal('autotrade')"
+    style="background:linear-gradient(135deg,#7c3aed,#a855f7);border-radius:10px;margin:3px 2px;flex:1.2;">
+    <span class="mob-icon" style="font-size:20px;">⚡</span>
+    <span class="mob-label" style="color:#fff;font-weight:700;">자동매매</span>
+  </button>
+</nav>
+
+<!-- ── DASHBOARD PAGE ── -->
+<div class="page" id="page-dash" style="overflow:hidden;">
+  <iframe 
+    id="dashFrame"
+    src="trading-dashboard.html" 
+    style="flex:1;border:none;width:100%;height:100%;display:block;"
+    loading="lazy"
+    title="TraidAIr 대시보드">
+  </iframe>
+</div>
+
+<!-- ── HTS PAGE ── -->
+<div class="page on" id="page-hts" style="position:relative;">
+  <!-- LIVE OVERLAY -->
+  <div class="live-ov" id="liveOv">
+    <div class="live-box">
+      <div class="live-hdr"><span style="font-size:14px;font-weight:700;">🔴 실거래 HTS 연결</span><button class="modal-x" onclick="closeLive()">×</button></div>
+      <div class="live-notice">⚠ 실거래 모드입니다. 실제 자금이 사용됩니다.<br>증권사 API 연동은 다음 버전에서 지원됩니다.</div>
+      <div class="live-body">
+        <div class="live-broker" id="brokerBtns">
+          <button class="broker-btn on" onclick="selBroker(this)">키움증권</button>
+          <button class="broker-btn" onclick="selBroker(this)">미래에셋</button>
+          <button class="broker-btn" onclick="selBroker(this)">삼성증권</button>
+          <button class="broker-btn" onclick="selBroker(this)">NH투자</button>
+          <button class="broker-btn" onclick="selBroker(this)">한국투자</button>
+        </div>
+        <div class="live-f"><label>아이디</label><input class="live-i" id="liveId" disabled placeholder="준비 중"></div>
+        <div class="live-f"><label>비밀번호</label><input class="live-i" id="livePw" type="password" disabled placeholder="준비 중"></div>
+        <button class="live-sub" disabled>로그인 (준비 중)</button>
+        <div class="live-note">* 실거래 연동은 다음 버전 지원 예정</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="hts">
+
+    <!-- ① LEFT: 관심종목 (col1 row1/3) -->
+    <div class="lp">
+      <!-- 실시간 강세 섹터 패널 -->
+      <div id="hotSectorBox" style="border-bottom:1px solid var(--br);background:linear-gradient(180deg,rgba(220,38,38,0.04),rgba(255,255,255,0));padding:6px 8px;flex-shrink:0;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+          <span style="font-size:9px;font-weight:800;color:var(--r);">🔥 실시간 강세 섹터</span>
+          <button id="hotSecRefreshBtn" onclick="refreshHotSectors(true)" title="새로고침" style="padding:1px 5px;border-radius:3px;border:none;background:var(--b);color:#fff;font-size:8px;cursor:pointer;">↻</button>
+        </div>
+        <div id="hotSectorList" style="display:flex;flex-direction:column;gap:3px;font-size:9px;">
+          <div style="color:var(--tm);font-size:9px;padding:2px 0;">분석 중...</div>
+        </div>
+        <div id="hotSecTime" style="font-size:8px;color:var(--tm);font-family:var(--mono);margin-top:3px;text-align:right;">-</div>
+      </div>
+      <div class="lp-tabs">
+        <div class="lpt on" onclick="lTab(this,'lpb-w')">관심</div>
+        <div class="lpt" onclick="lTab(this,'lpb-ck')">체크</div>
+        <div class="lpt" onclick="lTab(this,'lpb-f')">조건</div>
+        <div class="lpt" onclick="lTab(this,'lpb-n')">공시</div>
+        <div class="lpt" onclick="lTab(this,'lpb-ai')">AI</div>
+      </div>
+      <div class="lpb on" id="lpb-w">
+        <!-- 그룹 선택 탭 (Phase 3-9: 5그룹) -->
+        <div style="display:flex;border-bottom:1px solid var(--br);flex-shrink:0;background:var(--bg);">
+          <div class="wg-tab on" onclick="selWG(this,'wg0')" title="오늘 진입 후보 (최대 3개)">후보 <span id="candCount" style="font-family:var(--mono);font-size:8px;"></span></div>
+          <div class="wg-tab" onclick="selWG(this,'wg1')" title="계속 모니터링">모니터</div>
+          <div class="wg-tab" onclick="selWG(this,'wg2')" title="매매금지 목록" style="color:var(--r);">금지</div>
+          <div class="wg-tab" onclick="selWG(this,'wg3')" title="이슈/테마 관련">테마</div>
+          <div class="wg-tab" onclick="selWG(this,'wg4')" title="매매 후 복기">복기</div>
+        </div>
+        <!-- 그룹 헤더 -->
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-bottom:1px solid var(--br);flex-shrink:0;">
+          <span style="font-size:9px;font-weight:700;color:var(--ts);" id="wgTitle">🎯 오늘 진입 후보</span>
+          <div style="display:flex;gap:4px;">
+            <span style="font-size:8px;color:var(--tm);font-family:var(--mono);" id="wgCount">0/3</span>
+            <button onclick="addCurrentToWG()" style="padding:1px 5px;border-radius:3px;border:none;background:var(--b);color:#fff;font-size:8px;cursor:pointer;">+추가</button>
+          </div>
+        </div>
+        <!-- 오늘 후보 (AI추천 포함) -->
+        <div id="wg0" class="wg-body">
+          <div style="padding:4px 8px;border-bottom:1px solid var(--br);">
+            <div style="font-size:8px;color:var(--tm);margin-bottom:3px;">AI 추천 후보</div>
+            <div id="candList"></div>
+<!-- ── AI 현황 패널 ── -->
+<div style="border-top:2px solid var(--br);margin-top:4px;">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px 4px;">
+    <span style="font-size:9px;font-weight:700;color:var(--b);">🤖 AI 현황</span>
+    <span id="aiStatusDot" style="width:7px;height:7px;border-radius:50%;background:var(--tm);display:inline-block;transition:background .3s;"></span>
+  </div>
+  <div id="aiStatusBox" style="margin:0 8px 4px;padding:6px 8px;background:var(--card);border-radius:7px;border:1px solid var(--br);">
+    <div id="aiStatusLabel" style="font-size:9px;font-weight:700;color:var(--tm);margin-bottom:2px;">대기 중</div>
+    <div id="aiStatusMsg" style="font-size:9px;color:var(--ts);line-height:1.5;">자동매매 시작하면 AI 판단이 여기 표시됩니다</div>
+  </div>
+  <div style="padding:0 8px 6px;">
+    <div style="font-size:8px;color:var(--tm);margin-bottom:3px;">최근 판단 로그</div>
+    <div id="aiDecisionLog" style="max-height:130px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;">
+      <div style="font-size:8px;color:var(--tm);padding:2px 4px;">아직 판단 없음</div>
+    </div>
+  </div>
+</div>
+
+          </div>
+          <div id="wlList0"></div>
+        </div>
+        <div id="wg1" class="wg-body" style="display:none;"><div id="wlList1"></div></div>
+        <div id="wg2" class="wg-body" style="display:none;"><div id="banList" style="font-size:9px;color:var(--tm);padding:3px 0;">없음</div></div>
+        <div id="wg3" class="wg-body" style="display:none;"><div id="wlList3"></div></div>
+        <div id="wg4" class="wg-body" style="display:none;"><div id="wlList4"></div></div>
+      </div>
+      <!-- 장중 체크 탭 (Phase 8 실시간) -->
+      <div class="lpb" id="lpb-ck">
+        <div class="sec" style="padding:6px 8px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+            <span class="sec-t" style="margin-bottom:0;">📡 장중 자동 체크</span>
+            <button onclick="runIntraCheck()" style="padding:1px 7px;border-radius:4px;border:none;background:var(--b);color:#fff;font-size:8px;cursor:pointer;">↺ 갱신</button>
+          </div>
+          <div id="intraLiveList" style="font-size:9px;color:var(--tm);">자동 체크 중...</div>
+        </div>
+        <div class="sec" style="padding:6px 8px;">
+          <span class="sec-t" style="color:var(--r);">⚡ 뇌동매매 감지</span>
+          <div id="brainDongPanel" style="font-size:9px;line-height:1.9;">
+            <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid var(--br);">
+              <span style="color:var(--ts);">연속 손절</span><span id="bd_loss" style="font-family:var(--mono);font-weight:700;">0회</span></div>
+            <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid var(--br);">
+              <span style="color:var(--ts);">30분내 매매</span><span id="bd_freq" style="font-family:var(--mono);font-weight:700;">0회</span></div>
+            <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid var(--br);">
+              <span style="color:var(--ts);">단일비중 최고</span><span id="bd_size" style="font-family:var(--mono);font-weight:700;">0%</span></div>
+            <div style="display:flex;justify-content:space-between;padding:2px 0;">
+              <span style="color:var(--ts);">손절후재진입</span><span id="bd_re" style="font-family:var(--mono);font-weight:700;">0회</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="lpb" id="lpb-f">
+        <div class="sec"><div class="sec-t">조건 검색</div><div id="filterList"></div></div>
+        <div class="sec"><div class="sec-t">결과</div><div id="filterResult" style="font-size:9px;color:var(--tm);padding:3px 0;">조건을 선택하세요</div></div>
+      </div>
+      <div class="lpb" id="lpb-n">
+        <!-- 뉴스 → 섹터 AI 분석 -->
+        <div class="sec" style="padding:5px 8px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+            <span class="sec-t" style="margin-bottom:0;">🔥 뉴스→섹터 영향</span>
+            <button onclick="runNewsImpact()" style="padding:1px 6px;border-radius:4px;border:none;background:var(--p);color:#fff;font-size:8px;cursor:pointer;">AI분석</button>
+          </div>
+          <textarea id="newsInputTa" style="width:100%;height:42px;background:var(--bg);border:1px solid var(--br);border-radius:5px;color:var(--tp);font-family:var(--sans);font-size:9px;padding:3px 5px;resize:none;outline:none;" placeholder="뉴스 텍스트 붙여넣기 또는 공시 클릭시 자동입력..."></textarea>
+          <div id="newsImpactResult" style="font-size:9px;color:var(--tm);margin-top:3px;line-height:1.6;"></div>
+        </div>
+        <!-- 공시 -->
+        <div class="sec" style="padding:5px 8px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+            <span class="sec-t" style="margin-bottom:0;">📢 공시 (DART)</span>
+            <button onclick="fetchDartNews()" style="padding:1px 6px;border-radius:4px;border:none;background:var(--b);color:#fff;font-size:8px;cursor:pointer;">↺</button>
+          </div>
+          <div id="dartList" style="font-size:9px;color:var(--tm);">로딩 중...</div>
+        </div>
+        <div class="sec" style="padding:5px 8px;">
+          <span class="sec-t">📰 시장 뉴스</span>
+          <div id="newsList"></div>
+        </div>
+      </div>
+
+      <!-- AI 섹터/종목 추천 패널 (Phase 6, 7 기반) -->
+      <div class="lpb" id="lpb-ai">
+        <div class="sec" style="padding:6px 8px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+            <span class="sec-t" style="margin-bottom:0;color:var(--p);">🔥 섹터 수급 순위</span>
+            <button onclick="loadSectorRanking()" id="sectorRankBtn" style="padding:1px 7px;border-radius:4px;border:none;background:var(--p);color:#fff;font-size:8px;font-weight:600;cursor:pointer;">순위 보기</button>
+          </div>
+          <div id="sectorRankList" style="font-size:9px;color:var(--tm);">버튼을 눌러 섹터 수급을 확인하세요</div>
+        </div>
+        <div class="sec" style="padding:6px 8px;">
+          <div class="sec-t" style="color:var(--a);">📋 재료 강도 분석</div>
+          <textarea id="materialInput" style="width:100%;height:40px;background:var(--bg);border:1px solid var(--br);border-radius:6px;color:var(--tp);font-size:9px;padding:4px;resize:none;outline:none;" placeholder="뉴스/공시 텍스트 붙여넣기..."></textarea>
+          <button onclick="runMaterialAnalysis()" style="width:100%;margin-top:3px;padding:4px;border-radius:5px;border:none;background:var(--a);color:#000;font-size:9px;font-weight:700;cursor:pointer;">S/A/B/C 재료강도 분석</button>
+          <div id="materialResult" style="font-size:9px;margin-top:4px;line-height:1.6;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ② CENTER: 차트 (col2 row1) -->
+    <div class="cp">
+      <!-- 차트 종목 헤더 (어느 차트인지 명확히) -->
+      <div class="chart-hdr" id="chartHdr">
+        <div class="chart-hdr-l">
+          <span class="chart-hdr-nm" id="chartHdrNm">삼성전자</span>
+          <span class="chart-hdr-tk" id="chartHdrTk">005930</span>
+        </div>
+        <div class="chart-hdr-r">
+          <span class="chart-hdr-pr" id="chartHdrPr">0</span>
+          <span class="chart-hdr-ch" id="chartHdrCh">+0.00%</span>
+        </div>
+      </div>
+      <div class="cp-head">
+        <div style="display:flex;gap:2px;">
+          <button class="tf-btn on" onclick="setTF(this,'1')">1분</button>
+          <button class="tf-btn" onclick="setTF(this,'3')">3분</button>
+          <button class="tf-btn" onclick="setTF(this,'5')">5분</button>
+          <button class="tf-btn" onclick="setTF(this,'15')">15분</button>
+          <button class="tf-btn" onclick="setTF(this,'60')">1시간</button>
+          <button class="tf-btn" onclick="setTF(this,'D')">일봉</button>
+          <button class="tf-btn" onclick="setTF(this,'D1Y')">1년</button>
+          <button class="tf-btn" onclick="setTF(this,'D2Y')">2년</button>
+          <button class="tf-btn" onclick="setTF(this,'D3Y')">3년</button>
+        </div>
+        <div class="vsep"></div>
+        <button class="ind-btn on" id="ind-ma" onclick="togInd('ma',this)">MA</button>
+        <button class="ind-btn on" id="ind-vol" onclick="togInd('vol',this)">거래량</button>
+        <button class="ind-btn" id="ind-rsi" onclick="togInd('rsi',this)">RSI</button>
+        <button class="ind-btn" id="ind-macd" onclick="togInd('macd',this)">MACD</button>
+        <button class="ind-btn" id="ind-bb" onclick="togInd('bb',this)">볼린저</button>
+        <button class="ind-btn" id="ind-vwap" onclick="togInd('vwap',this)">VWAP</button>
+        <div class="vsep"></div>
+        <span class="cinfo" id="cinfo">O- H- L- C- V-</span>
+        <div class="vsep"></div>
+        <span style="font-family:var(--mono);font-size:8px;color:var(--tm);" id="phaseHint">5분봉 권장</span>
+        <div class="vsep"></div>
+        <!-- 차트 줌/팬 컨트롤 -->
+        <button class="ind-btn" onclick="chartZoom(0.7)" title="줌인 (+)">🔍+</button>
+        <button class="ind-btn" onclick="chartZoom(1.4)" title="줌아웃 (-)">🔍-</button>
+        <button class="ind-btn" onclick="chartReset()" title="리셋">↺</button>
+        <select id="candleCount" onchange="chartSetCount(this.value)" style="font-size:9px;font-family:var(--mono);border:1.5px solid var(--br);border-radius:6px;background:var(--pan);color:var(--ts);padding:2px 4px;cursor:pointer;">
+          <option value="30">30봉</option>
+          <option value="60" selected>60봉</option>
+          <option value="100">100봉</option>
+          <option value="200">200봉</option>
+        </select>
+      </div>
+      <div class="chart-area">
+        <div class="chart-main"><canvas id="mainChart"></canvas><canvas id="signalChart" style="position:absolute;top:0;left:0;pointer-events:none;"></canvas></div>
+        <div class="subc hide" id="rsiSub"><div class="slbl">RSI(14)</div><canvas id="rsiCanvas"></canvas></div>
+        <div class="subc hide" id="macdSub"><div class="slbl">MACD(12,26,9)</div><canvas id="macdCanvas"></canvas></div>
+      </div>
+    </div>
+    <!-- 차트 우클릭 AI 분석 메뉴 -->
+    <div id="chartCtxMenu" style="display:none;position:fixed;z-index:999;background:var(--pan);border:1px solid var(--br);border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,.15);padding:4px;min-width:160px;">
+      <div style="font-size:9px;font-weight:700;padding:4px 8px;color:var(--tm);border-bottom:1px solid var(--br);margin-bottom:2px;" id="ctxCandleInfo">-</div>
+      <button onclick="ctxAskAI('buy')" style="width:100%;text-align:left;padding:5px 8px;border:none;background:none;color:var(--g);font-size:10px;font-weight:600;cursor:pointer;border-radius:4px;">🟢 여기서 매수하면?</button>
+      <button onclick="ctxAskAI('sell')" style="width:100%;text-align:left;padding:5px 8px;border:none;background:none;color:var(--r);font-size:10px;font-weight:600;cursor:pointer;border-radius:4px;">🔴 여기서 매도하면?</button>
+      <button onclick="ctxAskAI('analysis')" style="width:100%;text-align:left;padding:5px 8px;border:none;background:none;color:var(--b);font-size:10px;font-weight:600;cursor:pointer;border-radius:4px;">🔍 이 구간 AI 분석</button>
+      <button onclick="closeChartCtx()" style="width:100%;text-align:left;padding:4px 8px;border:none;background:none;color:var(--tm);font-size:9px;cursor:pointer;">닫기</button>
+    </div>
+    <!-- AI 분석 결과 팝업 -->
+    <div id="chartAiPopup" style="display:none;position:fixed;z-index:998;background:var(--pan);border:1px solid var(--br);border-radius:10px;box-shadow:0 4px 24px rgba(0,0,0,.2);padding:12px 14px;max-width:280px;font-size:11px;line-height:1.6;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <span style="font-weight:700;font-size:12px;" id="aiPopupTitle">AI 분석</span>
+        <button onclick="document.getElementById('chartAiPopup').style.display='none'" style="border:none;background:none;font-size:14px;cursor:pointer;color:var(--tm);">✕</button>
+      </div>
+      <div id="aiPopupBody" style="color:var(--ts);">분석 중...</div>
+    </div>
+
+    <!-- AI 종합분석 패널 (col2 row2) — Phase 8 통합 -->
+    <div id="aiAnalysisPanel" style="grid-column:2;grid-row:2;background:var(--pan);border-top:2px solid rgba(49,130,246,.25);border-right:1px solid var(--br);overflow:hidden;display:flex;flex-direction:column;">
+      <div style="display:flex;align-items:center;gap:5px;padding:3px 8px;border-bottom:1px solid var(--br);flex-shrink:0;">
+        <div style="width:5px;height:5px;border-radius:50%;background:var(--b);animation:pu 2s infinite;flex-shrink:0;"></div>
+        <span style="font-size:9px;font-weight:700;">AI 종합분석</span>
+        <span style="font-size:8px;color:var(--tm);font-family:var(--mono);" id="analysisTk">종목선택시</span>
+        <div style="margin-left:auto;display:flex;align-items:center;gap:3px;">
+          <span id="goNogoTag" style="font-size:8px;padding:1px 6px;border-radius:3px;font-weight:700;font-family:var(--mono);background:var(--bg);">-</span>
+          <button onclick="runFullAnalysis()" style="padding:1px 7px;border-radius:4px;border:none;background:var(--b);color:#fff;font-size:8px;cursor:pointer;font-weight:600;">🔍분석</button>
+          <!-- 돌발악재 즉각청산 버튼 (Phase 9-6) -->
+          <button onclick="emergencySell()" style="padding:1px 7px;border-radius:4px;border:none;background:var(--r);color:#fff;font-size:8px;cursor:pointer;font-weight:700;" title="돌발 악재 즉각 전량 청산 (Phase 9-6)">🚨긴급청산</button>
+        </div>
+      </div>
+      <div style="display:flex;flex:1;min-height:0;overflow:hidden;">
+        <!-- 매매기법 선택 -->
+        <div style="flex:1;padding:4px 7px;border-right:1px solid var(--br);overflow-y:auto;min-width:0;">
+          <div style="font-size:7px;color:var(--tm);font-family:var(--mono);margin-bottom:3px;">🎯 매매기법</div>
+          <select id="techniqueSelect" onchange="setUserTechnique(this.value)" style="width:100%;font-size:9px;padding:2px 3px;border:1px solid var(--br);border-radius:4px;background:var(--inp);color:var(--tp);margin-bottom:3px;cursor:pointer;">
+            <option value="auto">🤖 AI 자동 감지</option>
+            <option value="눌림목">📉 눌림목</option>
+            <option value="돌파">🚀 돌파</option>
+            <option value="첫봉">🕯 첫봉</option>
+            <option value="갭상승">📈 갭상승</option>
+            <option value="이슈테마">🔥 이슈테마</option>
+            <option value="역추세">↩ 역추세</option>
+          </select>
+          <div id="techniqueTag" style="font-size:10px;font-weight:700;color:var(--b);display:none;">-</div>
+          <div id="techniqueReason" style="font-size:8px;color:var(--ts);line-height:1.4;margin-top:1px;">분석 버튼 눌러주세요</div>
+        </div>
+        <!-- 타점 -->
+        <div style="flex:1.1;padding:4px 7px;border-right:1px solid var(--br);overflow-y:auto;min-width:0;">
+          <div style="font-size:7px;color:var(--tm);font-family:var(--mono);margin-bottom:2px;">📍 진입·청산 타점</div>
+          <div id="entryPoint" style="font-size:8px;color:var(--ts);line-height:1.7;">-</div>
+        </div>
+        <!-- Phase 8 실시간 체크 -->
+        <div style="flex:1.4;padding:4px 7px;border-right:1px solid var(--br);overflow-y:auto;min-width:0;">
+          <div style="font-size:7px;color:var(--tm);font-family:var(--mono);margin-bottom:3px;">📊 실시간 체크</div>
+          <div id="phase8Check" style="font-size:9px;line-height:1.8;">-</div>
+        </div>
+        <!-- 트레일링 스탑 현황 (Phase 9-3) -->
+        <div style="flex:1;padding:4px 7px;overflow-y:auto;min-width:0;">
+          <div style="font-size:7px;color:var(--tm);font-family:var(--mono);margin-bottom:2px;">📈 트레일링 스탑</div>
+          <div id="trailPanel" style="font-size:8px;color:var(--ts);line-height:1.7;">-</div>
+          <div style="margin-top:4px;display:flex;gap:2px;flex-wrap:wrap;" id="trailBtns">
+            <button onclick="setTrailPct(2)" style="padding:1px 4px;border-radius:3px;border:1px solid var(--br);background:var(--bg);font-size:7px;color:var(--ts);cursor:pointer;">-2%</button>
+            <button onclick="setTrailPct(3)" style="padding:1px 4px;border-radius:3px;border:1px solid var(--br);background:var(--bg);font-size:7px;color:var(--ts);cursor:pointer;">-3%</button>
+            <button onclick="setTrailPct(5)" style="padding:1px 4px;border-radius:3px;border:1px solid var(--br);background:var(--bg);font-size:7px;color:var(--ts);cursor:pointer;">-5%</button>
+            <button onclick="setTrailMA5()" style="padding:1px 4px;border-radius:3px;border:1px solid var(--b);background:rgba(49,130,246,.08);font-size:7px;color:var(--b);cursor:pointer;">5MA</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ③ CENTER BOTTOM: 모의투자 컨트롤 (col2 row3) -->
+    <div class="mock-bar">
+      <div class="dp">
+        <label>날짜</label>
+        <input type="date" id="mockDate" onchange="onDateChange()">
+        <button class="ibtn" onclick="adjDate(-1)">◀</button>
+        <button class="ibtn" onclick="adjDate(1)">▶</button>
+      </div>
+      <div class="vsep" style="height:18px;"></div>
+      <button class="play-btn" id="playBtn" onclick="togPlay()" style="font-size:14px;line-height:1;">▶</button>
+      <div class="spd-wrap">
+        <span class="spd-l">배속</span>
+        <button class="spd-btn" onclick="setSpd(this,1)">실시간</button>
+        <button class="spd-btn" onclick="setSpd(this,10)">x10</button>
+        <button class="spd-btn" onclick="setSpd(this,30)">x30</button>
+        <button class="spd-btn on" onclick="setSpd(this,60)">x60</button>
+        <button class="spd-btn" onclick="setSpd(this,120)">x120</button>
+        <button class="spd-btn" onclick="setSpd(this,300)">x300</button>
+        <button class="spd-btn" onclick="setSpd(this,600)">x600</button>
+      </div>
+      <div class="prog" style="flex:1;position:relative;cursor:pointer;" onclick="seekToPos(event,this)" title="클릭으로 이동">
+        <div class="prog-f" id="progF" style="width:0%;pointer-events:none;"></div>
+        <input type="range" id="simSlider" min="0" max="100" value="0"
+          style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;margin:0;"
+          oninput="seekToSlider(this.value)">
+      </div>
+      <div class="mst">
+        <div class="ms"><div class="ms-l">봉</div><div class="ms-v cn" id="msBar">0</div></div>
+        <div class="ms"><div class="ms-l">시각</div><div class="ms-v cn" id="msTime">09:00</div></div>
+        <div class="ms" style="border-left:1px solid var(--br);padding-left:9px;"><div class="ms-l">평가손익</div><div class="ms-v" id="msPnl">+0원</div></div>
+        <div class="ms"><div class="ms-l">수익률</div><div class="ms-v" id="msPct">0.00%</div></div>
+        <div class="ms" style="border-left:1px solid var(--br);padding-left:9px;"><div class="ms-l">오늘손익</div><div class="ms-v" id="msTodayPnl">+0원</div></div>
+        <div class="ms"><div class="ms-l">매매횟수</div><div class="ms-v cn" id="msTrades">0회</div></div>
+        <div class="ms" style="border-left:1px solid var(--br);padding-left:9px;flex:1;min-width:70px;">
+          <div class="ms-l">목표달성</div>
+          <div style="display:flex;align-items:center;gap:4px;margin-top:1px;">
+            <div style="flex:1;height:4px;background:var(--bg);border-radius:2px;overflow:hidden;"><div id="goalProgressBar" style="height:100%;width:0%;background:var(--g);border-radius:2px;transition:width .5s;"></div></div>
+            <span class="ms-v" id="goalProgressPct" style="font-size:9px;">0%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ④ RIGHT: 호가창+체결창 (col3 row1/3) -->
+    <div class="rp">
+      <!-- 호가창 헤더 -->
+      <div style="padding:6px 8px 5px;border-bottom:1px solid var(--br);background:var(--pan);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+        <span style="font-size:10px;font-weight:700;color:var(--tp);">호가창</span>
+        <span style="font-family:var(--mono);font-size:9px;color:var(--ts);" id="obTkName">삼성전자</span>
+      </div>
+      <!-- 매도호가 -->
+      <div id="obSell" style="flex-shrink:0;"></div>
+      <!-- 현재가 -->
+      <div class="ob-cur" id="obCur">
+        <div class="ob-cur-p cu" id="obPr">71,500</div>
+        <div class="ob-cur-i" id="obInfo">+876 (+1.24%)</div>
+        <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:3px;">
+          <span style="font-size:9px;color:var(--ts);">체결강도</span>
+          <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--g);" id="obStrength">115</span>
+          <span style="font-size:9px;color:var(--ts);">매수잔량</span>
+          <span style="font-family:var(--mono);font-size:10px;font-weight:600;" id="obBuyTotal">-</span>
+        </div>
+      </div>
+      <!-- 매수호가 -->
+      <div id="obBuy" style="flex-shrink:0;"></div>
+      <!-- 여백 채우기 -->
+      <div style="flex:1;"></div>
+      <!-- 체결창 (하단 고정) -->
+      <div style="border-top:2px solid var(--br);flex-shrink:0;">
+        <div style="padding:5px 8px;border-bottom:1px solid var(--br);display:flex;align-items:center;justify-content:space-between;">
+          <span style="font-size:10px;font-weight:700;color:var(--tp);">체결</span>
+          <span style="font-size:9px;color:var(--ts);">강도 <span id="obStrength2" style="font-weight:700;color:var(--g);">-</span></span>
+        </div>
+        <div style="display:flex;padding:2px 8px;font-size:8px;color:var(--tm);font-family:var(--mono);border-bottom:1px solid var(--br);">
+          <span style="width:38px;">시간</span>
+          <span style="flex:1;text-align:right;">체결가</span>
+          <span style="min-width:34px;text-align:right;">수량</span>
+        </div>
+        <div id="thList" style="max-height:160px;overflow-y:auto;"></div>
+      </div>
+    </div>
+
+    <!-- ⑤ FAR RIGHT: 주문+보유+AI (col4 row1/3) -->
+    <div class="brp">
+      <div class="brp-tabs">
+        <div class="brpt on" onclick="brTab(this,'brpb-order')">주문</div>
+        <div class="brpt" onclick="brTab(this,'brpb-port')">보유</div>
+        <div class="brpt" onclick="brTab(this,'brpb-log')">거래</div>
+        <div class="brpt" onclick="brTab(this,'brpb-pending')">미체결</div>
+        <div class="brpt" onclick="brTab(this,'brpb-ai')">AI</div>
+      </div>
+
+      <!-- 주문 패널 -->
+      <div class="brpb on" id="brpb-order" style="overflow-y:auto;">
+        <div class="of">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+            <span style="font-size:8px;color:var(--tm);font-family:var(--mono);">F1지정매수 F2시장매수 F4손절 F7전량손절 F8반량</span>
+          </div>
+          <div class="of-tabs">
+            <button class="of-t buy on" id="otBuy" onclick="setOSide('buy')">매수 (F1/F2)</button>
+            <button class="of-t sell" id="otSell" onclick="setOSide('sell')">매도 (F3/F4)</button>
+          </div>
+          <div class="of-r">
+            <span class="of-l">유형</span>
+            <div class="ot-g">
+              <button class="ot-b on" id="ott-limit" onclick="setOType(this,'limit')">지정가</button>
+              <button class="ot-b" id="ott-market" onclick="setOType(this,'market')">시장가</button>
+            </div>
+          </div>
+          <div class="of-r">
+            <span class="of-l">거래방식</span>
+            <select class="cred-sel" id="credSel" onchange="onCredChange()">
+              <option value="cash">현금</option>
+              <option value="credit">신용(담보140%)</option>
+              <option value="margin">미수(위탁40%)</option>
+            </select>
+          </div>
+          <div class="cred-info" id="credInfo"></div>
+          <div class="of-r">
+            <span class="of-l">주문가격</span>
+            <input class="of-i" id="ofPr" type="number" oninput="updOSum()">
+          </div>
+          <div class="of-r">
+            <span class="of-l">수량</span>
+            <input class="of-i" id="ofQty" type="number" value="10" oninput="updOSum()">
+          </div>
+          <div class="of-r">
+            <span class="of-l">금액직접입력</span>
+            <input class="of-i" id="ofAmt" type="number" placeholder="예: 2000000" oninput="amtToQty(this.value)" style="font-size:10px;">
+          </div>
+          <div class="pct-r">
+            <button class="pct-b" onclick="setPct(10)">10%</button>
+            <button class="pct-b" onclick="setPct(25)">25%</button>
+            <button class="pct-b" onclick="setPct(50)">50%</button>
+            <button class="pct-b" onclick="setPct(100)">전량</button>
+          </div>
+          <div class="of-area stop">
+            <div class="of-area-t" style="color:var(--r);">🔴 손절가 자동설정</div>
+            <div class="of-r" style="margin-bottom:2px;">
+              <span class="of-l">손절가</span>
+              <input class="of-i" id="ofStop" type="number" placeholder="자동 -3%" oninput="updOSum()">
+            </div>
+            <div class="of-r" style="margin-bottom:0;">
+              <span class="of-l">트레일링</span>
+              <div class="ot-g">
+                <button class="ot-b on" id="trail-off" onclick="setTrail(this,'off')">끔</button>
+                <button class="ot-b" id="trail-pct" onclick="setTrail(this,'pct')">%</button>
+                <button class="ot-b" id="trail-ma" onclick="setTrail(this,'ma5')">5MA</button>
+              </div>
+            </div>
+          </div>
+          <div class="of-area tgt">
+            <div class="of-area-t" style="color:var(--g);">🟢 분할 익절 설정</div>
+            <div class="of-r" style="margin-bottom:2px;">
+              <span class="of-l">1차(50%)</span>
+              <input class="of-i" id="ofT1" type="number" placeholder="자동 +3%" oninput="updOSum()">
+            </div>
+            <div class="of-r" style="margin-bottom:0;">
+              <span class="of-l">2차(30%)</span>
+              <input class="of-i" id="ofT2" type="number" placeholder="자동 +5%" oninput="updOSum()">
+            </div>
+          </div>
+          <div class="of-sum" id="ofSum">예상금액: -</div>
+          <div class="of-warn" id="ofWarn"></div>
+          <!-- 가격 알림 설정 (Phase 3-8) -->
+          <div style="margin-top:5px;padding:5px 6px;background:var(--bg);border-radius:7px;border:1px solid var(--br);">
+            <div style="font-size:9px;color:var(--tm);font-family:var(--mono);margin-bottom:4px;">📣 가격 알림 설정</div>
+            <div style="display:flex;gap:3px;margin-bottom:3px;">
+              <input id="alPr" type="number" placeholder="알림 가격" style="flex:1;background:var(--pan);border:1px solid var(--br);border-radius:5px;color:var(--tp);font-family:var(--mono);font-size:10px;padding:3px 5px;outline:none;">
+              <select id="alDir" style="background:var(--pan);border:1px solid var(--br);border-radius:5px;color:var(--tp);font-family:var(--mono);font-size:9px;padding:3px;outline:none;">
+                <option value="above">이상</option>
+                <option value="below">이하</option>
+              </select>
+            </div>
+            <input id="alMemo" type="text" placeholder="메모 (예: 손절가)" style="width:100%;background:var(--pan);border:1px solid var(--br);border-radius:5px;color:var(--tp);font-family:var(--sans);font-size:10px;padding:3px 5px;outline:none;margin-bottom:3px;">
+            <button onclick="addAlert()" style="width:100%;padding:4px;border-radius:5px;border:none;background:var(--b);color:#fff;font-size:10px;font-weight:600;cursor:pointer;">+ 알림 추가</button>
+            <div id="alertList" style="margin-top:4px;font-size:9px;color:var(--tm);"></div>
+          </div>
+          <button class="sub-btn buy" id="subBtn" onclick="submitOrder()">매수 주문</button>
+          <!-- 스캘핑 수수료 계산기 (Phase 10-1) -->
+          <div style="margin-top:5px;padding:5px 6px;background:rgba(14,165,233,.06);border-radius:7px;border:1px solid rgba(14,165,233,.2);">
+            <div style="font-size:9px;color:var(--t);font-weight:700;margin-bottom:4px;">⚡ 스캘핑 실질수익 (Phase 10-1)</div>
+            <div style="display:flex;gap:3px;margin-bottom:3px;">
+              <input id="scalpAmt" type="number" placeholder="투자금액" style="flex:1;background:var(--pan);border:1px solid var(--br);border-radius:5px;color:var(--tp);font-family:var(--mono);font-size:10px;padding:3px 5px;outline:none;" oninput="calcScalpFee()">
+              <input id="scalpPct" type="number" placeholder="목표%" step="0.1" value="0.5" style="width:52px;background:var(--pan);border:1px solid var(--br);border-radius:5px;color:var(--tp);font-family:var(--mono);font-size:10px;padding:3px 5px;outline:none;" oninput="calcScalpFee()">
+            </div>
+            <div id="scalpResult" style="font-size:9px;color:var(--ts);padding:3px 5px;background:var(--bg);border-radius:4px;min-height:20px;"></div>
+          </div>
+          <!-- 피라미딩 계산기 (Phase 10-8) -->
+          <div style="margin-top:5px;padding:5px 6px;background:rgba(49,130,246,.05);border-radius:7px;border:1px solid rgba(49,130,246,.15);">
+            <div style="font-size:9px;color:var(--b);font-family:var(--mono);font-weight:700;margin-bottom:4px;">📐 피라미딩 계산기 (Phase 10-8)</div>
+            <div style="font-size:8px;color:var(--tm);margin-bottom:3px;">수익 중인 포지션에 추가매수 시에만 사용</div>
+            <div style="display:flex;gap:4px;margin-bottom:3px;">
+              <div style="flex:1;">
+                <div style="font-size:8px;color:var(--tm);">추가 금액</div>
+                <input id="pyAmt" type="number" placeholder="200만원" style="width:100%;background:var(--pan);border:1px solid var(--br);border-radius:5px;color:var(--tp);font-family:var(--mono);font-size:10px;padding:3px 5px;outline:none;" oninput="calcPyramid()">
+              </div>
+              <div style="flex:1;">
+                <div style="font-size:8px;color:var(--tm);">추가 가격</div>
+                <input id="pyPr" type="number" placeholder="추가매수가" style="width:100%;background:var(--pan);border:1px solid var(--br);border-radius:5px;color:var(--tp);font-family:var(--mono);font-size:10px;padding:3px 5px;outline:none;" oninput="calcPyramid()">
+              </div>
+            </div>
+            <div id="pyResult" style="font-size:9px;color:var(--ts);line-height:1.7;padding:4px 6px;background:var(--bg);border-radius:5px;min-height:28px;"></div>
+          </div>
+          <!-- 빠른 청산 -->
+          <div id="quickSellBtns" style="display:none;margin-top:6px;display:flex;gap:4px;flex-direction:column;">
+            <button onclick="quickSell(50)" style="width:100%;padding:6px;border-radius:8px;border:1.5px solid var(--r);background:rgba(240,62,62,.07);color:var(--r);font-size:10px;font-weight:700;cursor:pointer;">⚡ 50% 시장가 매도</button>
+            <button onclick="quickSell(100)" style="width:100%;padding:6px;border-radius:8px;border:none;background:var(--r);color:#fff;font-size:10px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(240,62,62,.3);">🚨 전량 손절 (시장가)</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 보유 패널 -->
+      <div class="brpb" id="brpb-port">
+        <!-- 잔고 헤더 -->
+        <div style="padding:8px 10px 4px;border-bottom:1px solid var(--br);">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+            <span style="font-size:10px;color:var(--tm);font-family:var(--mono);">모의잔고</span>
+            <button onclick="resetBalance()" style="font-size:9px;padding:2px 8px;border-radius:5px;border:1px solid var(--br);background:var(--card);color:var(--ts);cursor:pointer;">↺ 리셋</button>
+          </div>
+          <div id="cashVal" style="font-family:var(--mono);font-size:18px;font-weight:700;color:var(--ts);">10,000,000원</div>
+          <div id="cashPnlRow" style="font-size:10px;margin-top:2px;color:var(--tm);">오늘손익 <span id="todayPnlDisp" style="font-weight:600;">+0원</span></div>
+        </div>
+        <div class="cash-row"><span class="cash-lbl">신용/미수한도</span><span style="font-family:var(--mono);font-size:9px;color:var(--a);" id="credLim">-</span></div>
+        <!-- 처분효과·과잉확신 경고 배너 -->
+        <div id="psychWarningBanner" style="display:none;margin:4px 8px;padding:5px 8px;border-radius:6px;font-size:9px;line-height:1.6;"></div>
+        <div id="portItems" style="font-size:9px;color:var(--tm);text-align:center;padding:12px 0;">보유 종목 없음</div>
+      </div>
+
+      <!-- 거래내역 -->
+      <div class="brpb" id="brpb-log"><div id="tradeLog"></div></div>
+      <!-- 미체결 -->
+      <div class="brpb" id="brpb-pending">
+        <div style="padding:5px 8px;border-bottom:1px solid var(--br);display:flex;align-items:center;justify-content:space-between;">
+          <span style="font-size:10px;font-weight:700;">미체결 주문</span>
+          <button onclick="pendingOrders=[];renderPending();" style="font-size:8px;padding:1px 6px;border-radius:3px;border:1px solid var(--br);background:var(--bg);color:var(--ts);cursor:pointer;">전체취소</button>
+        </div>
+        <div id="pendingList"><div style="font-size:9px;color:var(--tm);padding:8px;">미체결 없음</div></div>
+      </div>
+
+      <!-- AI 조언 -->
+      <div class="brpb" id="brpb-ai" style="display:flex;flex-direction:column;height:100%;">
+        <div class="ai-adv-hdr" style="flex-shrink:0;">
+          <div class="ai-adv-t"><div class="ai-dot"></div>AI 실시간 조언</div>
+          <div class="ai-mb" id="aiModeBadge">대기중</div>
+        </div>
+        <div id="aiThoughtPanel" style="flex-shrink:0;padding:6px 8px;border-bottom:1px solid var(--br);">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+            <div id="aiThoughtDot" style="width:8px;height:8px;border-radius:50%;background:#94a3b8;flex-shrink:0;"></div>
+            <span id="aiThoughtTitle" style="font-weight:700;font-size:10px;color:#94a3b8;">대기중</span>
+            <span id="aiThoughtTime" style="color:var(--tm);font-size:8px;margin-left:auto;"></span>
+          </div>
+          <div id="ts-trend" class="thought-step" style="display:none;"></div>
+          <div id="ts-entry" class="thought-step" style="display:none;"></div>
+          <div id="ts-risk"  class="thought-step" style="display:none;"></div>
+          <div id="ts-decision" class="thought-step" style="display:none;"></div>
+          <div id="aiThoughtConclusion" style="display:none;margin-top:4px;padding:4px 7px;border-radius:5px;font-size:10px;font-weight:700;"></div>
+        </div>
+        <div class="adv-boxes" id="advBoxes" style="display:none;">
+          <div class="adv-box"><div class="adv-txt ld" id="advNow">-</div></div>
+          <div class="adv-box"><div class="adv-txt ld" id="advAction">-</div></div>
+        </div>
+        <div class="ai-msgs" id="aiMsgs" style="flex:1;min-height:0;overflow-y:auto;">
+          <div class="ai-msg">
+            <div class="ai-av ai">AI</div>
+            <div>
+              <div class="ai-bub">안녕하세요! 실시간 차트 분석 및 매매 조언을 드립니다.</div>
+              <div class="ai-meta">Claude · 지금</div>
+            </div>
+          </div>
+        </div>
+        <div class="ai-quick">
+          <button class="qb" onclick="qa('Phase 8 체크리스트 기준으로 지금 진입 가능해?')">✅ 진입점검</button>
+          <button class="qb" onclick="qa('지금 R/R 계산해줘')">📐 R/R</button>
+          <button class="qb" onclick="qa('손절선 어디에 잡아야 해?')">✂ 손절</button>
+          <button class="qb" onclick="qa('오늘 강한 섹터가 어디야? Phase 6 기준으로 재료 강도도 알려줘')">🏭 섹터</button>
+          <button class="qb" onclick="qa('Phase 7-7 스크리닝 기준으로 오늘 단타 후보 종목 추천해줘')">🔍 종목추천</button>
+          <button class="qb" onclick="qa('지금 차트 패턴이 뭐야?')">📊 패턴</button>
+          <button class="qb" onclick="qa('오늘 매매 복기해줘')">📝 복기</button>
+        </div>
+        <div class="ai-in-area">
+          <textarea class="ai-ta" id="aiIn" placeholder="질문 입력... (Enter 전송)" rows="1"
+            onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+          <button class="send-btn" id="sendBtn" onclick="sendChat()">↑</button>
+        </div>
+      </div>
+    </div><!-- /brp -->
+
+  </div><!-- /hts -->
+</div><!-- /page-hts -->
+
+<!-- ── STATS PAGE ── -->
+<div class="page" id="page-stats">
+  <div class="stats-page">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+      <h2 style="font-size:15px;font-weight:700;">복기 통계</h2>
+      <div style="display:flex;gap:6px;">
+        <button class="ibtn" onclick="renderStats()">↺ 새로고침</button>
+        <button class="ibtn pri" onclick="runAIPatternAnalysis()">🤖 AI 패턴 분석</button>
+      </div>
+    </div>
+
+    <!-- 핵심 지표 -->
+    <div class="stats-grid" id="statsGrid"></div>
+
+    <!-- 누적 손익 곡선 -->
+    <div class="chart-card">
+      <div class="chart-card-t">📈 누적 손익 곡선</div>
+      <div class="pnl-chart-wrap"><canvas id="pnlChart"></canvas></div>
+    </div>
+
+    <!-- 2단 분석 -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+      <!-- 수익/손실 패턴 -->
+      <div class="chart-card" style="margin-bottom:0;">
+        <div class="chart-card-t" style="display:flex;align-items:center;justify-content:space-between;">
+          <span>✅ 수익 나는 패턴</span>
+          <button onclick="runMySetupAI()" style="padding:2px 7px;border-radius:4px;border:none;background:var(--p);color:#fff;font-size:9px;cursor:pointer;">🤖 나만의 셋업 추출 (Phase 10-10)</button>
+        </div>
+        <div id="winPatterns" style="font-size:11px;color:var(--tm);">데이터 없음</div>
+      </div>
+      <div class="chart-card" style="margin-bottom:0;">
+        <div class="chart-card-t">❌ 손실 나는 패턴</div>
+        <div id="lossPatterns" style="font-size:11px;color:var(--tm);">데이터 없음</div>
+      </div>
+    </div>
+
+    <!-- 종목별 누적 손익 -->
+    <div class="chart-card">
+      <div class="chart-card-t">📊 종목별 누적 손익</div>
+      <div id="symbolPnl" style="font-size:11px;color:var(--tm);">거래 내역 없음</div>
+    </div>
+
+    <!-- 당일 매매 타임라인 -->
+    <div class="chart-card">
+      <div class="chart-card-t" style="display:flex;align-items:center;justify-content:space-between;">
+        <span>⏱ 당일 매매 타임라인</span>
+        <button onclick="renderTimeline()" style="padding:2px 7px;border-radius:4px;border:1px solid var(--br);background:var(--bg);color:var(--ts);font-size:9px;cursor:pointer;">↺</button>
+      </div>
+      <div id="tradeTimeline" style="font-size:10px;color:var(--tm);"></div>
+    </div>
+
+    <!-- 시간대별 성과 -->
+    <div class="chart-card">
+      <div class="chart-card-t">⏰ 시간대별 매매 성과</div>
+      <div id="timeStats" style="display:grid;grid-template-columns:repeat(6,1fr);gap:6px;"></div>
+    </div>
+
+    <!-- AI 패턴 분석 -->
+    <div class="chart-card">
+      <div class="chart-card-t">🤖 AI 복기 분석 (Phase 12)</div>
+      <div id="aiPatternResult" style="font-size:11px;color:var(--tm);line-height:1.8;">AI 패턴 분석 버튼을 눌러주세요.</div>
+    </div>
+
+    <!-- 반복 실수 -->
+    <div class="chart-card">
+      <div class="chart-card-t">⚠ 반복 실수 Top 3</div>
+      <div id="mistakeList" style="font-size:11px;color:var(--tm);">거래 내역이 없습니다.</div>
+    </div>
+
+    <!-- 주간/월간 통계 (Phase 12-7) -->
+    <div class="chart-card">
+      <div class="chart-card-t" style="display:flex;align-items:center;justify-content:space-between;">
+        <span>📅 주간/월간 통계 (Phase 12-7)</span>
+        <div style="display:flex;gap:5px;">
+          <button onclick="renderWeeklyStats()" style="padding:2px 7px;border-radius:4px;border:1px solid var(--br);background:var(--bg);color:var(--ts);font-size:9px;cursor:pointer;">주간</button>
+          <button onclick="renderMonthlyStats()" style="padding:2px 7px;border-radius:4px;border:1px solid var(--b);background:rgba(49,130,246,.08);color:var(--b);font-size:9px;cursor:pointer;">월간</button>
+        </div>
+      </div>
+      <div id="weeklyStatsPanel" style="font-size:10px;color:var(--tm);"></div>
+    </div>
+
+    <!-- 반복실수 제거 루틴 (Phase 12-8) -->
+    <div class="chart-card">
+      <div class="chart-card-t" style="display:flex;align-items:center;justify-content:space-between;">
+        <span>🔧 반복실수 제거 루틴 (Phase 12-8)</span>
+        <button onclick="runMistakeRemoval()" style="padding:2px 7px;border-radius:4px;border:none;background:var(--r);color:#fff;font-size:9px;cursor:pointer;">월간 분석</button>
+      </div>
+      <div id="mistakeRemovalPanel" style="font-size:10px;color:var(--tm);line-height:1.8;">월간 분석 버튼을 눌러주세요.</div>
+    </div>
+
+    <!-- 전략변경 판단 (Phase 12-10) -->
+    <div class="chart-card">
+      <div class="chart-card-t" style="display:flex;align-items:center;justify-content:space-between;">
+        <span>🔄 전략변경 시점 판단 (Phase 12-10)</span>
+        <button onclick="checkStrategyChange()" style="padding:2px 7px;border-radius:4px;border:none;background:var(--p);color:#fff;font-size:9px;cursor:pointer;">판단</button>
+      </div>
+      <div id="strategyChangePanel" style="font-size:10px;color:var(--tm);line-height:1.8;">판단 버튼을 눌러주세요.</div>
+    </div>
+
+    <!-- 성장단계 로드맵 (Phase 12-5) -->
+    <div class="chart-card">
+      <div class="chart-card-t">🗺 성장단계 로드맵 (Phase 12-5)</div>
+      <div id="growthRoadmap"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── JOURNAL PAGE ── -->
+<div class="page" id="page-journal">
+  <div class="jpage">
+    <!-- 일지 탭 -->
+    <div style="display:flex;gap:0;border-bottom:1px solid var(--br);margin-bottom:14px;">
+      <div class="stab on" onclick="jTab(this,'jt-log')" style="font-size:11px;">📓 매매일지</div>
+      <div class="stab" onclick="jTab(this,'jt-form')" style="font-size:11px;">✏ 일지 작성</div>
+      <div class="stab" onclick="jTab(this,'jt-rule')" style="font-size:11px;">📋 개인 원칙</div>
+      <div class="stab" onclick="jTab(this,'jt-checklist')" style="font-size:11px;">✅ 통합 체크리스트</div>
+      <button class="ibtn pri" onclick="genAllJournals()" style="margin-left:auto;font-size:10px;">🤖 AI 일지 생성</button>
+    </div>
+
+    <!-- 매매일지 목록 -->
+    <div id="jt-log">
+      <div id="journalList"><div style="font-size:12px;color:var(--tm);text-align:center;padding:40px;">거래 내역이 없습니다.</div></div>
+    </div>
+
+    <!-- 일지 작성 폼 (Phase 12-6 양식 자동입력) -->
+    <div id="jt-form" style="display:none;">
+      <div style="background:var(--pan);border-radius:14px;padding:16px;box-shadow:var(--sh0);margin-bottom:12px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <h3 style="font-size:13px;font-weight:700;">📓 매매 일지 작성 (Phase 12-6)</h3>
+          <button onclick="autoFillJournal()" style="padding:4px 10px;border-radius:6px;border:none;background:var(--b);color:#fff;font-size:10px;cursor:pointer;">⚡ 오늘 거래 자동입력</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+          <div>
+            <label style="font-size:9px;color:var(--tm);display:block;margin-bottom:3px;">날짜</label>
+            <input id="jf-date" type="date" style="width:100%;background:var(--bg);border:1.5px solid var(--br);border-radius:7px;color:var(--tp);font-family:var(--mono);font-size:11px;padding:5px 8px;outline:none;">
+          </div>
+          <div>
+            <label style="font-size:9px;color:var(--tm);display:block;margin-bottom:3px;">심리점수</label>
+            <input id="jf-psy" type="number" min="0" max="10" placeholder="0~10" style="width:100%;background:var(--bg);border:1.5px solid var(--br);border-radius:7px;color:var(--tp);font-family:var(--mono);font-size:11px;padding:5px 8px;outline:none;">
+          </div>
+          <div>
+            <label style="font-size:9px;color:var(--tm);display:block;margin-bottom:3px;">종목</label>
+            <input id="jf-nm" type="text" placeholder="삼성전자" style="width:100%;background:var(--bg);border:1.5px solid var(--br);border-radius:7px;color:var(--tp);font-family:var(--sans);font-size:11px;padding:5px 8px;outline:none;">
+          </div>
+          <div>
+            <label style="font-size:9px;color:var(--tm);display:block;margin-bottom:3px;">손익</label>
+            <input id="jf-pnl" type="number" placeholder="예: 150000" style="width:100%;background:var(--bg);border:1.5px solid var(--br);border-radius:7px;color:var(--tp);font-family:var(--mono);font-size:11px;padding:5px 8px;outline:none;">
+          </div>
+        </div>
+        <div style="margin-bottom:8px;">
+          <label style="font-size:9px;color:var(--tm);display:block;margin-bottom:3px;">진입 근거 (기술적/수급/재료)</label>
+          <textarea id="jf-reason" rows="2" placeholder="5분봉 눌림목 + 기관 순매수 + AI 수주 공시..." style="width:100%;background:var(--bg);border:1.5px solid var(--br);border-radius:7px;color:var(--tp);font-family:var(--sans);font-size:11px;padding:5px 8px;outline:none;resize:none;"></textarea>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+          <div>
+            <label style="font-size:9px;color:var(--g);display:block;margin-bottom:3px;">✅ 잘한 점</label>
+            <textarea id="jf-good" rows="2" placeholder="손절 원칙 준수..." style="width:100%;background:rgba(5,192,114,.05);border:1.5px solid rgba(5,192,114,.2);border-radius:7px;color:var(--tp);font-family:var(--sans);font-size:11px;padding:5px 8px;outline:none;resize:none;"></textarea>
+          </div>
+          <div>
+            <label style="font-size:9px;color:var(--r);display:block;margin-bottom:3px;">❌ 아쉬운 점</label>
+            <textarea id="jf-bad" rows="2" placeholder="조기 익절..." style="width:100%;background:rgba(240,62,62,.05);border:1.5px solid rgba(240,62,62,.2);border-radius:7px;color:var(--tp);font-family:var(--sans);font-size:11px;padding:5px 8px;outline:none;resize:none;"></textarea>
+          </div>
+        </div>
+        <div style="margin-bottom:10px;">
+          <label style="font-size:9px;color:var(--tm);display:block;margin-bottom:3px;">반복 실수 여부</label>
+          <select id="jf-repeat" style="background:var(--bg);border:1.5px solid var(--br);border-radius:7px;color:var(--tp);font-family:var(--sans);font-size:11px;padding:5px 8px;outline:none;width:100%;">
+            <option value="none">없음</option>
+            <option value="earlyExit">조기 익절 (처분효과)</option>
+            <option value="fomo">FOMO 추격매수</option>
+            <option value="noStop">손절 미실행</option>
+            <option value="revenge">복수심리 재진입</option>
+            <option value="oversize">비중 과다</option>
+            <option value="noCheck">체크리스트 스킵</option>
+            <option value="other">기타</option>
+          </select>
+        </div>
+        <button onclick="saveJournalForm()" style="width:100%;padding:8px;border-radius:8px;border:none;background:var(--b);color:#fff;font-size:11px;font-weight:700;cursor:pointer;">💾 일지 저장</button>
+      </div>
+      <!-- AI 복기 프롬프트 4종 (Phase 12-9) -->
+      <div style="background:var(--pan);border-radius:14px;padding:16px;box-shadow:var(--sh0);">
+        <div style="font-size:13px;font-weight:700;margin-bottom:12px;">🤖 AI 복기 프롬프트 (Phase 12-9)</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+          <button onclick="useReviewPrompt(1)" style="padding:10px;border-radius:10px;border:1.5px solid var(--b);background:rgba(49,130,246,.06);color:var(--b);font-size:10px;font-weight:600;cursor:pointer;text-align:left;">
+            📝 프롬프트 1<br><span style="font-size:9px;color:var(--ts);font-weight:400;">단일 매매 복기</span>
+          </button>
+          <button onclick="useReviewPrompt(2)" style="padding:10px;border-radius:10px;border:1.5px solid var(--g);background:rgba(5,192,114,.06);color:var(--g);font-size:10px;font-weight:600;cursor:pointer;text-align:left;">
+            📊 프롬프트 2<br><span style="font-size:9px;color:var(--ts);font-weight:400;">주간 패턴 분석</span>
+          </button>
+          <button onclick="useReviewPrompt(3)" style="padding:10px;border-radius:10px;border:1.5px solid var(--r);background:rgba(240,62,62,.06);color:var(--r);font-size:10px;font-weight:600;cursor:pointer;text-align:left;">
+            ⚠ 프롬프트 3<br><span style="font-size:9px;color:var(--ts);font-weight:400;">연속 손실 분석</span>
+          </button>
+          <button onclick="useReviewPrompt(4)" style="padding:10px;border-radius:10px;border:1.5px solid var(--p);background:rgba(124,58,237,.06);color:var(--p);font-size:10px;font-weight:600;cursor:pointer;text-align:left;">
+            🌀 프롬프트 4<br><span style="font-size:9px;color:var(--ts);font-weight:400;">슬럼프 감지</span>
+          </button>
+        </div>
+        <div id="reviewPromptBox" style="display:none;">
+          <textarea id="reviewPromptText" rows="7" readonly
+            style="width:100%;background:var(--bg);border:1.5px solid var(--br);border-radius:9px;color:var(--ts);font-family:var(--mono);font-size:9px;padding:8px;resize:none;outline:none;line-height:1.7;"></textarea>
+          <button onclick="copyPrompt()" style="margin-top:6px;width:100%;padding:7px;border-radius:8px;border:1.5px solid var(--b);background:var(--bg);color:var(--b);font-size:10px;font-weight:600;cursor:pointer;">📋 복사 → AI 채팅에 붙여넣기</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 개인 원칙 수립 (Phase 11-13) -->
+    <div id="jt-rule" style="display:none;">
+      <div style="background:var(--pan);border-radius:14px;padding:16px;box-shadow:var(--sh0);margin-bottom:12px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <h3 style="font-size:13px;font-weight:700;">📋 개인 매매 원칙 (Phase 11-13)</h3>
+          <button onclick="savePersonalRules()" style="padding:4px 10px;border-radius:6px;border:none;background:var(--b);color:#fff;font-size:10px;cursor:pointer;">💾 저장</button>
+        </div>
+        <div style="display:grid;gap:10px;">
+          <div>
+            <label style="font-size:10px;font-weight:700;color:var(--g);display:block;margin-bottom:4px;">✅ 강점 활용 — 가장 수익 잘 나는 패턴</label>
+            <textarea id="pr-strength" rows="2" placeholder="예: 10:00~11:30 눌림목 매매, 기관 순매수 동반 시..." style="width:100%;background:var(--bg);border:1.5px solid var(--br);border-radius:8px;color:var(--tp);font-family:var(--sans);font-size:11px;padding:7px 9px;outline:none;resize:none;"></textarea>
+          </div>
+          <div>
+            <label style="font-size:10px;font-weight:700;color:var(--r);display:block;margin-bottom:4px;">❌ 약점 방지 — 가장 자주 하는 실수</label>
+            <textarea id="pr-weakness" rows="2" placeholder="예: FOMO 추격매수, 손절 지연..." style="width:100%;background:var(--bg);border:1.5px solid var(--br);border-radius:8px;color:var(--tp);font-family:var(--sans);font-size:11px;padding:7px 9px;outline:none;resize:none;"></textarea>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <div>
+              <label style="font-size:10px;font-weight:700;color:var(--b);display:block;margin-bottom:4px;">⏰ 집중 매매 시간대</label>
+              <input id="pr-time" type="text" placeholder="예: 10:00~11:30" style="width:100%;background:var(--bg);border:1.5px solid var(--br);border-radius:8px;color:var(--tp);font-family:var(--sans);font-size:11px;padding:7px 9px;outline:none;">
+            </div>
+            <div>
+              <label style="font-size:10px;font-weight:700;color:var(--ts);display:block;margin-bottom:4px;">🚫 피하는 시간대</label>
+              <input id="pr-avoid" type="text" placeholder="예: 9:00~9:30, 점심" style="width:100%;background:var(--bg);border:1.5px solid var(--br);border-radius:8px;color:var(--tp);font-family:var(--sans);font-size:11px;padding:7px 9px;outline:none;">
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <div>
+              <label style="font-size:10px;font-weight:700;display:block;margin-bottom:4px;">💰 1회 최대 비중 (%)</label>
+              <input id="pr-size" type="number" placeholder="20" style="width:100%;background:var(--bg);border:1.5px solid var(--br);border-radius:8px;color:var(--tp);font-family:var(--mono);font-size:11px;padding:7px 9px;outline:none;">
+            </div>
+            <div>
+              <label style="font-size:10px;font-weight:700;display:block;margin-bottom:4px;">📊 동시 최대 종목 수</label>
+              <input id="pr-maxpos" type="number" placeholder="2" style="width:100%;background:var(--bg);border:1.5px solid var(--br);border-radius:8px;color:var(--tp);font-family:var(--mono);font-size:11px;padding:7px 9px;outline:none;">
+            </div>
+          </div>
+          <div>
+            <label style="font-size:10px;font-weight:700;color:var(--r);display:block;margin-bottom:4px;">🛑 매매 중단 신호</label>
+            <input id="pr-stop" type="text" placeholder="예: 연속손절 3회, 일손실한도 80% 초과" style="width:100%;background:var(--bg);border:1.5px solid var(--br);border-radius:8px;color:var(--tp);font-family:var(--sans);font-size:11px;padding:7px 9px;outline:none;">
+          </div>
+          <div>
+            <label style="font-size:10px;font-weight:700;display:block;margin-bottom:4px;">📅 주간 루틴</label>
+            <input id="pr-weekly" type="text" placeholder="예: 매주 일요일 복기, 다음주 후보 선정" style="width:100%;background:var(--bg);border:1.5px solid var(--br);border-radius:8px;color:var(--tp);font-family:var(--sans);font-size:11px;padding:7px 9px;outline:none;">
+          </div>
+        </div>
+        <div id="prSaved" style="margin-top:10px;font-size:10px;color:var(--tm);"></div>
+        <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--br);">
+          <div style="font-size:11px;font-weight:700;margin-bottom:8px;">🚦 실전전환 준비도 (Phase 12-5)</div>
+          <div id="realReadiness" style="font-size:10px;"></div>
+          <button onclick="checkRealReadiness()" style="margin-top:8px;width:100%;padding:7px;border-radius:8px;border:none;background:var(--b);color:#fff;font-size:11px;font-weight:700;cursor:pointer;">준비도 확인</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 전체통합 체크리스트 1장 (Phase 12-11) -->
+    <div id="jt-checklist" style="display:none;">
+      <div style="background:var(--pan);border-radius:14px;padding:16px;box-shadow:var(--sh0);">
+        <h3 style="font-size:13px;font-weight:700;margin-bottom:14px;">✅ 전체 통합 체크리스트 (Phase 12-11)</h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div>
+            <div style="font-size:10px;font-weight:700;color:var(--b);margin-bottom:7px;">🌅 장 시작 전 (5분)</div>
+            <div id="mcl-pre"></div>
+          </div>
+          <div>
+            <div style="font-size:10px;font-weight:700;color:var(--g);margin-bottom:7px;">📈 진입 시 (1분)</div>
+            <div id="mcl-entry"></div>
+          </div>
+          <div>
+            <div style="font-size:10px;font-weight:700;color:var(--a);margin-bottom:7px;">👁 보유 중 (30초)</div>
+            <div id="mcl-hold"></div>
+          </div>
+          <div>
+            <div style="font-size:10px;font-weight:700;color:var(--ts);margin-bottom:7px;">🌙 장 후 (10분)</div>
+            <div id="mcl-post"></div>
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;margin-top:12px;">
+          <button onclick="resetMasterChecklist()" style="padding:6px 14px;border-radius:7px;border:1.5px solid var(--br);background:var(--bg);color:var(--ts);font-size:10px;cursor:pointer;">↺ 초기화</button>
+          <button onclick="printChecklist()" style="padding:6px 14px;border-radius:7px;border:1.5px solid var(--b);background:rgba(49,130,246,.08);color:var(--b);font-size:10px;cursor:pointer;">🖨 인쇄</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── AI AUTO-TRADE MODAL ── -->
+<div class="modal-bg" id="modal-autotrade">
+  <div class="modal wide">
+    <div class="modal-hdr"><span class="modal-ttl">🤖 AI 자동매매 설정</span><button class="modal-x" onclick="closeModal('autotrade')">×</button></div>
+    <div class="modal-body">
+      <div style="font-size:11px;color:var(--ts);margin-bottom:10px;">AI가 얼마나 개입할지 선택하세요. 모든 결정에 Phase 근거를 설명합니다.</div>
+      <div class="level-wrap" id="levelCards">
+        <div class="level-card on" onclick="selLevel(0,this)"><div class="lc-num">레벨 0</div><div class="lc-title">완전 수동</div><div class="lc-desc">AI가 조언만 제공. 모든 실행은 직접.</div><div class="lc-ai">❌ 인간 필수 (Phase 12-2)</div></div>
+        <div class="level-card" onclick="selLevel(1,this)"><div class="lc-num">레벨 1</div><div class="lc-title">종목 선정만</div><div class="lc-desc">AI가 후보 종목 스크리닝 + 이유 설명.</div><div class="lc-ai">🤖 AI전담 (Phase 8 STEP 0~3)</div></div>
+        <div class="level-card" onclick="selLevel(2,this)"><div class="lc-num">레벨 2 ★권장</div><div class="lc-title">진입 신호까지</div><div class="lc-desc">셋업 감지 + 진입 알림. 실행은 직접.</div><div class="lc-ai">🤖 AI보조 (Phase 8 STEP 4~7)</div></div>
+        <div class="level-card" onclick="selLevel(3,this)"><div class="lc-num">레벨 3</div><div class="lc-title">진입 자동 실행</div><div class="lc-desc">조건 충족 시 AI가 모의매수 자동 실행.</div><div class="lc-ai">🤖 AI전담 매수 (모의 전용)</div></div>
+        <div class="level-card" onclick="selLevel(4,this)"><div class="lc-num">레벨 4</div><div class="lc-title">완전 자동</div><div class="lc-desc">종목선정→진입→손절/익절까지 AI가 모두.</div><div class="lc-ai">🤖 완전 자동 (모의 전용)</div></div>
+      </div>
+      <div class="auto-cfg">
+        <div class="auto-cfg-t">⚙ 자동매매 조건</div>
+        <div class="auto-r"><div><div class="auto-lbl">최소 R/R</div><div class="auto-sub">미달 시 진입 안 함</div></div><input class="auto-i" type="number" id="auto-rr" value="1.5" step="0.1"></div>
+        <div class="auto-r"><div><div class="auto-lbl">1회 최대 비중 (%)</div></div><input class="auto-i" type="number" id="auto-pos" value="15"></div>
+        <div class="auto-r"><div><div class="auto-lbl">자동 손절 (%)</div><div class="auto-sub">진입가 대비</div></div><input class="auto-i" type="number" id="auto-stop" value="3" step="0.5"></div>
+        <div class="auto-r"><div><div class="auto-lbl">1차 익절 (%)</div><div class="auto-sub">50% 물량</div></div><input class="auto-i" type="number" id="auto-t1" value="3" step="0.5"></div>
+        <div class="auto-r"><div><div class="auto-lbl">2차 익절 (%)</div><div class="auto-sub">30% 물량</div></div><input class="auto-i" type="number" id="auto-t2" value="5" step="0.5"></div>
+        <div class="auto-r"><div><div class="auto-lbl">트레일링 스탑</div></div><select class="auto-sel" id="auto-trail"><option value="off">끔</option><option value="pct">고점 대비 -3%</option><option value="ma5">5MA 이탈</option></select></div>
+        <div class="auto-r"><div><div class="auto-lbl">연속 손절 자동 정지</div><div class="auto-sub">3회 시 일시정지</div></div><label class="toggle"><input type="checkbox" id="auto-brk" checked><span class="tsl"></span></label></div>
+        <div class="auto-r"><div><div class="auto-lbl">결정 이유 설명</div><div class="auto-sub">Phase 근거 실시간 표시</div></div><label class="toggle"><input type="checkbox" id="auto-explain" checked><span class="tsl"></span></label></div>
+      </div>
+      <div style="font-size:10px;font-weight:700;color:var(--ts);margin-bottom:6px;">📋 AI 결정 로그</div>
+      <div id="aiDecisionLog" style="background:var(--card);border:1px solid var(--br);border-radius:7px;max-height:200px;overflow-y:auto;">
+        <div style="font-size:10px;color:var(--tm);text-align:center;padding:14px;">아직 결정 내역이 없습니다.</div>
+      </div>
+    </div>
+    <div class="modal-ft">
+      <button class="ibtn" onclick="closeModal('autotrade')">닫기</button>
+      <button class="ibtn pur" onclick="startAuto()" id="autoStartBtn">▶ 자동매매 시작</button>
+      <button class="ibtn" id="pauseBtn" onclick="pauseAuto()" style="display:none;background:#f59e0b;color:#fff;border-color:#f59e0b;">⏸ 일시정지</button>
+      <button class="ibtn red" id="stopBtn2" onclick="stopAuto();closeModal('autotrade');" style="display:none;">⏹ 정지</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── SETTINGS MODAL ── -->
+<div class="modal-bg" id="modal-settings">
+  <div class="modal wide" style="width:680px;max-width:96vw;">
+    <div class="modal-hdr">
+      <span class="modal-ttl">⚙ 설정</span>
+      <button class="modal-x" onclick="closeModal('settings')">×</button>
+    </div>
+    <!-- 설정 탭 -->
+    <div style="display:flex;gap:0;border-bottom:1px solid var(--br);flex-shrink:0;">
+      <div class="stab on" onclick="sTab(this,'st-api')">🔑 API 키</div>
+      <div class="stab" onclick="sTab(this,'st-trade')">💰 매매 설정</div>
+      <div class="stab" onclick="sTab(this,'st-usage')">📊 사용량</div>
+    </div>
+    <div class="modal-body" style="padding:0;">
+
+      <!-- API 키 탭 -->
+      <div class="stb on" id="st-api">
+        <!-- Claude API -->
+        <div class="sg" style="margin:0;border-bottom:1px solid var(--br);padding:14px 16px;">
+          <div class="sg-title" style="margin-bottom:10px;">🤖 Claude API (Anthropic)</div>
+          <div class="sg-r">
+            <div><div class="sg-l">Claude API Key</div><div class="sg-s">sk-ant-api03-...</div></div>
+            <input class="sg-i" type="password" id="claude-apikey" placeholder="sk-ant-api03-..." style="font-family:var(--mono);">
+          </div>
+          <div style="font-size:9px;color:var(--tm);margin:4px 0 8px;">
+            <a href="https://console.anthropic.com" target="_blank" style="color:var(--b);">console.anthropic.com</a> → API Keys → Create Key → 복사 후 입력
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <div style="background:var(--bg);border-radius:8px;padding:10px;">
+              <div style="font-size:9px;color:var(--tm);font-family:var(--mono);">사용 모델</div>
+              <div style="font-family:var(--mono);font-size:11px;font-weight:600;margin-top:2px;">claude-sonnet-4-5</div>
+            </div>
+            <div style="background:var(--bg);border-radius:8px;padding:10px;">
+              <div style="font-size:9px;color:var(--tm);font-family:var(--mono);">오늘 호출 횟수</div>
+              <div style="font-family:var(--mono);font-size:14px;font-weight:700;color:var(--b);margin-top:2px;" id="apiCallCount">0회</div>
+            </div>
+            <div style="background:var(--bg);border-radius:8px;padding:10px;">
+              <div style="font-size:9px;color:var(--tm);font-family:var(--mono);">오늘 입력 토큰</div>
+              <div style="font-family:var(--mono);font-size:14px;font-weight:700;margin-top:2px;" id="apiInTokens">0</div>
+            </div>
+            <div style="background:var(--bg);border-radius:8px;padding:10px;">
+              <div style="font-size:9px;color:var(--tm);font-family:var(--mono);">오늘 출력 토큰</div>
+              <div style="font-family:var(--mono);font-size:14px;font-weight:700;margin-top:2px;" id="apiOutTokens">0</div>
+            </div>
+          </div>
+          <div style="margin-top:8px;background:var(--bg);border-radius:8px;padding:10px;">
+            <div style="font-size:9px;color:var(--tm);font-family:var(--mono);margin-bottom:4px;">예상 요금 (오늘)</div>
+            <div style="display:flex;align-items:baseline;gap:6px;">
+              <span style="font-family:var(--mono);font-size:18px;font-weight:800;color:var(--b);" id="apiCost">$0.000</span>
+              <span style="font-size:9px;color:var(--tm);">Sonnet 4: 입력 $3/1M · 출력 $15/1M</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- KIS API -->
+        <div class="sg" style="margin:0;padding:14px 16px;">
+          <div class="sg-title" style="margin-bottom:10px;">📈 KIS API (한국투자증권)</div>
+          <div style="background:rgba(255,153,0,.06);border:1px solid rgba(255,153,0,.15);border-radius:8px;padding:9px 12px;margin-bottom:10px;font-size:10px;line-height:1.7;">
+            <b style="color:var(--a);">발급 방법:</b>
+            <ol style="margin-left:14px;margin-top:4px;color:var(--ts);">
+              <li>한국투자증권 계좌 개설 (비대면 가능)</li>
+              <li>앱 → 인증/보안 → HTS ID 등록</li>
+              <li><b>1544-5000</b> 전화 → "카카오뱅크 계좌 HTS ID 연결"</li>
+              <li><a href="https://apiportal.koreainvestment.com" target="_blank" style="color:var(--b);">apiportal.koreainvestment.com</a> → API 신청</li>
+              <li>APP_KEY + APP_SECRET 발급 → 아래에 입력</li>
+            </ol>
+          </div>
+          <div class="sg-r">
+            <div><div class="sg-l">APP_KEY (36자)</div></div>
+            <input class="sg-i" type="password" id="kis-appkey" placeholder="PSed321z... (36자리)" style="font-family:var(--mono);">
+          </div>
+          <div class="sg-r">
+            <div><div class="sg-l">APP_SECRET (180자)</div></div>
+            <input class="sg-i" type="password" id="kis-appsecret" placeholder="RR0sFMVB... (180자리)" style="font-family:var(--mono);">
+          </div>
+          <div class="sg-r">
+            <div><div class="sg-l">계좌번호</div></div>
+            <input class="sg-i" type="text" id="kis-account" placeholder="12345678-01" style="font-family:var(--mono);">
+          </div>
+          <div class="sg-r">
+            <div><div class="sg-l">모드</div></div>
+            <div style="display:flex;gap:6px;align-items:center;">
+              <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer;">
+                <input type="radio" name="kis-mode" value="mock" id="kis-mock" checked> 모의투자
+              </label>
+              <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer;color:var(--r);">
+                <input type="radio" name="kis-mode" value="real" id="kis-real"> 실거래 ⚠
+              </label>
+            </div>
+          </div>
+          <!-- DART API -->
+          <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--br);">
+            <div style="font-size:10px;font-weight:700;color:var(--ts);margin-bottom:6px;">📢 DART API (공시, 선택)</div>
+            <div class="sg-r">
+              <div><div class="sg-l">DART API 키 (40자)</div></div>
+              <input class="sg-i" type="password" id="dart-key" placeholder="abc123... (40자리)" style="font-family:var(--mono);">
+            </div>
+            <div style="font-size:9px;color:var(--tm);margin-top:4px;">
+              <a href="https://opendart.fss.or.kr" target="_blank" style="color:var(--b);">opendart.fss.or.kr</a> → 인증키 신청 → 이메일 인증 즉시 발급
+            </div>
+          </div>
+          <!-- 저장 버튼 -->
+          <button onclick="saveKisConfig()" style="width:100%;margin-top:12px;padding:9px 0;background:var(--g);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;touch-action:manipulation;">💾 API 설정 저장</button>
+          <div style="margin-top:10px;padding:8px 10px;background:var(--bg);border-radius:7px;">
+            <div style="font-size:9px;color:var(--tm);margin-bottom:4px;">API 연결 상태</div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+              <div id="kis-status" style="font-size:10px;color:var(--tm);flex:1;">⬜ KIS — 미설정</div>
+              <div id="dart-status" style="font-size:10px;color:var(--tm);">⬜ DART — 미설정</div>
+            </div>
+            <div style="display:flex;gap:6px;margin-top:8px;">
+              <button onclick="kisConnectBtn()" style="flex:1;padding:6px 0;background:var(--b);color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;touch-action:manipulation;">🔌 KIS 연결 테스트</button>
+              <button onclick="syncKisBalance()" style="flex:1;padding:6px 0;background:var(--card);color:var(--ts);border:1px solid var(--br);border-radius:6px;font-size:11px;cursor:pointer;touch-action:manipulation;">📊 잔고 동기화</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 매매 설정 탭 -->
+      <div class="stb" id="st-trade" style="padding:14px 16px;">
+        <div class="sg"><div class="sg-title">💰 자금</div>
+          <div class="sg-r"><div><div class="sg-l">초기 자본금</div></div><input class="sg-i" type="number" id="cfg-capital" value="10000000"></div>
+          <div class="sg-r"><div><div class="sg-l">일일 손실 한도 (%)</div></div><input class="sg-i" type="number" id="cfg-dayloss" value="2.0" step="0.1"></div>
+          <div class="sg-r"><div><div class="sg-l">1회 최대 비중 (%)</div></div><input class="sg-i" type="number" id="cfg-maxpos" value="20"></div>
+        </div>
+        <div class="sg"><div class="sg-title">💳 신용/미수</div>
+          <div class="sg-r"><div><div class="sg-l">신용 한도율 (%)</div><div class="sg-s">현금 대비</div></div><input class="sg-i" type="number" id="cfg-clim" value="140"></div>
+          <div class="sg-r"><div><div class="sg-l">미수 한도율 (%)</div></div><input class="sg-i" type="number" id="cfg-mlim" value="40"></div>
+          <div class="sg-r"><div><div class="sg-l">신용 이자 (%/연)</div></div><input class="sg-i" type="number" id="cfg-crate" value="8.5" step="0.5"></div>
+          <div class="sg-r"><div><div class="sg-l">미수 이자 (%/연)</div></div><input class="sg-i" type="number" id="cfg-mrate" value="12.0" step="0.5"></div>
+        </div>
+        <div class="sg"><div class="sg-title">📊 수수료</div>
+          <div class="sg-r"><div><div class="sg-l">매수 수수료 (%)</div></div><input class="sg-i" type="number" id="cfg-bf" value="0.015" step="0.001"></div>
+          <div class="sg-r"><div><div class="sg-l">매도 수수료 (%)</div></div><input class="sg-i" type="number" id="cfg-sf" value="0.015" step="0.001"></div>
+          <div class="sg-r"><div><div class="sg-l">거래세 (%)</div></div><input class="sg-i" type="number" id="cfg-tx" value="0.18" step="0.01"></div>
+        </div>
+        <div class="sg"><div class="sg-title">⚠ 알림</div>
+          <div class="sg-r"><div><div class="sg-l">뇌동매매 감지</div></div><label class="toggle"><input type="checkbox" id="cfg-bd" checked><span class="tsl"></span></label></div>
+          <div class="sg-r"><div><div class="sg-l">일손실 한도 경고</div></div><label class="toggle"><input type="checkbox" id="cfg-al" checked><span class="tsl"></span></label></div>
+        </div>
+      </div>
+
+      <!-- 사용량 탭 -->
+      <div class="stb" id="st-usage" style="padding:14px 16px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <div style="font-size:11px;font-weight:700;">Claude API 사용량 추적</div>
+          <button onclick="resetUsage()" style="padding:2px 8px;border-radius:5px;border:1px solid var(--br);background:var(--bg);color:var(--ts);font-size:9px;cursor:pointer;">초기화</button>
+        </div>
+        <!-- 오늘 요약 -->
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;">
+          <div style="background:rgba(49,130,246,.06);border-radius:10px;padding:10px;text-align:center;">
+            <div style="font-size:9px;color:var(--tm);font-family:var(--mono);">오늘 호출</div>
+            <div style="font-family:var(--mono);font-size:18px;font-weight:800;color:var(--b);" id="u_calls">0</div>
+            <div style="font-size:8px;color:var(--tm);">회</div>
+          </div>
+          <div style="background:rgba(5,192,114,.06);border-radius:10px;padding:10px;text-align:center;">
+            <div style="font-size:9px;color:var(--tm);font-family:var(--mono);">오늘 토큰</div>
+            <div style="font-family:var(--mono);font-size:18px;font-weight:800;color:var(--g);" id="u_tokens">0</div>
+            <div style="font-size:8px;color:var(--tm);">tokens</div>
+          </div>
+          <div style="background:rgba(124,58,237,.06);border-radius:10px;padding:10px;text-align:center;">
+            <div style="font-size:9px;color:var(--tm);font-family:var(--mono);">오늘 요금</div>
+            <div style="font-family:var(--mono);font-size:18px;font-weight:800;color:var(--p);" id="u_cost">$0.000</div>
+            <div style="font-size:8px;color:var(--tm);">USD</div>
+          </div>
+        </div>
+        <!-- 누적 -->
+        <div style="background:var(--bg);border-radius:10px;padding:12px;margin-bottom:12px;">
+          <div style="font-size:10px;font-weight:700;margin-bottom:8px;">📅 누적 통계</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:10px;">
+            <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--br);">
+              <span style="color:var(--tm);">총 호출 횟수</span>
+              <span style="font-family:var(--mono);font-weight:700;" id="u_total_calls">0회</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--br);">
+              <span style="color:var(--tm);">총 입력 토큰</span>
+              <span style="font-family:var(--mono);font-weight:700;" id="u_total_in">0</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--br);">
+              <span style="color:var(--tm);">총 출력 토큰</span>
+              <span style="font-family:var(--mono);font-weight:700;" id="u_total_out">0</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--br);">
+              <span style="color:var(--tm);">총 요금</span>
+              <span style="font-family:var(--mono);font-weight:700;color:var(--p);" id="u_total_cost">$0.000</span>
+            </div>
+          </div>
+        </div>
+        <!-- 기능별 사용량 -->
+        <div style="background:var(--bg);border-radius:10px;padding:12px;">
+          <div style="font-size:10px;font-weight:700;margin-bottom:8px;">🔍 기능별 호출 횟수</div>
+          <div id="u_breakdown" style="font-size:10px;"></div>
+        </div>
+        <!-- 요금 계산 기준 -->
+        <div style="margin-top:10px;padding:8px 10px;background:rgba(49,130,246,.05);border-radius:8px;font-size:9px;color:var(--tm);line-height:1.6;">
+          💡 요금 기준 (claude-sonnet-4-5)<br>
+          입력: $3.00 / 1M tokens · 출력: $15.00 / 1M tokens<br>
+          실제 청구는 Anthropic 콘솔에서 확인 → <a href="https://console.anthropic.com" target="_blank" style="color:var(--b);">console.anthropic.com</a>
+        </div>
+      </div>
+
+    </div>
+    <div class="modal-ft">
+      <button class="ibtn" onclick="resetMock()">모의투자 초기화</button>
+      <button class="ibtn" onclick="closeModal('settings')">닫기</button>
+      <button class="ibtn pri" onclick="saveSettings()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── JOURNAL MODAL ── -->
+<div class="modal-bg" id="modal-journal">
+  <div class="modal" style="width:620px;">
+    <div class="modal-hdr"><span class="modal-ttl">📓 AI 매매일지</span><button class="modal-x" onclick="closeModal('journal')">×</button></div>
+    <div class="modal-body"><div id="jModalBody"></div></div>
+    <div class="modal-ft"><button class="ibtn" onclick="closeModal('journal')">닫기</button><button class="ibtn pri" onclick="genJModal()">🤖 AI 일지 생성</button></div>
+  </div>
+</div>
+
+<!-- ── SHORTCUTS MODAL (Phase 3-4) ── -->
+<div class="modal-bg" id="modal-shortcuts">
+  <div class="modal" style="width:480px;">
+    <div class="modal-hdr"><span class="modal-ttl">⌨ 단축키 도움말 (Phase 3-4)</span><button class="modal-x" onclick="closeModal('shortcuts')">×</button></div>
+    <div class="modal-body">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div>
+          <div class="sg-title" style="margin-bottom:8px;">📈 주문 단축키</div>
+          <div style="font-size:11px;">
+            <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--br);"><span style="font-family:var(--mono);font-weight:700;color:var(--b);">F1</span><span>지정가 매수</span></div>
+            <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--br);"><span style="font-family:var(--mono);font-weight:700;color:var(--b);">F2</span><span>시장가 매수</span></div>
+            <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--br);"><span style="font-family:var(--mono);font-weight:700;color:var(--r);">F3</span><span>지정가 매도</span></div>
+            <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--br);"><span style="font-family:var(--mono);font-weight:700;color:var(--r);">F4</span><span>시장가 매도 (긴급손절)</span></div>
+            <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--br);"><span style="font-family:var(--mono);font-weight:700;">F5</span><span>주문 취소</span></div>
+            <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--br);"><span style="font-family:var(--mono);font-weight:700;color:var(--g);">F6</span><span>전량 지정가 매도</span></div>
+            <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--br);"><span style="font-family:var(--mono);font-weight:700;color:var(--g);">F7</span><span>전량 시장가 매도</span></div>
+            <div style="display:flex;justify-content:space-between;padding:5px 0;"><span style="font-family:var(--mono);font-weight:700;color:var(--a);">F8</span><span>50% 시장가 매도</span></div>
+          </div>
+          <div style="margin-top:10px;padding:8px;background:rgba(49,130,246,.06);border-radius:7px;font-size:9px;color:var(--ts);">F1~F2 매수 / F3~F8 매도 — 물리적 분리</div>
+        </div>
+        <div>
+          <div class="sg-title" style="margin-bottom:8px;">🖥 화면 단축키</div>
+          <div style="font-size:11px;">
+            <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--br);"><span style="font-family:var(--mono);font-weight:700;color:var(--b);">D</span><span>대시보드 ↔ HTS</span></div>
+            <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--br);"><span style="font-family:var(--mono);font-weight:700;">Space</span><span>차트 재생/정지</span></div>
+            <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--br);"><span style="font-family:var(--mono);font-weight:700;">← →</span><span>날짜 이전/다음</span></div>
+            <div style="display:flex;justify-content:space-between;padding:5px 0;"><span style="font-family:var(--mono);font-weight:700;">Esc</span><span>모달 닫기</span></div>
+          </div>
+          <div class="sg-title" style="margin-top:14px;margin-bottom:8px;">📐 차트 권장</div>
+          <div style="font-size:10px;color:var(--ts);line-height:1.8;">1분봉: 스캘핑<br>5분봉 ★: 당일매매 기본<br>일봉: 큰 추세 확인</div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-ft"><button class="ibtn pri" onclick="closeModal('shortcuts')">닫기</button></div>
+  </div>
+</div>
+
+<!-- ── ALERT MODAL ── -->
+<div class="modal-bg" id="modal-alert">
+  <div class="modal" style="width:320px;">
+    <div class="modal-hdr"><span class="modal-ttl" id="alertTtl">알림</span><button class="modal-x" onclick="closeModal('alert')">×</button></div>
+    <div class="modal-body"><p id="alertMsg" style="font-size:13px;line-height:1.6;"></p></div>
+    <div class="modal-ftr"><button class="mbtn" onclick="closeModal('alert')">확인</button></div>
+  </div>
+</div>
