@@ -1,4 +1,24 @@
-
+// ─ 새 버전 자동 감지 (캐시 우회) ───────────────────
+(function(){
+  const meta = document.querySelector('meta[name="build-ts"]');
+  const myBuildTs = meta ? meta.getAttribute('content') : '';
+  if(!myBuildTs || myBuildTs === '__BUILD_TS__') return;
+  let reloaded = false;
+  async function check(){
+    if(reloaded) return;
+    try{
+      const r = await fetch('/api/version', {cache:'no-store'});
+      const d = await r.json();
+      if(d && d.buildTs && String(d.buildTs) !== String(myBuildTs)){
+        reloaded = true;
+        location.replace(location.pathname + '?_v=' + d.buildTs);
+      }
+    }catch(e){}
+  }
+  setTimeout(check, 5000);
+  setInterval(check, 60000);
+  document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) check(); });
+})();
 
 // ── 대시보드 진행률 표시 ──
 let _dpTimer=null;

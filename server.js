@@ -798,10 +798,16 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // 버전 확인 엔드포인트
+  // 버전 확인 엔드포인트 — 클라이언트가 buildTs 비교용으로 폴링
   if(url==="/api/version"){
-    res.writeHead(200,{"Content-Type":"application/json",...CORS});
-    const _hp=require("path").join(__dirname,"trading-hts.html");const _hs=require("fs").statSync(_hp,{throwIfNoEntry:false});res.end(JSON.stringify({version:"1.0.3-debug",htmlSize:_hs?_hs.size:0,ts:Date.now()}));
+    res.writeHead(200,{"Content-Type":"application/json","Cache-Control":"no-cache, no-store, must-revalidate",...CORS});
+    let buildTs = 0;
+    try{ buildTs = JSON.parse(require("fs").readFileSync(require("path").join(__dirname,"buildinfo.json"),"utf8")).buildTs || 0; }catch(e){}
+    const _hp=require("path").join(__dirname,"trading-hts.html");
+    const _hs=require("fs").statSync(_hp,{throwIfNoEntry:false});
+    // buildinfo.json이 없으면 HTML 파일의 mtime을 buildTs 폴백으로 사용 (직접 편집해도 감지)
+    if(!buildTs && _hs && _hs.mtimeMs) buildTs = String(Math.round(_hs.mtimeMs));
+    res.end(JSON.stringify({version:"1.0.3", buildTs:String(buildTs), htmlSize:_hs?_hs.size:0, ts:Date.now()}));
     return;
   }
   // 정적 파일
@@ -811,7 +817,7 @@ const server = http.createServer(async (req, res) => {
     if (err) {
       fs.readFile(path.join(__dirname, 'trading-hts.html'), (e2, d2) => {
         if (e2) { res.writeHead(404); res.end('Not found'); return; }
-        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control':'no-cache, no-store, must-revalidate', 'Pragma':'no-cache', 'Expires':'0' });
         res.end(d2);
       });
       return;
