@@ -1330,11 +1330,11 @@ function _backtestLoadDay(dateStr){
   mock.todayPnl=0; mock.todayTrades=0; mock.lossSeries=0;
   // 캔들 로드 — KIS 있으면 실데이터, 없으면 시뮬
   genCandles(activeTk, dateStr);
-  // KIS 비동기 결과 기다리기 위해 살짝 지연
+  // KIS 비동기 대기: 배속이 빠를수록 더 짧게 (실제로는 시뮬이면 즉시)
+  const _wait = sim.speed>=300 ? 150 : sim.speed>=60 ? 300 : 600;
   setTimeout(()=>{
     chartViewCount=Math.min(120, sim.candles.length||60);
     chartViewStart=Math.max(0,(sim.candles.length||60)-chartViewCount);
-    // 당일 첫 봉으로 이동(전일 분봉 이후)
     const prevCount=(_kisChartMeta&&_kisChartMeta.prevCount)||0;
     sim.idx = prevCount>0 ? prevCount-1 : 0;
     updChartToIdx();
@@ -1342,7 +1342,7 @@ function _backtestLoadDay(dateStr){
     _syncPlayBtn();
     runStep();
     renderBacktestPanel();
-  }, 600);
+  }, _wait);
 }
 async function _backtestEndOfDay(){
   // 현재 날짜 결과 집계
@@ -1356,13 +1356,15 @@ async function _backtestEndOfDay(){
   addDecisionLog(`📅 ${dt} 마감`, `매매 ${todayTrades.length}건 | 손익 ${dayPnl>=0?'+':''}${dayPnl.toLocaleString()}원 | 승 ${wins}·패 ${losses}`, '백테스트');
   renderBacktestPanel();
   // 매매가 있었으면 매매일지 자동 작성 → 학습 누적
+  // 빠른 배속(>=300)에서는 일지를 백그라운드로 돌려 배속 유지, 느린 배속에서는 await
   if(todayTrades.length > 0 && typeof autoSaveJournalOnTrade === 'function'){
-    try{
-      sim.playing=false; // 일지 작성 동안 정지
-      _syncPlayBtn();
-      addDecisionLog(`📓 ${dt} 일지 작성 중`, 'AI 멘토 평가 → 학습 메모리 누적', '학습');
-      await autoSaveJournalOnTrade();
-    }catch(e){ console.warn('일지 자동작성 실패:', e.message); }
+    addDecisionLog(`📓 ${dt} 일지 작성`, sim.speed>=300?'백그라운드 (빠른 배속)':'AI 평가 대기 중', '학습');
+    const _p = autoSaveJournalOnTrade().catch(e=>console.warn('일지:', e.message));
+    if(sim.speed < 300){
+      // 느린 배속에서는 일지 끝까지 기다림 (학습 노트 다음날 즉시 반영)
+      try{ sim.playing=false; _syncPlayBtn(); await _p; }catch(e){}
+    }
+    // 빠른 배속에서는 await 안 함 → 학습은 다다음날부터 자연 반영
   }
   // 다음 영업일?
   if(backtest.dayIdx >= backtest.totalDays){
@@ -1396,6 +1398,31 @@ function _backtestReport(){
   addMsg('ai', msg);
   showAlert('백테스트 결과', msg);
 }
+// 실시간 거래 스트립 — 차트 헤더 아래 최근 6건
+function renderLiveTrades(){
+  const el = document.getElementById('liveTradesStrip');
+  if(!el) return;
+  const recent = (mock.trades||[]).slice(-6).reverse();
+  if(!recent.length){ el.style.display='none'; return; }
+  el.style.display='';
+  el.innerHTML = '<span style="color:var(--tm);font-weight:700;margin-right:6px;">⚡ 실시간 매매</span>' +
+    recent.map(function(t){
+      const isBuy = t.side==='buy';
+      const col = isBuy ? '#dc2626' : '#2563eb';
+      const pnlTxt = (!isBuy && typeof t.pnl==='number') ? ` <span style="color:${t.pnl>=0?'#05c072':'#dc3545'};">${t.pnl>=0?'+':''}${Math.round(t.pnl).toLocaleString()}</span>` : '';
+      const autoTag = t.auto ? '<span style="background:rgba(139,92,246,.15);color:var(--p);padding:0 3px;border-radius:2px;font-size:8px;margin-right:2px;">AI</span>' : '';
+      const time = (t.barTime || (t.time||''));
+      return `<span style="display:inline-block;margin-right:10px;padding:1px 4px;border-radius:3px;background:var(--pan);border:1px solid var(--br);">
+        <span style="color:var(--tm);">${time}</span>
+        ${autoTag}
+        <b style="color:${col};">${isBuy?'매수':'매도'}</b>
+        <span style="color:var(--t);">${t.nm||t.tk}</span>
+        <span style="color:var(--ts);">${(t.price||t.pr||0).toLocaleString()}원×${t.qty}</span>
+        ${pnlTxt}
+      </span>`;
+    }).join('');
+}
+
 function renderBacktestPanel(){
   const el=document.getElementById('backtestPanel');
   if(!el) return;
@@ -1824,6 +1851,7 @@ function submitOrder(autoExec){
     if(cfg.al){const lr=-mock.todayPnl/cfg.capital*100;if(lr>=cfg.dayloss)showAlert("⚠ 일일 손실 한도",`한도 ${cfg.dayloss}% 도달\n매매 중단 권고.`);}
   }
   saveMock(); renderPort(); renderTradeLog(); updCash(); updPnl(); updCredLim();
+  try{ renderLiveTrades&&renderLiveTrades(); }catch(_e){}
 
   // ── KIS 실계좌/모의투자 실제 주문 전송
   if (kisConfig.appKey && kisConfig.account) {
@@ -6312,7 +6340,7 @@ window.onload=()=>{
   if(savedTrust){trustScore=parseInt(savedTrust);const sl=document.getElementById('trustSlider');if(sl)sl.value=trustScore;updateTrustScore(trustScore);}
   setTimeout(()=>{renderGrowthRoadmap();detectSlump();},500);
   // 차트 큰 헤더 초기화 + 강세 섹터 패널 초기 렌더 / 주기적 갱신
-  setTimeout(()=>{updChartHeader&&updChartHeader();renderHotSectors&&renderHotSectors();refreshHotSectors&&refreshHotSectors(false);updateLearnerStage&&updateLearnerStage();}, 400);
+  setTimeout(()=>{updChartHeader&&updChartHeader();renderHotSectors&&renderHotSectors();refreshHotSectors&&refreshHotSectors(false);updateLearnerStage&&updateLearnerStage();renderLiveTrades&&renderLiveTrades();}, 400);
   // 5분마다 강세 섹터 자동 갱신 (모의투자라도 변동이 보이게)
   setInterval(()=>{refreshHotSectors&&refreshHotSectors(false);}, 5*60*1000);
 };
