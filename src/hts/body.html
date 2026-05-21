@@ -22,6 +22,12 @@
     <span class="si-ch cu" id="siCh">+1.24%</span>
   </div>
   <div class="bar-r">
+    <!-- 핵심 액션 버튼 먼저 (잘려도 가장 자주 쓰는 게 살아남음) -->
+    <button class="ibtn pur" onclick="openModal('autotrade')" id="autoBtn" title="자동매매">🤖</button>
+    <button class="ibtn pri" onclick="openModal('journal')" title="매매일지">📓</button>
+    <button class="ibtn" onclick="openModal('settings')" title="설정">⚙</button>
+    <button class="ibtn red" onclick="endMock()" title="종료">■</button>
+    <button class="ibtn" onclick="refreshAllData()" title="전체 새로고침" style="background:var(--g);color:#fff;border-color:var(--g);">↺</button>
     <div class="badge mock" id="modeBadge"><div class="bdot"></div><span id="modeText">모의투자</span></div>
     <div class="clk" id="clk">--:--:--</div>
     <!-- 실시간 지수 표시 -->
@@ -34,18 +40,12 @@
       <span id="idx-kosdq-chg" style="font-size:9px;">--</span>
       <span id="idx-pred" style="font-size:9px;padding:1px 6px;border-radius:4px;margin-left:2px;font-weight:700;display:none;"></span>
     </div>
-    <!-- 빠른 전환 버튼 -->
     <button class="ibtn" id="quickSwitchBtn" onclick="quickSwitch()" title="대시보드 ↔ HTS 전환 (단축키: D)">
-      <span id="quickSwitchIcon">📊</span> <span id="quickSwitchTxt">대시보드</span>
+      <span id="quickSwitchIcon">📊</span>
     </button>
     <button class="ibtn" onclick="openModal('shortcuts')" title="단축키 도움말">⌨</button>
     <button class="ibtn tab-quick-lp" onclick="openMobPanel('lp')" style="display:none;" title="관심종목">☰</button>
     <button class="ibtn tab-quick-rp" onclick="openMobPanel('rp')" style="display:none;" title="호가창">📊</button>
-    <button class="ibtn" onclick="openModal('settings')">⚙</button>
-    <button class="ibtn red" onclick="endMock()">■ 종료</button>
-    <button class="ibtn pri" onclick="openModal('journal')">📓</button>
-    <button class="ibtn pur" onclick="openModal('autotrade')" id="autoBtn">🤖 자동매매</button>
-    <button class="ibtn" onclick="refreshAllData()" title="전체 새로고침" style="background:var(--g);color:#fff;border-color:var(--g);">↺</button>
   </div>
 </header>
 
