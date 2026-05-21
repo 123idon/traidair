@@ -1287,10 +1287,16 @@ function _nextBusinessDay(dateStr){
   do{d.setDate(d.getDate()+1);}while(d.getDay()===0||d.getDay()===6);
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
-function startBacktest(startDate, endDate){
+async function startBacktest(startDate, endDate){
   if(backtest.running){addMsg('ai','⚠ 이미 백테스트 진행 중'); return;}
   const days=_businessDays(startDate, endDate);
   if(!days.length){showAlert('백테스트','영업일이 없습니다'); return;}
+  // 종목 풀이 거의 비었으면 강세섹터 자동 동기화 후 시작
+  const poolSize = (WGS[0]||[]).length + (WGS[1]||[]).length + (WGS[3]||[]).length + Object.keys(window._sectorInfo||{}).length;
+  if(poolSize < 2 && typeof refreshHotSectors==='function'){
+    addMsg('ai','📊 종목 풀 부족 — 강세섹터 동기화 후 백테스트 시작');
+    try{ await refreshHotSectors(true); }catch(_e){}
+  }
   backtest.running=true;
   backtest.startDate=days[0];
   backtest.endDate=days[days.length-1];
@@ -2969,12 +2975,34 @@ function runScreening(){
 }
 
 async function _runScreeningAsync(){
-  // ── 관심종목 전체 순환 분석 ──
-  var allTks=[...(WGS[0]||[]),...(WGS[1]||[]),...(WGS[3]||[])].filter(function(v,i,a){return a.indexOf(v)===i&&v;});
-  if(!allTks.length){
-    // 관심종목 없으면 현재 종목만
-    allTks=[activeTk];
+  // ── 분석 풀 구성: 다양성 보장을 위해 가능한 소스 모두 합침 ──
+  var pool = new Set();
+  (WGS[0]||[]).forEach(t=>pool.add(t));
+  (WGS[1]||[]).forEach(t=>pool.add(t));
+  (WGS[3]||[]).forEach(t=>pool.add(t));
+  Object.keys(window._sectorInfo||{}).forEach(t=>pool.add(t));
+  (CANDS||[]).forEach(c=>{ if(c&&c.tk) pool.add(c.tk); });
+  // 풀이 비면 강세섹터 즉시 가져오기 (절대 activeTk 하나로 떨어지지 않게)
+  if(pool.size === 0 && typeof refreshHotSectors === 'function'){
+    addDecisionLog('🔄 종목 풀 비어있음','강세섹터 자동 가져오기','종목선정');
+    try{ await refreshHotSectors(true); }catch(_e){}
+    Object.keys(window._sectorInfo||{}).forEach(t=>pool.add(t));
+    (WGS[0]||[]).forEach(t=>pool.add(t));
   }
+  // 그래도 비면 STOCKS 다양한 섹터 골고루
+  if(pool.size === 0){
+    // 섹터별 1종목씩 + 시총 큰 것 일부
+    var bySec={};
+    STOCKS.forEach(s=>{ if(s.sec && !bySec[s.sec]) bySec[s.sec]=s.tk; });
+    Object.values(bySec).slice(0,8).forEach(t=>pool.add(t));
+    STOCKS.slice(0,5).forEach(s=>pool.add(s.tk));
+    pool.add(activeTk);
+  }
+  var allTks=Array.from(pool).filter(Boolean);
+  // 다양성 페널티 계산용: 최근 8개 매매에서 같은 종목 출현 횟수
+  var _recentTks = (mock.trades||[]).slice(-8).map(function(t){return t.tk;});
+  var _tkRecent = {};
+  _recentTks.forEach(function(t){ _tkRecent[t]=(_tkRecent[t]||0)+1; });
 
   // 일일 손실/연속손절 체크
   var dayLossRate=-mock.todayPnl/cfg.capital*100;
@@ -3031,6 +3059,15 @@ async function _runScreeningAsync(){
     if(volR>=1.5){score+=3;tags.push('거래량x'+volR.toFixed(1));}
     else if(volR>=1.2){score+=1;tags.push('거래량+'+(((volR-1)*100).toFixed(0))+'%');}
     if(lrsi>=45&&lrsi<=72){score+=2;tags.push('RSI'+lrsi);}
+    // 강세 섹터 가산 (대시보드에서 받은 섹터 정보 활용)
+    var _si = (window._sectorInfo||{})[tk];
+    if(_si){
+      var _bonus = _si.rank===1?3:_si.rank===2?2:_si.rank===3?1:0;
+      if(_bonus){score+=_bonus;tags.push('강세'+_si.rank+'위');}
+    }
+    // 다양성 페널티: 최근 매매 8건 중 같은 종목 출현 횟수만큼 -1.5점
+    var _penal = (_tkRecent[tk]||0)*1.5;
+    if(_penal){ score = score - _penal; tags.push('-반복'+_tkRecent[tk]); }
 
     scored.push({tk:tk,stk:stk,score:score,tags:tags,lc:lc,lma5:lma5,lrsi:lrsi,volR:volR});
   }
