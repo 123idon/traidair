@@ -1852,7 +1852,9 @@ function renderWLGroup(){
       var _row="";
       _row+="<div style='display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:7px;cursor:pointer;margin-bottom:1px;'>";
       _row+="<div data-stk='"+_tk+"' onclick='selectStk(this.dataset.stk)' style='display:flex;align-items:center;gap:5px;flex:1;min-width:0;'>";
-      _row+="<div style='font-size:9px;font-family:var(--mono);color:"+_col+";width:34px;flex-shrink:0;'>"+_tk.slice(-4)+"</div>";
+      var _si=window._sectorInfo&&window._sectorInfo[_tk];
+      var _badge=_si?"<span style='font-size:8px;background:var(--b);color:#fff;border-radius:3px;padding:0 3px;margin-right:2px;'>"+ _si.rank+"위</span>":"";
+      _row+="<div style='font-size:9px;font-family:var(--mono);color:"+_col+";width:34px;flex-shrink:0;'>"+_badge+_tk.slice(-4)+"</div>";
       _row+="<div style='font-size:9px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>"+_s.nm+"</div>";
       _row+="<div style='font-size:9px;color:"+(_up?"var(--g)":"var(--r)")+";width:42px;text-align:right;flex-shrink:0;'>"+(_up?"+":"")+_chg+"%</div>";
       _row+="</div>";
@@ -2312,7 +2314,7 @@ function drawChart(){
 
   const toX=i=>PL+(i+0.5)*(cw/cs.length);
   const toY=v=>PT+mainH*(1-(v-yMin)/yR);
-  const bw=Math.max(1.5,Math.min(16,cw/cs.length*0.6));
+  const bw=Math.max(1.5,Math.min(10,cw/cs.length*0.55));
 
   // 배경
   ctx.clearRect(0,0,W,H);
@@ -2768,9 +2770,23 @@ function setTF(el,tf){
     // 일봉 계열은 genCandles에서 idx/view 설정함, 분봉은 0부터
     const isDaily = tf==='D'||tf.startsWith('D');
     if(!isDaily){
-      sim.idx=0;
-      chartViewCount=Math.min(60,sim.candles.length);
-      chartViewStart=0;
+      // KIS 연결 시 실제 분봉 로드
+      if(kisConfig.appKey&&kisConfig.appSecret){
+        _fetchKisCandles(activeTk,sim.date,tf).then(function(_ic){
+          if(_ic&&_ic.length>0){
+            sim.candles=_ic;
+            var _pc=_kisChartMeta.prevCount||0;
+            sim.idx=_pc>0?_pc-1:_ic.length-1;
+            chartViewCount=Math.min(60,_ic.length);
+            chartViewStart=Math.max(0,_ic.length-chartViewCount);
+            drawChart();
+          }
+        }).catch(function(e){console.warn('TF 분봉 로드 실패:',e.message);});
+      } else {
+        sim.idx=0;
+        chartViewCount=Math.min(60,sim.candles.length);
+        chartViewStart=0;
+      }
     }
     drawChart();
   }catch(e){
@@ -7270,36 +7286,91 @@ window.onload=()=>{
 // 대시보드 진입후보 → 관심종목 자동 추가
 async function syncCandidatesToWatchlist(){
   try{
-    const dashFrame = document.getElementById('dashFrame');
-    if(!dashFrame||!dashFrame.contentWindow) return;
-    // 대시보드의 진입후보 카드에서 종목 추출
-    const candCards = dashFrame.contentWindow.document.querySelectorAll('.cand-card,[data-tk]');
-    const tks = [];
-    candCards.forEach(function(el){
-      const tk = el.dataset.tk || el.getAttribute('data-tk');
-      if(tk && /^\d{6}$/.test(tk)) tks.push(tk);
+    addMsg('ai','🔄 강세섹터 분석 중...');
+    
+    // Claude AI로 당일 강세섹터 1~3위 + 대장주 분석
+    const date = sim.date || new Date().toISOString().slice(0,10);
+    const prompt = '오늘('+date+') 한국 주식시장 실시간 강세섹터 분석.\n\n'+
+      '강세섹터 상위 3개와 각 섹터 대장주 1~2개 선정.\n'+
+      '실적, 이슈, 수급 기반으로 판단.\n\n'+
+      'JSON만 반환 (다른 텍스트 없이):\n'+
+      '{"sectors":[{"rank":1,"name":"섹터명","reason":"강세이유1줄","stocks":[{"tk":"종목코드6자리","nm":"종목명","reason":"선정이유"}]},'+
+      '{"rank":2,...},{"rank":3,...}]}';
+
+    const res = await fetch('/api/claude',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-5',
+        max_tokens:600,
+        messages:[{role:'user',content:prompt}]
+      })
     });
-    // 대시보드 AI 분석 결과에서도 추출 (텍스트에서 종목코드 파싱)
-    const aiText = dashFrame.contentWindow.document.querySelector('#aiResult,#aiAnalysis,.ai-result');
-    if(aiText){
-      const matches = aiText.textContent.match(/\d{6}/g)||[];
-      matches.forEach(function(tk){ if(!tks.includes(tk)) tks.push(tk); });
+    const data = await res.json();
+    const text = (data.content&&data.content[0]&&data.content[0].text)||'{}';
+    const m = text.match(/\{[\s\S]*\}/);
+    if(!m) throw new Error('JSON 파싱 실패');
+    const result = JSON.parse(m[0]);
+    if(!result.sectors||!result.sectors.length) throw new Error('섹터 데이터 없음');
+
+    // 기존 후보 종목 제거 (WGS[0]에서 이전 자동추가 종목 제거)
+    const prevAuto = JSON.parse(localStorage.getItem('htsAutoTks')||'[]');
+    if(prevAuto.length){
+      WGS[0] = WGS[0].filter(function(tk){ return !prevAuto.includes(tk); });
     }
-    if(!tks.length) return;
-    // WGS[1] (모니터링 그룹)에 추가 (이미 있으면 skip)
-    if(!WGS[1]) WGS[1]=[];
-    let added=0;
-    tks.forEach(function(tk){
-      if(!WGS[0].includes(tk)&&!WGS[1].includes(tk)){
-        WGS[1].push(tk); added++;
-      }
+
+    // 새 종목 추가
+    const newTks = [];
+    const sectorInfo = {}; // tk → {rank, sectorName, reason}
+    result.sectors.forEach(function(sec){
+      (sec.stocks||[]).forEach(function(stk){
+        if(/^\d{6}$/.test(stk.tk) && !newTks.includes(stk.tk)){
+          newTks.push(stk.tk);
+          sectorInfo[stk.tk] = {rank:sec.rank, sector:sec.name, reason:stk.reason, nm:stk.nm};
+          // STOCKS에 없으면 추가
+          if(!STOCKS.find(function(s){return s.tk===stk.tk;})){
+            STOCKS.push({tk:stk.tk, nm:stk.nm, pr:0, base:1, sec:sec.name, cap:'중형'});
+          }
+        }
+      });
     });
-    if(added>0){
-      saveWGS();
-      renderWLGroup();
-      addMsg('ai','📋 대시보드 진입후보 '+added+'종목 관심목록에 자동 추가됨');
-    }
-  }catch(e){ console.warn('관심종목 동기화 실패:',e.message); }
+
+    // WGS[0]에 추가 (앞에 삽입)
+    newTks.forEach(function(tk){
+      if(!WGS[0].includes(tk)) WGS[0].unshift(tk);
+    });
+    
+    // 자동추가 목록 저장
+    localStorage.setItem('htsAutoTks', JSON.stringify(newTks));
+
+    // 순위 표시 태그 저장
+    localStorage.setItem('htsSectorInfo', JSON.stringify(sectorInfo));
+    window._sectorInfo = sectorInfo;
+
+    saveWGS();
+    renderWLGroup();
+
+    // 메시지 출력
+    let msg = '📊 강세섹터 자동 선정 완료\n\n';
+    result.sectors.forEach(function(sec){
+      msg += sec.rank+'위 '+sec.name+': '+sec.reason+'\n';
+      (sec.stocks||[]).forEach(function(stk){
+        msg += '  → '+stk.nm+'('+stk.tk+')\n';
+      });
+    });
+    addMsg('ai', msg);
+
+    // CANDS 업데이트
+    CANDS = newTks.slice(0,3).map(function(tk,i){
+      const info = sectorInfo[tk]||{};
+      return {tk:tk, why:info.sector+'('+info.rank+'위) '+info.reason, score:95-i*5};
+    });
+    renderCands();
+
+  }catch(e){
+    console.warn('강세섹터 분석 실패:', e.message);
+    addMsg('ai','⚠ 강세섹터 분석 실패: '+e.message);
+  }
 }
 
 async function autoSelectBestStock(){
