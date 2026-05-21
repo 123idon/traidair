@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#ffffff">
-<meta name="build-ts" content="1779394493250">
+<meta name="build-ts" content="1779395003054">
 <title>TraidAIr HTS</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 
@@ -1994,7 +1994,7 @@ const STOCKS=[
 ];
 // Phase 3-9: 관심종목 5그룹
 const WG_LABELS = ['🎯 오늘 진입 후보','📊 모니터링','🚫 매매금지','🔥 테마/이슈','📝 복기 대상'];
-const WG_MAX = [3, 10, 999, 10, 5];
+const WG_MAX = [10, 20, 999, 15, 10];
 let WGS = (()=>{
   try{
     const _raw = localStorage.getItem("htsWGS");
@@ -2037,10 +2037,12 @@ function addCurrentToWG(){
   const tk=activeTk;
   const grp=WGS[curWG]||(WGS[curWG]=[]);
   if(grp.includes(tk)){showAlert("중복","이미 이 그룹에 있습니다.");return;}
-  if(curWG===0&&grp.length>=3){showAlert("초과","진입 후보는 최대 3개입니다. (Phase 3-9)");return;}
+  // 한도 체크 (WG_MAX 기준)
+  const _max = WG_MAX[curWG]||10;
+  if(grp.length >= _max){showAlert("초과","이 그룹은 최대 "+_max+"개까지 가능합니다.");return;}
   grp.push(tk);saveWGS();renderWLGroup();
   const stk=STOCKS.find(s=>s.tk===tk);
-  addDecisionLog("["+WG_LABELS[curWG]+"] "+stk?.nm+" 추가","","Phase 3-9");
+  addDecisionLog("["+WG_LABELS[curWG]+"] "+(stk?.nm||tk)+" 추가","","관심종목");
 }
 function removeFromWG(gIdx,tk){
   WGS[gIdx]=WGS[gIdx].filter(w=>w!==tk);
@@ -3439,9 +3441,10 @@ async function _backtestLoadDay(dateStr){
       setTimeout(()=>{try{_df.contentWindow._skipHtsSync=false;}catch(e){}},100);
     }
   }catch(_e){}
-  // 매일 강세섹터 새로 가져오기 (장중 변동 반영) — 너무 자주는 부담이라 3일에 한 번
-  if((backtest.dayIdx % 3) === 0 && typeof refreshHotSectors==='function'){
-    try{ await refreshHotSectors(true); }catch(_e){}
+  // ★ 매일 강세섹터 새로 가져오기 (사용자 요청: 딜레이 있어도 정확하게)
+  if(typeof refreshHotSectors==='function'){
+    addDecisionLog('📊 '+dateStr+' 강세섹터 분석', '새 날짜 데이터 가져오는 중...', '백테스트');
+    try{ await refreshHotSectors(true); }catch(_e){ console.warn('섹터 fetch:', _e.message); }
   }
   // 종목 자동 전환: 강세 1위 종목 우선, 없으면 WGS[0] 첫 종목
   try{
@@ -8851,7 +8854,7 @@ function collectMarketCtx(){
 (function(){
   const meta = document.querySelector('meta[name="build-ts"]');
   const myBuildTs = meta ? meta.getAttribute('content') : '';
-  if(!myBuildTs || myBuildTs === '1779394493250') return; // 로컬 빌드 안 한 경우
+  if(!myBuildTs || myBuildTs === '1779395003054') return; // 로컬 빌드 안 한 경우
   let reloaded = false;
   async function check(){
     if(reloaded) return;
@@ -9026,7 +9029,8 @@ async function syncCandidatesToWatchlist(){
     const prompt =
       _lec + _learn +
       `# 강세섹터 정교 분석 요청 — ${date} ${_phase}\n\n` +
-      `당신은 단타 매매 멘토. 위 강의 원칙을 100% 따라 한국 주식시장 강세섹터를 선정.\n\n` +
+      `⚠️ 중요: 분석 대상 날짜는 정확히 ${date}이다. ${date} 기준 (그 시점의 시장 상황 + 그 직전 영업일까지 누적된 흐름)으로만 판단. 그 이후 정보는 사용 금지(미래 정보 leak 금지).\n\n` +
+      `당신은 단타 매매 멘토. 위 강의 원칙을 100% 따라 ${date} 기준 한국 주식시장 강세섹터를 선정.\n\n` +
       `## 시장 현황\n${_mkt}\n\n` +
       `## 분석 기준 (반드시 모두 종합)\n` +
       `1. **거래대금/거래량**: 코스피·코스닥 거래대금 상위 섹터, 거래량 전일 대비 200%+ 종목\n` +
@@ -9083,9 +9087,14 @@ async function syncCandidatesToWatchlist(){
     // 새 종목 추가
     const newTks = [];
     const sectorInfo = {}; // tk → {rank, sectorName, reason}
+    let _rejected = 0;
     result.sectors.forEach(function(sec){
       (sec.stocks||[]).forEach(function(stk){
-        if(/^\d{6}$/.test(stk.tk) && !newTks.includes(stk.tk)){
+        // 종목코드 정규화: 5자리도 허용, 앞에 0 추가
+        let _tk = String(stk.tk||'').trim().replace(/[^\d]/g,'');
+        if(_tk.length===5) _tk = '0'+_tk;
+        stk.tk = _tk;
+        if(/^\d{6}$/.test(_tk) && !newTks.includes(_tk)){
           newTks.push(stk.tk);
           sectorInfo[stk.tk] = {
             rank: sec.rank,
@@ -9102,17 +9111,34 @@ async function syncCandidatesToWatchlist(){
             short_trend: stk.short_trend || '',
           };
           // STOCKS에 없으면 추가
-          if(!STOCKS.find(function(s){return s.tk===stk.tk;})){
-            STOCKS.push({tk:stk.tk, nm:stk.nm, pr:0, base:1, sec:sec.name, cap:'중형'});
+          // STOCKS에 없으면 추가 (가격 추정치 base 사용)
+          if(!STOCKS.find(function(s){return s.tk===_tk;})){
+            // base 가격 추정: stk.entry에 숫자 있으면 그걸로
+            let _base = 50000;
+            const _em = String(stk.entry||'').match(/(\d{1,3}(?:,\d{3})*|\d+)\s*원/);
+            if(_em) _base = parseInt(_em[1].replace(/,/g,'')) || 50000;
+            STOCKS.push({tk:_tk, nm:stk.nm, pr:_base, base:_base, sec:sec.name, cap:'중형'});
           }
+        }else if(_tk){
+          _rejected++;
+          console.warn('종목코드 인식 실패:', stk.tk, '→', _tk);
         }
       });
     });
+    if(_rejected>0) addMsg('ai', '⚠ 종목코드 형식 오류 '+_rejected+'건 무시 (6자리 숫자 아님)');
+    if(!newTks.length){
+      addMsg('ai', '⚠ Claude가 유효한 종목코드를 반환 안 함. 강의 페이지 확인 또는 다시 시도.');
+      return;
+    }
 
-    // WGS[0]에 추가 (앞에 삽입)
+    // WGS[0]에 추가 (앞에 삽입). 한도(WG_MAX[0]) 내에서
     newTks.forEach(function(tk){
       if(!WGS[0].includes(tk)) WGS[0].unshift(tk);
     });
+    // 한도 초과분 제거
+    const _maxW = WG_MAX[0]||10;
+    if(WGS[0].length > _maxW) WGS[0] = WGS[0].slice(0, _maxW);
+    addDecisionLog('📌 관심종목 추가됨', newTks.length+'개 종목 → '+newTks.map(t=>{const s=STOCKS.find(x=>x.tk===t);return s?s.nm:t;}).join(', '), '종목선정');
     
     // 자동추가 목록 저장
     saveToServer('htsAutoTks', JSON.stringify(newTks));
