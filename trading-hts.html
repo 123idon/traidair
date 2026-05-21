@@ -336,8 +336,8 @@ button{cursor:pointer;font-family:var(--sans);}
 .live-note{font-size:9px;color:var(--tm);text-align:center;margin-top:6px;font-family:var(--mono);}
 /* ── 태블릿 (860px 이하) ── */
 /* ── 모바일 공통 컴포넌트 (기본값 = 숨김) ── */
-.mob-overlay{display:none;position:fixed;inset:0;z-index:299;background:rgba(0,0,0,.4);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);}
-.mob-tabbar{display:none;position:fixed;bottom:0;left:0;right:0;height:calc(var(--mob-nav) + var(--sab));padding-bottom:var(--sab);background:var(--pan);border-top:1px solid var(--br);box-shadow:0 -2px 12px rgba(0,0,0,.08);z-index:400;align-items:stretch;justify-content:space-around;}
+.mob-overlay{display:none;position:fixed;inset:0;z-index:599;background:rgba(0,0,0,.4);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);}
+.mob-tabbar{display:none;position:fixed;bottom:0;left:0;right:0;height:calc(var(--mob-nav) + var(--sab));padding-bottom:var(--sab);background:var(--pan);border-top:1px solid var(--br);box-shadow:0 -2px 12px rgba(0,0,0,.08);z-index:600;align-items:stretch;justify-content:space-around;}
 .mob-tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;background:none;border:none;cursor:pointer;color:var(--tm);font-size:9px;font-family:var(--sans);padding:6px 2px;min-width:0;transition:color .12s;-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
 .mob-tab.active{color:var(--b);}
 .mob-tab .mob-icon{font-size:20px;line-height:1;}
@@ -2477,6 +2477,42 @@ function drawChart(){
   _drawMACD(cs,cls);
 
   mChart={_ok:true};
+
+  // ── 매수/매도 체결 마커 ──
+  try{
+    const _trades=(mock.trades||[]).filter(function(t){
+      return t.tk===activeTk&&(t.side==='buy'||t.side==='sell');
+    });
+    _trades.forEach(function(t){
+      if(!t.ts) return;
+      var tIdx=-1;
+      for(var _ci=chartViewStart;_ci<Math.min(chartViewStart+chartViewCount,cs.length);_ci++){
+        var cTime=cs[_ci].ts||cs[_ci].t||0;
+        if(Math.abs(cTime-t.ts)<300000){tIdx=_ci;break;}
+      }
+      if(tIdx<0) return;
+      var ci2=tIdx-chartViewStart;
+      var x=Math.round(ci2*(bw+gap)+bw/2+padL);
+      var yPr=Math.round(H-padB-(t.pr-minP)/prRange*chartH);
+      var isBuy=t.side==='buy';
+      ctx.save();
+      ctx.fillStyle=isBuy?'#00c471':'#ff4757';
+      ctx.strokeStyle=isBuy?'#008855':'#cc1133';
+      ctx.lineWidth=1.5;
+      ctx.beginPath();
+      if(isBuy){
+        ctx.moveTo(x,yPr+14);ctx.lineTo(x-5,yPr+4);ctx.lineTo(x+5,yPr+4);
+      }else{
+        ctx.moveTo(x,yPr-14);ctx.lineTo(x-5,yPr-4);ctx.lineTo(x+5,yPr-4);
+      }
+      ctx.closePath();ctx.fill();ctx.stroke();
+      ctx.fillStyle=isBuy?'#00c471':'#ff4757';
+      ctx.font='bold 8px monospace';
+      ctx.textAlign='center';
+      ctx.fillText(t.pr.toLocaleString(),x,isBuy?yPr+25:yPr-17);
+      ctx.restore();
+    });
+  }catch(_me){}
   // AI 타점 오버레이
   drawSignalOverlay();
 }
@@ -4361,6 +4397,9 @@ async function _runScreeningAsync(){
     await new Promise(function(r){setTimeout(r,800);});
   }
 
+  // 스캘핑 기법 완전 차단
+  const _tech = typeof detectTechnique === "function" ? detectTechnique(scored[0]?.lc||{}) : {};
+  if(_tech.technique === "스캘핑"){addDecisionLog("스캘핑 차단","스캘핑 기법 금지 설정","NOGO");return;}
   if(best.score<3){
     addDecisionLog('['+best.stk.nm+'] 관망',best.tags.join(' ')||'조건미달','관망');
     updAdvBoxes('관망 — '+best.stk.nm+' ('+best.score+'점)','기술적 조건 미달');
