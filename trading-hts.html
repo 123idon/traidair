@@ -2,6 +2,9 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=5,user-scalable=yes,viewport-fit=cover">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -253,7 +256,7 @@ button{cursor:pointer;font-family:var(--sans);}
 .send-btn{width:32px;height:32px;border-radius:10px;border:none;background:var(--b);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;transition:all .12s;box-shadow:0 2px 8px rgba(49,130,246,.3);}
 .send-btn:hover{opacity:.85;transform:scale(1.05);}
 .send-btn:disabled{opacity:.4;cursor:not-allowed;}
-.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:300;display:none;align-items:center;justify-content:center;backdrop-filter:blur(8px);}
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;display:none;align-items:center;justify-content:center;backdrop-filter:blur(8px);}
 .modal-bg.show{display:flex;}
 .modal{background:var(--pan);border:none;border-radius:16px;width:560px;max-width:95vw;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:var(--sh2);}
 .modal.wide{width:680px;max-width:98vw;}
@@ -2493,7 +2496,7 @@ function drawChart(){
       if(tIdx<0) return;
       var ci2=tIdx-chartViewStart;
       var x=Math.round(ci2*(bw+gap)+bw/2+padL);
-      var yPr=Math.round(H-padB-(t.pr-minP)/prRange*chartH);
+      var _tpr=t.pr||t.price||0;var yPr=Math.round(H-padB-(_tpr-minP)/prRange*chartH);
       var isBuy=t.side==='buy';
       ctx.save();
       ctx.fillStyle=isBuy?'#00c471':'#ff4757';
@@ -2509,7 +2512,7 @@ function drawChart(){
       ctx.fillStyle=isBuy?'#00c471':'#ff4757';
       ctx.font='bold 8px monospace';
       ctx.textAlign='center';
-      ctx.fillText(t.pr.toLocaleString(),x,isBuy?yPr+25:yPr-17);
+      ctx.fillText((_tpr).toLocaleString(),x,isBuy?yPr+25:yPr-17);
       ctx.restore();
     });
   }catch(_me){}
@@ -3135,7 +3138,7 @@ function submitOrder(autoExec){
     const prevSO=stopOrders[activeTk];
     const newOrigQty=prevSO?(prevSO.origQty||0)+qty:qty;
     stopOrders[activeTk]={stop:stopPr,t1:t1Pr,t2:t2Pr,t1done:prevSO?prevSO.t1done:false,t2done:prevSO?prevSO.t2done:false,trail:trailMode,trailHigh:Math.max(pr,prevSO?.trailHigh||0),origQty:newOrigQty,origStop:stopPr};
-    mock.trades.push({date:sim.date,tk:activeTk,nm:stk.nm,side:"buy",price:pr,qty,fee:Math.round(fee),pnl:0,creditType:credType,auto:autoExec||false,time:new Date().toLocaleTimeString("ko-KR",{hour:"2-digit"})});
+    mock.trades.push({date:sim.date,tk:activeTk,nm:stk.nm,side:"buy",price:pr,pr:pr,ts:Date.now(),qty,fee:Math.round(fee),pnl:0,creditType:credType,auto:autoExec||false,time:new Date().toLocaleTimeString("ko-KR",{hour:"2-digit"})});
   checkBrainDong("buy",pr,qty,stk);
   } else {
     const pos=mock.positions[activeTk];
@@ -3154,7 +3157,7 @@ function submitOrder(autoExec){
           "연속 수익 "+mock.winSeries+"회!\n\n지금이 가장 위험한 순간입니다.\n\n• 비중 절대 늘리지 않음\n• 체크리스트 더 꼼꼼히\n• 연속수익은 운과 실력을 구분할 수 없음");
       }
     }
-    mock.trades.push({date:sim.date,tk:activeTk,nm:stk.nm,side:"sell",price:pr,qty,fee:Math.round(fee+tax),pnl:Math.round(pnl),creditType:credType,auto:autoExec||false,time:new Date().toLocaleTimeString("ko-KR",{hour:"2-digit"})});
+    mock.trades.push({date:sim.date,tk:activeTk,nm:stk.nm,side:"sell",price:pr,pr:pr,ts:Date.now(),qty,fee:Math.round(fee+tax),pnl:Math.round(pnl),creditType:credType,auto:autoExec||false,time:new Date().toLocaleTimeString("ko-KR",{hour:"2-digit"})});
   bdMetrics.lastSellTime=Date.now();checkBrainDong("sell",pr,qty,stk);
     if(cfg.al){const lr=-mock.todayPnl/cfg.capital*100;if(lr>=cfg.dayloss)showAlert("⚠ 일일 손실 한도",`한도 ${cfg.dayloss}% 도달\n매매 중단 권고.`);}
   }
@@ -7303,7 +7306,7 @@ window.onload=()=>{
   genCandles(); // ★ genCandles 내부에서 idx=0 설정됨 (미래 데이터 참조 금지)
   chartViewCount=60;
   chartViewStart=0;
-  setTimeout(async function(){if(!kisConfig.appKey||!kisConfig.appSecret)return;try{var _ic=await _fetchKisCandles(activeTk,sim.date,sim.tf||"5");if(_ic&&_ic.length>0){sim.candles=_ic;var _pc=_kisChartMeta.prevCount||0;sim.idx=_pc>0?_pc-1:_ic.length-1;chartViewCount=Math.min(60,_ic.length);chartViewStart=Math.max(0,_ic.length-chartViewCount);updPrice(_ic[sim.idx]);drawChart();var _ci=document.getElementById("cinfo");if(_ci)_ci.textContent="✅ "+_ic.length+"봉 전일"+(_kisChartMeta.prevCount||0)+"봉+당일"+(_kisChartMeta.todayCount||0)+"봉";}}catch(_e){console.warn("KIS초기:",_e.message);}},2500);
+  setTimeout(async function(){if(!kisConfig.appKey||!kisConfig.appSecret)return;try{var _ic=await _fetchKisCandles(activeTk,sim.date,sim.tf||"5");if(_ic&&_ic.length>0){sim.candles=_ic;var _pc=_kisChartMeta.prevCount||0;sim.idx=_pc>0?_pc-1:_ic.length-1;chartViewCount=Math.min(60,_ic.length);chartViewStart=Math.max(0,_ic.length-chartViewCount);updPrice(_ic[sim.idx]);drawChart();var _ci=document.getElementById("cinfo");if(_ci)_ci.textContent="✅ "+_ic.length+"봉 (전일"+(_kisChartMeta.prevCount||0)+"봉+오늘"+(_kisChartMeta.todayCount||0)+"봉)";addMsg("ai","📊 분봉 로드 완료: "+_ic.length+"봉\n전일: "+(_kisChartMeta.prevCount||0)+"봉 | 오늘: "+(_kisChartMeta.todayCount||0)+"봉");}}catch(_e){console.warn("KIS초기:",_e.message);}},2500);
   // 레이아웃 완성 후 차트 렌더 (requestAnimationFrame 중첩으로 보장)
   requestAnimationFrame(()=>requestAnimationFrame(()=>{
     drawChart();
