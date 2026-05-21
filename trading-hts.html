@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#ffffff">
-<meta name="build-ts" content="1779389867237">
+<meta name="build-ts" content="1779390297903">
 <title>TraidAIr HTS</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 
@@ -5242,11 +5242,13 @@ async function _runScreeningAsync(){
     if(lc.c>lc.o && bodyRatio>=0.6 && lowerWick<body*0.5){score+=2;tags.push('장대양봉');}
     // 6. 20봉 돌파 (신고가)
     if(lc.c>prev20High*0.998 && volR>=1.5){score+=3;tags.push('20봉돌파');}
-    // 7. 강세 섹터 가산
+    // 7. 강세 섹터 가산 (모멘텀 + 대장주 + 강의기법 매칭)
     var _si = (window._sectorInfo||{})[tk];
     if(_si){
       var _bonus = _si.rank===1?3:_si.rank===2?2:_si.rank===3?1:0;
       if(_bonus){score+=_bonus;tags.push('강세'+_si.rank+'위');}
+      if(_si.momentum==='강함'){ score+=1; tags.push('모멘텀강'); }
+      if(_si.role==='대장주'){ score+=1; tags.push('대장주'); }
     }
     // 8. 시그널 확정 — 직전봉도 score>=4였는지 (2봉 연속 강세)
     //   → window._priorScores에서 같은 종목 직전 점수 확인
@@ -8676,7 +8678,7 @@ function collectMarketCtx(){
 (function(){
   const meta = document.querySelector('meta[name="build-ts"]');
   const myBuildTs = meta ? meta.getAttribute('content') : '';
-  if(!myBuildTs || myBuildTs === '1779389867237') return; // 로컬 빌드 안 한 경우
+  if(!myBuildTs || myBuildTs === '1779390297903') return; // 로컬 빌드 안 한 경우
   let reloaded = false;
   async function check(){
     if(reloaded) return;
@@ -8776,19 +8778,32 @@ function renderHotSectors(){
   if(!el) return;
   let info={};
   try{info=JSON.parse(localStorage.getItem('htsSectorInfo')||'{}');}catch(e){}
-  // sectorInfo: {tk:{rank,sector,reason,nm}}
   const grouped={};
   Object.entries(info).forEach(([tk,v])=>{
-    if(!grouped[v.rank])grouped[v.rank]={sector:v.sector,reason:v.reason,stocks:[]};
-    grouped[v.rank].stocks.push({tk,nm:v.nm||tk});
+    if(!grouped[v.rank]) grouped[v.rank]={sector:v.sector,reason:v.reason,technique:v.technique,momentum:v.momentum,risk:v.risk,stocks:[]};
+    grouped[v.rank].stocks.push({tk,nm:v.nm||tk,role:v.role,entry:v.entry,reason:v.reason});
   });
   const ranks=Object.keys(grouped).sort((a,b)=>parseInt(a)-parseInt(b));
   if(!ranks.length){el.innerHTML='<div style="color:var(--tm);font-size:9px;padding:2px 0;">아직 데이터 없음 ↻ 클릭</div>';return;}
   el.innerHTML=ranks.map(r=>{
     const g=grouped[r];
-    const stkLine=g.stocks.map(s=>'<span class="hot-sec-stk" data-tk="'+s.tk+'" onclick="selectStk(this.dataset.tk)" style="cursor:pointer;color:var(--b);font-weight:600;">'+s.nm+'</span>').join(' · ');
-    return '<div style="line-height:1.4;"><span style="background:var(--r);color:#fff;border-radius:3px;padding:0 4px;font-weight:700;font-size:8px;margin-right:4px;">'+r+'위</span><span style="font-weight:700;">'+(g.sector||'-')+'</span><br><span style="color:var(--ts);font-size:8px;">'+(g.reason||'')+'</span><br>'+stkLine+'</div>';
-  }).join('<div style="height:1px;background:var(--br);margin:3px 0;"></div>');
+    const _momCol = g.momentum==='강함'?'var(--r)':g.momentum==='보통'?'var(--a)':'var(--tm)';
+    const _techTag = g.technique ? `<span style="font-size:8px;color:var(--b);background:rgba(49,130,246,.1);padding:0 4px;border-radius:3px;margin-left:3px;">${g.technique}</span>` : '';
+    const _momTag = g.momentum ? `<span style="font-size:8px;color:${_momCol};background:${_momCol==='var(--r)'?'rgba(220,38,38,.08)':'var(--bg)'};padding:0 4px;border-radius:3px;margin-left:3px;">${g.momentum}</span>` : '';
+    const stkLine = g.stocks.map(s => {
+      const _roleTag = s.role==='대장주' ? '👑' : '';
+      const _tip = (s.entry||s.reason) ? ` title="${(s.entry||s.reason||'').replace(/"/g,'&quot;')}"` : '';
+      return `<span class="hot-sec-stk" data-tk="${s.tk}" onclick="selectStk(this.dataset.tk)"${_tip} style="cursor:pointer;color:var(--b);font-weight:600;">${_roleTag}${s.nm}</span>`;
+    }).join(' · ');
+    const _riskLine = g.risk ? `<div style="color:var(--r);font-size:8px;margin-top:2px;">⚠ ${g.risk}</div>` : '';
+    return `<div style="line-height:1.4;">
+      <span style="background:var(--r);color:#fff;border-radius:3px;padding:0 4px;font-weight:700;font-size:8px;margin-right:4px;">${r}위</span>
+      <span style="font-weight:700;">${g.sector||'-'}</span>${_techTag}${_momTag}
+      <div style="color:var(--ts);font-size:8px;margin-top:2px;">${g.reason||''}</div>
+      ${stkLine}
+      ${_riskLine}
+    </div>`;
+  }).join('<div style="height:1px;background:var(--br);margin:5px 0;"></div>');
   const t=localStorage.getItem('htsSectorTime');
   if(te) te.textContent=t?('갱신 '+t):'-';
 }
@@ -8815,23 +8830,63 @@ async function refreshHotSectors(force){
 // 대시보드 진입후보 → 관심종목 자동 추가
 async function syncCandidatesToWatchlist(){
   try{
-    addMsg('ai','🔄 강세섹터 분석 중...');
-    
-    // Claude AI로 당일 강세섹터 1~3위 + 대장주 분석
+    addMsg('ai','🔄 강세섹터 정교 분석 중 (거래대금·수급·재료·모멘텀)...');
+
     const date = sim.date || new Date().toISOString().slice(0,10);
-    const prompt = '오늘('+date+') 한국 주식시장 실시간 강세섹터 분석.\n\n'+
-      '강세섹터 상위 3개와 각 섹터 대장주 1~2개 선정.\n'+
-      '실적, 이슈, 수급 기반으로 판단.\n\n'+
-      'JSON만 반환 (다른 텍스트 없이):\n'+
-      '{"sectors":[{"rank":1,"name":"섹터명","reason":"강세이유1줄","stocks":[{"tk":"종목코드6자리","nm":"종목명","reason":"선정이유"}]},'+
-      '{"rank":2,...},{"rank":3,...}]}';
+    // 분석 시점 결정 (장 전 / 장 시작 / 장중 / 장 마감)
+    const _now = new Date();
+    const _hm = _now.getHours()*60 + _now.getMinutes();
+    const _phase = _hm < 540 ? '장 전 (09:00 이전 — 갭/시초 시나리오)'
+      : _hm < 600 ? '장 시작 직후 (09:00~10:00 — 첫봉/갭상승 매매)'
+      : _hm < 840 ? '장중 (10:00~14:00 — 눌림목/돌파 매매)'
+      : _hm < 930 ? '장 후반 (14:00~15:30 — 마감 청산 시간대)'
+      : '장 마감 후 (복기·내일 준비)';
+
+    // 시장 컨텍스트 수집
+    const _mkt = (typeof collectMarketCtx==='function') ? collectMarketCtx() : '데이터없음';
+    const _lec = (typeof getLectureContext==='function') ? getLectureContext(3000) : '';
+    const _learn = (typeof getLearningContext==='function') ? getLearningContext(8) : '';
+
+    // 강의 + 학습 컨텍스트가 프롬프트 최상단에 자동 첨부됨
+    const prompt =
+      _lec + _learn +
+      `# 강세섹터 정교 분석 요청 — ${date} ${_phase}\n\n` +
+      `당신은 단타 매매 멘토. 위 강의 원칙을 100% 따라 한국 주식시장 강세섹터를 선정.\n\n` +
+      `## 시장 현황\n${_mkt}\n\n` +
+      `## 분석 기준 (반드시 모두 종합)\n` +
+      `1. **거래대금/거래량**: 코스피·코스닥 거래대금 상위 섹터, 거래량 전일 대비 200%+ 종목\n` +
+      `2. **수급**: 외국인 + 기관 동반 순매수, 연속 순매수 일수, 프로그램 매수\n` +
+      `3. **재료/모멘텀**: 정책 이슈, 실적 발표, 신규 수주, 신제품, 글로벌 테마 (AI/2차전지/바이오/방산/원전 등)\n` +
+      `4. **차트 기술적**: 정배열, 신고가 돌파, 거래량 동반 상승, RSI 50~65 안전구간\n` +
+      `5. **선도주 ↔ 후속주**: 섹터 대장주 + 동반 상승 2부 종목\n` +
+      `6. **시장 환경 정합**: 코스피 방향성·환율·미국 시장 흐름과 맞는 섹터\n` +
+      `7. **시간대 적합성**: ${_phase}에 진입하기 좋은 종목 (강의의 매매 기법 — 눌림목/돌파/첫봉/갭상승/이슈테마 중 어떤 게 적합?)\n\n` +
+      `## 출력 — JSON만 (다른 텍스트 X)\n` +
+      `{\n` +
+      `  "market_view":"오늘 시장 한줄 요약 (방향/리스크)",\n` +
+      `  "sectors":[\n` +
+      `    {\n` +
+      `      "rank":1,\n` +
+      `      "name":"섹터명",\n` +
+      `      "reason":"강세 근거 (거래대금·수급·재료를 수치로)",\n` +
+      `      "momentum":"강함/보통/약함",\n` +
+      `      "technique":"강의 매매기법명 (눌림목/돌파/첫봉/갭상승/이슈테마 중)",\n` +
+      `      "risk":"이 섹터 리스크 1줄",\n` +
+      `      "stocks":[\n` +
+      `        {"tk":"종목코드6자리","nm":"종목명","role":"대장주/후속주","reason":"선정이유","entry":"진입 시나리오 1줄","stop":"손절 기준"}\n` +
+      `      ]\n` +
+      `    },\n` +
+      `    ... 총 3개 섹터\n` +
+      `  ]\n` +
+      `}\n\n` +
+      `각 섹터별 종목 1~3개. 종목코드는 정확한 6자리. 모르면 그 종목 빼고 다른 거 선정.`;
 
     const res = await fetch('/api/claude',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
         model:'claude-sonnet-4-5',
-        max_tokens:600,
+        max_tokens:1500,
         messages:[{role:'user',content:prompt}]
       })
     });
@@ -8841,6 +8896,7 @@ async function syncCandidatesToWatchlist(){
     if(!m) throw new Error('JSON 파싱 실패');
     const result = JSON.parse(m[0]);
     if(!result.sectors||!result.sectors.length) throw new Error('섹터 데이터 없음');
+    if(result.market_view) addMsg('ai', '📊 오늘 시장: ' + result.market_view);
 
     // 기존 후보 종목 제거 (WGS[0]에서 이전 자동추가 종목 제거)
     const prevAuto = JSON.parse(localStorage.getItem('htsAutoTks')||'[]');
@@ -8855,7 +8911,18 @@ async function syncCandidatesToWatchlist(){
       (sec.stocks||[]).forEach(function(stk){
         if(/^\d{6}$/.test(stk.tk) && !newTks.includes(stk.tk)){
           newTks.push(stk.tk);
-          sectorInfo[stk.tk] = {rank:sec.rank, sector:sec.name, reason:stk.reason, nm:stk.nm};
+          sectorInfo[stk.tk] = {
+            rank: sec.rank,
+            sector: sec.name,
+            reason: stk.reason || sec.reason,
+            nm: stk.nm,
+            role: stk.role || '대장주',
+            technique: sec.technique || '',
+            momentum: sec.momentum || '',
+            risk: sec.risk || '',
+            entry: stk.entry || '',
+            stop: stk.stop || '',
+          };
           // STOCKS에 없으면 추가
           if(!STOCKS.find(function(s){return s.tk===stk.tk;})){
             STOCKS.push({tk:stk.tk, nm:stk.nm, pr:0, base:1, sec:sec.name, cap:'중형'});
