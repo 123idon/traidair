@@ -743,9 +743,9 @@ canvas{image-rendering:pixelated;}
     <div class="cp">
       <div class="cp-head">
         <div style="display:flex;gap:2px;">
-          <button class="tf-btn" onclick="setTF(this,'1')">1분</button>
+          <button class="tf-btn on" onclick="setTF(this,'1')">1분</button>
           <button class="tf-btn" onclick="setTF(this,'3')">3분</button>
-          <button class="tf-btn on" onclick="setTF(this,'5')">5분</button>
+          <button class="tf-btn" onclick="setTF(this,'5')">5분</button>
           <button class="tf-btn" onclick="setTF(this,'15')">15분</button>
           <button class="tf-btn" onclick="setTF(this,'60')">1시간</button>
           <button class="tf-btn" onclick="setTF(this,'D')">일봉</button>
@@ -2185,24 +2185,41 @@ function _genSimCandles(tk,dt){
     return res;
   }
 
-  // 분봉 처리
+  // 분봉 처리 (전일 + 당일을 합쳐서 표시)
   const intervals=parseInt(sim.tf)||5;
   const perDay=Math.floor(390/intervals);
-  const seed=(parseInt((dt||sim.date).replace(/-/g,"").slice(-6))||9999)+tkSeed;
-  const rnd=rng32(seed);
-  const res=[];
-  for(let i=0;i<perDay;i++){
-    const r1=rnd(),r2=rnd(),r3=rnd(),r4=rnd();
-    const c=base*(1+(r1-.498)*.018);
-    const h=c*(1+r2*.009),l=c*(1-r3*.009),o=base*(1+(r4-.5)*.007);
-    const v=Math.round(40000+r1*170000);
-    const hm=9*60+i*intervals;
-    res.push({t:`${String(Math.floor(hm/60)).padStart(2,"0")}:${String(hm%60).padStart(2,"0")}`,o:Math.round(o),h:Math.round(Math.max(o,c,h)),l:Math.round(Math.min(o,c,l)),c:Math.round(c),v});
-    base=c;
-  }
+  const _curDt = dt||sim.date;
+  // 전일(영업일) 계산
+  const _prevDate=(function(){
+    const d=new Date(_curDt);
+    do{d.setDate(d.getDate()-1);}while(d.getDay()===0||d.getDay()===6);
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  })();
+  const _genDay=function(dayStr,isPrev){
+    const seed=(parseInt(dayStr.replace(/-/g,"").slice(-6))||9999)+tkSeed+(isPrev?1:0);
+    const rnd=rng32(seed);
+    const out=[];
+    for(let i=0;i<perDay;i++){
+      const r1=rnd(),r2=rnd(),r3=rnd(),r4=rnd();
+      const c=base*(1+(r1-.498)*.018);
+      const h=c*(1+r2*.009),l=c*(1-r3*.009),o=base*(1+(r4-.5)*.007);
+      const v=Math.round(40000+r1*170000);
+      const hm=9*60+i*intervals;
+      out.push({t:`${String(Math.floor(hm/60)).padStart(2,"0")}:${String(hm%60).padStart(2,"0")}`,date:dayStr,isPrev:!!isPrev,o:Math.round(o),h:Math.round(Math.max(o,c,h)),l:Math.round(Math.min(o,c,l)),c:Math.round(c),v});
+      base=c;
+    }
+    return out;
+  };
+  const prevCandles=_genDay(_prevDate,true);
+  const todayCandles=_genDay(_curDt,false);
+  const res=[...prevCandles,...todayCandles];
   sim.candles=res;
-  sim.idx=0;
-  if(res.length>0)updPrice(res[0]);
+  // 시뮬에서도 KIS와 동일하게 메타데이터 채움 (전일+당일 표시용)
+  _kisChartMeta={prevCount:prevCandles.length,todayCount:todayCandles.length,prevDate:_prevDate,todayDate:_curDt};
+  _kisChartMeta._prevCount=prevCandles.length;
+  // 전일 마지막 봉에서 시작 (당일 첫 봉 전 — 자연스러운 진입점)
+  sim.idx=prevCandles.length>0?prevCandles.length-1:0;
+  if(res.length>0)updPrice(res[sim.idx]);
   return res;
 }
 
@@ -2225,7 +2242,7 @@ let stopOrders={};
 // ═══════════════════════════════
 let cfg={capital:10000000,dayloss:2,maxpos:20,clim:140,mlim:40,crate:8.5,mrate:12,bf:0.015,sf:0.015,tx:0.18,bd:true,al:true};
 let mock={cash:10000000,positions:{},trades:[],todayPnl:0,todayTrades:0,lossSeries:0,creditUsed:0,marginUsed:0};
-let sim={playing:false,speed:60,idx:0,candles:[],timer:null,date:todayStr(),tf:"5"};
+let sim={playing:false,speed:60,idx:0,candles:[],timer:null,date:todayStr(),tf:"1"};
 
 function openSettings(){openModal('settings');}
 // ═══════════════════════════════════════════════════════
@@ -2836,9 +2853,10 @@ function setTF(el,tf){
           }
         }).catch(function(e){console.warn('TF 분봉 로드 실패:',e.message);});
       } else {
-        sim.idx=0;
-        chartViewCount=Math.min(60,sim.candles.length);
-        chartViewStart=0;
+        // 시뮬: _genSimCandles에서 전일+당일 만들고 sim.idx 세팅함
+        // 뷰는 끝쪽(당일 첫봉 근처)에 맞춤
+        chartViewCount=Math.min(120,sim.candles.length||60);
+        chartViewStart=Math.max(0,(sim.candles.length||60)-chartViewCount);
       }
     }
     drawChart();
@@ -2853,6 +2871,23 @@ function onDateChange(){
   mock.todayPnl=0;mock.todayTrades=0;mock.lossSeries=0;
   if(sim.date<todayStr())activateMockMode();
   genCandles(activeTk,sim.date);initChart();
+  // 전일+당일 뷰 정렬
+  chartViewCount=Math.min(120,sim.candles.length||60);
+  chartViewStart=Math.max(0,(sim.candles.length||60)-chartViewCount);
+  drawChart();
+  // 대시보드 iframe에 날짜 전파
+  try{
+    const _df=document.getElementById("dashFrame");
+    if(_df&&_df.contentWindow){
+      _df.contentWindow._skipHtsSync=true;
+      _df.contentWindow.curDate=sim.date;
+      const _de=_df.contentWindow.document.getElementById("dashDate");
+      if(_de)_de.value=sim.date;
+      _df.contentWindow.loadDashData&&_df.contentWindow.loadDashData();
+      _df.contentWindow.autoLoadMarketData&&_df.contentWindow.autoLoadMarketData();
+      setTimeout(()=>{try{_df.contentWindow._skipHtsSync=false;}catch(e){}},100);
+    }
+  }catch(e){}
 }
 function adjDate(d){const dt=new Date(sim.date);dt.setDate(dt.getDate()+d);sim.date=dt.toISOString().slice(0,10);document.getElementById("mockDate").value=sim.date;onDateChange();}
 function activateMockMode(){document.getElementById("modeBadge").className="badge mock";document.getElementById("modeText").textContent="모의투자";}
@@ -6221,16 +6256,17 @@ function goPage(p,el){
       }catch(e){}
     }
   } else if(p==="dash"){
-    // HTS → 대시보드: HTS 날짜를 대시보드에 반영
+    // HTS → 대시보드: HTS 날짜를 대시보드에 항상 동기화 (단방향 push)
     const dashFrame=document.getElementById("dashFrame");
     if(dashFrame&&dashFrame.contentWindow){
       try{
-        if(dashFrame.contentWindow.curDate!==sim.date){
-          dashFrame.contentWindow.curDate=sim.date;
-          const dashDateEl=dashFrame.contentWindow.document.getElementById("dashDate");
-          if(dashDateEl){ dashDateEl.value=sim.date; dashFrame.contentWindow.loadDashData&&dashFrame.contentWindow.loadDashData(); }
-          dashFrame.contentWindow.autoLoadMarketData&&dashFrame.contentWindow.autoLoadMarketData();
-        }
+        dashFrame.contentWindow._skipHtsSync=true;
+        dashFrame.contentWindow.curDate=sim.date;
+        const dashDateEl=dashFrame.contentWindow.document.getElementById("dashDate");
+        if(dashDateEl){ dashDateEl.value=sim.date; }
+        dashFrame.contentWindow.loadDashData&&dashFrame.contentWindow.loadDashData();
+        dashFrame.contentWindow.autoLoadMarketData&&dashFrame.contentWindow.autoLoadMarketData();
+        setTimeout(()=>{try{dashFrame.contentWindow._skipHtsSync=false;}catch(e){}},100);
       }catch(e){}
     }
     // 강세섹터 자동 관심종목 동기화 (하루 1회만)
@@ -7316,9 +7352,10 @@ window.onload=()=>{
   }).catch(()=>{});
   updateKisStatus();
   renderAll();
-  genCandles(); // ★ genCandles 내부에서 idx=0 설정됨 (미래 데이터 참조 금지)
-  chartViewCount=60;
-  chartViewStart=0;
+  genCandles(); // ★ 전일+당일 분봉 생성, sim.idx는 전일 마지막 봉
+  // 전일+당일 보이도록 뷰 끝쪽 정렬 (당일 첫봉 근처)
+  chartViewCount=Math.min(120,sim.candles.length||60);
+  chartViewStart=Math.max(0,(sim.candles.length||60)-chartViewCount);
   setTimeout(async function(){if(!kisConfig.appKey||!kisConfig.appSecret)return;try{var _ic=await _fetchKisCandles(activeTk,sim.date,sim.tf||"5");if(_ic&&_ic.length>0){sim.candles=_ic;var _pc=_kisChartMeta.prevCount||0;sim.idx=_pc>0?_pc-1:_ic.length-1;chartViewCount=Math.min(60,_ic.length);chartViewStart=Math.max(0,_ic.length-chartViewCount);updPrice(_ic[sim.idx]);drawChart();var _ci=document.getElementById("cinfo");if(_ci)_ci.textContent="✅ "+_ic.length+"봉 (전일"+(_kisChartMeta.prevCount||0)+"봉+오늘"+(_kisChartMeta.todayCount||0)+"봉)";addMsg("ai","📊 분봉 로드 완료: "+_ic.length+"봉\n전일: "+(_kisChartMeta.prevCount||0)+"봉 | 오늘: "+(_kisChartMeta.todayCount||0)+"봉");}}catch(_e){console.warn("KIS초기:",_e.message);}},2500);
   // 레이아웃 완성 후 차트 렌더 (requestAnimationFrame 중첩으로 보장)
   requestAnimationFrame(()=>requestAnimationFrame(()=>{

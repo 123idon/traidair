@@ -769,8 +769,15 @@ function renderDashChart(cs, name){
 // 3초마다 자동 갱신
 setInterval(refreshChartFromHTS, 3000);
 
-// 오늘 날짜 기본값
-document.getElementById('dashDate').value = new Date().toISOString().slice(0,10);
+// HTS sim.date 우선 동기화 (없으면 오늘)
+(function(){
+  try{
+    if(window.parent && window.parent.sim && window.parent.sim.date){
+      curDate = window.parent.sim.date;
+    }
+  }catch(e){}
+  document.getElementById('dashDate').value = curDate;
+})();
 loadDashData();
 // ★ 페이지 열리면 시장 데이터 자동 로드
 autoLoadMarketData();
