@@ -1146,6 +1146,11 @@ function runStep(){
   sim.idx=Math.min(sim.idx+1,sim.candles.length-1);
   updChartToIdx();
   if(sim.idx>=sim.candles.length-1){
+    // 백테스트 모드면 다음 영업일로 자동 점프
+    if(window.backtest && backtest.running){
+      _backtestEndOfDay();
+      return;
+    }
     sim.playing=false;
     _syncPlayBtn();
     return;
@@ -1156,10 +1161,183 @@ function runStep(){
   const isDaily = sim.tf==='D'||sim.tf.startsWith('D');
   const tfMin = isDaily ? 390 : (parseInt(sim.tf)||5);
   const realMs = tfMin * 60 * 1000;
-  const delay = Math.max(100, realMs / sim.speed);
+  const delay = Math.max(50, realMs / sim.speed);
   sim.timer=setTimeout(runStep, delay);
 }
 function setSpd(el,v){sim.speed=v;document.querySelectorAll(".spd-btn").forEach(b=>b.classList.remove("on"));el.classList.add("on");}
+
+// ═══════════════════════════════════════════════
+// 백테스트 엔진 — 여러 영업일 연속 시뮬레이션
+// ═══════════════════════════════════════════════
+window.backtest = {
+  running:false, startDate:null, endDate:null,
+  currentDate:null, dayIdx:0, totalDays:0,
+  startCash:0, startPnl:0,
+  dailyResults:[], // [{date, pnl, trades, wins, losses}]
+};
+function _businessDays(start, end){
+  const out=[]; const d=new Date(start); const e=new Date(end);
+  while(d<=e){
+    const w=d.getDay();
+    if(w!==0&&w!==6) out.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
+    d.setDate(d.getDate()+1);
+  }
+  return out;
+}
+function _nextBusinessDay(dateStr){
+  const d=new Date(dateStr);
+  do{d.setDate(d.getDate()+1);}while(d.getDay()===0||d.getDay()===6);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function startBacktest(startDate, endDate){
+  if(backtest.running){addMsg('ai','⚠ 이미 백테스트 진행 중'); return;}
+  const days=_businessDays(startDate, endDate);
+  if(!days.length){showAlert('백테스트','영업일이 없습니다'); return;}
+  backtest.running=true;
+  backtest.startDate=days[0];
+  backtest.endDate=days[days.length-1];
+  backtest.totalDays=days.length;
+  backtest.dayIdx=0;
+  backtest.startCash=mock.cash;
+  backtest.startPnl=mock.todayPnl||0;
+  backtest.dailyResults=[];
+  // 자동매매 자동 시작 (level 3 이상 권장)
+  if(!autoState.running && typeof startAuto==='function'){
+    addMsg('ai','🎯 백테스트 시작 — 자동매매 자동 활성화');
+    try{startAuto();}catch(e){}
+  }
+  addMsg('ai',`🚀 백테스트 시작\n• 기간: ${backtest.startDate} ~ ${backtest.endDate}\n• 영업일: ${backtest.totalDays}일\n• 자본: ${mock.cash.toLocaleString()}원\n• 배속: x${sim.speed}\n\n진행 중...`);
+  _backtestLoadDay(days[0]);
+  renderBacktestPanel();
+}
+function stopBacktest(){
+  if(!backtest.running) return;
+  backtest.running=false;
+  sim.playing=false;
+  if(sim.timer){clearTimeout(sim.timer);sim.timer=null;}
+  _syncPlayBtn();
+  renderBacktestPanel();
+  _backtestReport();
+}
+function _backtestLoadDay(dateStr){
+  backtest.currentDate=dateStr;
+  sim.date=dateStr;
+  const md=document.getElementById('mockDate'); if(md) md.value=dateStr;
+  mock.todayPnl=0; mock.todayTrades=0; mock.lossSeries=0;
+  // 캔들 로드 — KIS 있으면 실데이터, 없으면 시뮬
+  genCandles(activeTk, dateStr);
+  // KIS 비동기 결과 기다리기 위해 살짝 지연
+  setTimeout(()=>{
+    chartViewCount=Math.min(120, sim.candles.length||60);
+    chartViewStart=Math.max(0,(sim.candles.length||60)-chartViewCount);
+    // 당일 첫 봉으로 이동(전일 분봉 이후)
+    const prevCount=(_kisChartMeta&&_kisChartMeta.prevCount)||0;
+    sim.idx = prevCount>0 ? prevCount-1 : 0;
+    updChartToIdx();
+    sim.playing=true;
+    _syncPlayBtn();
+    runStep();
+    renderBacktestPanel();
+  }, 600);
+}
+function _backtestEndOfDay(){
+  // 현재 날짜 결과 집계
+  const dt=backtest.currentDate;
+  const todayTrades=(mock.trades||[]).filter(t=>t.date===dt);
+  const wins=todayTrades.filter(t=>t.side==='sell'&&(t.pnl||0)>0).length;
+  const losses=todayTrades.filter(t=>t.side==='sell'&&(t.pnl||0)<0).length;
+  const dayPnl=todayTrades.filter(t=>t.side==='sell').reduce((s,t)=>s+(t.pnl||0),0);
+  backtest.dailyResults.push({date:dt, pnl:dayPnl, trades:todayTrades.length, wins, losses});
+  backtest.dayIdx++;
+  addDecisionLog(`📅 ${dt} 마감`, `매매 ${todayTrades.length}건 | 손익 ${dayPnl>=0?'+':''}${dayPnl.toLocaleString()}원 | 승 ${wins}·패 ${losses}`, '백테스트');
+  // 다음 영업일?
+  if(backtest.dayIdx >= backtest.totalDays){
+    stopBacktest();
+    return;
+  }
+  const next=_nextBusinessDay(dt);
+  // 너무 미래로 가지 않도록 endDate 체크
+  if(next > backtest.endDate){
+    stopBacktest();
+    return;
+  }
+  // 다음날 로드 → 자동 재생
+  _backtestLoadDay(next);
+}
+function _backtestReport(){
+  const totalPnl = backtest.dailyResults.reduce((s,d)=>s+d.pnl,0);
+  const totalTrades = backtest.dailyResults.reduce((s,d)=>s+d.trades,0);
+  const totalWins = backtest.dailyResults.reduce((s,d)=>s+d.wins,0);
+  const totalLosses = backtest.dailyResults.reduce((s,d)=>s+d.losses,0);
+  const winRate = totalWins+totalLosses>0 ? (totalWins/(totalWins+totalLosses)*100).toFixed(1) : '-';
+  const best = backtest.dailyResults.reduce((a,b)=>(!a||b.pnl>a.pnl)?b:a, null);
+  const worst = backtest.dailyResults.reduce((a,b)=>(!a||b.pnl<a.pnl)?b:a, null);
+  const pnlPct = backtest.startCash>0 ? (totalPnl/backtest.startCash*100).toFixed(2) : '-';
+  const msg=`📊 백테스트 종료\n\n` +
+    `• 기간: ${backtest.startDate} ~ ${backtest.endDate}\n` +
+    `• 실거래일: ${backtest.dailyResults.length}일\n` +
+    `• 총 매매: ${totalTrades}건\n` +
+    `• 총 손익: ${totalPnl>=0?'+':''}${totalPnl.toLocaleString()}원 (${pnlPct}%)\n` +
+    `• 승률: ${winRate}% (${totalWins}승 ${totalLosses}패)\n` +
+    (best ? `• 최고: ${best.date} (+${best.pnl.toLocaleString()})\n` : '') +
+    (worst ? `• 최악: ${worst.date} (${worst.pnl.toLocaleString()})\n` : '');
+  addMsg('ai', msg);
+  showAlert('백테스트 결과', msg);
+}
+function renderBacktestPanel(){
+  const el=document.getElementById('backtestPanel');
+  if(!el) return;
+  if(!backtest.running && !backtest.dailyResults.length){
+    el.style.display='none'; return;
+  }
+  el.style.display='';
+  const pct = backtest.totalDays>0 ? Math.round(backtest.dayIdx/backtest.totalDays*100) : 0;
+  const realtimePnl = (backtest.dailyResults.reduce((s,d)=>s+d.pnl,0));
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span style="font-size:10px;font-weight:700;color:var(--b);">🚀 백테스트</span>
+      <span style="font-family:var(--mono);font-size:10px;color:var(--t);">${backtest.currentDate||'-'}</span>
+      <span style="font-family:var(--mono);font-size:9px;color:var(--ts);">${backtest.dayIdx}/${backtest.totalDays}일 (${pct}%)</span>
+      <div style="flex:1;background:var(--bg);border-radius:6px;height:6px;overflow:hidden;">
+        <div style="width:${pct}%;background:var(--b);height:100%;transition:width .3s;"></div>
+      </div>
+      <span style="font-family:var(--mono);font-size:10px;font-weight:700;color:${realtimePnl>=0?'var(--g)':'var(--r)'};">${realtimePnl>=0?'+':''}${realtimePnl.toLocaleString()}원</span>
+      ${backtest.running ? '<button class="ibtn red" onclick="stopBacktest()" style="font-size:9px;padding:2px 6px;">■ 중지</button>' : '<button class="ibtn" onclick="document.getElementById(\'backtestPanel\').style.display=\'none\'" style="font-size:9px;padding:2px 6px;">닫기</button>'}
+    </div>
+  `;
+}
+function openBacktestDialog(){
+  const today = todayStr();
+  const d=new Date(today); d.setMonth(d.getMonth()-1);
+  const monthAgo=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const html = `
+    <div style="padding:12px;">
+      <div style="font-size:13px;font-weight:800;margin-bottom:10px;">🚀 백테스트 시작</div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;">
+        <label style="font-size:10px;color:var(--ts);">시작일
+          <input type="date" id="btStart" value="${monthAgo}" style="margin-left:6px;padding:4px 6px;border:1px solid var(--br);border-radius:6px;font-family:var(--mono);">
+        </label>
+        <label style="font-size:10px;color:var(--ts);">종료일
+          <input type="date" id="btEnd" value="${today}" style="margin-left:6px;padding:4px 6px;border:1px solid var(--br);border-radius:6px;font-family:var(--mono);">
+        </label>
+        <div style="font-size:9px;color:var(--tm);line-height:1.5;background:var(--bg);padding:6px 8px;border-radius:6px;">
+          • 자동매매가 꺼져있으면 자동 시작됩니다.<br>
+          • 현재 배속(x${sim.speed})으로 진행. 더 빠르게 하려면 배속을 올리세요.<br>
+          • 분봉(${sim.tf}분) 기준. 1분봉+x600 ≈ 39초/일.
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button class="ibtn" onclick="document.getElementById('btDialog').remove()" style="font-size:11px;">취소</button>
+        <button class="ibtn pur" onclick="(function(){const s=document.getElementById('btStart').value;const e=document.getElementById('btEnd').value;if(!s||!e||s>e){alert('날짜 확인');return;}document.getElementById('btDialog').remove();startBacktest(s,e);})()" style="font-size:11px;">▶ 시작</button>
+      </div>
+    </div>
+  `;
+  const d2 = document.createElement('div');
+  d2.id='btDialog';
+  d2.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9999;background:var(--pan);border-radius:14px;box-shadow:0 8px 40px rgba(0,0,0,.2);width:320px;max-width:92vw;';
+  d2.innerHTML=html;
+  document.body.appendChild(d2);
+}
 function setTF(el,tf){
   try{
     sim.tf=tf;
@@ -2796,13 +2974,21 @@ async function _runScreeningAsync(){
       var stopPr=Math.round(lc2.c*(1-autoState.cfg.stop/100));
       var t1Pr=Math.round(lc2.c*(1+autoState.cfg.t1/100));
       var rr=((t1Pr-lc2.c)/(lc2.c-stopPr)).toFixed(2);
+      // 시황·강세섹터·공시 맥락 자동 수집 (학습용 — AI 판단 이유에 포함)
+      var _mkt = typeof collectMarketCtx==='function' ? collectMarketCtx() : '';
+      var _si = (window._sectorInfo||{})[best.tk];
+      var _sectorLine = _si ? `강세섹터 ${_si.rank}위 ${_si.sector} — ${_si.reason||''}` : '';
+      var _newsItems = (typeof window._newsItems!=='undefined' && Array.isArray(_newsItems)) ? _newsItems.slice(0,3).map(n=>'• '+(n.title||n)).join('\n') : '';
       var prompt='단타 트레이딩 멘토. 자동매매 최종 진입 여부.\n\n'+
-        '종목: '+best.stk.nm+'('+best.tk+') '+best.stk.sec+'\n'+
-        '현재가: '+lc2.c.toLocaleString()+'원\n'+
-        'RSI: '+best.lrsi+' | 거래량: 평균x'+best.volR.toFixed(1)+'\n'+
-        '조건: '+best.tags.join(' · ')+'\n'+
-        '손절: '+stopPr.toLocaleString()+' | 목표: '+t1Pr.toLocaleString()+' | R/R 1:'+rr+'\n\n'+
-        'JSON만: {"decision":"BUY"또는"PASS","confidence":0-100,"reason":"2줄이내","risk":"리스크1줄","waitFor":"PASS시조건"}';
+        '【종목】 '+best.stk.nm+'('+best.tk+') '+best.stk.sec+'\n'+
+        '【시간】 '+(sim.date||'')+' '+(best.lc.t||'')+'\n'+
+        '【기술적】 가격 '+lc2.c.toLocaleString()+'원 | RSI '+best.lrsi+' | 거래량 평균x'+best.volR.toFixed(1)+'\n'+
+        '【조건】 '+best.tags.join(' · ')+'\n'+
+        (_sectorLine ? '【수급/섹터】 '+_sectorLine+'\n' : '')+
+        (_newsItems ? '【최근 공시】\n'+_newsItems+'\n' : '')+
+        (_mkt && _mkt!=='데이터없음' ? '【시황】\n'+_mkt+'\n' : '')+
+        '【리스크】 손절 '+stopPr.toLocaleString()+' | 목표 '+t1Pr.toLocaleString()+' | R/R 1:'+rr+'\n\n'+
+        'JSON만: {"decision":"BUY"또는"PASS","confidence":0-100,"reason":"왜 매수/관망인지 2줄","factors":"근거한 데이터 3가지","risk":"리스크1줄","waitFor":"PASS시조건"}';
       var res=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:300,messages:[{role:'user',content:prompt}]})});
       var data=await res.json();
@@ -2810,13 +2996,15 @@ async function _runScreeningAsync(){
       var m=text.match(/\{[\s\S]*\}/);
       var ai=m?JSON.parse(m[0]):{};
       if(ai.decision==='BUY'&&ai.confidence>=65){
-        addDecisionLog('['+best.stk.nm+'] ✅ AI매수 (신뢰도'+ai.confidence+'%)',ai.reason,'Phase8통과');
-        addMsg('ai','🤖 AI자동매수\n\n종목: '+best.stk.nm+' '+lc2.c.toLocaleString()+'원\n신뢰도: '+ai.confidence+'%\n\n✅ '+ai.reason+'\n⚠ '+ai.risk+'\n\n손절: '+stopPr.toLocaleString()+' | 목표: '+t1Pr.toLocaleString()+' | R/R 1:'+rr);
-        updAdvBoxes('✅ 매수결정 — '+best.stk.nm,'신뢰도 '+ai.confidence+'%\n'+ai.reason);
+        var _factorsTxt = ai.factors ? ('근거: '+ai.factors+'\n') : '';
+        addDecisionLog('['+best.stk.nm+'] ✅ AI매수 (신뢰도'+ai.confidence+'%)',ai.reason+(ai.factors?(' | '+ai.factors):''),'Phase8통과');
+        addMsg('ai','🤖 AI자동매수\n\n종목: '+best.stk.nm+' '+lc2.c.toLocaleString()+'원\n신뢰도: '+ai.confidence+'%\n\n✅ '+ai.reason+'\n'+_factorsTxt+'⚠ '+ai.risk+'\n\n손절: '+stopPr.toLocaleString()+' | 목표: '+t1Pr.toLocaleString()+' | R/R 1:'+rr);
+        updAdvBoxes('✅ 매수결정 — '+best.stk.nm,'신뢰도 '+ai.confidence+'%\n'+ai.reason+(ai.factors?('\n근거: '+ai.factors):''));
         await execAutoBuy(lc2.c,best.stk);
       }else{
-        addDecisionLog('['+best.stk.nm+'] ⏸ AI관망',ai.reason||'조건미충족','2단계차단');
-        updAdvBoxes('⏸ AI관망 — '+best.stk.nm,(ai.reason||'조건미충족')+'\n기다릴것: '+(ai.waitFor||'추세확인'));
+        var _factorsTxt2 = ai.factors ? (' | '+ai.factors) : '';
+        addDecisionLog('['+best.stk.nm+'] ⏸ AI관망',(ai.reason||'조건미충족')+_factorsTxt2,'2단계차단');
+        updAdvBoxes('⏸ AI관망 — '+best.stk.nm,(ai.reason||'조건미충족')+(ai.factors?('\n근거: '+ai.factors):'')+'\n기다릴것: '+(ai.waitFor||'추세확인'));
       }
     }catch(_e2){
       addDecisionLog('['+best.stk.nm+'] AI분석실패',_e2.message,'관망');

@@ -267,6 +267,8 @@
           <span class="chart-hdr-ch" id="chartHdrCh">+0.00%</span>
         </div>
       </div>
+      <!-- 백테스트 진행 패널 (실행 중에만 표시) -->
+      <div id="backtestPanel" style="display:none;padding:6px 12px;background:linear-gradient(90deg,rgba(49,130,246,0.08),rgba(139,92,246,0.04));border-bottom:1px solid var(--br);flex-shrink:0;"></div>
       <div class="cp-head">
         <div style="display:flex;gap:2px;">
           <button class="tf-btn on" onclick="setTF(this,'1')">1분</button>
@@ -388,6 +390,7 @@
       </div>
       <div class="vsep" style="height:18px;"></div>
       <button class="play-btn" id="playBtn" onclick="togPlay()" style="font-size:14px;line-height:1;">▶</button>
+      <button class="ibtn pur" onclick="openBacktestDialog()" title="여러 영업일 연속 백테스트" style="font-size:10px;padding:3px 8px;">🚀 백테스트</button>
       <div class="spd-wrap">
         <span class="spd-l">배속</span>
         <button class="spd-btn" onclick="setSpd(this,1)">실시간</button>
