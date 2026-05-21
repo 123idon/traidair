@@ -239,7 +239,7 @@ async function loadFromServer() {
       'htsSectorInfo','htsAutoTks','htsAutoSyncDate','htsSectorTime',
       'htsAutoState','htsChatMsgs','htsDecisionLog','htsAiStatus',
       'htsIntra','trustScore','apiUsage','htsSimState',
-      'htsLearningMemory','htsLearnedDates'
+      'htsLearningMemory','htsLearnedDates','htsFeatureSuggestions'
     ];
     keys.forEach(k => {
       if (data[k] !== undefined) {
@@ -4792,6 +4792,8 @@ function _renderJEntry(e){
 function renderJPage(){
   const js=safeParseJSON(localStorage.getItem("htsJournals"), "{}");
   const entries=Object.values(js).sort((a,b)=>b.date.localeCompare(a.date));
+  // 통계/차트는 항상 갱신 (거래 없어도 빈 카드 표시)
+  try{ renderJournalStats(); }catch(e){ console.warn('stats:', e.message); }
   if(!entries.length){document.getElementById("journalList").innerHTML="<div style='font-size:12px;color:var(--tm);text-align:center;padding:40px;'>거래 내역이 없습니다.</div>";return;}
   document.getElementById("journalList").innerHTML=entries.map(e=>{
     const aiTag = e.aiTradeCount ? `<span style="font-size:9px;background:rgba(139,92,246,.15);color:var(--p);padding:1px 5px;border-radius:3px;font-weight:700;margin-left:4px;">🤖 AI ${e.aiTradeCount}건</span>` : '';
@@ -4817,6 +4819,229 @@ function renderJPage(){
     </div>`;
   }).join("");
 }
+// ═══════════════════════════════════════════════
+// 매매일지 통계 / 누적손익 차트 / AI 기능 제안
+// ═══════════════════════════════════════════════
+function _journalStatsData(){
+  const js = safeParseJSON(localStorage.getItem("htsJournals"), "{}");
+  const entries = Object.values(js).sort((a,b)=>a.date.localeCompare(b.date));
+  const trades = (mock.trades || []).slice().sort((a,b)=>a.date.localeCompare(b.date));
+  const sells = trades.filter(t=>t.side==='sell');
+  const wins = sells.filter(t=>(t.pnl||0)>0);
+  const losses = sells.filter(t=>(t.pnl||0)<0);
+  const totalPnl = sells.reduce((s,t)=>s+(t.pnl||0),0);
+  const winRate = sells.length ? (wins.length/sells.length*100) : 0;
+  const avgWin = wins.length ? wins.reduce((s,t)=>s+t.pnl,0)/wins.length : 0;
+  const avgLoss = losses.length ? Math.abs(losses.reduce((s,t)=>s+t.pnl,0)/losses.length) : 0;
+  const rr = avgLoss>0 ? avgWin/avgLoss : 0;
+  // 일별 누적
+  const daily = entries.map(e => ({date:e.date, pnl:e.pnl||0, wins:e.wins||0, total:e.total||0}));
+  let cum = 0;
+  const curve = daily.map(d => ({date:d.date, pnl:d.pnl, cum: (cum += d.pnl)}));
+  // 연승/연패
+  let curWin=0, curLoss=0, maxWin=0, maxLoss=0;
+  sells.forEach(t=>{
+    if((t.pnl||0)>0){ curWin++; curLoss=0; if(curWin>maxWin) maxWin=curWin; }
+    else if((t.pnl||0)<0){ curLoss++; curWin=0; if(curLoss>maxLoss) maxLoss=curLoss; }
+  });
+  // AI vs 수동
+  const aiSells = sells.filter(t=>t.auto);
+  const manSells = sells.filter(t=>!t.auto);
+  const aiPnl = aiSells.reduce((s,t)=>s+(t.pnl||0),0);
+  const manPnl = manSells.reduce((s,t)=>s+(t.pnl||0),0);
+  const aiWinRate = aiSells.length ? (aiSells.filter(t=>(t.pnl||0)>0).length/aiSells.length*100) : 0;
+  const manWinRate = manSells.length ? (manSells.filter(t=>(t.pnl||0)>0).length/manSells.length*100) : 0;
+  // 종목별 TOP3
+  const byTk = {};
+  sells.forEach(t=>{
+    if(!byTk[t.tk]) byTk[t.tk] = {tk:t.tk, nm:t.nm, pnl:0, count:0, wins:0};
+    byTk[t.tk].pnl += (t.pnl||0);
+    byTk[t.tk].count++;
+    if((t.pnl||0)>0) byTk[t.tk].wins++;
+  });
+  const topStocks = Object.values(byTk).sort((a,b)=>b.pnl-a.pnl);
+  const best = curve.reduce((a,b)=>(!a||b.pnl>a.pnl)?b:a, null);
+  const worst = curve.reduce((a,b)=>(!a||b.pnl<a.pnl)?b:a, null);
+  // 최대 낙폭(MDD)
+  let peak = 0, mdd = 0;
+  curve.forEach(c=>{ if(c.cum>peak) peak=c.cum; const dd=peak-c.cum; if(dd>mdd) mdd=dd; });
+  return {
+    entries, sells, trades, wins, losses,
+    totalPnl, winRate, avgWin, avgLoss, rr,
+    daily, curve, maxWin, maxLoss,
+    aiSells, manSells, aiPnl, manPnl, aiWinRate, manWinRate,
+    topStocks, best, worst, mdd
+  };
+}
+
+function renderJournalStats(){
+  const d = _journalStatsData();
+  const kpiEl = document.getElementById('jKpiRow');
+  if(kpiEl){
+    const pnlCol = d.totalPnl>=0 ? 'var(--g)' : 'var(--r)';
+    const kpi = (label, val, col) => `<div style="background:var(--bg);border-radius:8px;padding:8px;text-align:center;"><div style="font-size:9px;color:var(--tm);margin-bottom:3px;">${label}</div><div style="font-size:14px;font-weight:800;color:${col||'var(--t)'};">${val}</div></div>`;
+    kpiEl.innerHTML =
+      kpi('총 손익', (d.totalPnl>=0?'+':'')+d.totalPnl.toLocaleString()+'원', pnlCol) +
+      kpi('승률', d.sells.length ? d.winRate.toFixed(1)+'%' : '-') +
+      kpi('손익비', d.rr>0 ? '1:'+d.rr.toFixed(2) : '-') +
+      kpi('매매일', d.curve.length+'일');
+  }
+  // 누적손익 차트
+  const cv = document.getElementById('jPnlChart');
+  if(cv && d.curve.length){
+    const r = cv.getBoundingClientRect();
+    const W = Math.round(r.width)||600, H = 140;
+    cv.width = W; cv.height = H;
+    const ctx = cv.getContext('2d');
+    ctx.clearRect(0,0,W,H);
+    const PL=42, PR=10, PT=10, PB=22;
+    const cw = W-PL-PR, ch = H-PT-PB;
+    const cums = d.curve.map(c=>c.cum);
+    let yMin = Math.min(0, ...cums), yMax = Math.max(0, ...cums);
+    if(yMin===yMax){ yMin -= 1; yMax += 1; }
+    const yPad = (yMax-yMin)*0.08;
+    yMin -= yPad; yMax += yPad;
+    const yR = yMax-yMin;
+    const toY = v => PT + ch*(1-(v-yMin)/yR);
+    const toX = i => PL + cw*(i/Math.max(d.curve.length-1,1));
+    // 0선
+    ctx.strokeStyle = 'rgba(0,0,0,.15)';
+    ctx.setLineDash([3,3]);
+    ctx.beginPath(); ctx.moveTo(PL, toY(0)); ctx.lineTo(W-PR, toY(0)); ctx.stroke();
+    ctx.setLineDash([]);
+    // Y라벨
+    ctx.fillStyle='#8c9db5'; ctx.font='9px monospace'; ctx.textAlign='right';
+    [yMax, (yMax+yMin)/2, yMin].forEach(v=>{
+      const y = toY(v);
+      ctx.fillText((v>=0?'+':'')+Math.round(v/1000)+'k', PL-4, y+3);
+    });
+    // 면적
+    const grad = ctx.createLinearGradient(0, PT, 0, PT+ch);
+    grad.addColorStop(0, 'rgba(5,192,114,.25)');
+    grad.addColorStop(1, 'rgba(5,192,114,0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.moveTo(toX(0), toY(0));
+    d.curve.forEach((c,i)=>ctx.lineTo(toX(i), toY(c.cum)));
+    ctx.lineTo(toX(d.curve.length-1), toY(0));
+    ctx.closePath(); ctx.fill();
+    // 라인
+    ctx.strokeStyle = d.totalPnl>=0 ? '#05c072' : '#dc3545';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    d.curve.forEach((c,i)=>{
+      const x=toX(i), y=toY(c.cum);
+      if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    });
+    ctx.stroke();
+    // X 라벨 (시작/중간/끝)
+    ctx.fillStyle='#8c9db5'; ctx.textAlign='center';
+    [0, Math.floor(d.curve.length/2), d.curve.length-1].forEach(i=>{
+      if(d.curve[i]) ctx.fillText(d.curve[i].date.slice(5), toX(i), H-6);
+    });
+  } else if(cv){
+    const ctx=cv.getContext('2d'); ctx.clearRect(0,0,cv.width,cv.height);
+    ctx.fillStyle='#8c9db5'; ctx.font='11px sans-serif'; ctx.textAlign='center';
+    ctx.fillText('매매일지가 쌓이면 누적 손익이 표시됩니다', cv.width/2, cv.height/2);
+  }
+  // 분해 분석
+  const bd = document.getElementById('jBreakdown');
+  if(bd){
+    const bar = (label, valPct, col) => `<div style="margin-bottom:6px;"><div style="display:flex;justify-content:space-between;font-size:9px;color:var(--tm);margin-bottom:2px;"><span>${label}</span><span>${valPct.toFixed(1)}%</span></div><div style="background:var(--bg);height:6px;border-radius:3px;overflow:hidden;"><div style="width:${Math.min(100,valPct)}%;height:100%;background:${col};"></div></div></div>`;
+    const aiVsMan = `
+      <div style="background:var(--bg);border-radius:8px;padding:10px;">
+        <div style="font-size:10px;font-weight:700;margin-bottom:6px;">🤖 AI vs 🙋 수동</div>
+        ${bar('AI 승률 ('+d.aiSells.length+'건)', d.aiWinRate, 'var(--p)')}
+        ${bar('수동 승률 ('+d.manSells.length+'건)', d.manWinRate, 'var(--b)')}
+        <div style="display:flex;justify-content:space-between;font-size:9px;margin-top:4px;">
+          <span>AI 손익: <b style="color:${d.aiPnl>=0?'var(--g)':'var(--r)'};">${d.aiPnl>=0?'+':''}${d.aiPnl.toLocaleString()}</b></span>
+          <span>수동 손익: <b style="color:${d.manPnl>=0?'var(--g)':'var(--r)'};">${d.manPnl>=0?'+':''}${d.manPnl.toLocaleString()}</b></span>
+        </div>
+      </div>`;
+    const extras = `
+      <div style="background:var(--bg);border-radius:8px;padding:10px;font-size:10px;line-height:1.7;">
+        <div style="font-weight:700;margin-bottom:6px;">📊 상세 지표</div>
+        <div>평균 수익: <b style="color:var(--g);">+${Math.round(d.avgWin).toLocaleString()}원</b></div>
+        <div>평균 손실: <b style="color:var(--r);">-${Math.round(d.avgLoss).toLocaleString()}원</b></div>
+        <div>최대 연승: <b>${d.maxWin}회</b> · 최대 연패: <b>${d.maxLoss}회</b></div>
+        <div>최대 낙폭(MDD): <b style="color:var(--r);">-${Math.round(d.mdd).toLocaleString()}원</b></div>
+        ${d.best?`<div>최고일: ${d.best.date} <b style="color:var(--g);">+${d.best.pnl.toLocaleString()}</b></div>`:''}
+        ${d.worst?`<div>최악일: ${d.worst.date} <b style="color:var(--r);">${d.worst.pnl.toLocaleString()}</b></div>`:''}
+      </div>`;
+    const topStk = `
+      <div style="background:var(--bg);border-radius:8px;padding:10px;grid-column:1/-1;">
+        <div style="font-size:10px;font-weight:700;margin-bottom:6px;">🏆 종목별 손익 TOP/BOTTOM</div>
+        ${d.topStocks.slice(0,3).map(s=>`<div style="display:flex;justify-content:space-between;font-size:10px;padding:2px 0;"><span>${s.nm} (${s.tk}) · ${s.count}건 · 승${s.wins}</span><b style="color:${s.pnl>=0?'var(--g)':'var(--r)'};">${s.pnl>=0?'+':''}${s.pnl.toLocaleString()}원</b></div>`).join('')}
+        ${d.topStocks.length>3 ? '<div style="font-size:9px;color:var(--tm);margin:4px 0;text-align:center;">···</div>' : ''}
+        ${d.topStocks.slice(-2).reverse().filter(s=>!d.topStocks.slice(0,3).includes(s)).map(s=>`<div style="display:flex;justify-content:space-between;font-size:10px;padding:2px 0;"><span>${s.nm} (${s.tk}) · ${s.count}건 · 승${s.wins}</span><b style="color:${s.pnl>=0?'var(--g)':'var(--r)'};">${s.pnl>=0?'+':''}${s.pnl.toLocaleString()}원</b></div>`).join('')}
+      </div>`;
+    bd.innerHTML = aiVsMan + extras + topStk;
+  }
+}
+
+// AI 기능 제안 — 매매일지·학습노트·통계 보고 새 기능/개선점 제안
+async function askAIForFeatureSuggestion(){
+  const body = document.getElementById('jSuggestBody');
+  if(body) body.innerHTML = '<div style="color:var(--tm);">🤖 분석 중...</div>';
+  try{
+    const s = _journalStatsData();
+    const stage = (typeof getLearnerStage==='function') ? getLearnerStage() : null;
+    const learnSummary = (window.learningMemory||[]).slice(-10).map(l=>`[${l.category}] ${l.text}`).join('\n');
+    const lastJournals = s.entries.slice(-5).map(e=>`${e.date} pnl${e.pnl>=0?'+':''}${e.pnl} good:${(e.good||'').slice(0,40)} bad:${(e.bad||'').slice(0,60)} improve:${(e.improvement||'').slice(0,60)}`).join('\n');
+    const prompt = `너는 트레이딩 앱 PM 겸 트레이더 멘토.
+이 사용자의 매매 통계와 학습 노트를 보고, **이 앱에 추가하면 매매 성능이 가장 좋아질 기능 3가지**를 제안해줘.
+기존 기능: 자동매매(레벨1~4), 백테스트, 학습 메모리, 강세 섹터 자동감지, 매매일지 자동작성, AI 판단 로그.
+
+【통계】
+총손익 ${s.totalPnl.toLocaleString()}원 / 매매 ${s.sells.length}건 / 승률 ${s.winRate.toFixed(1)}%
+손익비 1:${s.rr.toFixed(2)} / MDD -${Math.round(s.mdd).toLocaleString()}원 / 최대연패 ${s.maxLoss}회
+AI손익 ${s.aiPnl.toLocaleString()} (승률 ${s.aiWinRate.toFixed(1)}%) vs 수동 ${s.manPnl.toLocaleString()} (${s.manWinRate.toFixed(1)}%)
+학습단계 ${stage?('Lv'+stage.lv+' '+stage.label):'미시작'}
+
+【최근 일지 요약】
+${lastJournals || '없음'}
+
+【최근 학습 노트】
+${learnSummary || '없음'}
+
+JSON만:
+{"suggestions":[
+ {"title":"기능명 (5자내외)","why":"왜 필요한지 통계 근거 1줄","what":"무엇을 만들지 2~3줄","impact":"예상 성능 영향","priority":"높음/중간/낮음"},
+ ...총 3개
+]}`;
+    const res = await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:1200,messages:[{role:'user',content:prompt}]})});
+    const data = await res.json();
+    const txt = (data.content&&data.content[0]&&data.content[0].text)||'{}';
+    const m = txt.match(/\{[\s\S]*\}/);
+    if(!m) throw new Error('JSON 파싱 실패');
+    const ai = JSON.parse(m[0]);
+    const sugs = ai.suggestions || [];
+    if(!sugs.length){ body.innerHTML = '<div style="color:var(--tm);">제안 없음</div>'; return; }
+    body.innerHTML = sugs.map((s,i)=>{
+      const pCol = s.priority==='높음'?'var(--r)':s.priority==='중간'?'var(--a)':'var(--tm)';
+      return `
+        <div style="background:var(--pan);border-radius:8px;padding:10px;margin-bottom:6px;border-left:4px solid ${pCol};">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+            <div style="font-size:12px;font-weight:800;">${i+1}. ${s.title}</div>
+            <span style="font-size:9px;background:${pCol};color:#fff;padding:1px 6px;border-radius:3px;font-weight:700;">${s.priority}</span>
+          </div>
+          <div style="font-size:10px;color:var(--ts);margin-bottom:4px;">📊 ${s.why}</div>
+          <div style="font-size:10px;line-height:1.6;margin-bottom:4px;">🔧 ${s.what}</div>
+          <div style="font-size:10px;color:var(--g);font-weight:600;">📈 ${s.impact}</div>
+        </div>`;
+    }).join('');
+    // 메모리에 저장 (다음 빌드에 참고)
+    try{
+      const list = JSON.parse(localStorage.getItem('htsFeatureSuggestions')||'[]');
+      list.push({ts:Date.now(), suggestions:sugs});
+      if(list.length>30) list.shift();
+      saveToServer('htsFeatureSuggestions', JSON.stringify(list));
+    }catch(e){}
+  }catch(e){
+    if(body) body.innerHTML = '<div style="color:var(--r);">실패: '+e.message+'</div>';
+  }
+}
+
 async function genAllJournals(){
   showAlert("생성 중","AI 일지를 생성합니다. 잠시 후 확인하세요.");
   const bd={};mock.trades.forEach(t=>{if(!bd[t.date])bd[t.date]=[];bd[t.date].push(t);});
