@@ -256,9 +256,9 @@ button{cursor:pointer;font-family:var(--sans);}
 .send-btn{width:32px;height:32px;border-radius:10px;border:none;background:var(--b);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;transition:all .12s;box-shadow:0 2px 8px rgba(49,130,246,.3);}
 .send-btn:hover{opacity:.85;transform:scale(1.05);}
 .send-btn:disabled{opacity:.4;cursor:not-allowed;}
-.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;display:none;align-items:center;justify-content:center;backdrop-filter:blur(8px);}
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:700;display:none;align-items:center;justify-content:center;backdrop-filter:blur(8px);}
 .modal-bg.show{display:flex;}
-.modal{background:var(--pan);border:none;border-radius:16px;width:560px;max-width:95vw;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:var(--sh2);}
+.modal{position:relative;z-index:701;background:var(--pan);border:none;border-radius:16px;width:560px;max-width:95vw;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:var(--sh2);}
 .modal.wide{width:680px;max-width:98vw;}
 .modal.wide{width:720px;}
 .modal-hdr{padding:12px 16px;border-bottom:1px solid var(--br);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
@@ -359,7 +359,7 @@ input,select,textarea{-webkit-appearance:none;appearance:none;}
 
 /* ── 갤럭시 폴드 펼친화면 (1024px~1920px) ── */
 @media(min-width:1024px) and (max-width:1920px){
-  .hts{grid-template-columns:180px 1fr 196px 252px;}
+  .hts{grid-template-columns:180px 1fr 200px 260px;}
   .bar{gap:5px;padding:0 10px;height:44px;}
   .tab{padding:3px 10px;font-size:11px;}
   .ibtn{font-size:10px;padding:3px 8px;}
@@ -824,7 +824,6 @@ canvas{image-rendering:pixelated;}
             <option value="갭상승">📈 갭상승</option>
             <option value="이슈테마">🔥 이슈테마</option>
             <option value="역추세">↩ 역추세</option>
-            <option value="스캘핑">⚡ 스캘핑</option>
           </select>
           <div id="techniqueTag" style="font-size:10px;font-weight:700;color:var(--b);display:none;">-</div>
           <div id="techniqueReason" style="font-size:8px;color:var(--ts);line-height:1.4;margin-top:1px;">분석 버튼 눌러주세요</div>
@@ -2038,7 +2037,7 @@ function genCandles(tk,dt){
         const todayCount = _kisChartMeta.todayCount || candles.length;
         // sim.idx: 전일 마지막 봉에서 시작 (전일 분봉 끝 + 오늘 첫 봉 전)
         // 오늘 봉이 있으면 전일 마지막 봉에서 멈춤, 없으면 끝에서 시작
-        sim.idx = prevCount > 0 ? prevCount - 1 : 0;
+        sim.idx = prevCount > 0 ? prevCount - 1 : candles.length - 1;
         chartViewCount = Math.min(Math.max(prevCount + 20, 80), candles.length);
         chartViewStart = Math.max(0, candles.length - chartViewCount);
         if(candles.length > 0) updPrice(candles[sim.idx]);
@@ -2483,20 +2482,21 @@ function drawChart(){
 
   // ── 매수/매도 체결 마커 ──
   try{
-    const _trades=(mock.trades||[]).filter(function(t){
-      return t.tk===activeTk&&(t.side==='buy'||t.side==='sell');
+    var _trades=(mock.trades||[]).filter(function(t){
+      return t.tk===activeTk&&t.date===sim.date&&(t.side==='buy'||t.side==='sell');
     });
     _trades.forEach(function(t){
-      if(!t.ts) return;
-      var tIdx=-1;
-      for(var _ci=chartViewStart;_ci<Math.min(chartViewStart+chartViewCount,cs.length);_ci++){
-        var cTime=cs[_ci].ts||cs[_ci].t||0;
-        if(Math.abs(cTime-t.ts)<300000){tIdx=_ci;break;}
+      var matchIdx=-1;
+      if(t.barTime){
+        for(var bi=0;bi<cs.length;bi++){
+          if(cs[bi].t===t.barTime){matchIdx=bi;break;}
+        }
       }
-      if(tIdx<0) return;
-      var ci2=tIdx-chartViewStart;
-      var x=Math.round(ci2*(bw+gap)+bw/2+padL);
-      var _tpr=t.pr||t.price||0;var yPr=Math.round(H-padB-(_tpr-minP)/prRange*chartH);
+      if(matchIdx<0) return;
+      var x=toX(matchIdx);
+      var _tpr=t.price||t.pr||0;
+      if(!_tpr) return;
+      var yPr=toY(_tpr);
       var isBuy=t.side==='buy';
       ctx.save();
       ctx.fillStyle=isBuy?'#00c471':'#ff4757';
@@ -2512,7 +2512,7 @@ function drawChart(){
       ctx.fillStyle=isBuy?'#00c471':'#ff4757';
       ctx.font='bold 8px monospace';
       ctx.textAlign='center';
-      ctx.fillText((_tpr).toLocaleString(),x,isBuy?yPr+25:yPr-17);
+      ctx.fillText(_tpr.toLocaleString(),x,isBuy?yPr+25:yPr-17);
       ctx.restore();
     });
   }catch(_me){}
@@ -3138,7 +3138,7 @@ function submitOrder(autoExec){
     const prevSO=stopOrders[activeTk];
     const newOrigQty=prevSO?(prevSO.origQty||0)+qty:qty;
     stopOrders[activeTk]={stop:stopPr,t1:t1Pr,t2:t2Pr,t1done:prevSO?prevSO.t1done:false,t2done:prevSO?prevSO.t2done:false,trail:trailMode,trailHigh:Math.max(pr,prevSO?.trailHigh||0),origQty:newOrigQty,origStop:stopPr};
-    mock.trades.push({date:sim.date,tk:activeTk,nm:stk.nm,side:"buy",price:pr,pr:pr,ts:Date.now(),qty,fee:Math.round(fee),pnl:0,creditType:credType,auto:autoExec||false,time:new Date().toLocaleTimeString("ko-KR",{hour:"2-digit"})});
+    mock.trades.push({date:sim.date,tk:activeTk,nm:stk.nm,side:"buy",price:pr,pr:pr,ts:Date.now(),barTime:(sim.candles[sim.idx]||{}).t||"",qty,fee:Math.round(fee),pnl:0,creditType:credType,auto:autoExec||false,time:new Date().toLocaleTimeString("ko-KR",{hour:"2-digit"})});
   checkBrainDong("buy",pr,qty,stk);
   } else {
     const pos=mock.positions[activeTk];
@@ -3157,7 +3157,7 @@ function submitOrder(autoExec){
           "연속 수익 "+mock.winSeries+"회!\n\n지금이 가장 위험한 순간입니다.\n\n• 비중 절대 늘리지 않음\n• 체크리스트 더 꼼꼼히\n• 연속수익은 운과 실력을 구분할 수 없음");
       }
     }
-    mock.trades.push({date:sim.date,tk:activeTk,nm:stk.nm,side:"sell",price:pr,pr:pr,ts:Date.now(),qty,fee:Math.round(fee+tax),pnl:Math.round(pnl),creditType:credType,auto:autoExec||false,time:new Date().toLocaleTimeString("ko-KR",{hour:"2-digit"})});
+    mock.trades.push({date:sim.date,tk:activeTk,nm:stk.nm,side:"sell",price:pr,pr:pr,ts:Date.now(),barTime:(sim.candles[sim.idx]||{}).t||"",qty,fee:Math.round(fee+tax),pnl:Math.round(pnl),creditType:credType,auto:autoExec||false,time:new Date().toLocaleTimeString("ko-KR",{hour:"2-digit"})});
   bdMetrics.lastSellTime=Date.now();checkBrainDong("sell",pr,qty,stk);
     if(cfg.al){const lr=-mock.todayPnl/cfg.capital*100;if(lr>=cfg.dayloss)showAlert("⚠ 일일 손실 한도",`한도 ${cfg.dayloss}% 도달\n매매 중단 권고.`);}
   }
@@ -4623,7 +4623,6 @@ const TECHNIQUES = {
   "돌파": {phase:"10-5", cond:"전고점 저항선 돌파 + 거래량 300%+", stop:"돌파선 아래", target:"다음 저항선"},
   "첫봉": {phase:"10-3", cond:"시가 후 첫봉 양봉 + 거래량 150%+", stop:"첫봉 저가", target:"전일 고점"},
   "갭상승": {phase:"10-2", cond:"갭업 후 첫봉 양봉 확정", stop:"갭 아래 (시가)", target:"이전 저항 or +5%"},
-  "스캘핑": {phase:"10-1", cond:"체결강도 120+ + 호가창 매도벽 소화", stop:"-0.3% 즉시", target:"+0.5~1%"},
   "이슈테마": {phase:"10-6", cond:"재료 A급 이상 + 선도주 + 거래량 1위", stop:"시가 이탈", target:"R/R 1:2"},
 };
 
@@ -6234,6 +6233,15 @@ function goPage(p,el){
         }
       }catch(e){}
     }
+    // 강세섹터 자동 관심종목 동기화 (하루 1회만)
+    try{
+      const _today=sim.date||new Date().toISOString().slice(0,10);
+      const _lastSync=localStorage.getItem('htsAutoSyncDate')||'';
+      if(_lastSync!==_today){
+        localStorage.setItem('htsAutoSyncDate',_today);
+        syncCandidatesToWatchlist&&syncCandidatesToWatchlist();
+      }
+    }catch(e){}
   }
 }
 
@@ -7277,6 +7285,11 @@ function collectMarketCtx(){
 
 window.onload=()=>{
   loadState();
+  // 캐시된 강세섹터 정보 복원 (관심종목 순위 배지용)
+  try{
+    const _si=localStorage.getItem('htsSectorInfo');
+    if(_si) window._sectorInfo=JSON.parse(_si);
+  }catch(e){}
   goPage('hts',document.getElementById('tab-hts'));
   document.getElementById("mockDate").value=sim.date;
   initChartEvents();
