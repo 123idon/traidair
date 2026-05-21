@@ -1272,6 +1272,7 @@ window.backtest = {
   currentDate:null, dayIdx:0, totalDays:0,
   startCash:0, startPnl:0,
   dailyResults:[], // [{date, pnl, trades, wins, losses}]
+  pendingJournals:[], // 백그라운드로 작성 중인 일지 Promise 목록
 };
 function _businessDays(start, end){
   const out=[]; const d=new Date(start); const e=new Date(end);
@@ -1291,11 +1292,9 @@ async function startBacktest(startDate, endDate){
   if(backtest.running){addMsg('ai','⚠ 이미 백테스트 진행 중'); return;}
   const days=_businessDays(startDate, endDate);
   if(!days.length){showAlert('백테스트','영업일이 없습니다'); return;}
-  // 백테스트는 자동 실거래 모드로 강제 (level<3이면 거래 안 일어남)
-  if(autoLevel < 3){
-    autoLevel = 3;
-    addMsg('ai','📊 백테스트 — 자동매매 레벨 3(진입자동)으로 강제 설정');
-  }
+  // 백테스트는 항상 완전자동(Lv4 = 진입자동 + 15:20 마감 자동청산) 모드
+  autoLevel = 4;
+  addMsg('ai','📊 백테스트 — 자동매매 레벨 4(완전자동)로 고정');
   // 종목 풀이 거의 비었으면 강세섹터 자동 동기화 후 시작
   const poolSize = (WGS[0]||[]).length + (WGS[1]||[]).length + (WGS[3]||[]).length + Object.keys(window._sectorInfo||{}).length;
   if(poolSize < 2 && typeof refreshHotSectors==='function'){
@@ -1319,13 +1318,19 @@ async function startBacktest(startDate, endDate){
   _backtestLoadDay(days[0]);
   renderBacktestPanel();
 }
-function stopBacktest(){
+async function stopBacktest(){
   if(!backtest.running) return;
   backtest.running=false;
   sim.playing=false;
   if(sim.timer){clearTimeout(sim.timer);sim.timer=null;}
   _syncPlayBtn();
   renderBacktestPanel();
+  // 백그라운드 일지 작성 모두 완료까지 대기 (학습 메모리 보장)
+  if(backtest.pendingJournals && backtest.pendingJournals.length){
+    addMsg('ai',`⏳ 진행 중인 매매일지 ${backtest.pendingJournals.length}건 작성 완료까지 대기...`);
+    try{ await Promise.allSettled(backtest.pendingJournals); }catch(e){}
+    backtest.pendingJournals = [];
+  }
   _backtestReport();
 }
 function _backtestLoadDay(dateStr){
@@ -1370,16 +1375,26 @@ async function _backtestEndOfDay(){
   backtest.dayIdx++;
   addDecisionLog(`📅 ${dt} 마감`, `매매 ${todayTrades.length}건 | 손익 ${dayPnl>=0?'+':''}${dayPnl.toLocaleString()}원 | 승 ${wins}·패 ${losses}`, '백테스트');
   renderBacktestPanel();
-  // 매매가 있었으면 매매일지 자동 작성 → 학습 누적
-  // 빠른 배속(>=300)에서는 일지를 백그라운드로 돌려 배속 유지, 느린 배속에서는 await
+  // 백테스트는 매일 매매일지 무조건 자동 작성 (학습 누적용)
   if(todayTrades.length > 0 && typeof autoSaveJournalOnTrade === 'function'){
     addDecisionLog(`📓 ${dt} 일지 작성`, sim.speed>=300?'백그라운드 (빠른 배속)':'AI 평가 대기 중', '학습');
-    const _p = autoSaveJournalOnTrade().catch(e=>console.warn('일지:', e.message));
+    // sim.date가 다음날로 넘어가도 이날 매매 기준으로 평가하도록 dt를 클로저로 캡쳐
+    const _journalDay = dt;
+    const _origDate = sim.date;
+    const _p = (async function(){
+      try{
+        // autoSaveJournalOnTrade는 sim.date를 기준으로 동작 — 잠깐 그날로 되돌렸다가 복귀
+        sim.date = _journalDay;
+        await autoSaveJournalOnTrade();
+      }catch(e){ console.warn('일지:', e.message); }
+      finally{ sim.date = _origDate; }
+    })();
+    backtest.pendingJournals.push(_p);
     if(sim.speed < 300){
       // 느린 배속에서는 일지 끝까지 기다림 (학습 노트 다음날 즉시 반영)
       try{ sim.playing=false; _syncPlayBtn(); await _p; }catch(e){}
     }
-    // 빠른 배속에서는 await 안 함 → 학습은 다다음날부터 자연 반영
+    // 빠른 배속에서는 await 안 함 — stopBacktest에서 모두 await
   }
   // 다음 영업일?
   if(backtest.dayIdx >= backtest.totalDays){
