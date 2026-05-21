@@ -3550,16 +3550,16 @@ async function _runScreeningAsync(){
         return;
       }
     }
-    // 진입 등급:
-    // - score≥7: 강한 신호 (BUY)
-    // - score≥4 + 확정시그널: BUY
-    // - score≥3: 관찰
+    // 진입 등급 (백테스트는 매매 발생이 핵심 — 임계 더 낮춤):
+    // - score≥5: BUY
+    // - score≥3 + 확정시그널: BUY
+    // - score≥2: 관찰
     const hasConfirm = best.tags.indexOf('확정시그널') !== -1;
-    if(best.score >= 7 || (best.score >= 4 && hasConfirm)){
+    if(best.score >= 5 || (best.score >= 3 && hasConfirm)){
       var lcQ=best.lc;
-      addDecisionLog('['+best.stk.nm+'] ✅ 진입 ('+best.score+'점)', best.tags.join(' · '), best.score>=7?'강한신호':'확정시그널');
+      addDecisionLog('['+best.stk.nm+'] ✅ 진입 ('+best.score+'점)', best.tags.join(' · '), best.score>=5?'강한신호':'확정시그널');
       try{ await execAutoBuy(lcQ.c, best.stk, best.score); }catch(_e){}
-    } else if(best.score >= 3){
+    } else if(best.score >= 2){
       addDecisionLog('['+best.stk.nm+'] 👀 관찰 ('+best.score+'점)', best.tags.join(' · '), '대기');
     } else {
       addDecisionLog('['+best.stk.nm+'] ⏸ 약함 ('+best.score+'점)', best.tags.join(' · ')||'조건 불충분', '관망');
@@ -5828,6 +5828,15 @@ function goPage(p,el){
   if(pg) pg.classList.add("on");
   document.querySelectorAll(".tab").forEach(t=>t.classList.remove("on"));
   if(el) el.classList.add("on");
+  // ★ 페이지별 렌더 트리거 — 통계/일지가 비어있던 원인 해결
+  try{
+    if(p==='stats'){
+      if(typeof renderStats==='function') renderStats();
+      if(typeof renderStatsEnhanced==='function') renderStatsEnhanced();
+    } else if(p==='journal'){
+      if(typeof renderJPage==='function') renderJPage();
+    }
+  }catch(_e){ console.warn('goPage 렌더:', _e.message); }
   // ── 날짜 동기화 ──
   if(p==="hts"){
     // 대시보드 → HTS: 대시보드 날짜를 HTS에 반영
