@@ -118,6 +118,13 @@ button{cursor:pointer;font-family:var(--sans);}
 .fi.on .fi-t{color:var(--tp);}
 .cp{grid-column:2;grid-row:1;display:flex;flex-direction:column;overflow:hidden;background:var(--pan);border-right:1px solid var(--br);min-height:0;max-height:45vh;}
 .cp-head{display:flex;align-items:center;gap:5px;padding:6px 10px;background:var(--pan);border-bottom:1px solid var(--br);flex-shrink:0;flex-wrap:wrap;row-gap:3px;box-shadow:var(--sh0);}
+.chart-hdr{display:flex;align-items:center;justify-content:space-between;padding:6px 12px;background:var(--pan);border-bottom:1px solid var(--br);flex-shrink:0;gap:10px;}
+.chart-hdr-l{display:flex;align-items:baseline;gap:8px;min-width:0;}
+.chart-hdr-nm{font-size:17px;font-weight:800;color:var(--t);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.chart-hdr-tk{font-family:var(--mono);font-size:11px;color:var(--tm);font-weight:600;}
+.chart-hdr-r{display:flex;align-items:baseline;gap:8px;flex-shrink:0;}
+.chart-hdr-pr{font-family:var(--mono);font-size:16px;font-weight:700;color:var(--t);}
+.chart-hdr-ch{font-family:var(--mono);font-size:13px;font-weight:700;}
 .tf-btn,.ind-btn{padding:3px 7px;border-radius:6px;border:1.5px solid transparent;background:transparent;color:var(--ts);font-size:9px;font-family:var(--mono);transition:all .12s;font-weight:500;}
 .tf-btn.on{background:var(--b);border-color:var(--b);color:#fff;font-weight:700;}
 .ind-btn{border-color:var(--br);background:var(--pan);}
@@ -364,6 +371,13 @@ input,select,textarea{-webkit-appearance:none;appearance:none;}
   .tab{padding:3px 10px;font-size:11px;}
   .ibtn{font-size:10px;padding:3px 8px;}
   #idxBar{gap:6px;}
+  /* 시뮬 바 wrap 허용 + 배속 컴팩트 (x120까지 보이게) */
+  .mock-bar{flex-wrap:wrap;row-gap:3px;}
+  .spd-btn{padding:3px 5px;font-size:9px;}
+  .spd-wrap{flex-wrap:wrap;}
+  .chart-hdr{padding:5px 10px;gap:8px;}
+  .chart-hdr-nm{font-size:15px;}
+  .chart-hdr-pr{font-size:14px;}
 }
 /* ── 폴드 최소화 (280px 이하) ── */
 @media(max-width:360px){
@@ -615,6 +629,17 @@ canvas{image-rendering:pixelated;}
 
     <!-- ① LEFT: 관심종목 (col1 row1/3) -->
     <div class="lp">
+      <!-- 실시간 강세 섹터 패널 -->
+      <div id="hotSectorBox" style="border-bottom:1px solid var(--br);background:linear-gradient(180deg,rgba(220,38,38,0.04),rgba(255,255,255,0));padding:6px 8px;flex-shrink:0;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+          <span style="font-size:9px;font-weight:800;color:var(--r);">🔥 실시간 강세 섹터</span>
+          <button id="hotSecRefreshBtn" onclick="refreshHotSectors(true)" title="새로고침" style="padding:1px 5px;border-radius:3px;border:none;background:var(--b);color:#fff;font-size:8px;cursor:pointer;">↻</button>
+        </div>
+        <div id="hotSectorList" style="display:flex;flex-direction:column;gap:3px;font-size:9px;">
+          <div style="color:var(--tm);font-size:9px;padding:2px 0;">분석 중...</div>
+        </div>
+        <div id="hotSecTime" style="font-size:8px;color:var(--tm);font-family:var(--mono);margin-top:3px;text-align:right;">-</div>
+      </div>
       <div class="lp-tabs">
         <div class="lpt on" onclick="lTab(this,'lpb-w')">관심</div>
         <div class="lpt" onclick="lTab(this,'lpb-ck')">체크</div>
@@ -741,6 +766,17 @@ canvas{image-rendering:pixelated;}
 
     <!-- ② CENTER: 차트 (col2 row1) -->
     <div class="cp">
+      <!-- 차트 종목 헤더 (어느 차트인지 명확히) -->
+      <div class="chart-hdr" id="chartHdr">
+        <div class="chart-hdr-l">
+          <span class="chart-hdr-nm" id="chartHdrNm">삼성전자</span>
+          <span class="chart-hdr-tk" id="chartHdrTk">005930</span>
+        </div>
+        <div class="chart-hdr-r">
+          <span class="chart-hdr-pr" id="chartHdrPr">0</span>
+          <span class="chart-hdr-ch" id="chartHdrCh">+0.00%</span>
+        </div>
+      </div>
       <div class="cp-head">
         <div style="display:flex;gap:2px;">
           <button class="tf-btn on" onclick="setTF(this,'1')">1분</button>
@@ -2914,6 +2950,12 @@ function updPrice(c){
   if(siPr){siPr.textContent=pr.toLocaleString();siPr.className="si-pr "+cls;}
   const siCh=document.getElementById("siCh");
   if(siCh){siCh.textContent=(up?"+":"")+ca.toLocaleString()+" ("+(up?"+":"")+cp+"%)";siCh.className="si-ch "+cls;}
+  // 차트 큰 헤더
+  const chNm=document.getElementById("chartHdrNm");if(chNm) chNm.textContent=stk.nm;
+  const chTk=document.getElementById("chartHdrTk");if(chTk) chTk.textContent=stk.tk;
+  const chPr=document.getElementById("chartHdrPr");if(chPr) chPr.textContent=pr.toLocaleString();
+  const chCh=document.getElementById("chartHdrCh");
+  if(chCh){chCh.textContent=(up?"+":"")+cp+"%";chCh.style.color=up?"var(--r)":"var(--b)";}
   const obPr=document.getElementById("obPr");
   if(obPr){obPr.textContent=pr.toLocaleString();obPr.className="ob-cur-p "+cls;}
   const obInfo=document.getElementById("obInfo");
@@ -5964,8 +6006,27 @@ function renderNews(){
 function selectStk(tk){activeTk=tk;const s=STOCKS.find(s=>s.tk===tk)||STOCKS[0];document.getElementById("siNm").textContent=s.nm;// 관심종목 자동 추가 제거 (수동으로 그룹 선택 후 추가)
   const tkEl=document.getElementById("obTkName");if(tkEl)tkEl.textContent=s.nm;document.getElementById("srchIn").value="";hideSrch();renderWL();genCandles(tk,sim.date);initChart();renderOB();renderTH();
   const atk=document.getElementById("analysisTk");if(atk)atk.textContent=s.nm;
+  // 차트 상단 큰 종목명 갱신
+  updChartHeader();
   setTimeout(()=>{updateAIAdvisor();runFullAnalysis();fetchDartNews();},400);
   _syncIdxWithSim();}
+// AI 자동매매가 호출하는 종목 전환 — selectStk 위임 (실시간 차트/호가/AI 패널 모두 전환)
+function setActiveTk(tk){
+  if(!tk||tk===activeTk) return;
+  selectStk(tk);
+  try{addDecisionLog&&addDecisionLog('🔄 종목 자동 전환',(STOCKS.find(s=>s.tk===tk)||{nm:tk}).nm+' ('+tk+')','자동매매');}catch(e){}
+}
+// 차트 헤더 종목 정보 갱신 (큰 종목명 / 가격 / 등락)
+function updChartHeader(){
+  const s=STOCKS.find(s=>s.tk===activeTk);if(!s) return;
+  const chgPct=((s.pr-s.base)/s.base*100);
+  const up=chgPct>=0;
+  const ne=document.getElementById('chartHdrNm');if(ne) ne.textContent=s.nm;
+  const te=document.getElementById('chartHdrTk');if(te) te.textContent=s.tk;
+  const pe=document.getElementById('chartHdrPr');if(pe) pe.textContent=(s.pr||0).toLocaleString();
+  const ce=document.getElementById('chartHdrCh');
+  if(ce){ ce.textContent=(up?'+':'')+chgPct.toFixed(2)+'%'; ce.style.color=up?'var(--r)':'var(--b)'; }
+}
 
 // ═══════════════════════════════
 // SEARCH
@@ -7385,7 +7446,51 @@ window.onload=()=>{
   const savedTrust=localStorage.getItem('trustScore');
   if(savedTrust){trustScore=parseInt(savedTrust);const sl=document.getElementById('trustSlider');if(sl)sl.value=trustScore;updateTrustScore(trustScore);}
   setTimeout(()=>{renderGrowthRoadmap();detectSlump();},500);
+  // 차트 큰 헤더 초기화 + 강세 섹터 패널 초기 렌더 / 주기적 갱신
+  setTimeout(()=>{updChartHeader&&updChartHeader();renderHotSectors&&renderHotSectors();refreshHotSectors&&refreshHotSectors(false);}, 400);
+  // 5분마다 강세 섹터 자동 갱신 (모의투자라도 변동이 보이게)
+  setInterval(()=>{refreshHotSectors&&refreshHotSectors(false);}, 5*60*1000);
 };
+// 강세 섹터 캐시 렌더링 (localStorage에서 가져옴)
+function renderHotSectors(){
+  const el=document.getElementById('hotSectorList');
+  const te=document.getElementById('hotSecTime');
+  if(!el) return;
+  let info={};
+  try{info=JSON.parse(localStorage.getItem('htsSectorInfo')||'{}');}catch(e){}
+  // sectorInfo: {tk:{rank,sector,reason,nm}}
+  const grouped={};
+  Object.entries(info).forEach(([tk,v])=>{
+    if(!grouped[v.rank])grouped[v.rank]={sector:v.sector,reason:v.reason,stocks:[]};
+    grouped[v.rank].stocks.push({tk,nm:v.nm||tk});
+  });
+  const ranks=Object.keys(grouped).sort((a,b)=>parseInt(a)-parseInt(b));
+  if(!ranks.length){el.innerHTML='<div style="color:var(--tm);font-size:9px;padding:2px 0;">아직 데이터 없음 ↻ 클릭</div>';return;}
+  el.innerHTML=ranks.map(r=>{
+    const g=grouped[r];
+    const stkLine=g.stocks.map(s=>'<span class="hot-sec-stk" data-tk="'+s.tk+'" onclick="selectStk(this.dataset.tk)" style="cursor:pointer;color:var(--b);font-weight:600;">'+s.nm+'</span>').join(' · ');
+    return '<div style="line-height:1.4;"><span style="background:var(--r);color:#fff;border-radius:3px;padding:0 4px;font-weight:700;font-size:8px;margin-right:4px;">'+r+'위</span><span style="font-weight:700;">'+(g.sector||'-')+'</span><br><span style="color:var(--ts);font-size:8px;">'+(g.reason||'')+'</span><br>'+stkLine+'</div>';
+  }).join('<div style="height:1px;background:var(--br);margin:3px 0;"></div>');
+  const t=localStorage.getItem('htsSectorTime');
+  if(te) te.textContent=t?('갱신 '+t):'-';
+}
+// 강세 섹터 새로 가져오기 (5분 쿨다운, force=true면 무시)
+let _hotSecLast=0;
+async function refreshHotSectors(force){
+  const now=Date.now();
+  if(!force && now-_hotSecLast < 5*60*1000) return; // 5분 쿨다운
+  _hotSecLast=now;
+  const btn=document.getElementById('hotSecRefreshBtn');
+  if(btn){btn.textContent='…';btn.disabled=true;}
+  try{
+    await syncCandidatesToWatchlist();
+    const now2=new Date();
+    const hh=String(now2.getHours()).padStart(2,'0'), mm=String(now2.getMinutes()).padStart(2,'0');
+    localStorage.setItem('htsSectorTime', hh+':'+mm);
+    renderHotSectors();
+  }catch(e){console.warn('hotSec:',e.message);}
+  if(btn){btn.textContent='↻';btn.disabled=false;}
+}
 // ══════════════════════════════════════════════
 // AI 종목 선택 시스템 (강의 기준 기반)
 // ══════════════════════════════════════════════
@@ -7455,6 +7560,8 @@ async function syncCandidatesToWatchlist(){
 
     saveWGS();
     renderWLGroup();
+    // HTS 좌측 강세 섹터 패널도 즉시 갱신
+    try{renderHotSectors&&renderHotSectors();}catch(_e){}
 
     // 메시지 출력
     let msg = '📊 강세섹터 자동 선정 완료\n\n';
