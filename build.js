@@ -23,6 +23,10 @@ fs.writeFileSync('./cfg.json', JSON.stringify(merged, null, 2));
 console.log('✅ cfg.json 생성/업데이트');
 
 // ── 2. src/ 페이지 빌드 ──────────────────────────────
+const BUILD_TS = String(Date.now());
+fs.writeFileSync('./buildinfo.json', JSON.stringify({ buildTs: BUILD_TS, builtAt: new Date().toISOString() }, null, 2));
+console.log('✅ buildinfo.json: ' + BUILD_TS);
+
 const PAGES = [
   { src: 'src/hts', out: 'trading-hts.html' },
   { src: 'src/dashboard', out: 'trading-dashboard.html' },
@@ -51,7 +55,8 @@ function buildPage({ src, out }) {
   const html = tpl
     .replace('\n/*##STYLES##*/\n', () => css)
     .replace('\n<!--##BODY##-->\n', () => body)
-    .replace('\n/*##SCRIPT##*/\n', () => js);
+    .replace('\n/*##SCRIPT##*/\n', () => js)
+    .replace(/__BUILD_TS__/g, () => BUILD_TS);
   fs.writeFileSync(out, html);
   console.log(`✅ 빌드: ${src} → ${out} (${(html.length / 1024).toFixed(1)} KB)`);
 }

@@ -6273,6 +6273,32 @@ function collectMarketCtx(){
   return lines.join('\n');
 }
 
+// ─ 새 버전 자동 감지 (캐시 우회) ───────────────────
+(function(){
+  const meta = document.querySelector('meta[name="build-ts"]');
+  const myBuildTs = meta ? meta.getAttribute('content') : '';
+  if(!myBuildTs || myBuildTs === '__BUILD_TS__') return; // 로컬 빌드 안 한 경우
+  let reloaded = false;
+  async function check(){
+    if(reloaded) return;
+    try{
+      const r = await fetch('/api/version', {cache:'no-store'});
+      const d = await r.json();
+      if(d && d.buildTs && String(d.buildTs) !== String(myBuildTs)){
+        reloaded = true;
+        console.log('🔄 새 버전 감지, 새로고침합니다.', d.buildTs, '!=', myBuildTs);
+        // ?_v= 쿼리 추가해서 강제 새 응답
+        const u = location.pathname + '?_v=' + d.buildTs;
+        location.replace(u);
+      }
+    }catch(e){}
+  }
+  // 초기 + 60초마다 + 탭 다시 활성화될 때
+  setTimeout(check, 5000);
+  setInterval(check, 60000);
+  document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) check(); });
+})();
+
 window.onload=()=>{
   loadState();
   // 캐시된 강세섹터 정보 복원 (관심종목 순위 배지용)
