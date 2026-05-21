@@ -2003,8 +2003,14 @@ async function loadFromServer() {
     const d = await r.json();
     if (!d.ok || !d.data) return false;
     const data = d.data;
-    // 각 키를 localStorage에도 동기화
-    const keys = ['htsMock','htsStopOrders','htsCfg','htsWGS','htsBan','htsJournals','manualJournals','personalRules','masterCL'];
+    // 각 키를 localStorage에도 동기화 (영구 보존 대상 전체)
+    const keys = [
+      'htsMock','htsStopOrders','htsCfg','htsWGS','htsBan','htsJournals',
+      'manualJournals','personalRules','masterCL',
+      'htsSectorInfo','htsAutoTks','htsAutoSyncDate','htsSectorTime',
+      'htsAutoState','htsChatMsgs','htsDecisionLog','htsAiStatus',
+      'htsIntra','trustScore','apiUsage','htsSimState'
+    ];
     keys.forEach(k => {
       if (data[k] !== undefined) {
         try { localStorage.setItem(k, data[k]); } catch(e) {}
@@ -2033,6 +2039,64 @@ function loadState(){
       if(m2){const p=JSON.parse(m2);mock={...mock,...p};mock.cash=mock.cash||cfg.capital;if(!mock.positions)mock.positions={};if(!mock.trades)mock.trades=[];}
       const so2=localStorage.getItem("htsStopOrders");
       if(so2){try{stopOrders={...JSON.parse(so2)};}catch(e){}}
+      // 시뮬 상태(날짜/TF/현재종목) 복원
+      try{
+        const _ss=localStorage.getItem('htsSimState');
+        if(_ss){
+          const p=JSON.parse(_ss);
+          if(p.date) sim.date=p.date;
+          if(p.tf) sim.tf=p.tf;
+          if(p.activeTk) activeTk=p.activeTk;
+          const md=document.getElementById('mockDate'); if(md) md.value=sim.date;
+          document.querySelectorAll('.tf-btn').forEach(b=>{b.classList.toggle('on', b.getAttribute('onclick')&&b.getAttribute('onclick').includes("'"+sim.tf+"'"));});
+        }
+      }catch(e){}
+      // AI 채팅 복원
+      try{
+        const _cm=localStorage.getItem('htsChatMsgs');
+        if(_cm){
+          window._chatMsgs=JSON.parse(_cm);
+          const m=document.getElementById('aiMsgs');
+          if(m){
+            m.innerHTML='';
+            window._chatMsgs.forEach(function(it){
+              const h=(it.content||'').replace(/\n/g,'<br>');
+              const d=document.createElement('div');
+              d.className='ai-msg'+(it.role==='me'?' me':'');
+              d.innerHTML='<div class="ai-av '+(it.role==='ai'?'ai':'me')+'">'+(it.role==='ai'?'AI':'나')+'</div><div><div class="ai-bub">'+h+'</div><div class="ai-meta">'+(it.role==='ai'?'Claude · ':'나 · ')+(it.tm||'')+'</div></div>';
+              m.appendChild(d);
+            });
+            m.scrollTop=m.scrollHeight;
+          }
+        }
+      }catch(e){}
+      // AI 판단 로그 복원
+      try{
+        const _dl=localStorage.getItem('htsDecisionLog');
+        if(_dl){window._decisionLog=JSON.parse(_dl);
+          const last=window._decisionLog[window._decisionLog.length-1];
+          if(last) _updateAIStatusPanel&&_updateAIStatusPanel(last);
+        }
+      }catch(e){}
+      // 자동매매 상태 복원 (running 이었으면 다시 시작)
+      try{
+        const _as=localStorage.getItem('htsAutoState');
+        if(_as){
+          const p=JSON.parse(_as);
+          if(p.cfg) autoState.cfg={...autoState.cfg,...p.cfg};
+          if(p.level!==undefined) autoState.level=p.level;
+          if(typeof autoLevel!=='undefined' && p.autoLevel!==undefined) autoLevel=p.autoLevel;
+          if(p.running){
+            setTimeout(()=>{try{startAuto&&startAuto();addMsg('ai','🔄 자동매매 상태 복원됨 — 모니터링 재개');}catch(e){}},1500);
+          }
+        }
+      }catch(e){}
+      // 강세 섹터 캐시 복원 (라벨용)
+      try{
+        const _si=localStorage.getItem('htsSectorInfo');
+        if(_si){window._sectorInfo=JSON.parse(_si);}
+        renderHotSectors&&renderHotSectors();
+      }catch(e){}
       renderAll();
     }
   });
@@ -2870,6 +2934,7 @@ function setSpd(el,v){sim.speed=v;document.querySelectorAll(".spd-btn").forEach(
 function setTF(el,tf){
   try{
     sim.tf=tf;
+    try{saveToServer('htsSimState', JSON.stringify({date:sim.date, tf:sim.tf, activeTk}));}catch(e){}
     document.querySelectorAll(".tf-btn").forEach(b=>b.classList.remove("on"));
     if(el)el.classList.add("on");
     genCandles(activeTk,sim.date);
@@ -2904,6 +2969,7 @@ function setTF(el,tf){
 }
 function onDateChange(){
   sim.date=document.getElementById("mockDate").value;
+  try{saveToServer('htsSimState', JSON.stringify({date:sim.date, tf:sim.tf, activeTk}));}catch(e){}
   mock.todayPnl=0;mock.todayTrades=0;mock.lossSeries=0;
   if(sim.date<todayStr())activateMockMode();
   genCandles(activeTk,sim.date);initChart();
@@ -3368,11 +3434,11 @@ function renderIntraCheck(){
 }
 function togIntra(id){
   intraState[id]=!intraState[id];
-  localStorage.setItem("htsIntra",JSON.stringify(intraState));
+  saveToServer("htsIntra",JSON.stringify(intraState));
   renderIntraCheck();
 }
 function resetIntraCheck(){
-  intraState={};localStorage.setItem("htsIntra","{}");renderIntraCheck();
+  intraState={};saveToServer("htsIntra","{}");renderIntraCheck();
 }
 
 // ═══════════════════════════════
@@ -3726,7 +3792,7 @@ function updateTrustScore(v){
   desc.style.background=trustScore>=5?'rgba(5,192,114,.06)':'rgba(240,62,62,.06)';
   desc.style.color=c; desc.textContent=d;
   if(limit){limit.textContent=l;limit.style.display=l?'block':'none';}
-  localStorage.setItem('trustScore', trustScore);
+  saveToServer('trustScore', String(trustScore));
 }
 
 // ══════════════════════════════════════════════════════════
@@ -4279,6 +4345,8 @@ function startAuto(){
   closeModal("autotrade");
   addMsg("ai",`🤖 AI 자동매매 시작 (레벨 ${autoState.level})\n모드: ${["완전수동","종목선정","진입신호","진입자동","완전자동"][autoState.level]}\n\n설정값:\n• 최소 R/R: 1:${autoState.cfg.rr}\n• 자동 손절: -${autoState.cfg.stop}%\n• 1차 익절: +${autoState.cfg.t1}% (50%)\n• 2차 익절: +${autoState.cfg.t2}% (30%)\n\n[Phase 8: 매수 전 통합 점검 프로세스 적용]`);
   if(autoState.level>=1)scheduleScreening();
+  // 자동매매 상태 영구 저장 (페이지 새로고침 후에도 복원)
+  try{saveToServer('htsAutoState', JSON.stringify({running:autoState.running, level:autoState.level, cfg:autoState.cfg, autoLevel:autoLevel}));}catch(e){}
 }
 function pauseAuto(){
   if(!autoState.running) return;
@@ -4298,6 +4366,7 @@ function pauseAuto(){
 }
 function stopAuto(){
   autoState.running=false;autoState.paused=false;if(autoTimer){clearTimeout(autoTimer);autoTimer=null;}
+  try{saveToServer('htsAutoState', JSON.stringify({running:false, level:autoState.level, cfg:autoState.cfg}));}catch(e){}
   // 버튼 UI 복원
   const pBtn=document.getElementById('pauseBtn'), sBtn=document.getElementById('stopBtn2');
   if(pBtn){pBtn.style.display='none';pBtn.textContent='⏸ 일시정지';pBtn.style.background='';}
@@ -4318,7 +4387,9 @@ function addDecisionLog(title, body, phase){
   if(!window._decisionLog) window._decisionLog=[];
   const entry = {title, body, phase, time: new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',second:'2-digit'})};
   window._decisionLog.push(entry);
-  if(window._decisionLog.length > 50) window._decisionLog.shift();
+  if(window._decisionLog.length > 100) window._decisionLog.shift();
+  // 영구 저장 (디바운스로 묶임)
+  try{saveToServer('htsDecisionLog', JSON.stringify(window._decisionLog.slice(-100)));}catch(e){}
   // UI 업데이트
   _updateAIStatusPanel(entry);
 }
@@ -5843,7 +5914,12 @@ function addMsg(role,content){
     .replace(/(Phase \d+[-\d]*)/g,"<span class='adv-tag pha'>$1</span>");
   const d=document.createElement("div");d.className="ai-msg"+(role==="me"?" me":"");
   d.innerHTML=`<div class="ai-av ${role==="ai"?"ai":"me"}">${role==="ai"?"AI":"나"}</div><div><div class="ai-bub">${h}</div><div class="ai-meta">${role==="ai"?"Claude · ":"나 · "}${tm}</div></div>`;
-  m.appendChild(d);m.scrollTop=m.scrollHeight;
+  m&&m.appendChild(d);if(m)m.scrollTop=m.scrollHeight;
+  // 영구 저장 (최근 100개)
+  if(!window._chatMsgs) window._chatMsgs=[];
+  window._chatMsgs.push({role,content,tm});
+  if(window._chatMsgs.length>100) window._chatMsgs.shift();
+  try{saveToServer('htsChatMsgs', JSON.stringify(window._chatMsgs));}catch(e){}
 }
 function appendTyping(){const m=document.getElementById("aiMsgs");const d=document.createElement("div");d.className="ai-msg";d.id="typi";d.innerHTML=`<div class="ai-av ai">AI</div><div class="ai-bub"><div class="tyd-wrap"><div class="tyd"></div><div class="tyd"></div><div class="tyd"></div></div></div>`;m.appendChild(d);m.scrollTop=m.scrollHeight;}
 function removeTyping(){const t=document.getElementById("typi");if(t)t.remove();}
@@ -6003,7 +6079,8 @@ function renderNews(){
     </div>`;
   }).join("");
 }
-function selectStk(tk){activeTk=tk;const s=STOCKS.find(s=>s.tk===tk)||STOCKS[0];document.getElementById("siNm").textContent=s.nm;// 관심종목 자동 추가 제거 (수동으로 그룹 선택 후 추가)
+function selectStk(tk){activeTk=tk;const s=STOCKS.find(s=>s.tk===tk)||STOCKS[0];document.getElementById("siNm").textContent=s.nm;
+  try{saveToServer('htsSimState', JSON.stringify({date:sim.date, tf:sim.tf, activeTk}));}catch(e){}
   const tkEl=document.getElementById("obTkName");if(tkEl)tkEl.textContent=s.nm;document.getElementById("srchIn").value="";hideSrch();renderWL();genCandles(tk,sim.date);initChart();renderOB();renderTH();
   const atk=document.getElementById("analysisTk");if(atk)atk.textContent=s.nm;
   // 차트 상단 큰 종목명 갱신
@@ -6335,7 +6412,7 @@ function goPage(p,el){
       const _today=sim.date||new Date().toISOString().slice(0,10);
       const _lastSync=localStorage.getItem('htsAutoSyncDate')||'';
       if(_lastSync!==_today){
-        localStorage.setItem('htsAutoSyncDate',_today);
+        saveToServer('htsAutoSyncDate',_today);
         syncCandidatesToWatchlist&&syncCandidatesToWatchlist();
       }
     }catch(e){}
@@ -7486,7 +7563,7 @@ async function refreshHotSectors(force){
     await syncCandidatesToWatchlist();
     const now2=new Date();
     const hh=String(now2.getHours()).padStart(2,'0'), mm=String(now2.getMinutes()).padStart(2,'0');
-    localStorage.setItem('htsSectorTime', hh+':'+mm);
+    saveToServer('htsSectorTime', hh+':'+mm);
     renderHotSectors();
   }catch(e){console.warn('hotSec:',e.message);}
   if(btn){btn.textContent='↻';btn.disabled=false;}
@@ -7552,10 +7629,10 @@ async function syncCandidatesToWatchlist(){
     });
     
     // 자동추가 목록 저장
-    localStorage.setItem('htsAutoTks', JSON.stringify(newTks));
+    saveToServer('htsAutoTks', JSON.stringify(newTks));
 
     // 순위 표시 태그 저장
-    localStorage.setItem('htsSectorInfo', JSON.stringify(sectorInfo));
+    saveToServer('htsSectorInfo', JSON.stringify(sectorInfo));
     window._sectorInfo = sectorInfo;
 
     saveWGS();
