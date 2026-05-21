@@ -119,6 +119,11 @@
 
     <!-- ① LEFT: 관심종목 (col1 row1/3) -->
     <div class="lp">
+      <!-- AI 학습 단계 배지 -->
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-bottom:1px solid var(--br);background:linear-gradient(180deg,rgba(139,92,246,0.06),rgba(255,255,255,0));flex-shrink:0;">
+        <div id="learnerStageBadge" style="flex:1;font-size:9px;line-height:1.4;">Lv1 초보 · 0일 학습</div>
+        <button onclick="openLearningMemo()" title="AI 학습 노트 보기" style="padding:1px 6px;border-radius:3px;border:none;background:var(--p);color:#fff;font-size:8px;cursor:pointer;font-weight:700;">🎓 노트</button>
+      </div>
       <!-- 실시간 강세 섹터 패널 -->
       <div id="hotSectorBox" style="border-bottom:1px solid var(--br);background:linear-gradient(180deg,rgba(220,38,38,0.04),rgba(255,255,255,0));padding:6px 8px;flex-shrink:0;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">

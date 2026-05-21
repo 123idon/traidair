@@ -629,6 +629,11 @@ canvas{image-rendering:pixelated;}
 
     <!-- ① LEFT: 관심종목 (col1 row1/3) -->
     <div class="lp">
+      <!-- AI 학습 단계 배지 -->
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-bottom:1px solid var(--br);background:linear-gradient(180deg,rgba(139,92,246,0.06),rgba(255,255,255,0));flex-shrink:0;">
+        <div id="learnerStageBadge" style="flex:1;font-size:9px;line-height:1.4;">Lv1 초보 · 0일 학습</div>
+        <button onclick="openLearningMemo()" title="AI 학습 노트 보기" style="padding:1px 6px;border-radius:3px;border:none;background:var(--p);color:#fff;font-size:8px;cursor:pointer;font-weight:700;">🎓 노트</button>
+      </div>
       <!-- 실시간 강세 섹터 패널 -->
       <div id="hotSectorBox" style="border-bottom:1px solid var(--br);background:linear-gradient(180deg,rgba(220,38,38,0.04),rgba(255,255,255,0));padding:6px 8px;flex-shrink:0;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
@@ -2012,7 +2017,8 @@ async function loadFromServer() {
       'manualJournals','personalRules','masterCL',
       'htsSectorInfo','htsAutoTks','htsAutoSyncDate','htsSectorTime',
       'htsAutoState','htsChatMsgs','htsDecisionLog','htsAiStatus',
-      'htsIntra','trustScore','apiUsage','htsSimState'
+      'htsIntra','trustScore','apiUsage','htsSimState',
+      'htsLearningMemory','htsLearnedDates'
     ];
     keys.forEach(k => {
       if (data[k] !== undefined) {
@@ -2099,6 +2105,14 @@ function loadState(){
         const _si=localStorage.getItem('htsSectorInfo');
         if(_si){window._sectorInfo=JSON.parse(_si);}
         renderHotSectors&&renderHotSectors();
+      }catch(e){}
+      // 학습 메모리 복원 (서버 → 메모리)
+      try{
+        const _lm=localStorage.getItem('htsLearningMemory');
+        if(_lm){window.learningMemory=JSON.parse(_lm);}
+        const _ld=localStorage.getItem('htsLearnedDates');
+        if(_ld){window.learnedDates=JSON.parse(_ld);}
+        updateLearnerStage&&updateLearnerStage();
       }catch(e){}
       renderAll();
     }
@@ -2941,6 +2955,95 @@ function runStep(){
 function setSpd(el,v){sim.speed=v;document.querySelectorAll(".spd-btn").forEach(b=>b.classList.remove("on"));el.classList.add("on");}
 
 // ═══════════════════════════════════════════════
+// 학습 메모리 — 매매일지에서 누적된 깨달음
+// ═══════════════════════════════════════════════
+window.learningMemory = (function(){
+  try{ const s=localStorage.getItem('htsLearningMemory'); return s?JSON.parse(s):[]; }catch(e){ return []; }
+})();
+window.learnedDates = (function(){
+  try{ const s=localStorage.getItem('htsLearnedDates'); return s?JSON.parse(s):[]; }catch(e){ return []; }
+})();
+function appendLesson(date, ai){
+  const items=[];
+  if(ai.bad && ai.bad !== '-' && ai.bad !== '없음') items.push({date, category:'반성', text:ai.bad});
+  if(ai.improvement && ai.improvement !== '-') items.push({date, category:'개선', text:ai.improvement});
+  if(ai.mentor_comment && ai.mentor_comment !== '-') items.push({date, category:'멘토', text:ai.mentor_comment});
+  if(ai.psychology && ai.psychology !== '-') items.push({date, category:'심리', text:ai.psychology});
+  if(!items.length) return;
+  learningMemory.push(...items);
+  // 최근 80개만 유지 (오래된 건 자연 망각)
+  if(learningMemory.length > 80) learningMemory = learningMemory.slice(-80);
+  window.learningMemory = learningMemory;
+  // 학습 일자 목록 (진화 단계 계산용)
+  if(!learnedDates.includes(date)){
+    learnedDates.push(date);
+    if(learnedDates.length > 200) learnedDates = learnedDates.slice(-200);
+    window.learnedDates = learnedDates;
+    saveToServer('htsLearnedDates', JSON.stringify(learnedDates));
+  }
+  saveToServer('htsLearningMemory', JSON.stringify(learningMemory));
+  updateLearnerStage();
+}
+function getLearningContext(maxItems){
+  if(!learningMemory || !learningMemory.length) return '';
+  const recent = learningMemory.slice(-(maxItems||12));
+  // 카테고리별 그룹화
+  const byCat={};
+  recent.forEach(l=>{ (byCat[l.category]=byCat[l.category]||[]).push(l.text); });
+  let out = '【지금까지 깨달은 것 — 같은 실수 반복 금지】\n';
+  Object.keys(byCat).forEach(c=>{
+    byCat[c].slice(-3).forEach(t=>{ out += `• [${c}] ${t}\n`; });
+  });
+  return out + '\n';
+}
+function getLearnerStage(){
+  const n = learnedDates.length;
+  if(n >= 50) return {lv:4, label:'전문가', color:'var(--p)', next:'무한'};
+  if(n >= 20) return {lv:3, label:'숙련', color:'var(--g)', next:50-n+'일 더'};
+  if(n >= 6)  return {lv:2, label:'학습', color:'var(--b)', next:20-n+'일 더'};
+  return {lv:1, label:'초보', color:'var(--a)', next:6-n+'일 더'};
+}
+function updateLearnerStage(){
+  const el = document.getElementById('learnerStageBadge');
+  if(!el) return;
+  const s = getLearnerStage();
+  el.innerHTML = `<span style="background:${s.color};color:#fff;padding:1px 5px;border-radius:3px;font-size:8px;font-weight:700;">Lv${s.lv} ${s.label}</span> <span style="font-size:8px;color:var(--tm);">${learnedDates.length}일 학습 · 노트 ${learningMemory.length}건 · ${s.next}</span>`;
+}
+function openLearningMemo(){
+  const html = `
+    <div style="padding:14px;max-width:520px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <div style="font-size:14px;font-weight:800;">🎓 AI 학습 노트</div>
+        <button class="ibtn" onclick="document.getElementById('lmDlg').remove()" style="font-size:11px;">닫기</button>
+      </div>
+      <div id="lmStageRow" style="margin-bottom:10px;"></div>
+      <div style="font-size:10px;color:var(--tm);margin-bottom:8px;">매매일지에서 누적된 깨달음입니다. 다음 매매 결정 시 AI 프롬프트에 자동 첨부돼요.</div>
+      <div style="max-height:50vh;overflow-y:auto;display:flex;flex-direction:column;gap:6px;">
+        ${learningMemory.length ? learningMemory.slice().reverse().map(l=>`
+          <div style="padding:6px 8px;background:var(--bg);border-radius:6px;border-left:3px solid ${l.category==='반성'?'var(--r)':l.category==='개선'?'var(--g)':l.category==='멘토'?'var(--b)':'var(--p)'};">
+            <div style="font-size:9px;color:var(--tm);margin-bottom:2px;">${l.date} · ${l.category}</div>
+            <div style="font-size:11px;line-height:1.5;">${(l.text||'').replace(/</g,'&lt;')}</div>
+          </div>
+        `).join('') : '<div style="font-size:11px;color:var(--tm);padding:20px;text-align:center;">아직 학습된 노트가 없습니다. 백테스트나 매매를 마치면 자동으로 쌓여요.</div>'}
+      </div>
+      <div style="margin-top:10px;display:flex;justify-content:flex-end;gap:6px;">
+        <button class="ibtn red" onclick="if(confirm('전체 학습 노트를 초기화할까요?')){learningMemory=[];learnedDates=[];saveToServer('htsLearningMemory','[]');saveToServer('htsLearnedDates','[]');document.getElementById('lmDlg').remove();updateLearnerStage();}" style="font-size:10px;">전체 초기화</button>
+      </div>
+    </div>
+  `;
+  const d = document.createElement('div');
+  d.id='lmDlg';
+  d.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9999;background:var(--pan);border-radius:14px;box-shadow:0 8px 40px rgba(0,0,0,.2);width:520px;max-width:94vw;';
+  d.innerHTML = html;
+  document.body.appendChild(d);
+  const sr = document.getElementById('lmStageRow');
+  if(sr){
+    const s = getLearnerStage();
+    sr.innerHTML = `<span style="background:${s.color};color:#fff;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:700;">Lv${s.lv} ${s.label}</span> <span style="font-size:11px;color:var(--ts);">${learnedDates.length}일 학습 · 노트 ${learningMemory.length}건 · 다음 단계까지 ${s.next}</span>`;
+  }
+}
+
+// ═══════════════════════════════════════════════
 // 백테스트 엔진 — 여러 영업일 연속 시뮬레이션
 // ═══════════════════════════════════════════════
 window.backtest = {
@@ -3014,7 +3117,7 @@ function _backtestLoadDay(dateStr){
     renderBacktestPanel();
   }, 600);
 }
-function _backtestEndOfDay(){
+async function _backtestEndOfDay(){
   // 현재 날짜 결과 집계
   const dt=backtest.currentDate;
   const todayTrades=(mock.trades||[]).filter(t=>t.date===dt);
@@ -3024,18 +3127,26 @@ function _backtestEndOfDay(){
   backtest.dailyResults.push({date:dt, pnl:dayPnl, trades:todayTrades.length, wins, losses});
   backtest.dayIdx++;
   addDecisionLog(`📅 ${dt} 마감`, `매매 ${todayTrades.length}건 | 손익 ${dayPnl>=0?'+':''}${dayPnl.toLocaleString()}원 | 승 ${wins}·패 ${losses}`, '백테스트');
+  renderBacktestPanel();
+  // 매매가 있었으면 매매일지 자동 작성 → 학습 누적
+  if(todayTrades.length > 0 && typeof autoSaveJournalOnTrade === 'function'){
+    try{
+      sim.playing=false; // 일지 작성 동안 정지
+      _syncPlayBtn();
+      addDecisionLog(`📓 ${dt} 일지 작성 중`, 'AI 멘토 평가 → 학습 메모리 누적', '학습');
+      await autoSaveJournalOnTrade();
+    }catch(e){ console.warn('일지 자동작성 실패:', e.message); }
+  }
   // 다음 영업일?
   if(backtest.dayIdx >= backtest.totalDays){
     stopBacktest();
     return;
   }
   const next=_nextBusinessDay(dt);
-  // 너무 미래로 가지 않도록 endDate 체크
   if(next > backtest.endDate){
     stopBacktest();
     return;
   }
-  // 다음날 로드 → 자동 재생
   _backtestLoadDay(next);
 }
 function _backtestReport(){
@@ -4748,12 +4859,14 @@ async function _runScreeningAsync(){
       var stopPr=Math.round(lc2.c*(1-autoState.cfg.stop/100));
       var t1Pr=Math.round(lc2.c*(1+autoState.cfg.t1/100));
       var rr=((t1Pr-lc2.c)/(lc2.c-stopPr)).toFixed(2);
-      // 시황·강세섹터·공시 맥락 자동 수집 (학습용 — AI 판단 이유에 포함)
+      // 시황·강세섹터·공시·과거 학습 맥락 자동 수집
       var _mkt = typeof collectMarketCtx==='function' ? collectMarketCtx() : '';
       var _si = (window._sectorInfo||{})[best.tk];
       var _sectorLine = _si ? `강세섹터 ${_si.rank}위 ${_si.sector} — ${_si.reason||''}` : '';
       var _newsItems = (typeof window._newsItems!=='undefined' && Array.isArray(_newsItems)) ? _newsItems.slice(0,3).map(n=>'• '+(n.title||n)).join('\n') : '';
+      var _learn = typeof getLearningContext==='function' ? getLearningContext(10) : '';
       var prompt='단타 트레이딩 멘토. 자동매매 최종 진입 여부.\n\n'+
+        _learn +
         '【종목】 '+best.stk.nm+'('+best.tk+') '+best.stk.sec+'\n'+
         '【시간】 '+(sim.date||'')+' '+(best.lc.t||'')+'\n'+
         '【기술적】 가격 '+lc2.c.toLocaleString()+'원 | RSI '+best.lrsi+' | 거래량 평균x'+best.volR.toFixed(1)+'\n'+
@@ -4762,7 +4875,8 @@ async function _runScreeningAsync(){
         (_newsItems ? '【최근 공시】\n'+_newsItems+'\n' : '')+
         (_mkt && _mkt!=='데이터없음' ? '【시황】\n'+_mkt+'\n' : '')+
         '【리스크】 손절 '+stopPr.toLocaleString()+' | 목표 '+t1Pr.toLocaleString()+' | R/R 1:'+rr+'\n\n'+
-        'JSON만: {"decision":"BUY"또는"PASS","confidence":0-100,"reason":"왜 매수/관망인지 2줄","factors":"근거한 데이터 3가지","risk":"리스크1줄","waitFor":"PASS시조건"}';
+        '※ 위에 학습 노트가 있다면 반드시 반영해서 같은 실수를 반복하지 말 것.\n'+
+        'JSON만: {"decision":"BUY"또는"PASS","confidence":0-100,"reason":"왜 매수/관망인지 2줄(학습노트 반영시 명시)","factors":"근거한 데이터 3가지","risk":"리스크1줄","waitFor":"PASS시조건"}';
       var res=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:300,messages:[{role:'user',content:prompt}]})});
       var data=await res.json();
@@ -7715,7 +7829,7 @@ window.onload=()=>{
   if(savedTrust){trustScore=parseInt(savedTrust);const sl=document.getElementById('trustSlider');if(sl)sl.value=trustScore;updateTrustScore(trustScore);}
   setTimeout(()=>{renderGrowthRoadmap();detectSlump();},500);
   // 차트 큰 헤더 초기화 + 강세 섹터 패널 초기 렌더 / 주기적 갱신
-  setTimeout(()=>{updChartHeader&&updChartHeader();renderHotSectors&&renderHotSectors();refreshHotSectors&&refreshHotSectors(false);}, 400);
+  setTimeout(()=>{updChartHeader&&updChartHeader();renderHotSectors&&renderHotSectors();refreshHotSectors&&refreshHotSectors(false);updateLearnerStage&&updateLearnerStage();}, 400);
   // 5분마다 강세 섹터 자동 갱신 (모의투자라도 변동이 보이게)
   setInterval(()=>{refreshHotSectors&&refreshHotSectors(false);}, 5*60*1000);
 };
@@ -7931,7 +8045,10 @@ async function autoSaveJournalOnTrade(){
     const ai=JSON.parse(m[0]);
     const aiEntry={summary:date+' 매매 '+tt.length+'건 / '+(pnl>=0?'+':'')+pnl.toLocaleString()+'원',why_bought:ai.why_bought||'-',why_sold:ai.why_sold||'-',good:ai.good||'-',bad:ai.bad||'-',psychology:ai.psychology||'-',improvement:ai.improvement||'-',phase_check:ai.phase_check||'-',mentor_comment:ai.mentor_comment||'-',aiGenerated:true,trades:str};
     saveJEntry(date,aiEntry,pnl,wins,total,str);
-    addMsg('ai','📓 매매일지 자동 작성 완료\n\n'+date+' '+(pnl>=0?'+':'')+pnl.toLocaleString()+'원\n\n✅ 잘한점: '+ai.good+'\n\n🔴 반성: '+ai.bad+'\n\n💡 개선: '+ai.improvement+'\n\n🎯 멘토: '+ai.mentor_comment);
+    // 학습 메모리 누적 (다음 매매 결정에 자동 반영)
+    try{ appendLesson(date, ai); }catch(_e){}
+    const stage = (typeof getLearnerStage==='function') ? getLearnerStage() : {lv:1,label:'초보'};
+    addMsg('ai','📓 매매일지 자동 작성 완료\n\n'+date+' '+(pnl>=0?'+':'')+pnl.toLocaleString()+'원\n\n✅ 잘한점: '+ai.good+'\n\n🔴 반성: '+ai.bad+'\n\n💡 개선: '+ai.improvement+'\n\n🎯 멘토: '+ai.mentor_comment+'\n\n🎓 학습 단계: Lv'+stage.lv+' '+stage.label+' (노트 '+learningMemory.length+'건)');
     const nPageId=localStorage.getItem('notionJournalPageId');
     if(nPageId)await _saveJournalToNotion(date,aiEntry,pnl,str);
   }catch(e){
