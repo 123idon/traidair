@@ -1291,6 +1291,11 @@ async function startBacktest(startDate, endDate){
   if(backtest.running){addMsg('ai','⚠ 이미 백테스트 진행 중'); return;}
   const days=_businessDays(startDate, endDate);
   if(!days.length){showAlert('백테스트','영업일이 없습니다'); return;}
+  // 백테스트는 자동 실거래 모드로 강제 (level<3이면 거래 안 일어남)
+  if(autoLevel < 3){
+    autoLevel = 3;
+    addMsg('ai','📊 백테스트 — 자동매매 레벨 3(진입자동)으로 강제 설정');
+  }
   // 종목 풀이 거의 비었으면 강세섹터 자동 동기화 후 시작
   const poolSize = (WGS[0]||[]).length + (WGS[1]||[]).length + (WGS[3]||[]).length + Object.keys(window._sectorInfo||{}).length;
   if(poolSize < 2 && typeof refreshHotSectors==='function'){
@@ -1328,6 +1333,16 @@ function _backtestLoadDay(dateStr){
   sim.date=dateStr;
   const md=document.getElementById('mockDate'); if(md) md.value=dateStr;
   mock.todayPnl=0; mock.todayTrades=0; mock.lossSeries=0;
+  // 종목 자동 전환: 강세 1위 종목 우선, 없으면 WGS[0] 첫 종목
+  try{
+    const si = window._sectorInfo || {};
+    let rank1 = null;
+    Object.entries(si).forEach(([tk, v])=>{ if(v && v.rank===1 && !rank1) rank1 = tk; });
+    const candidate = rank1 || (WGS[0]||[])[0] || (WGS[1]||[])[0];
+    if(candidate && candidate !== activeTk && typeof setActiveTk==='function'){
+      setActiveTk(candidate);
+    }
+  }catch(_e){}
   // 캔들 로드 — KIS 있으면 실데이터, 없으면 시뮬
   genCandles(activeTk, dateStr);
   // KIS 비동기 대기: 배속이 빠를수록 더 짧게 (실제로는 시뮬이면 즉시)
@@ -1941,7 +1956,7 @@ function checkPriceAlerts(){
 // ═══════════════════════════════
 // AI AUTO-TRADE ENGINE
 // ═══════════════════════════════
-let autoLevel=0;
+let autoLevel=3; // 기본 Lv3: 진입 자동 (Claude 검토 + 자동 매수). 0 = 완전수동, 4 = 완전자동(15:20 청산 포함)
 
 // ═══════════════════════════════
 // 장중 체크리스트 (Phase 8 실시간)
@@ -2928,7 +2943,14 @@ function stopAuto(){
   document.getElementById("autoBtn").classList.remove("on");document.getElementById("aiModeBadge").textContent="대기중";
   addMsg("ai","⏹ AI 자동매매 중지.");
 }
-function scheduleScreening(){if(!autoState.running)return;runScreening();autoTimer=setTimeout(scheduleScreening,5000);}
+function scheduleScreening(){
+  if(!autoState.running)return;
+  runScreening();
+  // 배속이 빠를수록 더 자주 스크리닝 (그래야 봉을 따라잡음)
+  const _spd = (sim&&sim.speed)||1;
+  const interval = _spd >= 300 ? 300 : _spd >= 60 ? 800 : 5000;
+  autoTimer=setTimeout(scheduleScreening, interval);
+}
 function addDecisionLog(title, body, phase){
   // 전역 로그 배열
   if(!window._decisionLog) window._decisionLog=[];
@@ -2994,7 +3016,10 @@ function runScreening(){
   const now = Date.now();
   // 중복 실행 방지 (이전 스크리닝이 진행 중이거나 3초 이내)
   if(_autoScreenRunning) return;
-  if(now - _lastAutoScreenTime < 3000) return;
+  // 쿨다운: 배속 비례 (x300+ 면 100ms, x60+ 500ms, 그 외 3000ms)
+  const _spd2 = (sim&&sim.speed)||1;
+  const _cooldown = _spd2 >= 300 ? 100 : _spd2 >= 60 ? 500 : 3000;
+  if(now - _lastAutoScreenTime < _cooldown) return;
   _lastAutoScreenTime = now;
   _autoScreenRunning = true;
 
@@ -3138,7 +3163,20 @@ async function _runScreeningAsync(){
   addDecisionLog('['+best.stk.nm+'] 1단계 통과 ('+best.score+'점)',best.tags.join(' '),'2단계 AI 검토');
   updAdvBoxes('🔍 AI 검토 중 — '+best.stk.nm,'1단계: '+best.score+'점\nClaude 심층 분석 중...');
 
-  // ── Claude AI 심층 분석 (레벨3 이상) ──
+  // ── 빠른 배속에선 Claude 우회: 기술 score만으로 즉시 매수 결정 ──
+  if(autoState.level>=3 && (sim&&sim.speed>=300)){
+    if(best.score >= 5){
+      var lcQ=best.lc;
+      var stopPrQ=Math.round(lcQ.c*(1-autoState.cfg.stop/100));
+      var t1PrQ=Math.round(lcQ.c*(1+autoState.cfg.t1/100));
+      addDecisionLog('['+best.stk.nm+'] ⚡ 빠른매수 ('+best.score+'점)', best.tags.join(' · ')+' / 배속x'+sim.speed+' Claude 우회', '백테스트');
+      try{ await execAutoBuy(lcQ.c, best.stk); }catch(_e){}
+    }else{
+      addDecisionLog('['+best.stk.nm+'] ⏸ 점수 미달('+best.score+')', '빠른 배속 모드 — 진입 임계 5점 미달', '관망');
+    }
+    return;
+  }
+  // ── Claude AI 심층 분석 (레벨3 이상, 평상시 배속) ──
   if(autoState.level>=3){
     try{
       var lc2=best.lc;
