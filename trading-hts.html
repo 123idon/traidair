@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#ffffff">
-<meta name="build-ts" content="1779379943616">
+<meta name="build-ts" content="1779386035786">
 <title>TraidAIr HTS</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 
@@ -1682,6 +1682,25 @@ canvas{image-rendering:pixelated;}
               <a href="https://opendart.fss.or.kr" target="_blank" style="color:var(--b);">opendart.fss.or.kr</a> → 인증키 신청 → 이메일 인증 즉시 발급
             </div>
           </div>
+          <!-- Notion 강의 -->
+          <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--br);">
+            <div style="font-size:10px;font-weight:700;color:var(--ts);margin-bottom:6px;">📚 Notion 강의 (AI 매매 원칙)</div>
+            <div class="sg-r">
+              <div><div class="sg-l">Notion Integration Token</div></div>
+              <input class="sg-i" type="password" id="notion-token" placeholder="secret_xxx... (또는 ntn_xxx...)" style="font-family:var(--mono);">
+            </div>
+            <div class="sg-r" style="margin-top:6px;">
+              <div><div class="sg-l">강의 페이지 ID (32자)</div></div>
+              <input class="sg-i" type="text" id="notion-page-id" placeholder="35a0717882e381ce8fc3d257a5c24e4b" style="font-family:var(--mono);" value="35a0717882e381ce8fc3d257a5c24e4b">
+            </div>
+            <div style="font-size:9px;color:var(--tm);margin-top:6px;line-height:1.6;">
+              ① <a href="https://notion.so/profile/integrations" target="_blank" style="color:var(--b);">notion.so/profile/integrations</a> → "+ New integration" → 토큰 복사<br>
+              ② 강의 페이지 → 우측 상단 ⋯ → Connections → 방금 만든 것 추가<br>
+              ③ 위 두 칸 채우고 저장 → 좌측 📚 강의 버튼으로 동기화
+            </div>
+            <button onclick="testNotionConnection()" style="margin-top:6px;width:100%;padding:6px 0;background:var(--card);color:var(--ts);border:1px solid var(--br);border-radius:6px;font-size:11px;cursor:pointer;">🔌 노션 연결 테스트</button>
+            <div id="notion-status" style="margin-top:4px;font-size:10px;color:var(--tm);">⬜ Notion — 미설정</div>
+          </div>
           <!-- 저장 버튼 -->
           <button onclick="saveKisConfig()" style="width:100%;margin-top:12px;padding:9px 0;background:var(--g);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;touch-action:manipulation;">💾 API 설정 저장</button>
           <div style="margin-top:10px;padding:8px 10px;background:var(--bg);border-radius:7px;">
@@ -3091,6 +3110,35 @@ window.lectureContent = (function(){
 window.lectureUpdatedAt = (function(){
   try{ return parseInt(localStorage.getItem('htsLectureUpdatedAt')||'0'); }catch(e){ return 0; }
 })();
+// 노션 연결 테스트 (설정창 버튼)
+async function testNotionConnection(){
+  const el = document.getElementById('notion-status');
+  if(el){ el.textContent='🔄 테스트 중...'; el.style.color='var(--tm)'; }
+  // 입력란 값으로 임시 저장 후 fetch
+  const nt = document.getElementById('notion-token')?.value?.trim() || '';
+  const np = document.getElementById('notion-page-id')?.value?.trim() || NOTION_LECTURE_PAGE_ID_DEFAULT;
+  if(!nt){
+    if(el){ el.textContent='⚠ 토큰을 먼저 입력하세요'; el.style.color='var(--r)'; }
+    return;
+  }
+  // 서버에 토큰부터 저장
+  try{
+    await fetch('/api/save-config', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({notionToken:nt, notionPageId:np})});
+  }catch(_e){}
+  try{
+    const r = await fetch('/api/notion-lecture?pageId='+encodeURIComponent(np), {cache:'no-store'});
+    const d = await r.json();
+    if(d.ok){
+      if(el){ el.textContent='✅ Notion 연결 성공 — '+d.length+'자 가져옴'; el.style.color='var(--g)'; }
+      try{ refreshLecture&&refreshLecture(true); }catch(_e){}
+    } else {
+      if(el){ el.textContent='❌ '+(d.error||'연결 실패'); el.style.color='var(--r)'; }
+    }
+  }catch(e){
+    if(el){ el.textContent='❌ '+e.message; el.style.color='var(--r)'; }
+  }
+}
+
 async function refreshLecture(force){
   const now = Date.now();
   // 6시간 캐시 (force=true면 무시)
@@ -6162,6 +6210,8 @@ async function saveKisConfig(){
   const ac = document.getElementById('kis-account')?.value?.trim() || '';
   const dk = document.getElementById('dart-key')?.value?.trim() || '';
   const ck = document.getElementById('claude-apikey')?.value?.trim() || '';
+  const nt = document.getElementById('notion-token')?.value?.trim() || '';
+  const np = document.getElementById('notion-page-id')?.value?.trim() || '';
   const mode = document.getElementById('kis-real')?.checked ? 'real' : 'mock';
   if(mode === 'real' && kisConfig.mode !== 'real'){
     if(!confirm('⚠ 실거래 모드로 전환합니다.\n실제 자금이 사용됩니다.\n계속하시겠습니까?')){
@@ -6185,12 +6235,16 @@ async function saveKisConfig(){
         kisAccount: ac,
         kisMode: mode,
         dartKey: dk,
+        notionToken: nt,
+        notionPageId: np,
       })
     });
     const d = await r.json();
     if(d.ok){
       updateKisStatus();
       _applyModeToHTS(mode);
+      // 노션 토큰 저장됐으면 즉시 강의 동기화 시도
+      if(nt){ try{ refreshLecture&&refreshLecture(true); }catch(_e){} }
       showAlert('✅ 저장 완료', '서버에 영구 저장되었습니다.\n재배포 후에도 유지됩니다.');
     } else {
       throw new Error(d.error || '저장 실패');
@@ -6265,6 +6319,17 @@ async function loadKisConfig(){
   if(ka && kisConfig.account) ka.value=kisConfig.account;
   if(kd && kisConfig.dartKey) kd.value=kisConfig.dartKey;
   if(kc && kisConfig.claudeKey) kc.value=kisConfig.claudeKey;
+  // 노션 토큰/페이지 ID 입력란 채우기 + 상태 표시
+  try{
+    const r2 = await fetch('/api/get-config');
+    const d2 = await r2.json();
+    const nti=document.getElementById('notion-token');
+    const npi=document.getElementById('notion-page-id');
+    const ns=document.getElementById('notion-status');
+    if(nti && d2.notionTokenSet) nti.placeholder = '✓ 설정됨 ('+(d2.notionToken||'****')+')';
+    if(npi && d2.notionPageId) npi.value = d2.notionPageId;
+    if(ns) ns.textContent = d2.notionTokenSet ? '✅ Notion — 토큰 설정됨' : '⬜ Notion — 미설정';
+  }catch(_e){}
   if(kisConfig.mode==='real'){const kr=document.getElementById('kis-real');if(kr)kr.checked=true;}
   updateKisStatus();
 }
@@ -8455,7 +8520,7 @@ function collectMarketCtx(){
 (function(){
   const meta = document.querySelector('meta[name="build-ts"]');
   const myBuildTs = meta ? meta.getAttribute('content') : '';
-  if(!myBuildTs || myBuildTs === '1779379943616') return; // 로컬 빌드 안 한 경우
+  if(!myBuildTs || myBuildTs === '1779386035786') return; // 로컬 빌드 안 한 경우
   let reloaded = false;
   async function check(){
     if(reloaded) return;
