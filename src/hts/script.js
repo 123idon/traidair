@@ -43,6 +43,17 @@ const MENTOR_SYSTEM_PROMPT = `당신은 주식 단타 전문 트레이딩 멘토
 // 노션 강의 페이지 ID (사용자 제공)
 const NOTION_LECTURE_PAGE_ID_DEFAULT = '35a0717882e381ce8fc3d257a5c24e4b';
 
+// AI 생성 버튼 상태 표시 헬퍼 — 클릭 시 비활성 + "생성 중..." 표시
+function _btnBusy(btn, label){
+  if(!btn) return ()=>{};
+  const _orig = btn.innerHTML;
+  const _disabled = btn.disabled;
+  btn.disabled = true;
+  btn.innerHTML = (label||'🤖 생성 중...');
+  btn.style.opacity = '0.6';
+  return ()=>{ btn.innerHTML = _orig; btn.disabled = _disabled; btn.style.opacity=''; };
+}
+
 // Claude 호출 헬퍼 — 모든 호출에 멘토 시스템 프롬프트 자동 첨부
 async function claudeAsk(opts){
   const body = {
@@ -3560,7 +3571,9 @@ async function _runScreeningAsync(){
       var _newsItems = (typeof window._newsItems!=='undefined' && Array.isArray(_newsItems)) ? _newsItems.slice(0,3).map(n=>'• '+(n.title||n)).join('\n') : '';
       var _learn = typeof getLearningContext==='function' ? getLearningContext(10) : '';
       var _lec = typeof getLectureContext==='function' ? getLectureContext(2500) : '';
-      var prompt='단타 트레이딩 멘토. 자동매매 최종 진입 여부. 아래 강의 원칙을 반드시 따를 것.\n\n'+
+      var prompt='단타 트레이딩 멘토. 자동매매 최종 진입 여부.\n\n'+
+        '⚠️ 절대 원칙: 아래 강의 매매 원칙은 100% 따라야 한다. 강의에 어긋나는 진입은 \"PASS\". 의심스러우면 PASS.\n'+
+        '강의에 명시된 매매 기법(눌림목/돌파/첫봉/갭상승/이슈테마)에 해당하지 않으면 \"PASS\".\n\n'+
         _lec +
         _learn +
         '【종목】 '+best.stk.nm+'('+best.tk+') '+best.stk.sec+'\n'+
@@ -5618,9 +5631,12 @@ function renderJournalStats(){
 }
 
 // AI 기능 제안 — 매매일지·학습노트·통계 보고 새 기능/개선점 제안
-async function askAIForFeatureSuggestion(){
+async function askAIForFeatureSuggestion(ev){
+  const btn = (ev && ev.target) || document.querySelector('button[onclick*="askAIForFeatureSuggestion"]');
+  const _restore = _btnBusy(btn, '🤖 분석 중...');
   const body = document.getElementById('jSuggestBody');
   if(body) body.innerHTML = '<div style="color:var(--tm);">🤖 분석 중...</div>';
+  try{
   try{
     const s = _journalStatsData();
     const stage = (typeof getLearnerStage==='function') ? getLearnerStage() : null;
@@ -5678,39 +5694,59 @@ JSON만:
   }catch(e){
     if(body) body.innerHTML = '<div style="color:var(--r);">실패: '+e.message+'</div>';
   }
+  }finally{ _restore(); }
 }
 
-async function genAllJournals(){
-  // 매매가 있고 아직 aiGenerated 안 된 날짜만 작성
-  const bd={};
-  (mock.trades||[]).forEach(t=>{ if(!bd[t.date]) bd[t.date]=[]; bd[t.date].push(t); });
-  const dates = Object.keys(bd).sort();
-  if(!dates.length){ showAlert('일지 생성','매매 내역이 없습니다'); return; }
-  const existing = safeParseJSON(localStorage.getItem('htsJournals'), '{}');
-  const todo = dates.filter(d => !(existing[d] && existing[d].aiGenerated));
-  if(!todo.length){ showAlert('일지 생성','모든 거래일의 AI 일지가 이미 작성돼 있습니다.'); return; }
-  // 진행률 토스트
-  let toast = document.getElementById('genJToast');
-  if(!toast){
-    toast = document.createElement('div');
-    toast.id = 'genJToast';
-    toast.style.cssText = 'position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:9999;background:var(--pan);border:1px solid var(--br);border-radius:10px;padding:8px 14px;box-shadow:0 4px 20px rgba(0,0,0,.15);font-size:11px;display:flex;align-items:center;gap:10px;';
-    document.body.appendChild(toast);
-  }
-  let done = 0, fail = 0;
-  toast.innerHTML = `🤖 일지 작성 중 0 / ${todo.length}`;
-  for(const date of todo){
-    toast.innerHTML = `🤖 일지 작성 중 ${date} (${done+1} / ${todo.length})`;
-    try{
-      await autoSaveJournalOnTrade(date);
-      done++;
-    }catch(e){ fail++; }
+async function genAllJournals(ev){
+  const btn = (ev && ev.target) || document.querySelector('button[onclick="genAllJournals()"]');
+  const _restore = _btnBusy(btn, '🤖 생성 중...');
+  try{
+    // 매매가 있고 아직 aiGenerated 안 된 날짜만 작성
+    const bd={};
+    (mock.trades||[]).forEach(t=>{ if(!bd[t.date]) bd[t.date]=[]; bd[t.date].push(t); });
+    // 일지에 있는 날짜도 포함 (관망일지)
+    const existing = safeParseJSON(localStorage.getItem('htsJournals'), '{}');
+    Object.keys(existing).forEach(d=>{ if(!bd[d]) bd[d]=[]; });
+    const dates = Object.keys(bd).sort();
+    if(!dates.length){ showAlert('일지 생성','매매 내역이 없습니다'); return; }
+    const todo = dates.filter(d => !(existing[d] && existing[d].aiGenerated) && (bd[d]||[]).length>0);
+    if(!todo.length){ showAlert('일지 생성','모든 거래일의 AI 일지가 이미 작성돼 있습니다.'); return; }
+    let toast = document.getElementById('genJToast');
+    if(!toast){
+      toast = document.createElement('div');
+      toast.id = 'genJToast';
+      toast.style.cssText = 'position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:9999;background:var(--pan);border:1px solid var(--br);border-radius:10px;padding:8px 14px;box-shadow:0 4px 20px rgba(0,0,0,.15);font-size:11px;display:flex;align-items:center;gap:10px;';
+      document.body.appendChild(toast);
+    }
+    let done = 0, fail = 0;
+    toast.innerHTML = `🤖 일지 작성 중 0 / ${todo.length}`;
+    for(const date of todo){
+      const _t0 = Date.now();
+      let _timerId;
+      const _updateToast = ()=>{ toast.innerHTML = `🤖 ${date} 작성중 (${done+1}/${todo.length}) · ${Math.round((Date.now()-_t0)/1000)}초`; };
+      _updateToast();
+      _timerId = setInterval(_updateToast, 1000);
+      try{
+        await Promise.race([
+          autoSaveJournalOnTrade(date),
+          new Promise((_, rej) => setTimeout(()=>rej(new Error('timeout 35s')), 35000)),
+        ]);
+        done++;
+      }catch(e){
+        fail++;
+        console.warn('일지 실패 '+date+':', e.message);
+        toast.innerHTML = `⚠ ${date} 실패 (${e.message}) — 다음으로...`;
+        await new Promise(r=>setTimeout(r,800));
+      }finally{
+        clearInterval(_timerId);
+      }
+      renderJPage();
+      await new Promise(r=>setTimeout(r,200));
+    }
+    toast.innerHTML = `✅ 일지 ${done}건 작성 완료 ${fail?'(실패 '+fail+'건)':''}`;
+    setTimeout(()=>{ try{toast.remove();}catch(e){} }, 3500);
     renderJPage();
-    await new Promise(r=>setTimeout(r,200));
-  }
-  toast.innerHTML = `✅ 일지 ${done}건 작성 완료 ${fail?'('+fail+'건 실패)':''}`;
-  setTimeout(()=>{ try{toast.remove();}catch(e){} }, 3500);
-  renderJPage();
+  }finally{ _restore(); }
 }
 
 // ═══════════════════════════════
@@ -7312,7 +7348,11 @@ async function autoSaveJournalOnTrade(forceDate){
     const logs=(window._decisionLog||[]).slice(-20).map(function(d){return '['+(d.phase||'')+'] '+d.title+': '+(d.body||'');}).join('\n');
     const _lecJ = typeof getLectureContext==='function' ? getLectureContext(2500) : '';
     const prompt='단타 트레이딩 멘토. 오늘 매매를 강의 원칙 기준으로 평가해서 매매일지 작성.\n\n'+_lecJ+'\n날짜: '+date+'\n매매내역:\n'+str+'\n\nAI결정로그:\n'+(logs||'없음')+'\n\n손익: '+(pnl>=0?'+':'')+pnl.toLocaleString()+'원 ('+total+'건 중 '+wins+'건 수익)\n\n위 강의 원칙 기준으로 평가해줘. JSON만:\n{"why_bought":"매수이유 (어떤 강의 규칙 적용?)","why_sold":"청산이유 (강의 청산 조건 부합?)","good":"잘한점 (강의 기준)","bad":"반성할점 — 강의 어떤 규칙을 어겼나","psychology":"심리평가","improvement":"개선행동 (강의에서 권장하는 행동)","phase_check":"적용 Phase/원칙과 준수여부","mentor_comment":"멘토한마디 (강의 핵심 한 줄 인용)"}';
-    const res=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:800,messages:[{role:'user',content:prompt}]})});
+    // fetch + timeout (30초) — 멈춤 방지
+    const ctrl = new AbortController();
+    const _timer = setTimeout(()=>ctrl.abort(), 30000);
+    const res = await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},signal:ctrl.signal,body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:800,messages:[{role:'user',content:prompt}]})});
+    clearTimeout(_timer);
     const data=await res.json();
     const text=(data.content&&data.content[0]&&data.content[0].text)||'{}';
     const m=text.match(/\{[\s\S]*\}/);
