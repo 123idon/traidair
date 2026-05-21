@@ -3383,6 +3383,14 @@ async function _runScreeningAsync(){
       if(_bonus){score+=_bonus;tags.push('강세'+_si.rank+'위');}
       if(_si.momentum==='강함'){ score+=1; tags.push('모멘텀강'); }
       if(_si.role==='대장주'){ score+=1; tags.push('대장주'); }
+      // 공매도: 잔고비율 + 추세 반영
+      if(_si.short_trend==='감소'){ score+=2; tags.push('공매도감소'); } // 쇼트 스퀴즈 기대
+      else if(_si.short_trend==='증가'){ score-=2; tags.push('공매도증가-2'); } // 하락 압력
+      var _sr = parseFloat((_si.short_ratio||'').replace('%',''));
+      if(!isNaN(_sr)){
+        if(_sr>=5){ score-=2; tags.push('공매도잔고높음'); } // 5%+ 매우 위험
+        else if(_sr>=3){ score-=1; tags.push('공매도잔고주의'); }
+      }
     }
     // 8. 시그널 확정 — 직전봉도 score>=4였는지 (2봉 연속 강세)
     //   → window._priorScores에서 같은 종목 직전 점수 확인
@@ -3500,6 +3508,7 @@ async function _runScreeningAsync(){
       var _mkt = typeof collectMarketCtx==='function' ? collectMarketCtx() : '';
       var _si = (window._sectorInfo||{})[best.tk];
       var _sectorLine = _si ? `강세섹터 ${_si.rank}위 ${_si.sector} — ${_si.reason||''}` : '';
+      var _shortLine = (_si && (_si.short_ratio || _si.short_trend)) ? `공매도 잔고 ${_si.short_ratio||'-'} / 추세 ${_si.short_trend||'-'}` : '';
       var _newsItems = (typeof window._newsItems!=='undefined' && Array.isArray(_newsItems)) ? _newsItems.slice(0,3).map(n=>'• '+(n.title||n)).join('\n') : '';
       var _learn = typeof getLearningContext==='function' ? getLearningContext(10) : '';
       var _lec = typeof getLectureContext==='function' ? getLectureContext(2500) : '';
@@ -3511,6 +3520,7 @@ async function _runScreeningAsync(){
         '【기술적】 가격 '+lc2.c.toLocaleString()+'원 | RSI '+best.lrsi+' | 거래량 평균x'+best.volR.toFixed(1)+'\n'+
         '【조건】 '+best.tags.join(' · ')+'\n'+
         (_sectorLine ? '【수급/섹터】 '+_sectorLine+'\n' : '')+
+        (_shortLine ? '【공매도】 '+_shortLine+'\n' : '')+
         (_newsItems ? '【최근 공시】\n'+_newsItems+'\n' : '')+
         (_mkt && _mkt!=='데이터없음' ? '【시황】\n'+_mkt+'\n' : '')+
         '【리스크】 손절 '+stopPr.toLocaleString()+' | 목표 '+t1Pr.toLocaleString()+' | R/R 1:'+rr+'\n\n'+
@@ -6926,8 +6936,10 @@ function renderHotSectors(){
     const _momTag = g.momentum ? `<span style="font-size:8px;color:${_momCol};background:${_momCol==='var(--r)'?'rgba(220,38,38,.08)':'var(--bg)'};padding:0 4px;border-radius:3px;margin-left:3px;">${g.momentum}</span>` : '';
     const stkLine = g.stocks.map(s => {
       const _roleTag = s.role==='대장주' ? '👑' : '';
+      const _short = (info[s.tk]&&info[s.tk].short_trend) || '';
+      const _shortIcon = _short==='감소' ? '🔥' : _short==='증가' ? '⚠️' : '';
       const _tip = (s.entry||s.reason) ? ` title="${(s.entry||s.reason||'').replace(/"/g,'&quot;')}"` : '';
-      return `<span class="hot-sec-stk" data-tk="${s.tk}" onclick="selectStk(this.dataset.tk)"${_tip} style="cursor:pointer;color:var(--b);font-weight:600;">${_roleTag}${s.nm}</span>`;
+      return `<span class="hot-sec-stk" data-tk="${s.tk}" onclick="selectStk(this.dataset.tk)"${_tip} style="cursor:pointer;color:var(--b);font-weight:600;">${_roleTag}${_shortIcon}${s.nm}</span>`;
     }).join(' · ');
     const _riskLine = g.risk ? `<div style="color:var(--r);font-size:8px;margin-top:2px;">⚠ ${g.risk}</div>` : '';
     return `<div style="line-height:1.4;">
@@ -6990,11 +7002,12 @@ async function syncCandidatesToWatchlist(){
       `## 분석 기준 (반드시 모두 종합)\n` +
       `1. **거래대금/거래량**: 코스피·코스닥 거래대금 상위 섹터, 거래량 전일 대비 200%+ 종목\n` +
       `2. **수급**: 외국인 + 기관 동반 순매수, 연속 순매수 일수, 프로그램 매수\n` +
-      `3. **재료/모멘텀**: 정책 이슈, 실적 발표, 신규 수주, 신제품, 글로벌 테마 (AI/2차전지/바이오/방산/원전 등)\n` +
-      `4. **차트 기술적**: 정배열, 신고가 돌파, 거래량 동반 상승, RSI 50~65 안전구간\n` +
-      `5. **선도주 ↔ 후속주**: 섹터 대장주 + 동반 상승 2부 종목\n` +
-      `6. **시장 환경 정합**: 코스피 방향성·환율·미국 시장 흐름과 맞는 섹터\n` +
-      `7. **시간대 적합성**: ${_phase}에 진입하기 좋은 종목 (강의의 매매 기법 — 눌림목/돌파/첫봉/갭상승/이슈테마 중 어떤 게 적합?)\n\n` +
+      `3. **공매도 잔고**: 종목별 공매도 잔고 비율(%), 최근 5일 추이 (감소=스퀴즈 기대 / 급증=하락 압력)\n` +
+      `4. **재료/모멘텀**: 정책 이슈, 실적 발표, 신규 수주, 신제품, 글로벌 테마 (AI/2차전지/바이오/방산/원전 등)\n` +
+      `5. **차트 기술적**: 정배열, 신고가 돌파, 거래량 동반 상승, RSI 50~65 안전구간\n` +
+      `6. **선도주 ↔ 후속주**: 섹터 대장주 + 동반 상승 2부 종목\n` +
+      `7. **시장 환경 정합**: 코스피 방향성·환율·미국 시장 흐름과 맞는 섹터\n` +
+      `8. **시간대 적합성**: ${_phase}에 진입하기 좋은 종목 (강의의 매매 기법 — 눌림목/돌파/첫봉/갭상승/이슈테마 중 어떤 게 적합?)\n\n` +
       `## 출력 — JSON만 (다른 텍스트 X)\n` +
       `{\n` +
       `  "market_view":"오늘 시장 한줄 요약 (방향/리스크)",\n` +
@@ -7007,7 +7020,7 @@ async function syncCandidatesToWatchlist(){
       `      "technique":"강의 매매기법명 (눌림목/돌파/첫봉/갭상승/이슈테마 중)",\n` +
       `      "risk":"이 섹터 리스크 1줄",\n` +
       `      "stocks":[\n` +
-      `        {"tk":"종목코드6자리","nm":"종목명","role":"대장주/후속주","reason":"선정이유","entry":"진입 시나리오 1줄","stop":"손절 기준"}\n` +
+      `        {"tk":"종목코드6자리","nm":"종목명","role":"대장주/후속주","reason":"선정이유","entry":"진입 시나리오 1줄","stop":"손절 기준","short_ratio":"공매도 잔고비율 (예: 1.2%, 모르면 -)","short_trend":"공매도 추세 (감소/유지/증가/모름)"}\n` +
       `      ]\n` +
       `    },\n` +
       `    ... 총 3개 섹터\n` +
@@ -7056,6 +7069,8 @@ async function syncCandidatesToWatchlist(){
             risk: sec.risk || '',
             entry: stk.entry || '',
             stop: stk.stop || '',
+            short_ratio: stk.short_ratio || '',
+            short_trend: stk.short_trend || '',
           };
           // STOCKS에 없으면 추가
           if(!STOCKS.find(function(s){return s.tk===stk.tk;})){
