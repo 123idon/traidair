@@ -2035,7 +2035,9 @@ function amtToQty(amt){
 function updOSum(){
   const pr=parseFloat(document.getElementById("ofPr").value)||0;
   const qty=parseInt(document.getElementById("ofQty").value)||0;
-  const tot=pr*qty,fee=tot*(cfg.bf+cfg.sf)/100,tax=oSide==="sell"?tot*cfg.tx/100:0;
+  const tot=pr*qty;
+  const fee = oSide==='sell' ? tot*((cfg.sf||0.015)/100) : tot*((cfg.bf||0.015)/100);
+  const tax = oSide==='sell' ? tot*cfg.tx/100 : 0;
   const stop=parseFloat(document.getElementById("ofStop").value);
   const t1=parseFloat(document.getElementById("ofT1").value);
   let warn="";
@@ -2089,7 +2091,10 @@ function submitOrder(autoExec){
   const pr=oType==="market"?stk.pr:parseFloat(document.getElementById("ofPr").value)||stk.pr;
   const qty=parseInt(document.getElementById("ofQty").value)||0;
   if(qty<=0){if(!autoExec)showAlert("주문 오류","수량을 입력하세요.");return false;}
-  const fee=(pr*qty)*(cfg.bf+cfg.sf)/100,tax=oSide==="sell"?(pr*qty)*cfg.tx/100:0;
+  // ★ 수수료는 매수/매도 각각 따로 — 이중 차감 방지
+  const _br = (cfg.bf||0.015)/100, _sr = (cfg.sf||0.015)/100;
+  const fee = oSide==='sell' ? (pr*qty)*_sr : (pr*qty)*_br;
+  const tax = oSide==='sell' ? (pr*qty)*cfg.tx/100 : 0;
   const tot=pr*qty,ratio=tot/mock.cash*100;
   if(oSide==="buy"){
     let cashN=tot+fee,credN=0;
