@@ -343,22 +343,23 @@ const server = http.createServer(async (req, res) => {
         const prevDate = getPrevBusinessDay(targetDate);
 
         const fetchDayCandles = async (dayStr) => {
+          // KIS 일별 분봉 차트 — fid_input_date_1로 과거 일자 지정 (미래 데이터 사용 절대 금지)
           const result = await kisRequest({
             hostname: kisHost('real'),
             port: kisPort('real'),
-            path: `/uapi/domestic-stock/v1/quotations/inquire-time-itemchartprice?fid_etc_cls_code=&fid_cond_mrkt_div_code=J&fid_input_iscd=${code}&fid_input_hour_1=${interval}&fid_pw_data_inqu_yn=N`,
+            path: `/uapi/domestic-stock/v1/quotations/inquire-time-dailychartprice?fid_etc_cls_code=&fid_cond_mrkt_div_code=J&fid_input_iscd=${code}&fid_input_hour_1=${interval}&fid_input_date_1=${dayStr}&fid_pw_data_inqu_yn=Y`,
             method: 'GET',
             headers: {
               'Content-Type': 'application/json',
               'authorization': `Bearer ${token}`,
               'appkey': appKey, 'appsecret': appSecret,
-              'tr_id': 'FHKST03010200',
+              'tr_id': 'FHKST03010230',
               'custtype': 'P',
             },
           });
           const output2 = result.data.output2 || [];
-          return output2
-            .filter(r => r.stck_bsop_date === dayStr)
+          const filtered = output2
+            .filter(r => r.stck_bsop_date === dayStr) // ★ 요청 날짜만 — 미래 데이터 차단
             .map(r => ({
               t: `${r.stck_cntg_hour.slice(0,2)}:${r.stck_cntg_hour.slice(2,4)}`,
               date: r.stck_bsop_date,
@@ -370,6 +371,7 @@ const server = http.createServer(async (req, res) => {
             }))
             .filter(c => c.c > 0)
             .sort((a, b) => a.t.localeCompare(b.t));
+          return filtered;
         };
 
         // 전일 + 당일 병렬 조회
