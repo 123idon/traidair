@@ -267,9 +267,22 @@
           <span class="chart-hdr-nm" id="chartHdrNm">삼성전자</span>
           <span class="chart-hdr-tk" id="chartHdrTk">005930</span>
         </div>
-        <div class="chart-hdr-r">
+        <div class="chart-hdr-r" style="flex-wrap:wrap;gap:10px;">
           <span class="chart-hdr-pr" id="chartHdrPr">0</span>
           <span class="chart-hdr-ch" id="chartHdrCh">+0.00%</span>
+          <!-- 실시간 잔고 / 평가손익 -->
+          <span style="display:inline-flex;align-items:baseline;gap:4px;border-left:1px solid var(--br);padding-left:10px;">
+            <span style="font-size:9px;color:var(--tm);">잔고</span>
+            <span id="hdrCash" style="font-family:var(--mono);font-size:12px;font-weight:700;color:var(--t);">-</span>
+          </span>
+          <span style="display:inline-flex;align-items:baseline;gap:4px;">
+            <span style="font-size:9px;color:var(--tm);">평가</span>
+            <span id="hdrEval" style="font-family:var(--mono);font-size:12px;font-weight:700;color:var(--t);">-</span>
+          </span>
+          <span style="display:inline-flex;align-items:baseline;gap:4px;">
+            <span style="font-size:9px;color:var(--tm);">손익</span>
+            <span id="hdrPnl" style="font-family:var(--mono);font-size:12px;font-weight:700;">-</span>
+          </span>
         </div>
       </div>
       <!-- 백테스트 진행 패널 (실행 중에만 표시) -->
@@ -407,6 +420,7 @@
         <button class="spd-btn" onclick="setSpd(this,120)">x120</button>
         <button class="spd-btn" onclick="setSpd(this,300)">x300</button>
         <button class="spd-btn" onclick="setSpd(this,600)">x600</button>
+        <button class="spd-btn" onclick="setSpd(this,1500)">x1500</button>
       </div>
       <div class="prog" style="flex:1;position:relative;cursor:pointer;" onclick="seekToPos(event,this)" title="클릭으로 이동">
         <div class="prog-f" id="progF" style="width:0%;pointer-events:none;"></div>
@@ -800,6 +814,8 @@
 
     <!-- 매매일지 목록 -->
     <div id="jt-log">
+      <!-- 가장 최근 AI 코칭 (열자마자 보임) -->
+      <div id="jLatestCoaching" style="background:linear-gradient(135deg,rgba(139,92,246,0.08),rgba(49,130,246,0.04));border:1px solid var(--p);border-radius:12px;padding:14px;margin-bottom:12px;display:none;"></div>
       <!-- 누적손익 차트 + 통계 박스 -->
       <div id="jStatsBox" style="background:var(--pan);border-radius:12px;padding:14px;margin-bottom:12px;box-shadow:var(--sh0);">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">

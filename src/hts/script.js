@@ -565,7 +565,7 @@ function _genSimCandles(tk,dt){
 let BAN_LIST=safeParseJSON(localStorage.getItem("htsBan"), []);
 function addBanCurrent(){const stk=STOCKS.find(s=>s.tk===activeTk)||STOCKS[0];if(!BAN_LIST.includes(activeTk)){BAN_LIST.push(activeTk);saveBan();renderBanList();showAlert("매매금지 추가",stk.nm+" 매매금지 등록됨");}}
 function addPending(tk,nm,side,price,qty){const id=Date.now();pendingOrders.push({id,tk,nm,side,price,qty,time:new Date().toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"})});renderPending();return id;}
-let autoState={running:false,level:0,cfg:{rr:1.5,pos:15,stop:3,t1:3,t2:5,trail:"off",brk:true,explain:true}};
+let autoState={running:false,level:0,cfg:{rr:1.5,pos:30,stop:3,t1:3,t2:5,trail:"off",brk:false,explain:true}};
 let autoTimer=null;
 function cancelPending(id){pendingOrders=pendingOrders.filter(o=>o.id!==id);renderPending();}
 let chatHist=[],chatBusy=false;
@@ -1170,7 +1170,7 @@ function runStep(){
   const isDaily = sim.tf==='D'||sim.tf.startsWith('D');
   const tfMin = isDaily ? 390 : (parseInt(sim.tf)||5);
   const realMs = tfMin * 60 * 1000;
-  const delay = Math.max(50, realMs / sim.speed);
+  const delay = Math.max(20, realMs / sim.speed);
   sim.timer=setTimeout(runStep, delay);
 }
 function setSpd(el,v){sim.speed=v;document.querySelectorAll(".spd-btn").forEach(b=>b.classList.remove("on"));el.classList.add("on");}
@@ -2084,6 +2084,9 @@ function updateTimeGuide(){
 let bdMetrics={lossSeries:0,last30min:[],reentryCount:0,lastSellTime:null};
 
 function checkBrainDong(side,price,qty,stk){
+  // 자동매매/백테스트 중에는 사람용 경고 표시 안 함 (UI 클러터 + 알림창 차단)
+  const _suppress = (autoState&&autoState.running) || (window.backtest&&backtest.running);
+  if(_suppress) return;
   const now=Date.now();
   // 30분 내 매매 횟수
   bdMetrics.last30min=bdMetrics.last30min.filter(t=>now-t<1800000);
@@ -2963,7 +2966,7 @@ function scheduleScreening(){
   runScreening();
   // 배속이 빠를수록 더 자주 스크리닝 (그래야 봉을 따라잡음)
   const _spd = (sim&&sim.speed)||1;
-  const interval = _spd >= 300 ? 300 : _spd >= 60 ? 800 : 5000;
+  const interval = _spd >= 1000 ? 120 : _spd >= 300 ? 300 : _spd >= 60 ? 800 : 5000;
   autoTimer=setTimeout(scheduleScreening, interval);
 }
 function addDecisionLog(title, body, phase){
@@ -3033,7 +3036,7 @@ function runScreening(){
   if(_autoScreenRunning) return;
   // 쿨다운: 배속 비례 (x300+ 면 100ms, x60+ 500ms, 그 외 3000ms)
   const _spd2 = (sim&&sim.speed)||1;
-  const _cooldown = _spd2 >= 300 ? 100 : _spd2 >= 60 ? 500 : 3000;
+  const _cooldown = _spd2 >= 1000 ? 50 : _spd2 >= 300 ? 100 : _spd2 >= 60 ? 500 : 3000;
   if(now - _lastAutoScreenTime < _cooldown) return;
   _lastAutoScreenTime = now;
   _autoScreenRunning = true;
@@ -3180,14 +3183,26 @@ async function _runScreeningAsync(){
 
   // ── 빠른 배속에선 Claude 우회: 기술 score만으로 즉시 매수 결정 ──
   if(autoState.level>=3 && (sim&&sim.speed>=300)){
-    if(best.score >= 5){
+    // 매매 간격 제한 (스캘핑 방지)
+    const _now = Date.now();
+    const _recent = (mock.trades||[]).filter(t=>t.date===sim.date && _now-(t.ts||0)<30*60*1000);
+    if(_recent.length >= 3){
+      addDecisionLog('과매매 차단', '30분 내 매매 3건 — 진입 보류', '신중모드');
+      return;
+    }
+    // 같은 종목 매도/매수 후 30분 쿨다운
+    const _lastSame = (mock.trades||[]).filter(t=>t.tk===best.tk).pop();
+    if(_lastSame && _now-(_lastSame.ts||0)<30*60*1000){
+      addDecisionLog('['+best.stk.nm+'] 쿨다운', '같은 종목 30분 이내 매매 이력 — 보류', '신중모드');
+      return;
+    }
+    // 점수 임계 — 신중하게 7점 이상만 매수
+    if(best.score >= 7){
       var lcQ=best.lc;
-      var stopPrQ=Math.round(lcQ.c*(1-autoState.cfg.stop/100));
-      var t1PrQ=Math.round(lcQ.c*(1+autoState.cfg.t1/100));
       addDecisionLog('['+best.stk.nm+'] ⚡ 빠른매수 ('+best.score+'점)', best.tags.join(' · ')+' / 배속x'+sim.speed+' Claude 우회', '백테스트');
       try{ await execAutoBuy(lcQ.c, best.stk); }catch(_e){}
     }else{
-      addDecisionLog('['+best.stk.nm+'] ⏸ 점수 미달('+best.score+')', '빠른 배속 모드 — 진입 임계 5점 미달', '관망');
+      addDecisionLog('['+best.stk.nm+'] ⏸ 점수 미달('+best.score+')', '신중모드 진입 임계 7점 미달', '관망');
     }
     return;
   }
@@ -3266,8 +3281,11 @@ function runAutoStep(cs){
 async function execAutoBuy(pr,stk){
   if(!autoState.running||autoState.level<3)return;
   if(mock.lossSeries>=3&&autoState.cfg.brk){addMsg("ai","⏸ 연속 손절 3회 — 자동매매 일시정지\n[Phase 11: 뇌동매매 방지]");stopAuto();return;}
-  const qty=Math.floor(mock.cash*(autoState.cfg.pos/100)/pr);
-  if(qty<=0)return;
+  // 잔고의 비중(autoState.cfg.pos %)으로 매수 — 일반인 거래처럼
+  const posPct = Math.max(5, Math.min(80, autoState.cfg.pos||30)); // 5~80% 범위
+  const budget = Math.floor(mock.cash * (posPct/100));
+  const qty = Math.floor(budget / pr);
+  if(qty<=0){ addDecisionLog('['+stk.nm+'] 잔고 부족', '예산 '+budget.toLocaleString()+'원 < 1주('+pr.toLocaleString()+')', '관망'); return; }
   document.getElementById("ofPr").value=pr;document.getElementById("ofQty").value=qty;
   document.getElementById("ofStop").value=Math.round(pr*(1-autoState.cfg.stop/100));
   document.getElementById("ofT1").value=Math.round(pr*(1+autoState.cfg.t1/100));
@@ -4737,16 +4755,36 @@ function setActiveTk(tk){
   selectStk(tk);
   try{addDecisionLog&&addDecisionLog('🔄 종목 자동 전환',(STOCKS.find(s=>s.tk===tk)||{nm:tk}).nm+' ('+tk+')','자동매매');}catch(e){}
 }
-// 차트 헤더 종목 정보 갱신 (큰 종목명 / 가격 / 등락)
+// 차트 헤더 종목 정보 갱신 (큰 종목명 / 가격 / 등락 / 실시간 잔고)
 function updChartHeader(){
-  const s=STOCKS.find(s=>s.tk===activeTk);if(!s) return;
-  const chgPct=((s.pr-s.base)/s.base*100);
-  const up=chgPct>=0;
-  const ne=document.getElementById('chartHdrNm');if(ne) ne.textContent=s.nm;
-  const te=document.getElementById('chartHdrTk');if(te) te.textContent=s.tk;
-  const pe=document.getElementById('chartHdrPr');if(pe) pe.textContent=(s.pr||0).toLocaleString();
-  const ce=document.getElementById('chartHdrCh');
-  if(ce){ ce.textContent=(up?'+':'')+chgPct.toFixed(2)+'%'; ce.style.color=up?'var(--r)':'var(--b)'; }
+  const s=STOCKS.find(s=>s.tk===activeTk);
+  if(s){
+    const chgPct=((s.pr-s.base)/s.base*100);
+    const up=chgPct>=0;
+    const ne=document.getElementById('chartHdrNm');if(ne) ne.textContent=s.nm;
+    const te=document.getElementById('chartHdrTk');if(te) te.textContent=s.tk;
+    const pe=document.getElementById('chartHdrPr');if(pe) pe.textContent=(s.pr||0).toLocaleString();
+    const ce=document.getElementById('chartHdrCh');
+    if(ce){ ce.textContent=(up?'+':'')+chgPct.toFixed(2)+'%'; ce.style.color=up?'var(--r)':'var(--b)'; }
+  }
+  // 실시간 잔고 / 평가 / 손익
+  try{
+    let eval = 0;
+    Object.entries(mock.positions||{}).forEach(([tk,p])=>{
+      if(!p||p.qty<=0) return;
+      const stk = STOCKS.find(x=>x.tk===tk);
+      const pr = (stk&&stk.pr) || p.avg || 0;
+      eval += pr * p.qty;
+    });
+    const totalPnl = (mock.todayPnl||0);
+    const he = document.getElementById('hdrCash'); if(he) he.textContent = Math.round(mock.cash||0).toLocaleString()+'원';
+    const ev = document.getElementById('hdrEval'); if(ev) ev.textContent = Math.round(eval).toLocaleString()+'원';
+    const pn = document.getElementById('hdrPnl');
+    if(pn){
+      pn.textContent = (totalPnl>=0?'+':'')+Math.round(totalPnl).toLocaleString()+'원';
+      pn.style.color = totalPnl>=0 ? 'var(--g)' : 'var(--r)';
+    }
+  }catch(e){}
 }
 
 // ═══════════════════════════════
@@ -4912,6 +4950,35 @@ function renderJPage(){
   const entries=Object.values(js).sort((a,b)=>b.date.localeCompare(a.date));
   // 통계/차트는 항상 갱신 (거래 없어도 빈 카드 표시)
   try{ renderJournalStats(); }catch(e){ console.warn('stats:', e.message); }
+  // 가장 최근 AI 코칭 박스 — 열자마자 보임
+  try{
+    const lc = document.getElementById('jLatestCoaching');
+    if(lc){
+      const latest = entries.find(e=>e.aiGenerated);
+      if(latest){
+        lc.style.display='';
+        const stage = (typeof getLearnerStage==='function') ? getLearnerStage() : {lv:1,label:'초보',color:'var(--a)'};
+        lc.innerHTML = `
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+            <div style="font-size:13px;font-weight:800;color:var(--p);">🎓 AI 코칭 — ${latest.date}</div>
+            <span style="background:${stage.color};color:#fff;padding:2px 8px;border-radius:5px;font-size:10px;font-weight:700;">Lv${stage.lv} ${stage.label}</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+            ${latest.good && latest.good!=='-' ? `<div style="background:rgba(5,192,114,0.08);border-left:3px solid var(--g);padding:6px 10px;border-radius:6px;"><div style="font-size:10px;color:var(--g);font-weight:700;margin-bottom:2px;">✅ 잘한 점</div><div style="font-size:11px;line-height:1.5;">${latest.good}</div></div>` : ''}
+            ${latest.bad && latest.bad!=='-' ? `<div style="background:rgba(240,62,62,0.08);border-left:3px solid var(--r);padding:6px 10px;border-radius:6px;"><div style="font-size:10px;color:var(--r);font-weight:700;margin-bottom:2px;">🔴 반성</div><div style="font-size:11px;line-height:1.5;">${latest.bad}</div></div>` : ''}
+            ${latest.improvement && latest.improvement!=='-' ? `<div style="background:rgba(49,130,246,0.08);border-left:3px solid var(--b);padding:6px 10px;border-radius:6px;"><div style="font-size:10px;color:var(--b);font-weight:700;margin-bottom:2px;">💡 개선</div><div style="font-size:11px;line-height:1.5;">${latest.improvement}</div></div>` : ''}
+            ${latest.psychology && latest.psychology!=='-' ? `<div style="background:rgba(245,158,11,0.08);border-left:3px solid var(--a);padding:6px 10px;border-radius:6px;"><div style="font-size:10px;color:var(--a);font-weight:700;margin-bottom:2px;">🧠 심리</div><div style="font-size:11px;line-height:1.5;">${latest.psychology}</div></div>` : ''}
+          </div>
+          ${latest.mentor_comment && latest.mentor_comment!=='-' ? `<div style="background:var(--pan);padding:8px 12px;border-radius:8px;border:1px dashed var(--p);font-size:11px;line-height:1.6;"><b style="color:var(--p);">🎯 멘토 한마디:</b> ${latest.mentor_comment}</div>` : ''}
+        `;
+      }else if(entries.length===0){
+        lc.style.display='';
+        lc.innerHTML = `<div style="font-size:12px;color:var(--tm);text-align:center;padding:20px;">백테스트나 매매를 마치면 여기에 AI 코칭이 자동으로 나타납니다.</div>`;
+      }else{
+        lc.style.display='none';
+      }
+    }
+  }catch(e){ console.warn('latest coaching:', e.message); }
   if(!entries.length){document.getElementById("journalList").innerHTML="<div style='font-size:12px;color:var(--tm);text-align:center;padding:40px;'>거래 내역이 없습니다.</div>";return;}
   document.getElementById("journalList").innerHTML=entries.map(e=>{
     const aiTag = e.aiTradeCount ? `<span style="font-size:9px;background:rgba(139,92,246,.15);color:var(--p);padding:1px 5px;border-radius:3px;font-weight:700;margin-left:4px;">🤖 AI ${e.aiTradeCount}건</span>` : '';
@@ -5915,6 +5982,7 @@ function updChartToIdx(){
   const cs = getCandles(1);
   const lc = cs[cs.length-1];
   if(lc) updPrice(lc);
+  try{ updChartHeader&&updChartHeader(); }catch(e){}
   // 슬라이더 동기화
   const total = sim.candles.length;
   const pct = total > 1 ? (sim.idx / (total-1)) * 100 : 0;
