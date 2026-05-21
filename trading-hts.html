@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#ffffff">
-<meta name="build-ts" content="1779388274440">
+<meta name="build-ts" content="1779388844989">
 <title>TraidAIr HTS</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 
@@ -2505,7 +2505,7 @@ let stopOrders={};
 // ═══════════════════════════════
 // STATE
 // ═══════════════════════════════
-let cfg={capital:10000000,dayloss:2,maxpos:20,clim:140,mlim:40,crate:8.5,mrate:12,bf:0.015,sf:0.015,tx:0.18,bd:true,al:true};
+let cfg={capital:10000000,dayloss:3,maxpos:50,clim:200,mlim:60,crate:8.5,mrate:12,bf:0.015,sf:0.015,tx:0.18,bd:false,al:true};
 let mock={cash:10000000,positions:{},trades:[],todayPnl:0,todayTrades:0,lossSeries:0,creditUsed:0,marginUsed:0};
 let sim={playing:false,speed:60,idx:0,candles:[],timer:null,date:todayStr(),tf:"1"};
 
@@ -3392,7 +3392,7 @@ async function _backtestEndOfDay(){
   backtest.dayIdx++;
   addDecisionLog(`📅 ${dt} 마감`, `매매 ${todayTrades.length}건 | 손익 ${dayPnl>=0?'+':''}${dayPnl.toLocaleString()}원 | 승 ${wins}·패 ${losses}`, '백테스트');
   renderBacktestPanel();
-  // 백테스트는 매일 매매일지 무조건 자동 작성 (학습 누적용)
+  // 매매가 있으면 AI 일지 자동 작성 (학습 누적)
   if(todayTrades.length > 0 && typeof autoSaveJournalOnTrade === 'function'){
     addDecisionLog(`📓 ${dt} 일지 작성`, sim.speed>=300?'백그라운드 (빠른 배속)':'AI 평가 대기 중', '학습');
     const _p = autoSaveJournalOnTrade(dt).catch(e=>console.warn('일지:', e.message));
@@ -3400,6 +3400,19 @@ async function _backtestEndOfDay(){
     if(sim.speed < 300){
       try{ sim.playing=false; _syncPlayBtn(); await _p; }catch(e){}
     }
+  } else {
+    // 매매 없는 날도 "관망" 일지로 기록 → 백테스트 통계에 반영
+    try{
+      const noTradeEntry = {
+        summary: dt+' 매매 없음 (관망)',
+        why_bought:'진입 신호 없음', why_sold:'-',
+        good:'필수 게이트 미달 종목 진입 회피', bad:'-',
+        psychology:'-', improvement:'-', phase_check:'관망',
+        mentor_comment:'기다림도 매매다',
+        aiGenerated: false, trades:'(매매 없음)',
+      };
+      if(typeof saveJEntry==='function') saveJEntry(dt, noTradeEntry, 0, 0, 0, '');
+    }catch(_e){}
   }
   // 다음 영업일?
   if(backtest.dayIdx >= backtest.totalDays){
@@ -3432,6 +3445,9 @@ function _backtestReport(){
     (worst ? `• 최악: ${worst.date} (${worst.pnl.toLocaleString()})\n` : '');
   addMsg('ai', msg);
   showAlert('백테스트 결과', msg);
+  // 매매일지 페이지 즉시 갱신 + 안내
+  try{ renderJPage&&renderJPage(); }catch(_e){}
+  addDecisionLog('📓 백테스트 일지 완료', `${backtest.dailyResults.length}일 / 매매 ${totalTrades}건 — 📓 버튼으로 확인`, '학습');
 }
 // 실시간 거래 스트립 — 차트 헤더 아래 최근 6건
 function renderLiveTrades(){
@@ -5270,17 +5286,17 @@ async function _runScreeningAsync(){
         return;
       }
     }
-    // ★ 진입 임계: 확신도 등급
-    // - 강한신호 (score>=10): BUY
-    // - 시그널 (score 7~9): BUY (단 확정시그널 태그 필요)
-    // - 약한 (score<7): 관망
+    // ★ 진입 등급제 (완화 + 명확한 등급)
+    // - 강한신호 (score>=8): 즉시 매수
+    // - 보통 (score 5~7): 확정시그널 있으면 매수
+    // - 약한 (score<5): 관망
     const hasConfirm = best.tags.indexOf('확정시그널') !== -1;
-    if(best.score >= 10 || (best.score >= 7 && hasConfirm)){
+    if(best.score >= 8 || (best.score >= 5 && hasConfirm)){
       var lcQ=best.lc;
-      addDecisionLog('['+best.stk.nm+'] ✅ 진입 ('+best.score+'점)', best.tags.join(' · '), '확신매수');
+      addDecisionLog('['+best.stk.nm+'] ✅ 진입 ('+best.score+'점)', best.tags.join(' · '), best.score>=8?'강한신호':'확정시그널');
       try{ await execAutoBuy(lcQ.c, best.stk, best.score); }catch(_e){}
-    } else if(best.score >= 5){
-      addDecisionLog('['+best.stk.nm+'] 👀 관찰 ('+best.score+'점)', '시그널 미확정 — '+best.tags.join(' · '), '대기');
+    } else if(best.score >= 4){
+      addDecisionLog('['+best.stk.nm+'] 👀 관찰 ('+best.score+'점)', '시그널 확정 대기 — '+best.tags.join(' · '), '대기');
     } else {
       addDecisionLog('['+best.stk.nm+'] ⏸ 약함 ('+best.score+'점)', best.tags.join(' · ')||'조건 불충분', '관망');
     }
@@ -5411,23 +5427,33 @@ async function execAutoBuy(pr, stk, score){
   }
   // 사용자 cfg 상한 존중 (cfg.pos를 사용자가 60%로 올려놓았다면 그 이상은 안 감)
   posPct = Math.min(posPct, Math.max(20, autoState.cfg.pos||50));
-  const budget = Math.floor(mock.cash * (posPct/100));
+  // 신용 한도 포함 가용 자금 (잔고 + 신용한도 - 사용중)
+  const creditAvail = Math.max(0, Math.round(mock.cash*((cfg.clim||140)/100)) - (mock.creditUsed||0));
+  const totalAvail = mock.cash + creditAvail;
+  const budget = Math.floor(totalAvail * (posPct/100));
   let qty = Math.floor(budget / pr);
-  // 예산이 1주에 못 미치면 살 수 있는 만큼 (잔고 전체 한도 내에서)
-  if(qty<=0 && mock.cash >= pr){
-    qty = Math.floor(mock.cash / pr); // 잔고로 최대 살 수 있는 주
-    if(qty>0) addDecisionLog('['+stk.nm+'] 비중 보정', '예산 부족 — 잔고 한도로 '+qty+'주 매수', '백테스트');
+  // 신용 한도 내 최대 매수 가능량
+  const maxByTotal = Math.floor(totalAvail / pr);
+  if(qty<=0 && maxByTotal>0){
+    qty = Math.min(maxByTotal, 10);
+    addDecisionLog('['+stk.nm+'] 비중 보정', '신용 포함 한도 내 '+qty+'주 매수', '백테스트');
   }
-  if(qty<=0){ addDecisionLog('['+stk.nm+'] 잔고 부족', '예산 '+budget.toLocaleString()+'원, 잔고 '+mock.cash.toLocaleString()+'원 < 1주('+pr.toLocaleString()+')', '관망'); return; }
+  if(qty<=0){ addDecisionLog('['+stk.nm+'] 잔고/신용 부족', '가용 '+totalAvail.toLocaleString()+'원 < 1주('+pr.toLocaleString()+')', '관망'); return; }
+  // 신용 사용 여부 결정 (잔고 부족하면 자동 신용)
+  const totalCost = qty * pr;
+  const useCredit = totalCost > mock.cash && creditAvail > 0;
   document.getElementById("ofPr").value=pr;document.getElementById("ofQty").value=qty;
   document.getElementById("ofStop").value=Math.round(pr*(1-autoState.cfg.stop/100));
   document.getElementById("ofT1").value=Math.round(pr*(1+autoState.cfg.t1/100));
   document.getElementById("ofT2").value=Math.round(pr*(1+autoState.cfg.t2/100));
-  oSide="buy";oType="market";credType="cash";trailMode=autoState.cfg.trail;
+  oSide="buy";oType="market";credType=useCredit?"credit":"cash";trailMode=autoState.cfg.trail;
+  // credSel UI도 동기화 (submitOrder가 select에서 읽음)
+  const credSel=document.getElementById("credSel"); if(credSel) credSel.value = credType;
   const ok=submitOrder(true);
   if(ok){
     const _inv = (qty*pr).toLocaleString();
-    addDecisionLog(`[${stk.nm}] 자동 매수 (${posPct}% 비중)`,`${pr.toLocaleString()}원 × ${qty}주 = ${_inv}원 | 손절 ${Math.round(pr*(1-autoState.cfg.stop/100)).toLocaleString()} | 목표 ${Math.round(pr*(1+autoState.cfg.t1/100)).toLocaleString()}`,"Phase 9-4");
+    const _credTag = useCredit ? ' 🟠신용' : '';
+    addDecisionLog(`[${stk.nm}] 자동 매수 (${posPct}% 비중)${_credTag}`,`${pr.toLocaleString()}원 × ${qty}주 = ${_inv}원 | 손절 ${Math.round(pr*(1-autoState.cfg.stop/100)).toLocaleString()} | 목표 ${Math.round(pr*(1+autoState.cfg.t1/100)).toLocaleString()}`,"Phase 9-4");
     if(autoState.cfg.explain)setTimeout(()=>explainAutoDecision(stk,pr,qty),600);
   }
 }
@@ -8599,7 +8625,7 @@ function collectMarketCtx(){
 (function(){
   const meta = document.querySelector('meta[name="build-ts"]');
   const myBuildTs = meta ? meta.getAttribute('content') : '';
-  if(!myBuildTs || myBuildTs === '1779388274440') return; // 로컬 빌드 안 한 경우
+  if(!myBuildTs || myBuildTs === '1779388844989') return; // 로컬 빌드 안 한 경우
   let reloaded = false;
   async function check(){
     if(reloaded) return;
