@@ -516,8 +516,7 @@
             <span class="of-l">거래방식</span>
             <select class="cred-sel" id="credSel" onchange="onCredChange()">
               <option value="cash">현금</option>
-              <option value="credit">신용(담보140%)</option>
-              <option value="margin">미수(위탁40%)</option>
+              <option value="credit">신용(담보200%)</option>
             </select>
           </div>
           <div class="cred-info" id="credInfo"></div>
@@ -811,6 +810,7 @@
       <div class="stab" onclick="jTab(this,'jt-rule')" style="font-size:11px;">📋 개인 원칙</div>
       <div class="stab" onclick="jTab(this,'jt-checklist')" style="font-size:11px;">✅ 통합 체크리스트</div>
       <button class="ibtn pri" onclick="genAllJournals()" style="margin-left:auto;font-size:10px;">🤖 AI 일지 생성</button>
+      <button class="ibtn" onclick="copyAllJournals()" style="font-size:10px;">📋 전체 복사</button>
       <button class="ibtn red" onclick="clearAllJournals()" style="font-size:10px;">🗑 전체 삭제</button>
     </div>
 

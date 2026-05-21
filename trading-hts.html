@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#ffffff">
-<meta name="build-ts" content="1779390541786">
+<meta name="build-ts" content="1779391986270">
 <title>TraidAIr HTS</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 
@@ -1048,8 +1048,7 @@ canvas{image-rendering:pixelated;}
             <span class="of-l">거래방식</span>
             <select class="cred-sel" id="credSel" onchange="onCredChange()">
               <option value="cash">현금</option>
-              <option value="credit">신용(담보140%)</option>
-              <option value="margin">미수(위탁40%)</option>
+              <option value="credit">신용(담보200%)</option>
             </select>
           </div>
           <div class="cred-info" id="credInfo"></div>
@@ -1343,6 +1342,7 @@ canvas{image-rendering:pixelated;}
       <div class="stab" onclick="jTab(this,'jt-rule')" style="font-size:11px;">📋 개인 원칙</div>
       <div class="stab" onclick="jTab(this,'jt-checklist')" style="font-size:11px;">✅ 통합 체크리스트</div>
       <button class="ibtn pri" onclick="genAllJournals()" style="margin-left:auto;font-size:10px;">🤖 AI 일지 생성</button>
+      <button class="ibtn" onclick="copyAllJournals()" style="font-size:10px;">📋 전체 복사</button>
       <button class="ibtn red" onclick="clearAllJournals()" style="font-size:10px;">🗑 전체 삭제</button>
     </div>
 
@@ -2142,21 +2142,34 @@ function _peekSimCandlesFor(tk, dateStr, untilIdx){
     const tkSeed = tk.split('').reduce((a,c)=>a+c.charCodeAt(0),0);
     const intervals = parseInt((typeof sim!=='undefined' && sim.tf) || '1') || 1;
     const perDay = Math.floor(390/intervals);
-    const seed = (parseInt((dateStr||'').replace(/-/g,'').slice(-6))||9999) + tkSeed;
-    const rnd = rng32(seed);
-    const out = [];
-    // 현재 봉 인덱스까지만 생성 (미래 봉 노출 금지)
-    const limit = Math.min(perDay, (untilIdx||0)+1);
-    for(let i=0;i<limit;i++){
-      const r1=rnd(),r2=rnd(),r3=rnd(),r4=rnd();
-      const c=base*(1+(r1-.498)*.018);
-      const h=c*(1+r2*.009),l=c*(1-r3*.009),o=base*(1+(r4-.5)*.007);
-      const v=Math.round(40000+r1*170000);
-      const hm=9*60+i*intervals;
-      out.push({t:`${String(Math.floor(hm/60)).padStart(2,'0')}:${String(hm%60).padStart(2,'0')}`,date:dateStr,o:Math.round(o),h:Math.round(Math.max(o,c,h)),l:Math.round(Math.min(o,c,l)),c:Math.round(c),v});
-      base=c;
-    }
-    return out;
+    // 전일 영업일
+    const prevDate = (function(){
+      const d = new Date(dateStr||'');
+      if(isNaN(d.getTime())) return dateStr||'';
+      do{ d.setDate(d.getDate()-1); } while(d.getDay()===0 || d.getDay()===6);
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    })();
+    const genDay = (dayStr, isPrev) => {
+      const seed = (parseInt((dayStr||'').replace(/-/g,'').slice(-6))||9999) + tkSeed + (isPrev?1:0);
+      const rnd = rng32(seed);
+      const out = [];
+      for(let i=0;i<perDay;i++){
+        const r1=rnd(),r2=rnd(),r3=rnd(),r4=rnd();
+        const c = base*(1+(r1-.498)*.018);
+        const h = c*(1+r2*.009), l = c*(1-r3*.009), o = base*(1+(r4-.5)*.007);
+        const v = Math.round(40000+r1*170000);
+        const hm = 9*60+i*intervals;
+        out.push({t:`${String(Math.floor(hm/60)).padStart(2,'0')}:${String(hm%60).padStart(2,'0')}`,date:dayStr,isPrev:!!isPrev,o:Math.round(o),h:Math.round(Math.max(o,c,h)),l:Math.round(Math.min(o,c,l)),c:Math.round(c),v});
+        base = c;
+      }
+      return out;
+    };
+    const prev = genDay(prevDate, true);
+    const today = genDay(dateStr, false);
+    const all = [...prev, ...today];
+    // 현재 봉 인덱스까지만 (미래 봉 절대 노출 금지)
+    const limit = Math.min(all.length, Math.max(0,(untilIdx||0))+1);
+    return all.slice(0, limit);
   }catch(e){ return []; }
 }
 
@@ -2538,7 +2551,7 @@ let stopOrders={};
 // ═══════════════════════════════
 // STATE
 // ═══════════════════════════════
-let cfg={capital:10000000,dayloss:3,maxpos:50,clim:200,mlim:60,crate:8.5,mrate:12,bf:0.015,sf:0.015,tx:0.18,bd:false,al:true};
+let cfg={capital:10000000,dayloss:3,maxpos:50,clim:200,mlim:0,crate:8.5,mrate:12,bf:0.015,sf:0.015,tx:0.18,bd:false,al:true};
 let mock={cash:10000000,positions:{},trades:[],todayPnl:0,todayTrades:0,lossSeries:0,creditUsed:0,marginUsed:0};
 let sim={playing:false,speed:60,idx:0,candles:[],timer:null,date:todayStr(),tf:"1"};
 
@@ -5509,6 +5522,7 @@ async function execAutoBuy(pr, stk, score){
   document.getElementById("ofStop").value=Math.round(pr*(1-autoState.cfg.stop/100));
   document.getElementById("ofT1").value=Math.round(pr*(1+autoState.cfg.t1/100));
   document.getElementById("ofT2").value=Math.round(pr*(1+autoState.cfg.t2/100));
+  // ★ 자동매매는 신용만 사용. 미수(margin)는 절대 사용 안 함
   oSide="buy";oType="market";credType=useCredit?"credit":"cash";trailMode=autoState.cfg.trail;
   // credSel UI도 동기화 (submitOrder가 select에서 읽음)
   const credSel=document.getElementById("credSel"); if(credSel) credSel.value = credType;
@@ -7251,8 +7265,9 @@ function renderJPage(){
     return `<div class="jday">
       <div class="jd-hdr">
         <span class="jd-dt">${e.date} ${savedTag}</span>
-        <span style="display:flex;align-items:center;gap:8px;">
+        <span style="display:flex;align-items:center;gap:6px;">
           <span class="jd-pnl ${(e.pnl||0)>=0?"cu":"cd"}">${(e.pnl||0)>=0?"+":""}${(e.pnl||0).toLocaleString()}원</span>
+          <button data-copy="${e.date}" onclick="copyJEntry('${e.date}')" title="마크다운 복사" style="background:none;border:1px solid var(--br);border-radius:4px;color:var(--ts);font-size:10px;cursor:pointer;padding:1px 6px;">📋</button>
           <button onclick="delJEntry('${e.date}')" title="삭제" style="background:none;border:none;color:var(--tm);font-size:14px;cursor:pointer;padding:0 4px;line-height:1;">&times;</button>
         </span>
       </div>
@@ -8357,6 +8372,66 @@ function addToWG(g, tk){
 // ═══════════════════════════════
 // 매매일지 AI 매매 구분 표시
 // ═══════════════════════════════
+// 일지 단건 복사 (Claude Code/Notion 등에 붙여넣기 용)
+function copyJEntry(date){
+  try{
+    const js = safeParseJSON(localStorage.getItem('htsJournals'), '{}');
+    const e = js[date];
+    if(!e){ showAlert('복사', '일지를 찾을 수 없습니다'); return; }
+    const md = `# 매매일지 — ${date}\n\n` +
+      `**손익**: ${(e.pnl||0)>=0?'+':''}${(e.pnl||0).toLocaleString()}원\n` +
+      `**매매**: ${e.total||0}건 / 승률 ${e.total?Math.round((e.wins||0)/e.total*100):0}%\n\n` +
+      (e.summary?`**요약**: ${e.summary}\n\n`:'') +
+      (e.market_context?`## 시장 환경\n${e.market_context}\n\n`:'') +
+      `## 매매 분석\n` +
+      `- **진입 이유**: ${e.why_bought||'-'}\n` +
+      `- **청산 이유**: ${e.why_sold||'-'}\n\n` +
+      `## 평가\n` +
+      `- ✅ 잘한점: ${e.good||'-'}\n` +
+      `- 🔴 반성: ${e.bad||e.mistakes||'-'}\n` +
+      `- 🧠 심리: ${e.psychology||'-'}\n` +
+      `- 💡 개선: ${e.improvement||'-'}\n` +
+      `- 📋 Phase 체크: ${e.phase_check||'-'}\n` +
+      (e.mentor_comment?`\n## 멘토 한마디\n> ${e.mentor_comment}\n`:'') +
+      (e.score_total?`\n## 점수\n원칙:${e.score_principle||'-'} 타점:${e.score_timing||'-'} 심리:${e.score_psychology||'-'} | **종합 ${e.score_total}/10**\n`:'') +
+      (e.trades?`\n## 매매 내역\n\`\`\`\n${e.trades}\n\`\`\`\n`:'');
+    navigator.clipboard.writeText(md).then(()=>{
+      const btn = document.querySelector(`button[data-copy="${date}"]`);
+      if(btn){ const _o=btn.textContent; btn.textContent='✓'; btn.style.color='var(--g)'; setTimeout(()=>{btn.textContent=_o;btn.style.color='';},1500); }
+    }).catch(e=>{
+      showAlert('복사 실패', e.message);
+    });
+  }catch(e){ showAlert('복사 오류', e.message); }
+}
+// 전체 일지 복사
+function copyAllJournals(){
+  try{
+    const js = safeParseJSON(localStorage.getItem('htsJournals'), '{}');
+    const entries = Object.values(js).sort((a,b)=>a.date.localeCompare(b.date));
+    if(!entries.length){ showAlert('복사', '일지가 없습니다'); return; }
+    const totalPnl = entries.reduce((s,e)=>s+(e.pnl||0),0);
+    const wins = entries.reduce((s,e)=>s+(e.wins||0),0);
+    const total = entries.reduce((s,e)=>s+(e.total||0),0);
+    let md = `# 매매일지 전체 (${entries.length}일)\n\n` +
+      `**기간**: ${entries[0].date} ~ ${entries[entries.length-1].date}\n` +
+      `**총 손익**: ${totalPnl>=0?'+':''}${totalPnl.toLocaleString()}원\n` +
+      `**매매**: ${total}건 / 승률 ${total?Math.round(wins/total*100):0}%\n\n---\n\n`;
+    entries.forEach(e=>{
+      md += `## ${e.date} (${(e.pnl||0)>=0?'+':''}${(e.pnl||0).toLocaleString()}원, ${e.total||0}건)\n\n`;
+      if(e.summary) md += `${e.summary}\n\n`;
+      if(e.why_bought && e.why_bought !== '-') md += `**진입**: ${e.why_bought}\n`;
+      if(e.why_sold && e.why_sold !== '-') md += `**청산**: ${e.why_sold}\n`;
+      if(e.good && e.good !== '-') md += `**잘한점**: ${e.good}\n`;
+      if(e.bad && e.bad !== '-') md += `**반성**: ${e.bad}\n`;
+      if(e.improvement && e.improvement !== '-') md += `**개선**: ${e.improvement}\n`;
+      if(e.mentor_comment && e.mentor_comment !== '-') md += `> 멘토: ${e.mentor_comment}\n`;
+      md += '\n';
+    });
+    navigator.clipboard.writeText(md).then(()=>{
+      showAlert('복사 완료', entries.length+'일치 일지가 클립보드에 복사됐습니다.\nClaude Code에 그대로 붙여넣으세요.');
+    }).catch(err=>showAlert('복사 실패', err.message));
+  }catch(e){ showAlert('복사 오류', e.message); }
+}
 // 일지 단건 삭제
 function delJEntry(date){
   if(!confirm(date+' 일지를 삭제할까요?')) return;
@@ -8688,7 +8763,7 @@ function collectMarketCtx(){
 (function(){
   const meta = document.querySelector('meta[name="build-ts"]');
   const myBuildTs = meta ? meta.getAttribute('content') : '';
-  if(!myBuildTs || myBuildTs === '1779390541786') return; // 로컬 빌드 안 한 경우
+  if(!myBuildTs || myBuildTs === '1779391986270') return; // 로컬 빌드 안 한 경우
   let reloaded = false;
   async function check(){
     if(reloaded) return;
