@@ -369,8 +369,16 @@ input,select,textarea{-webkit-appearance:none;appearance:none;}
   .hts{grid-template-columns:180px 1fr 200px 260px;}
   .bar{gap:5px;padding:0 10px;height:44px;}
   .tab{padding:3px 10px;font-size:11px;}
-  .ibtn{font-size:10px;padding:3px 8px;}
-  #idxBar{gap:6px;}
+  .ibtn{font-size:10px;padding:3px 7px;}
+  #idxBar{gap:4px;font-size:9px;padding:0 6px;}
+  /* 상단바 오른쪽 영역: 잘림 방지 + 가로 스크롤 허용 */
+  .bar-r{overflow-x:auto;overflow-y:hidden;flex-wrap:nowrap;-webkit-overflow-scrolling:touch;}
+  .bar-r::-webkit-scrollbar{display:none;}
+  .bar-r{scrollbar-width:none;}
+  /* 종목 정보는 차트 헤더에 큰 글씨로 있으므로 숨김 (공간 확보) */
+  .si{display:none;}
+  /* 시계도 모바일 패턴처럼 숨김 (공간 확보) */
+  .clk{display:none;}
   /* 시뮬 바 wrap 허용 + 배속 컴팩트 (x120까지 보이게) */
   .mock-bar{flex-wrap:wrap;row-gap:3px;}
   .spd-btn{padding:3px 5px;font-size:9px;}
