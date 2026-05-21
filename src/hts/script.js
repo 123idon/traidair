@@ -1083,7 +1083,7 @@ function initChartEvents(){
 
   // 드래그 팬
   let dragX=null,dragBase=0;
-  wrap.addEventListener('mousedown',e=>{dragX=e.clientX;dragBase=chartViewStart;window._chartUserDragging=true;});
+  wrap.addEventListener('mousedown',e=>{dragX=e.clientX;dragBase=chartViewStart;window._chartUserDragging=true;window._followLatest=false;});
   window.addEventListener('mousemove',e=>{
     if(dragX===null)return;
     const a=_cvAll();if(!a.length)return;
@@ -1092,7 +1092,28 @@ function initChartEvents(){
     chartViewStart=Math.max(0,Math.min(dragBase+shift,a.length-chartViewCount));
     drawChart();
   });
-  window.addEventListener('mouseup',()=>{dragX=null;});
+  window.addEventListener('mouseup',()=>{
+    dragX=null;
+    // 드래그 종료 → 약간 후 auto-follow 복귀 (마지막 봉 근처면)
+    setTimeout(()=>{
+      window._chartUserDragging=false;
+      const a=_cvAll();
+      // 사용자가 끝에서 3봉 이내에 두면 자동 follow 모드 ON
+      if(a.length && chartViewStart + chartViewCount >= a.length - 3){
+        window._followLatest = true;
+      }
+    }, 700);
+  });
+  // 터치 끝났을 때도 동일
+  wrap.addEventListener('touchend',()=>{
+    setTimeout(()=>{
+      window._chartUserDragging=false;
+      const a=_cvAll();
+      if(a.length && chartViewStart + chartViewCount >= a.length - 3){
+        window._followLatest = true;
+      }
+    }, 700);
+  });
 
   // 스크롤바 드래그
   let sbDrag=false,sbDragX=0,sbDragBase=0;
@@ -1574,6 +1595,19 @@ async function _backtestLoadDay(dateStr){
 async function _backtestEndOfDay(){
   // 현재 날짜 결과 집계
   const dt=backtest.currentDate;
+  // ★ 안전망: 다음날 시작 전 모든 보유 종목 강제 청산 (당일매매 원칙)
+  try{
+    Object.keys(mock.positions||{}).forEach(tk=>{
+      const pos=mock.positions[tk]; if(!pos||pos.qty<=0) return;
+      const stk=STOCKS.find(s=>s.tk===tk); if(!stk) return;
+      const sv=activeTk,svSide=oSide,svType=oType,svCred=credType;
+      activeTk=tk; oSide="sell"; oType="market"; credType="cash";
+      document.getElementById("ofQty").value=pos.qty;
+      submitOrder(true);
+      activeTk=sv; oSide=svSide; oType=svType; credType=svCred;
+      addDecisionLog(`[${stk.nm}] 종가 청산`, '백테스트 다음날 이전 강제 청산', '백테스트');
+    });
+  }catch(_e){}
   const todayTrades=(mock.trades||[]).filter(t=>t.date===dt);
   const wins=todayTrades.filter(t=>t.side==='sell'&&(t.pnl||0)>0).length;
   const losses=todayTrades.filter(t=>t.side==='sell'&&(t.pnl||0)<0).length;
@@ -3288,8 +3322,9 @@ async function _runScreeningAsync(){
 
   // 일일 손실/연속손절 체크
   var dayLossRate=-mock.todayPnl/cfg.capital*100;
-  if(dayLossRate>=cfg.dayloss*0.8){
-    addDecisionLog('⚠ 일손실 한도 80%','오늘 손실 '+dayLossRate.toFixed(1)+'%','NOGO');
+  // 일손실 한도: 백테스트는 매일 리셋되니 OK. 한도 도달 시 그 날 매매 중단 (다음날 재개)
+  if(dayLossRate>=cfg.dayloss){
+    addDecisionLog('⚠ 일손실 한도 도달','오늘 손실 '+dayLossRate.toFixed(1)+'% (한도 '+cfg.dayloss+'%) — 오늘 매매 중단','NOGO');
     return;
   }
   if(mock.lossSeries>=3&&autoState.cfg.brk){
@@ -3582,13 +3617,15 @@ function runAutoStep(cs){
   // Level 4: 15:20 auto-close
   if(autoState.level>=4){
     const cur=cs[cs.length-1];
-    if(cur&&cur.t>="15:20"){
+    // 마지막 봉 도달 또는 15:20 이후 → 전량 청산 (당일매매 원칙)
+    const isEndBar = sim.idx >= sim.candles.length - 2;
+    if((cur && cur.t >= "15:20") || isEndBar){
       Object.keys(mock.positions).forEach(tk=>{
         const pos=mock.positions[tk];if(!pos||pos.qty<=0)return;
         const stk=STOCKS.find(s=>s.tk===tk);if(!stk)return;
         const sv=activeTk,svSide=oSide,svType=oType,svCred=credType;activeTk=tk;oSide="sell";oType="market";credType="cash";document.getElementById("ofQty").value=pos.qty;
         submitOrder(true);activeTk=sv;oSide=svSide;oType=svType;credType=svCred;
-        addDecisionLog(`[${stk.nm}] 15:20 자동 전량 청산`,"당일매매 원칙","Phase 12-2: 14:30~15:20 마감");
+        addDecisionLog(`[${stk.nm}] 마감 자동 전량 청산`, '당일매매 원칙', 'Phase 12-2');
       });
     }
   }
@@ -6415,6 +6452,16 @@ function updChartToIdx(){
   const lc = cs[cs.length-1];
   if(lc) updPrice(lc);
   try{ updChartHeader&&updChartHeader(); }catch(e){}
+  // Auto-follow: 사용자가 끝쪽에 두면 새 봉을 따라 자동 스크롤
+  if(window._followLatest !== false && !window._chartUserDragging){
+    try{
+      const _allLen = sim.candles.length;
+      if(_allLen > chartViewCount){
+        const _newStart = Math.max(0, sim.idx - chartViewCount + 5);
+        if(_newStart !== chartViewStart) chartViewStart = _newStart;
+      }
+    }catch(_e){}
+  }
   // 슬라이더 동기화
   const total = sim.candles.length;
   const pct = total > 1 ? (sim.idx / (total-1)) * 100 : 0;
