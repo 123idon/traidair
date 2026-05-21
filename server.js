@@ -57,6 +57,8 @@ let runtimeConfig = {
   kisAccount:   process.env.KIS_ACCOUNT       || _localCfg.ac || '',
   kisMode:      process.env.KIS_MODE          || _localCfg.md || 'real',
   dartKey:      process.env.DART_API_KEY      || _localCfg.dk || '',
+  notionToken:  process.env.NOTION_TOKEN      || _localCfg.nt || '',
+  notionPageId: process.env.NOTION_LECTURE_PAGE_ID || _localCfg.np || '35a0717882e381ce8fc3d257a5c24e4b',
 };
 
 // 파일 저장 경로 (Railway 볼륨 없으면 /tmp 사용 — 재시작 후 날아가지만 환경변수로 복원됨)
@@ -73,6 +75,7 @@ console.log('✅ 설정 로드:', {
   claude: runtimeConfig.claudeKey ? '✅' : '❌',
   kis: runtimeConfig.kisAppKey ? '✅' : '❌',
   dart: runtimeConfig.dartKey ? '✅' : '❌',
+  notion: runtimeConfig.notionToken ? '✅' : '❌',
 });
 
 // ── KIS 토큰 캐시
@@ -193,6 +196,8 @@ const server = http.createServer(async (req, res) => {
         if (cfg.kisAccount)   runtimeConfig.kisAccount = cfg.kisAccount;
         if (cfg.kisMode)      runtimeConfig.kisMode = cfg.kisMode;
         if (cfg.dartKey)      runtimeConfig.dartKey = cfg.dartKey;
+        if (cfg.notionToken)   runtimeConfig.notionToken = cfg.notionToken;
+        if (cfg.notionPageId)  runtimeConfig.notionPageId = cfg.notionPageId;
         saveToFile(runtimeConfig);
         console.log('✅ 설정 저장:', Object.keys(cfg).join(', '));
         // GitHub에 영구 저장 (재배포 후에도 유지)
@@ -221,6 +226,9 @@ const server = http.createServer(async (req, res) => {
       kisAccount:   runtimeConfig.kisAccount || '',
       kisMode:      runtimeConfig.kisMode || 'mock',
       dartKey:      runtimeConfig.dartKey || '',
+      notionToken:  runtimeConfig.notionToken ? runtimeConfig.notionToken.slice(0,10)+'...' : '',
+      notionTokenSet: !!runtimeConfig.notionToken,
+      notionPageId: runtimeConfig.notionPageId || '',
     }));
     return;
   }
@@ -851,8 +859,8 @@ const server = http.createServer(async (req, res) => {
   // 환경변수: NOTION_TOKEN (Internal integration secret), NOTION_LECTURE_PAGE_ID
   if (url === '/api/notion-lecture') {
     (async () => {
-      const token = process.env.NOTION_TOKEN || '';
-      let pageId = (require('url').parse(req.url, true).query.pageId) || process.env.NOTION_LECTURE_PAGE_ID || '';
+      const token = runtimeConfig.notionToken || process.env.NOTION_TOKEN || '';
+      let pageId = (require('url').parse(req.url, true).query.pageId) || runtimeConfig.notionPageId || process.env.NOTION_LECTURE_PAGE_ID || '';
       if (!token) {
         res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
         return res.end(JSON.stringify({ ok:false, error:'NOTION_TOKEN 미설정 (Railway env)' }));

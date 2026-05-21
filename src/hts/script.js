@@ -1245,6 +1245,35 @@ window.lectureContent = (function(){
 window.lectureUpdatedAt = (function(){
   try{ return parseInt(localStorage.getItem('htsLectureUpdatedAt')||'0'); }catch(e){ return 0; }
 })();
+// 노션 연결 테스트 (설정창 버튼)
+async function testNotionConnection(){
+  const el = document.getElementById('notion-status');
+  if(el){ el.textContent='🔄 테스트 중...'; el.style.color='var(--tm)'; }
+  // 입력란 값으로 임시 저장 후 fetch
+  const nt = document.getElementById('notion-token')?.value?.trim() || '';
+  const np = document.getElementById('notion-page-id')?.value?.trim() || NOTION_LECTURE_PAGE_ID_DEFAULT;
+  if(!nt){
+    if(el){ el.textContent='⚠ 토큰을 먼저 입력하세요'; el.style.color='var(--r)'; }
+    return;
+  }
+  // 서버에 토큰부터 저장
+  try{
+    await fetch('/api/save-config', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({notionToken:nt, notionPageId:np})});
+  }catch(_e){}
+  try{
+    const r = await fetch('/api/notion-lecture?pageId='+encodeURIComponent(np), {cache:'no-store'});
+    const d = await r.json();
+    if(d.ok){
+      if(el){ el.textContent='✅ Notion 연결 성공 — '+d.length+'자 가져옴'; el.style.color='var(--g)'; }
+      try{ refreshLecture&&refreshLecture(true); }catch(_e){}
+    } else {
+      if(el){ el.textContent='❌ '+(d.error||'연결 실패'); el.style.color='var(--r)'; }
+    }
+  }catch(e){
+    if(el){ el.textContent='❌ '+e.message; el.style.color='var(--r)'; }
+  }
+}
+
 async function refreshLecture(force){
   const now = Date.now();
   // 6시간 캐시 (force=true면 무시)
@@ -4316,6 +4345,8 @@ async function saveKisConfig(){
   const ac = document.getElementById('kis-account')?.value?.trim() || '';
   const dk = document.getElementById('dart-key')?.value?.trim() || '';
   const ck = document.getElementById('claude-apikey')?.value?.trim() || '';
+  const nt = document.getElementById('notion-token')?.value?.trim() || '';
+  const np = document.getElementById('notion-page-id')?.value?.trim() || '';
   const mode = document.getElementById('kis-real')?.checked ? 'real' : 'mock';
   if(mode === 'real' && kisConfig.mode !== 'real'){
     if(!confirm('⚠ 실거래 모드로 전환합니다.\n실제 자금이 사용됩니다.\n계속하시겠습니까?')){
@@ -4339,12 +4370,16 @@ async function saveKisConfig(){
         kisAccount: ac,
         kisMode: mode,
         dartKey: dk,
+        notionToken: nt,
+        notionPageId: np,
       })
     });
     const d = await r.json();
     if(d.ok){
       updateKisStatus();
       _applyModeToHTS(mode);
+      // 노션 토큰 저장됐으면 즉시 강의 동기화 시도
+      if(nt){ try{ refreshLecture&&refreshLecture(true); }catch(_e){} }
       showAlert('✅ 저장 완료', '서버에 영구 저장되었습니다.\n재배포 후에도 유지됩니다.');
     } else {
       throw new Error(d.error || '저장 실패');
@@ -4419,6 +4454,17 @@ async function loadKisConfig(){
   if(ka && kisConfig.account) ka.value=kisConfig.account;
   if(kd && kisConfig.dartKey) kd.value=kisConfig.dartKey;
   if(kc && kisConfig.claudeKey) kc.value=kisConfig.claudeKey;
+  // 노션 토큰/페이지 ID 입력란 채우기 + 상태 표시
+  try{
+    const r2 = await fetch('/api/get-config');
+    const d2 = await r2.json();
+    const nti=document.getElementById('notion-token');
+    const npi=document.getElementById('notion-page-id');
+    const ns=document.getElementById('notion-status');
+    if(nti && d2.notionTokenSet) nti.placeholder = '✓ 설정됨 ('+(d2.notionToken||'****')+')';
+    if(npi && d2.notionPageId) npi.value = d2.notionPageId;
+    if(ns) ns.textContent = d2.notionTokenSet ? '✅ Notion — 토큰 설정됨' : '⬜ Notion — 미설정';
+  }catch(_e){}
   if(kisConfig.mode==='real'){const kr=document.getElementById('kis-real');if(kr)kr.checked=true;}
   updateKisStatus();
 }
