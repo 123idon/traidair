@@ -809,7 +809,7 @@
       <div class="stab" onclick="jTab(this,'jt-form')" style="font-size:11px;">✏ 일지 작성</div>
       <div class="stab" onclick="jTab(this,'jt-rule')" style="font-size:11px;">📋 개인 원칙</div>
       <div class="stab" onclick="jTab(this,'jt-checklist')" style="font-size:11px;">✅ 통합 체크리스트</div>
-      <button class="ibtn pri" onclick="genAllJournals()" style="margin-left:auto;font-size:10px;">🤖 AI 일지 생성</button>
+      <button class="ibtn pri" onclick="genAllJournals(event)" style="margin-left:auto;font-size:10px;">🤖 AI 일지 생성</button>
       <button class="ibtn" onclick="copyAllJournals()" style="font-size:10px;">📋 전체 복사</button>
       <button class="ibtn red" onclick="clearAllJournals()" style="font-size:10px;">🗑 전체 삭제</button>
     </div>
@@ -838,7 +838,7 @@
       <div id="jSuggestBox" style="background:linear-gradient(135deg,rgba(139,92,246,0.06),rgba(49,130,246,0.03));border:1px dashed var(--p);border-radius:12px;padding:14px;margin-bottom:12px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
           <div style="font-size:13px;font-weight:800;color:var(--p);">💡 AI 기능 제안</div>
-          <button class="ibtn pur" onclick="askAIForFeatureSuggestion()" style="font-size:10px;padding:3px 8px;">🤖 제안 받기</button>
+          <button class="ibtn pur" onclick="askAIForFeatureSuggestion(event)" style="font-size:10px;padding:3px 8px;">🤖 제안 받기</button>
         </div>
         <div id="jSuggestBody" style="font-size:11px;color:var(--ts);line-height:1.6;">
           매매일지·학습 노트·현재 기능을 분석해서 <b>새 기능 / 개선점</b>을 AI가 제안합니다. 매매 성능에 직접 도움되는 항목을 골라드려요.
