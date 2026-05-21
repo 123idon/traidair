@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#ffffff">
-<meta name="build-ts" content="1779379125811">
+<meta name="build-ts" content="1779379554770">
 <title>TraidAIr HTS</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 
@@ -651,10 +651,11 @@ canvas{image-rendering:pixelated;}
 
     <!-- ① LEFT: 관심종목 (col1 row1/3) -->
     <div class="lp">
-      <!-- AI 학습 단계 배지 -->
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-bottom:1px solid var(--br);background:linear-gradient(180deg,rgba(139,92,246,0.06),rgba(255,255,255,0));flex-shrink:0;">
-        <div id="learnerStageBadge" style="flex:1;font-size:9px;line-height:1.4;">Lv1 초보 · 0일 학습</div>
-        <button onclick="openLearningMemo()" title="AI 학습 노트 보기" style="padding:1px 6px;border-radius:3px;border:none;background:var(--p);color:#fff;font-size:8px;cursor:pointer;font-weight:700;">🎓 노트</button>
+      <!-- AI 학습 단계 + 강의 동기화 -->
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-bottom:1px solid var(--br);background:linear-gradient(180deg,rgba(139,92,246,0.06),rgba(255,255,255,0));flex-shrink:0;gap:4px;">
+        <div id="learnerStageBadge" style="flex:1;font-size:9px;line-height:1.4;min-width:0;">Lv1 초보 · 0일 학습</div>
+        <button onclick="refreshLecture(true)" title="노션 강의 새로 가져오기" style="padding:1px 5px;border-radius:3px;border:none;background:var(--a);color:#fff;font-size:8px;cursor:pointer;font-weight:700;">📚 강의</button>
+        <button onclick="openLearningMemo()" title="AI 학습 노트 보기" style="padding:1px 5px;border-radius:3px;border:none;background:var(--p);color:#fff;font-size:8px;cursor:pointer;font-weight:700;">🎓 노트</button>
       </div>
       <!-- 실시간 강세 섹터 패널 -->
       <div id="hotSectorBox" style="border-bottom:1px solid var(--br);background:linear-gradient(180deg,rgba(220,38,38,0.04),rgba(255,255,255,0));padding:6px 8px;flex-shrink:0;">
@@ -2084,7 +2085,8 @@ async function loadFromServer() {
       'htsSectorInfo','htsAutoTks','htsAutoSyncDate','htsSectorTime',
       'htsAutoState','htsChatMsgs','htsDecisionLog','htsAiStatus',
       'htsIntra','trustScore','apiUsage','htsSimState',
-      'htsLearningMemory','htsLearnedDates','htsFeatureSuggestions'
+      'htsLearningMemory','htsLearnedDates','htsFeatureSuggestions',
+      'htsLectureContent','htsLectureUpdatedAt'
     ];
     keys.forEach(k => {
       if (data[k] !== undefined) {
@@ -3019,6 +3021,49 @@ function runStep(){
   sim.timer=setTimeout(runStep, delay);
 }
 function setSpd(el,v){sim.speed=v;document.querySelectorAll(".spd-btn").forEach(b=>b.classList.remove("on"));el.classList.add("on");}
+
+// ═══════════════════════════════════════════════
+// 노션 강의 자동 동기화 — Claude 프롬프트에 강의 원칙 첨부
+// ═══════════════════════════════════════════════
+window.lectureContent = (function(){
+  try{ return localStorage.getItem('htsLectureContent') || ''; }catch(e){ return ''; }
+})();
+window.lectureUpdatedAt = (function(){
+  try{ return parseInt(localStorage.getItem('htsLectureUpdatedAt')||'0'); }catch(e){ return 0; }
+})();
+async function refreshLecture(force){
+  const now = Date.now();
+  // 6시간 캐시 (force=true면 무시)
+  if(!force && now - lectureUpdatedAt < 6*60*60*1000 && lectureContent) return lectureContent;
+  try{
+    const r = await fetch('/api/notion-lecture', {cache:'no-store'});
+    const d = await r.json();
+    if(d.ok && d.content){
+      window.lectureContent = d.content;
+      window.lectureUpdatedAt = now;
+      try{
+        localStorage.setItem('htsLectureContent', d.content);
+        localStorage.setItem('htsLectureUpdatedAt', String(now));
+        saveToServer('htsLectureContent', d.content);
+        saveToServer('htsLectureUpdatedAt', String(now));
+      }catch(e){}
+      addDecisionLog('📚 강의 동기화 완료', '노션 페이지 '+d.length+'자 가져옴', '학습');
+      return d.content;
+    } else {
+      console.warn('강의 fetch:', d.error);
+      return lectureContent || '';
+    }
+  }catch(e){
+    console.warn('강의 fetch error:', e.message);
+    return lectureContent || '';
+  }
+}
+function getLectureContext(maxChars){
+  if(!lectureContent) return '';
+  const max = maxChars || 3000;
+  const content = lectureContent.length > max ? lectureContent.slice(0, max) + '\n...(이하 생략)' : lectureContent;
+  return '【강의 원칙 — 반드시 이 규칙을 우선 적용할 것】\n' + content + '\n\n';
+}
 
 // ═══════════════════════════════════════════════
 // 학습 메모리 — 매매일지에서 누적된 깨달음
@@ -5110,13 +5155,15 @@ async function _runScreeningAsync(){
       var stopPr=Math.round(lc2.c*(1-autoState.cfg.stop/100));
       var t1Pr=Math.round(lc2.c*(1+autoState.cfg.t1/100));
       var rr=((t1Pr-lc2.c)/(lc2.c-stopPr)).toFixed(2);
-      // 시황·강세섹터·공시·과거 학습 맥락 자동 수집
+      // 시황·강세섹터·공시·과거 학습·강의 원칙 맥락 자동 수집
       var _mkt = typeof collectMarketCtx==='function' ? collectMarketCtx() : '';
       var _si = (window._sectorInfo||{})[best.tk];
       var _sectorLine = _si ? `강세섹터 ${_si.rank}위 ${_si.sector} — ${_si.reason||''}` : '';
       var _newsItems = (typeof window._newsItems!=='undefined' && Array.isArray(_newsItems)) ? _newsItems.slice(0,3).map(n=>'• '+(n.title||n)).join('\n') : '';
       var _learn = typeof getLearningContext==='function' ? getLearningContext(10) : '';
-      var prompt='단타 트레이딩 멘토. 자동매매 최종 진입 여부.\n\n'+
+      var _lec = typeof getLectureContext==='function' ? getLectureContext(2500) : '';
+      var prompt='단타 트레이딩 멘토. 자동매매 최종 진입 여부. 아래 강의 원칙을 반드시 따를 것.\n\n'+
+        _lec +
         _learn +
         '【종목】 '+best.stk.nm+'('+best.tk+') '+best.stk.sec+'\n'+
         '【시간】 '+(sim.date||'')+' '+(best.lc.t||'')+'\n'+
@@ -8323,7 +8370,7 @@ function collectMarketCtx(){
 (function(){
   const meta = document.querySelector('meta[name="build-ts"]');
   const myBuildTs = meta ? meta.getAttribute('content') : '';
-  if(!myBuildTs || myBuildTs === '1779379125811') return; // 로컬 빌드 안 한 경우
+  if(!myBuildTs || myBuildTs === '1779379554770') return; // 로컬 빌드 안 한 경우
   let reloaded = false;
   async function check(){
     if(reloaded) return;
@@ -8412,7 +8459,7 @@ window.onload=()=>{
   if(savedTrust){trustScore=parseInt(savedTrust);const sl=document.getElementById('trustSlider');if(sl)sl.value=trustScore;updateTrustScore(trustScore);}
   setTimeout(()=>{renderGrowthRoadmap();detectSlump();},500);
   // 차트 큰 헤더 초기화 + 강세 섹터 패널 초기 렌더 / 주기적 갱신
-  setTimeout(()=>{updChartHeader&&updChartHeader();renderHotSectors&&renderHotSectors();refreshHotSectors&&refreshHotSectors(false);updateLearnerStage&&updateLearnerStage();renderLiveTrades&&renderLiveTrades();}, 400);
+  setTimeout(()=>{updChartHeader&&updChartHeader();renderHotSectors&&renderHotSectors();refreshHotSectors&&refreshHotSectors(false);updateLearnerStage&&updateLearnerStage();renderLiveTrades&&renderLiveTrades();refreshLecture&&refreshLecture(false);}, 400);
   // 5분마다 강세 섹터 자동 갱신 (모의투자라도 변동이 보이게)
   setInterval(()=>{refreshHotSectors&&refreshHotSectors(false);}, 5*60*1000);
 };
@@ -8619,7 +8666,8 @@ async function autoSaveJournalOnTrade(){
   saveJEntry(date,baseEntry,pnl,wins,total,str);
   try{
     const logs=(window._decisionLog||[]).slice(-20).map(function(d){return '['+(d.phase||'')+'] '+d.title+': '+(d.body||'');}).join('\n');
-    const prompt='단타 트레이딩 멘토. 오늘 매매 분석해서 매매일지 작성해줘.\n날짜: '+date+'\n매매내역:\n'+str+'\n\nAI결정로그:\n'+(logs||'없음')+'\n\n손익: '+(pnl>=0?'+':'')+pnl.toLocaleString()+'원 ('+total+'건 중 '+wins+'건 수익)\n\n강의 Phase 기준으로 평가해줘. JSON만:\n{"why_bought":"매수이유","why_sold":"청산이유","good":"잘한점","bad":"반성할점(구체적으로)","psychology":"심리평가","improvement":"개선행동","phase_check":"적용Phase와준수여부","mentor_comment":"멘토한마디(직접적으로)"}';
+    const _lecJ = typeof getLectureContext==='function' ? getLectureContext(2500) : '';
+    const prompt='단타 트레이딩 멘토. 오늘 매매를 강의 원칙 기준으로 평가해서 매매일지 작성.\n\n'+_lecJ+'\n날짜: '+date+'\n매매내역:\n'+str+'\n\nAI결정로그:\n'+(logs||'없음')+'\n\n손익: '+(pnl>=0?'+':'')+pnl.toLocaleString()+'원 ('+total+'건 중 '+wins+'건 수익)\n\n위 강의 원칙 기준으로 평가해줘. JSON만:\n{"why_bought":"매수이유 (어떤 강의 규칙 적용?)","why_sold":"청산이유 (강의 청산 조건 부합?)","good":"잘한점 (강의 기준)","bad":"반성할점 — 강의 어떤 규칙을 어겼나","psychology":"심리평가","improvement":"개선행동 (강의에서 권장하는 행동)","phase_check":"적용 Phase/원칙과 준수여부","mentor_comment":"멘토한마디 (강의 핵심 한 줄 인용)"}';
     const res=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:800,messages:[{role:'user',content:prompt}]})});
     const data=await res.json();
     const text=(data.content&&data.content[0]&&data.content[0].text)||'{}';

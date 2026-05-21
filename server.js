@@ -798,6 +798,84 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ── 노션 강의 페이지 조회 (/api/notion-lecture)
+  // 환경변수: NOTION_TOKEN (Internal integration secret), NOTION_LECTURE_PAGE_ID
+  if (url === '/api/notion-lecture') {
+    (async () => {
+      const token = process.env.NOTION_TOKEN || '';
+      let pageId = (require('url').parse(req.url, true).query.pageId) || process.env.NOTION_LECTURE_PAGE_ID || '';
+      if (!token) {
+        res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+        return res.end(JSON.stringify({ ok:false, error:'NOTION_TOKEN 미설정 (Railway env)' }));
+      }
+      if (!pageId) {
+        res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+        return res.end(JSON.stringify({ ok:false, error:'pageId 쿼리 또는 NOTION_LECTURE_PAGE_ID env 필요' }));
+      }
+      pageId = pageId.replace(/-/g, '');
+      // 32자 ID → UUID 형식으로 변환
+      const uuid = pageId.length===32 ? `${pageId.slice(0,8)}-${pageId.slice(8,12)}-${pageId.slice(12,16)}-${pageId.slice(16,20)}-${pageId.slice(20,32)}` : pageId;
+      try {
+        const fetchBlocks = async (parentId) => {
+          const out = [];
+          let cursor = null;
+          do {
+            const path = `/v1/blocks/${parentId}/children?page_size=100${cursor?`&start_cursor=${cursor}`:''}`;
+            const result = await new Promise((resolve, reject) => {
+              const opts = { hostname:'api.notion.com', port:443, path, method:'GET',
+                headers:{ 'Authorization':`Bearer ${token}`, 'Notion-Version':'2022-06-28' } };
+              const r = https.request(opts, resp => {
+                let d=''; resp.on('data',c=>d+=c); resp.on('end',()=>{ try{resolve(JSON.parse(d));}catch(e){reject(e);} });
+              });
+              r.on('error', reject); r.end();
+            });
+            if (result.results) out.push(...result.results);
+            cursor = result.next_cursor;
+          } while (cursor);
+          return out;
+        };
+        const blockToText = (b) => {
+          if (!b) return '';
+          const t = b.type;
+          const rich = (b[t] && b[t].rich_text) || [];
+          const text = rich.map(r => r.plain_text || '').join('');
+          if (t === 'heading_1') return '\n# ' + text;
+          if (t === 'heading_2') return '\n## ' + text;
+          if (t === 'heading_3') return '\n### ' + text;
+          if (t === 'bulleted_list_item') return '\n• ' + text;
+          if (t === 'numbered_list_item') return '\n1. ' + text;
+          if (t === 'to_do') return '\n[ ] ' + text;
+          if (t === 'toggle') return '\n▸ ' + text;
+          if (t === 'quote') return '\n> ' + text;
+          if (t === 'callout') return '\n💡 ' + text;
+          if (t === 'code') return '\n```\n' + text + '\n```';
+          if (t === 'paragraph') return '\n' + text;
+          return '';
+        };
+        const collectAll = async (parentId, depth=0) => {
+          if (depth > 4) return ''; // 깊이 제한
+          const blocks = await fetchBlocks(parentId);
+          let out = '';
+          for (const b of blocks) {
+            out += blockToText(b);
+            if (b.has_children) {
+              out += await collectAll(b.id, depth+1);
+            }
+          }
+          return out;
+        };
+        const content = await collectAll(uuid);
+        const trimmed = content.trim();
+        res.writeHead(200, { 'Content-Type':'application/json','Cache-Control':'public, max-age=600', ...CORS });
+        res.end(JSON.stringify({ ok:true, pageId:uuid, length:trimmed.length, content:trimmed }));
+      } catch (e) {
+        res.writeHead(200, { 'Content-Type':'application/json', ...CORS });
+        res.end(JSON.stringify({ ok:false, error:e.message }));
+      }
+    })();
+    return;
+  }
+
   // 버전 확인 엔드포인트 — 클라이언트가 buildTs 비교용으로 폴링
   if(url==="/api/version"){
     res.writeHead(200,{"Content-Type":"application/json","Cache-Control":"no-cache, no-store, must-revalidate",...CORS});
