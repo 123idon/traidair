@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#ffffff">
-<meta name="build-ts" content="1779378803036">
+<meta name="build-ts" content="1779379125811">
 <title>TraidAIr HTS</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 
@@ -4957,33 +4957,80 @@ async function _runScreeningAsync(){
     if(cs.length<10) continue;
 
     var cls=cs.map(function(c){return c.c;}),vls=cs.map(function(c){return c.v;});
-    var lc=cs[cs.length-1],pc=cs[cs.length-2]||lc,pc2=cs[cs.length-3]||pc;
+    var lc=cs[cs.length-1],pc=cs[cs.length-2]||lc,pc2=cs[cs.length-3]||pc,pc3=cs[cs.length-4]||pc2;
     var ma5=calcMA(cls,5),ma20=calcMA(cls,20),ma60=calcMA(cls,60);
     var lma5=ma5[ma5.length-1]||0,lma20=ma20[ma20.length-1]||0,lma60=ma60[ma60.length-1]||0;
+    var pma5=ma5[ma5.length-2]||lma5;
     var lrsi=parseFloat((calcRSI(cls,14).slice(-1)[0]||50).toFixed(1));
+    var prevRsi=parseFloat((calcRSI(cls,14).slice(-2,-1)[0]||50).toFixed(1));
     var avg5v=vls.slice(-6,-1).reduce(function(a,b){return a+b;},0)/5||1;
     var volR=vls[vls.length-1]/avg5v;
+    var pvolR=(cs[cs.length-2]?cs[cs.length-2].v:0)/avg5v;
+    // 봉 형태
+    var body=Math.abs(lc.c-lc.o), upperWick=lc.h-Math.max(lc.c,lc.o), lowerWick=Math.min(lc.c,lc.o)-lc.l;
+    var bodyRatio=body/(lc.h-lc.l||1);
+    // 20봉 신고가 (돌파)
+    var prev20High=Math.max.apply(null, cs.slice(-21,-1).map(function(c){return c.h;}));
+    // 시간대 (시각 추출 — "HH:MM")
+    var _hm=String(lc.t||'').split(':'), _hh=parseInt(_hm[0])||0, _mm=parseInt(_hm[1])||0, _mins=_hh*60+_mm;
 
-    // 하락추세 차단
-    if(lc.c<lma5&&lma5<lma20) continue;
-    if(lc.c<lc.o&&pc.c<pc.o&&pc2.c<pc2.o) continue;
+    // ═══ 필수 게이트 (모두 통과해야 진입 후보) ═══
+    var gateFails=[];
+    // G1: 시간대 — 9:30~14:00 (시초 변동성/마감 직전 제외)
+    if(_mins>0 && (_mins<570 || _mins>840)) gateFails.push('시간대'+_hh+':'+String(_mm).padStart(2,'0'));
+    // G2: 강한 하락 추세 차단 (5MA 아래 + 5<20)
+    if(lc.c<lma5 && lma5<lma20) gateFails.push('5MA이탈+데드크로스');
+    // G3: 3연속 음봉
+    if(lc.c<lc.o && pc.c<pc.o && pc2.c<pc2.o) gateFails.push('3연속음봉');
+    // G4: 과매수 (RSI>=72)
+    if(lrsi>=72) gateFails.push('과매수RSI'+lrsi);
+    // G5: 추격매수 차단 — 직전 봉 대비 +3% 이상 급등 위 진입 금지
+    if(lc.c > pc.c*1.03) gateFails.push('급등진입+'+((lc.c/pc.c-1)*100).toFixed(1)+'%');
+    // G6: 위꼬리 비대 (윗꼬리 본체의 2배 이상)
+    if(body>0 && upperWick > body*2) gateFails.push('윗꼬리비대');
+    // G7: 보유 중 (이미 위에서 필터링 — 이중체크)
+    // 필수 게이트 1개라도 실패 시 즉시 제외
+    if(gateFails.length){
+      addDecisionLog('['+stk.nm+'] 필수조건 미달', gateFails.join(' · '), 'NOGO');
+      continue;
+    }
 
+    // ═══ 확신도 점수 (모든 필수 통과 후 가산) ═══
     var score=0,tags=[];
-    if(lma5>lma20&&lma20>lma60){score+=3;tags.push('MA정배열');}
-    if(lc.c>lma5){score+=2;tags.push('5MA위');}
-    if(lc.c>lc.o){score+=1;tags.push('양봉');}
-    if(volR>=1.5){score+=3;tags.push('거래량x'+volR.toFixed(1));}
-    else if(volR>=1.2){score+=1;tags.push('거래량+'+(((volR-1)*100).toFixed(0))+'%');}
-    if(lrsi>=45&&lrsi<=72){score+=2;tags.push('RSI'+lrsi);}
-    // 강세 섹터 가산 (대시보드에서 받은 섹터 정보 활용)
+    // 1. 추세 강도
+    if(lma5>lma20 && lma20>lma60){score+=3;tags.push('정배열');}
+    else if(lma5>lma20){score+=1;tags.push('단기상승');}
+    if(lma5>pma5){score+=1;tags.push('5MA상승');}
+    // 2. 가격 위치
+    if(lc.c>lma5 && lc.c<lma5*1.015){score+=2;tags.push('5MA지지');} // 5MA 막 위에서 지지
+    if(lc.c>lma20){score+=1;tags.push('20MA위');}
+    // 3. 거래량 (당봉 + 직전봉도 같이 늘어야 진짜)
+    if(volR>=2 && pvolR>=1.3){score+=4;tags.push('거래량폭증x'+volR.toFixed(1));}
+    else if(volR>=1.5){score+=2;tags.push('거래량x'+volR.toFixed(1));}
+    else if(volR>=1.2){score+=1;tags.push('거래량+'+((volR-1)*100|0)+'%');}
+    // 4. RSI 안전 구간
+    if(lrsi>=50 && lrsi<=65){score+=2;tags.push('RSI'+lrsi);}
+    else if(lrsi>=40 && lrsi<70){score+=1;tags.push('RSI'+lrsi);}
+    // 5. 봉 형태 (장대양봉)
+    if(lc.c>lc.o && bodyRatio>=0.6 && lowerWick<body*0.5){score+=2;tags.push('장대양봉');}
+    // 6. 20봉 돌파 (신고가)
+    if(lc.c>prev20High*0.998 && volR>=1.5){score+=3;tags.push('20봉돌파');}
+    // 7. 강세 섹터 가산
     var _si = (window._sectorInfo||{})[tk];
     if(_si){
       var _bonus = _si.rank===1?3:_si.rank===2?2:_si.rank===3?1:0;
       if(_bonus){score+=_bonus;tags.push('강세'+_si.rank+'위');}
     }
-    // 다양성 페널티: 최근 매매 8건 중 같은 종목 출현 횟수만큼 -1.5점
-    var _penal = (_tkRecent[tk]||0)*1.5;
-    if(_penal){ score = score - _penal; tags.push('-반복'+_tkRecent[tk]); }
+    // 8. 시그널 확정 — 직전봉도 score>=4였는지 (2봉 연속 강세)
+    //   → window._priorScores에서 같은 종목 직전 점수 확인
+    if(!window._priorScores) window._priorScores = {};
+    var _prior = window._priorScores[tk] || 0;
+    if(_prior >= 4 && score >= 5){
+      score += 2; tags.push('확정시그널');
+    }
+    window._priorScores[tk] = score;
+    // 9. RSI 상승 반전 (이전 RSI<현재 RSI)
+    if(lrsi > prevRsi+3 && lrsi<=60){score+=1;tags.push('RSI반전');}
 
     scored.push({tk:tk,stk:stk,score:score,tags:tags,lc:lc,lma5:lma5,lrsi:lrsi,volR:volR});
   }
@@ -5026,28 +5073,33 @@ async function _runScreeningAsync(){
   addDecisionLog('['+best.stk.nm+'] 1단계 통과 ('+best.score+'점)',best.tags.join(' '),'2단계 AI 검토');
   updAdvBoxes('🔍 AI 검토 중 — '+best.stk.nm,'1단계: '+best.score+'점\nClaude 심층 분석 중...');
 
-  // ── 빠른 배속에선 Claude 우회: 기술 score만으로 즉시 매수 결정 ──
+  // ── 빠른 배속(>=300): Claude 우회 + 다층 필터 기반 진입 ──
   if(autoState.level>=3 && (sim&&sim.speed>=300)){
-    // 매매 간격 제한 (스캘핑 방지)
-    const _now = Date.now();
-    const _recent = (mock.trades||[]).filter(t=>t.date===sim.date && _now-(t.ts||0)<30*60*1000);
-    if(_recent.length >= 3){
-      addDecisionLog('과매매 차단', '30분 내 매매 3건 — 진입 보류', '신중모드');
-      return;
+    // 필수 게이트는 이미 위에서 통과 (gateFails 없는 종목만 scored에 들어옴)
+    // 같은 종목 매매 후 N봉 쿨다운 — 단순 시간이 아닌 봉 단위
+    const _lastSame = (mock.trades||[]).filter(t=>t.tk===best.tk && t.date===sim.date).pop();
+    if(_lastSame && _lastSame.ts){
+      // 매봉 약 1분(=시뮬 시간)이라 가정. 같은 날 같은 종목 매매 후 10봉(약10분) 쿨다운
+      // (sim 시간 진행이 빠르니 ts diff 작아도 봉 차이는 큼)
+      const elapsedMs = Date.now() - _lastSame.ts;
+      if(elapsedMs < 1000){ // 1초 = 봉 진행 직후 → 무조건 스킵
+        addDecisionLog('['+best.stk.nm+'] 직전 매매','같은 봉 사이클 진입 금지','신중');
+        return;
+      }
     }
-    // 같은 종목 매도/매수 후 30분 쿨다운
-    const _lastSame = (mock.trades||[]).filter(t=>t.tk===best.tk).pop();
-    if(_lastSame && _now-(_lastSame.ts||0)<30*60*1000){
-      addDecisionLog('['+best.stk.nm+'] 쿨다운', '같은 종목 30분 이내 매매 이력 — 보류', '신중모드');
-      return;
-    }
-    // 점수 임계 — 신중하게 7점 이상만 매수
-    if(best.score >= 7){
+    // ★ 진입 임계: 확신도 등급
+    // - 강한신호 (score>=10): BUY
+    // - 시그널 (score 7~9): BUY (단 확정시그널 태그 필요)
+    // - 약한 (score<7): 관망
+    const hasConfirm = best.tags.indexOf('확정시그널') !== -1;
+    if(best.score >= 10 || (best.score >= 7 && hasConfirm)){
       var lcQ=best.lc;
-      addDecisionLog('['+best.stk.nm+'] ⚡ 빠른매수 ('+best.score+'점)', best.tags.join(' · ')+' / 배속x'+sim.speed+' Claude 우회', '백테스트');
+      addDecisionLog('['+best.stk.nm+'] ✅ 진입 ('+best.score+'점)', best.tags.join(' · '), '확신매수');
       try{ await execAutoBuy(lcQ.c, best.stk); }catch(_e){}
-    }else{
-      addDecisionLog('['+best.stk.nm+'] ⏸ 점수 미달('+best.score+')', '신중모드 진입 임계 7점 미달', '관망');
+    } else if(best.score >= 5){
+      addDecisionLog('['+best.stk.nm+'] 👀 관찰 ('+best.score+'점)', '시그널 미확정 — '+best.tags.join(' · '), '대기');
+    } else {
+      addDecisionLog('['+best.stk.nm+'] ⏸ 약함 ('+best.score+'점)', best.tags.join(' · ')||'조건 불충분', '관망');
     }
     return;
   }
@@ -5121,6 +5173,34 @@ function runAutoStep(cs){
         addDecisionLog(`[${stk.nm}] 15:20 자동 전량 청산`,"당일매매 원칙","Phase 12-2: 14:30~15:20 마감");
       });
     }
+  }
+  // ── 모멘텀 약화 자동 매도 (보유 종목 — 5MA 이탈 + 거래량 감소) ──
+  if(autoState.level>=3 && (sim&&sim.speed>=300)){
+    try{
+      const cur2=cs[cs.length-1], prev=cs[cs.length-2];
+      const cls=cs.map(c=>c.c), vls=cs.map(c=>c.v);
+      const ma5arr=calcMA(cls,5);
+      const ma5cur=ma5arr[ma5arr.length-1]||0, ma5prev=ma5arr[ma5arr.length-2]||ma5cur;
+      const avgV=vls.slice(-6,-1).reduce((a,b)=>a+b,0)/5||1;
+      const volR=cur2.v/avgV;
+      const pos=mock.positions[activeTk];
+      if(pos && pos.qty>0 && ma5cur && cur2 && prev){
+        // 조건: 5MA 이탈 (현재 종가 < 5MA) AND 직전 봉 5MA 위였음 AND 거래량 살아있음 → 모멘텀 약화
+        const broke5MA = prev.c >= ma5prev && cur2.c < ma5cur*0.997;
+        const profitable = cur2.c > (pos.avg||0); // 수익 중일 때만 자동 청산 (손실은 stopOrders가 처리)
+        if(broke5MA && profitable && volR>=0.7){
+          const sv=activeTk,svSide=oSide,svType=oType,svCred=credType;
+          oSide="sell";oType="market";credType="cash";
+          document.getElementById("ofQty").value=Math.floor(pos.qty*0.5)||pos.qty; // 절반 익절
+          const ok=submitOrder(true);
+          if(ok){
+            const stk=STOCKS.find(s=>s.tk===activeTk);
+            addDecisionLog('['+(stk?stk.nm:activeTk)+'] 🎯 모멘텀 약화 절반 익절','5MA 이탈 — 수익 보호','자동매도');
+          }
+          oSide=svSide;oType=svType;credType=svCred;
+        }
+      }
+    }catch(_e){}
   }
 }
 async function execAutoBuy(pr,stk){
@@ -8243,7 +8323,7 @@ function collectMarketCtx(){
 (function(){
   const meta = document.querySelector('meta[name="build-ts"]');
   const myBuildTs = meta ? meta.getAttribute('content') : '';
-  if(!myBuildTs || myBuildTs === '1779378803036') return; // 로컬 빌드 안 한 경우
+  if(!myBuildTs || myBuildTs === '1779379125811') return; // 로컬 빌드 안 한 경우
   let reloaded = false;
   async function check(){
     if(reloaded) return;
