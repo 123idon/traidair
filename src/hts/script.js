@@ -54,6 +54,23 @@ function _btnBusy(btn, label){
   return ()=>{ btn.innerHTML = _orig; btn.disabled = _disabled; btn.style.opacity=''; };
 }
 
+// ── 전역 에러 캐처 — 모든 JS 에러를 디버그 로그에 자동 기록 ──
+window._jsErrors = window._jsErrors || [];
+window.addEventListener('error', function(e){
+  const info = { ts: Date.now(), msg: e.message, src: e.filename, line: e.lineno, col: e.colno };
+  window._jsErrors.push(info);
+  if(window._jsErrors.length > 100) window._jsErrors.shift();
+  console.error('[JS ERROR]', info);
+  try{ addDecisionLog && addDecisionLog('🐛 JS 에러', (e.message||'').slice(0,80), 'NOGO'); }catch(_e){}
+});
+window.addEventListener('unhandledrejection', function(e){
+  const info = { ts: Date.now(), msg: 'Promise rejected: '+(e.reason && (e.reason.message || e.reason.toString()) || 'unknown') };
+  window._jsErrors.push(info);
+  if(window._jsErrors.length > 100) window._jsErrors.shift();
+  console.error('[PROMISE REJECT]', info);
+  try{ addDecisionLog && addDecisionLog('🐛 비동기 에러', info.msg.slice(0,80), 'NOGO'); }catch(_e){}
+});
+
 // ── 디버그 패널 — 사용자가 직접 상태 확인 가능 ──
 window.debugTraidair = function debugTraidair(){
   const tk = (mock.trades||[]).length;
@@ -89,6 +106,9 @@ ${tk===0 ? '⚠ 매매 0건 — 자동매매가 안 돌았거나 진입 조건 �
   sells===0 ? '⚠ 매도 0건 — 매수만 했음. 마감 청산이 작동 안 함. 백테스트 끝나면 청산되는지 확인.' :
   journals===0 ? '⚠ 매매는 있는데 일지 0개 — autoSaveJournalOnTrade 실패. AI 일지 생성 버튼 눌러서 확인.' :
   '✅ 데이터 정상'}
+
+[최근 JS 에러] (${(window._jsErrors||[]).length}건)
+${(window._jsErrors||[]).slice(-5).map(e=>'• '+(e.msg||'').slice(0,80)).join('\n') || '(에러 없음)'}
 ━━━━━━━━━━━━━━━━━━━━━━`;
   alert(msg);
   console.log('[TraidAIr 디버그]', { mock, autoState, backtest:window.backtest, WGS, sectorInfo:window._sectorInfo, journals:JSON.parse(localStorage.getItem('htsJournals')||'{}') });
@@ -7669,7 +7689,10 @@ function resetBalance(){
   cfg.capital=amt;mock.cash=amt;mock.positions={};mock.trades=[];
   mock.todayPnl=0;mock.totalPnl=0;mock.lossSeries=0;mock.wins=0;mock.losses=0;
   mock.creditUsed=0;mock.marginUsed=0;
-  saveMock();saveCfg();updCash();updPnl();renderPort();renderTradeLog();
+  saveMock();
+  // saveCfg가 정의돼 있으면 호출 (없을 수도)
+  if(typeof saveCfg === 'function') saveCfg();
+  updCash();updPnl();renderPort();renderTradeLog();
   addMsg("ai","잔고 "+amt.toLocaleString()+"원으로 리셋 완료");
   showAlert("리셋 완료",amt.toLocaleString()+"원으로 리셋되었습니다.");
 }
