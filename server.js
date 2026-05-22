@@ -268,15 +268,30 @@ const server = http.createServer(async (req, res) => {
       let bodyToSend = body;
       try{
         const parsed = JSON.parse(body);
-        // system이 문자열이면 cache_control 가능한 구조로 변환
-        if(typeof parsed.system === 'string' && parsed.system){
-          parsed.system = [{ type:'text', text: parsed.system, cache_control:{ type:'ephemeral' } }];
+        // ★ user message에 들어있는 강의 컨텍스트를 자동으로 system으로 분리 (캐시 적용)
+        // 강의 컨텍스트는 '【강의 원칙' 또는 '강의 매매 원칙'으로 시작
+        let extractedLecture = '';
+        if(Array.isArray(parsed.messages) && parsed.messages.length){
+          const lastUser = parsed.messages.find(m => m.role === 'user');
+          if(lastUser && typeof lastUser.content === 'string'){
+            const m = lastUser.content.match(/【강의 원칙[^】]*】[\s\S]*?(?=\n【|\n\d|$)/);
+            if(m && m[0].length > 200){
+              extractedLecture = m[0];
+              lastUser.content = lastUser.content.replace(m[0], '').trim();
+            }
+          }
         }
-        if(!parsed.system){
-          parsed.system = [{ type:'text', text: MENTOR_SYSTEM, cache_control:{ type:'ephemeral' } }];
+        // system 처리 — string이면 cache 가능한 배열로 변환
+        let baseSys = parsed.system;
+        if(typeof baseSys === 'string' && baseSys) baseSys = [{ type:'text', text: baseSys }];
+        if(!baseSys) baseSys = [{ type:'text', text: MENTOR_SYSTEM }];
+        // 강의 컨텍스트를 system 끝에 추가 (별도 cache breakpoint)
+        const sysArr = baseSys.map((b, i) => ({ ...b, cache_control: { type:'ephemeral' } }));
+        if(extractedLecture){
+          sysArr.push({ type:'text', text: extractedLecture, cache_control: { type:'ephemeral' } });
         }
-        // 단순/빠른 작업은 haiku 4.5로 자동 다운그레이드 (cost 1/3)
-        // model이 sonnet-4-5인데 max_tokens가 300 이하면 haiku로 변경
+        parsed.system = sysArr;
+        // 자동 모델 다운그레이드: sonnet + max_tokens<=300 → haiku
         if(parsed.model === 'claude-sonnet-4-5' && (parsed.max_tokens||0) <= 300){
           parsed.model = 'claude-haiku-4-5';
         }
