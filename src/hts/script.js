@@ -56,6 +56,34 @@ function _btnBusy(btn, label){
 
 // ── 전역 에러 캐처 — 모든 JS 에러를 디버그 로그에 자동 기록 ──
 window._jsErrors = window._jsErrors || [];
+// ── 백그라운드 탭에서도 백테스트 진행 (Audio API로 keep-alive) ──
+// 브라우저는 백그라운드 탭에서 setTimeout을 1000ms로 throttle하지만
+// AudioContext가 활성이면 throttle 약화됨
+(function _bgKeepAlive(){
+  let _audio = null;
+  function start(){
+    if(_audio) return;
+    try{
+      _audio = new (window.AudioContext||window.webkitAudioContext)();
+      const osc = _audio.createOscillator();
+      const gain = _audio.createGain();
+      gain.gain.value = 0; // 무음
+      osc.connect(gain); gain.connect(_audio.destination);
+      osc.start(0);
+    }catch(e){ _audio = null; }
+  }
+  function stop(){
+    if(_audio){ try{_audio.close();}catch(e){} _audio = null; }
+  }
+  // 백테스트 시작 시 keep-alive 켬, 정지 시 끔
+  window._bgKeepAliveStart = start;
+  window._bgKeepAliveStop = stop;
+  // 페이지 visibility 변경 시 백테스트 진행 중이면 keep-alive
+  document.addEventListener('visibilitychange', ()=>{
+    if(document.hidden && window.backtest && backtest.running) start();
+  });
+})();
+
 window.addEventListener('error', function(e){
   const info = { ts: Date.now(), msg: e.message, src: e.filename, line: e.lineno, col: e.colno };
   window._jsErrors.push(info);
@@ -1587,6 +1615,7 @@ async function startBacktest(startDate, endDate){
     try{ await refreshHotSectors(true); }catch(_e){}
   }
   backtest.running=true;
+  try{ window._bgKeepAliveStart && _bgKeepAliveStart(); }catch(e){}
   backtest.startDate=days[0];
   backtest.endDate=days[days.length-1];
   backtest.totalDays=days.length;
@@ -1606,8 +1635,11 @@ async function startBacktest(startDate, endDate){
 async function stopBacktest(){
   if(!backtest.running) return;
   backtest.running=false;
+  try{ window._bgKeepAliveStop && _bgKeepAliveStop(); }catch(e){}
   sim.playing=false;
   if(sim.timer){clearTimeout(sim.timer);sim.timer=null;}
+  // ★ pending setTimeout 모두 cancel (다음날 자동 시작 차단)
+  if(backtest._pendingStart){ clearTimeout(backtest._pendingStart); backtest._pendingStart=null; }
   _syncPlayBtn();
   renderBacktestPanel();
   // 백그라운드 일지 작성 모두 완료까지 대기 (학습 메모리 보장)
@@ -1656,11 +1688,15 @@ async function _backtestLoadDay(dateStr){
   // 캔들 로드 — KIS 있으면 실데이터, 없으면 시뮬
   genCandles(activeTk, dateStr);
   const _wait = sim.speed>=300 ? 150 : sim.speed>=60 ? 300 : 600;
-  setTimeout(()=>{
+  // setTimeout 핸들 backtest에 저장 — stopBacktest에서 clear 가능
+  if(backtest._pendingStart){ clearTimeout(backtest._pendingStart); backtest._pendingStart=null; }
+  backtest._pendingStart = setTimeout(()=>{
+    backtest._pendingStart = null;
+    // ★ setTimeout 안에서도 backtest.running 체크 (정지 후 재시작 차단)
+    if(!window.backtest || !backtest.running) return;
     chartViewCount=Math.min(120, sim.candles.length||60);
     chartViewStart=Math.max(0,(sim.candles.length||60)-chartViewCount);
     const prevCount=(_kisChartMeta&&_kisChartMeta.prevCount)||0;
-    // ★ 당일 9시 첫 봉부터 시작 (전일 분봉 끝이 아닌 당일 첫 봉)
     sim.idx = prevCount>0 ? prevCount : 0;
     updChartToIdx();
     addDecisionLog('🔔 '+dateStr+' 장 시작 (09:00)', '강세섹터 분석 완료 — 매매 시작', '백테스트');
@@ -2892,10 +2928,13 @@ function renderTimeline(){
 function renderWeeklyStats(){
   const el=document.getElementById('weeklyStatsPanel'); if(!el)return;
   const trades=mock.trades||[];
-  const now=new Date();
-  const weekStart=new Date(now);weekStart.setDate(now.getDate()-now.getDay());
+  // ★ 가장 최근 거래일 기준으로 이번 주 (백테스트도 정상 작동)
+  const allDates = [...new Set(trades.map(t=>t.date))].sort();
+  const refDate = allDates.length ? allDates[allDates.length-1] : (sim.date||new Date().toISOString().slice(0,10));
+  const ref = new Date(refDate);
+  const weekStart = new Date(ref); weekStart.setDate(ref.getDate()-ref.getDay());
   const weekly=trades.filter(t=>{
-    const d=new Date(t.date); return d>=weekStart;
+    const d=new Date(t.date); return d>=weekStart && d<=ref;
   });
   if(!weekly.length){el.textContent='이번 주 거래 없음';return;}
   const wins=weekly.filter(t=>t.pnl>0),losses=weekly.filter(t=>t.pnl<0);
@@ -2930,9 +2969,12 @@ function renderWeeklyStats(){
 function renderMonthlyStats(){
   const el=document.getElementById('weeklyStatsPanel'); if(!el)return;
   const trades=mock.trades||[];
-  const now=new Date();
+  // ★ 가장 최근 거래월 기준 (백테스트 호환)
+  const allDates = [...new Set(trades.map(t=>t.date))].sort();
+  const refDate = allDates.length ? allDates[allDates.length-1] : (sim.date||new Date().toISOString().slice(0,10));
+  const ref = new Date(refDate);
   const monthly=trades.filter(t=>{
-    const d=new Date(t.date); return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear();
+    const d=new Date(t.date); return d.getMonth()===ref.getMonth() && d.getFullYear()===ref.getFullYear();
   });
   if(!monthly.length){el.textContent='이번 달 거래 없음';return;}
   const wins=monthly.filter(t=>t.pnl>0),losses=monthly.filter(t=>t.pnl<0);
@@ -5690,7 +5732,11 @@ function renderJPage(){
 // ═══════════════════════════════════════════════
 function _journalStatsData(){
   const js = safeParseJSON(localStorage.getItem("htsJournals"), "{}");
-  const entries = Object.values(js).sort((a,b)=>a.date.localeCompare(b.date));
+  // ★ 키로 date 보강 (autoSave 도중 부분 저장된 항목도 통계 반영)
+  const entries = Object.entries(js)
+    .map(([key, v])=>({...(v||{}), date: (v && v.date) || key}))
+    .filter(e=>e.date)
+    .sort((a,b)=>String(a.date).localeCompare(String(b.date)));
   const trades = (mock.trades || []).slice().sort((a,b)=>a.date.localeCompare(b.date));
   const sells = trades.filter(t=>t.side==='sell');
   const wins = sells.filter(t=>(t.pnl||0)>0);
