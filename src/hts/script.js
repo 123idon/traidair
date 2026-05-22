@@ -3267,19 +3267,19 @@ function pauseAuto(){
 function stopAuto(){
   autoState.running=false;autoState.paused=false;if(autoTimer){clearTimeout(autoTimer);autoTimer=null;}
   try{saveToServer('htsAutoState', JSON.stringify({running:false, level:autoState.level, cfg:autoState.cfg}));}catch(e){}
-  // 버튼 UI 복원
-  const pBtn=document.getElementById('pauseBtn'), sBtn=document.getElementById('stopBtn2');
+  // 모든 DOM 접근 null 가드
+  const _q = id => document.getElementById(id);
+  const pBtn=_q('pauseBtn'), sBtn=_q('stopBtn2');
   if(pBtn){pBtn.style.display='none';pBtn.textContent='⏸ 일시정지';pBtn.style.background='';}
   if(sBtn) sBtn.style.display='none';
   const startBtn=document.querySelector('.modal-content .ibtn.pur[onclick="startAuto()"]');
   if(startBtn) startBtn.style.display='';
-  document.getElementById("autoBtn").classList.remove("on");
-  var _ab2=document.getElementById("autoBtn");
-  if(_ab2){_ab2.textContent="▶ 자동매매";_ab2.style.background="";_ab2.style.borderColor="";_ab2.style.color="";}
-  document.getElementById("aiModeBadge").textContent='';
-  activateMockMode();document.getElementById("autoStopBtn").style.display="none";
-  document.getElementById("autoBtn").classList.remove("on");document.getElementById("aiModeBadge").textContent="대기중";
-  addMsg("ai","⏹ AI 자동매매 중지.");
+  const ab=_q('autoBtn');
+  if(ab){ ab.classList.remove('on'); ab.textContent='▶ 자동매매'; ab.style.background=''; ab.style.borderColor=''; ab.style.color=''; }
+  const aiBadge=_q('aiModeBadge'); if(aiBadge) aiBadge.textContent='대기중';
+  try{ activateMockMode&&activateMockMode(); }catch(_e){}
+  const stopBtnEl=_q('autoStopBtn'); if(stopBtnEl) stopBtnEl.style.display='none';
+  try{ addMsg('ai','⏹ AI 자동매매 중지.'); }catch(_e){}
 }
 function scheduleScreening(){
   if(!autoState.running)return;
@@ -3788,7 +3788,7 @@ async function execAutoBuy(pr, stk, score){
     const _inv = (qty*pr).toLocaleString();
     const _credTag = useCredit ? ' 🟠신용' : '';
     addDecisionLog(`[${stk.nm}] 자동 매수 (${posPct}% 비중)${_credTag}`,`${pr.toLocaleString()}원 × ${qty}주 = ${_inv}원 | 손절 ${Math.round(pr*(1-autoState.cfg.stop/100)).toLocaleString()} | 목표 ${Math.round(pr*(1+autoState.cfg.t1/100)).toLocaleString()}`,"Phase 9-4");
-    if(autoState.cfg.explain)setTimeout(()=>explainAutoDecision(stk,pr,qty),600);
+    if(autoState.cfg.explain && typeof explainAutoDecision === 'function') setTimeout(()=>explainAutoDecision(stk,pr,qty),600);
   }
 }
 
@@ -5410,7 +5410,31 @@ function renderStats(){
   if(pnlChart)pnlChart.destroy();
   const dm={};sells.forEach(t=>{dm[t.date]=(dm[t.date]||0)+t.pnl;});
   const dates=Object.keys(dm).sort();let cum=0;const cd=dates.map(d=>{cum+=dm[d];return cum;});
-  if(dates.length){const ctx=document.getElementById("pnlChart").getContext("2d");pnlChart=new Chart(ctx,{type:"line",data:{labels:dates,datasets:[{data:cd,borderColor:"#4d9fff",borderWidth:2,pointRadius:3,fill:true,backgroundColor:"rgba(77,159,255,.08)",tension:.3}]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:"#454b58",font:{size:8}}},y:{ticks:{color:"#8c9db5",font:{size:8},callback:v=>v.toLocaleString()}}}}});}
+  // 차트는 Chart.js 의존 — 라이브러리 미로드면 자체 canvas 그림으로 대체
+  if(dates.length){
+    const pcv=document.getElementById("pnlChart");
+    if(pcv && typeof Chart !== 'undefined'){
+      try{ const ctx=pcv.getContext("2d"); pnlChart=new Chart(ctx,{type:"line",data:{labels:dates,datasets:[{data:cd,borderColor:"#4d9fff",borderWidth:2,pointRadius:3,fill:true,backgroundColor:"rgba(77,159,255,.08)",tension:.3}]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:"#454b58",font:{size:8}}},y:{ticks:{color:"#8c9db5",font:{size:8},callback:v=>v.toLocaleString()}}}}}); }catch(_e){ console.warn('Chart 실패:', _e.message); }
+    } else if(pcv){
+      // Chart.js 없을 때 자체 canvas로 누적 손익 그리기 (jPnlChart와 동일 로직 단순화)
+      try{
+        const r=pcv.getBoundingClientRect(); const W=Math.round(r.width)||600, H=160; pcv.width=W; pcv.height=H;
+        const ctx=pcv.getContext('2d'); ctx.clearRect(0,0,W,H);
+        const PL=42, PR=10, PT=10, PB=22; const cw=W-PL-PR, ch=H-PT-PB;
+        let yMin=Math.min(0,...cd), yMax=Math.max(0,...cd); if(yMin===yMax){yMin-=1;yMax+=1;}
+        const yPad=(yMax-yMin)*0.08; yMin-=yPad; yMax+=yPad; const yR=yMax-yMin;
+        const toY=v=>PT+ch*(1-(v-yMin)/yR); const toX=i=>PL+cw*(i/Math.max(cd.length-1,1));
+        ctx.strokeStyle='rgba(0,0,0,.15)'; ctx.setLineDash([3,3]); ctx.beginPath(); ctx.moveTo(PL,toY(0)); ctx.lineTo(W-PR,toY(0)); ctx.stroke(); ctx.setLineDash([]);
+        ctx.fillStyle='#8c9db5'; ctx.font='9px monospace'; ctx.textAlign='right';
+        [yMax,(yMax+yMin)/2,yMin].forEach(v=>ctx.fillText((v>=0?'+':'')+Math.round(v/1000)+'k', PL-4, toY(v)+3));
+        const last=cd[cd.length-1]||0; const col=last>=0?'#05c072':'#dc3545';
+        const grad=ctx.createLinearGradient(0,PT,0,PT+ch); grad.addColorStop(0,col==='#05c072'?'rgba(5,192,114,.25)':'rgba(220,53,69,.25)'); grad.addColorStop(1,'rgba(255,255,255,0)');
+        ctx.fillStyle=grad; ctx.beginPath(); ctx.moveTo(toX(0),toY(0)); cd.forEach((c,i)=>ctx.lineTo(toX(i),toY(c))); ctx.lineTo(toX(cd.length-1),toY(0)); ctx.closePath(); ctx.fill();
+        ctx.strokeStyle=col; ctx.lineWidth=2; ctx.beginPath(); cd.forEach((c,i)=>{const x=toX(i),y=toY(c); if(i===0)ctx.moveTo(x,y); else ctx.lineTo(x,y);}); ctx.stroke();
+        ctx.fillStyle='#8c9db5'; ctx.textAlign='center'; [0,Math.floor(dates.length/2),dates.length-1].forEach(i=>{ if(dates[i]) ctx.fillText(dates[i].slice(5), toX(i), H-6); });
+      }catch(_e){ console.warn('pnl 자체 차트:', _e.message); }
+    }
+  }
   const mis=mock.trades.filter(t=>t.side==="sell"&&t.pnl<0);
   const mt={"FOMO 추격 진입":0,"손절 지연":0,"목표가 조기 익절":0,"재진입 손실":0};
   mis.forEach((_,i)=>{const k=Object.keys(mt)[i%4];mt[k]++;});
@@ -5493,7 +5517,8 @@ function _renderJEntry(e){
 
 function renderJPage(){
   const js=safeParseJSON(localStorage.getItem("htsJournals"), "{}");
-  const entries=Object.values(js).sort((a,b)=>b.date.localeCompare(a.date));
+  // 안전 sort: date 누락된 entry 필터링 후 정렬
+  const entries=Object.values(js).filter(e=>e && e.date).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
   // 통계/차트는 항상 갱신 (거래 없어도 빈 카드 표시)
   try{ renderJournalStats(); }catch(e){ console.warn('stats:', e.message); }
   // 가장 최근 AI 코칭 박스 — 열자마자 보임
@@ -7359,7 +7384,10 @@ async function syncCandidatesToWatchlist(){
       })
     });
     const data = await res.json();
-    const text = (data.content&&data.content[0]&&data.content[0].text)||'{}';
+    let text = (data.content&&data.content[0]&&data.content[0].text)||'{}';
+    // 코드 블록/주석 제거 (Claude가 ```json ... ``` 으로 감싸는 경우 대응)
+    text = text.replace(/```json\s*/gi,'').replace(/```\s*/g,'').replace(/\/\/.*$/gm,'');
+    // 마지막 } 까지 매칭 (greedy)
     const m = text.match(/\{[\s\S]*\}/);
     if(!m) throw new Error('JSON 파싱 실패');
     const result = JSON.parse(m[0]);
