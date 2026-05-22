@@ -3351,7 +3351,11 @@ function runScreening(){
   _autoScreenRunning = true;
 
   // 비동기로 실행 (UI 블로킹 방지)
-  _runScreeningAsync().finally(() => { _autoScreenRunning = false; });
+  // Promise.race로 15초 강제 컷 — fetch 멈춤/네트워크 문제로 락 영구점유 방지
+  Promise.race([
+    _runScreeningAsync(),
+    new Promise((_, rej) => setTimeout(()=>rej(new Error('screening timeout 15s')), 15000)),
+  ]).catch(e => console.warn('screening:', e.message)).finally(() => { _autoScreenRunning = false; });
 }
 
 async function _runScreeningAsync(){
@@ -3640,8 +3644,12 @@ async function _runScreeningAsync(){
         '【리스크】 손절 '+stopPr.toLocaleString()+' | 목표 '+t1Pr.toLocaleString()+' | R/R 1:'+rr+'\n\n'+
         '※ 위에 학습 노트가 있다면 반드시 반영해서 같은 실수를 반복하지 말 것.\n'+
         'JSON만: {"decision":"BUY"또는"PASS","confidence":0-100,"reason":"왜 매수/관망인지 2줄(학습노트 반영시 명시)","factors":"근거한 데이터 3가지","risk":"리스크1줄","waitFor":"PASS시조건"}';
-      var res=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},
+      // Claude 호출에 8초 timeout — 응답 안 오면 cancel하고 진입 PASS
+      var _ctrl = new AbortController();
+      var _to = setTimeout(()=>_ctrl.abort(), 8000);
+      var res=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},signal:_ctrl.signal,
         body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:300,messages:[{role:'user',content:prompt}]})});
+      clearTimeout(_to);
       var data=await res.json();
       var text=(data.content&&data.content[0]&&data.content[0].text)||'{}';
       var m=text.match(/\{[\s\S]*\}/);
