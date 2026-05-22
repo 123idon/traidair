@@ -413,7 +413,7 @@ async function loadFromServer() {
       'htsAutoState','htsChatMsgs','htsDecisionLog','htsAiStatus',
       'htsIntra','trustScore','apiUsage','htsSimState',
       'htsLearningMemory','htsLearnedDates','htsFeatureSuggestions',
-      'htsLectureContent','htsLectureUpdatedAt'
+      'htsLectureContent','htsLectureUpdatedAt','htsCoachingHistory'
     ];
     keys.forEach(k => {
       if (data[k] !== undefined) {
@@ -1659,8 +1659,10 @@ async function _backtestLoadDay(dateStr){
     chartViewCount=Math.min(120, sim.candles.length||60);
     chartViewStart=Math.max(0,(sim.candles.length||60)-chartViewCount);
     const prevCount=(_kisChartMeta&&_kisChartMeta.prevCount)||0;
-    sim.idx = prevCount>0 ? prevCount-1 : 0;
+    // ★ 당일 9시 첫 봉부터 시작 (전일 분봉 끝이 아닌 당일 첫 봉)
+    sim.idx = prevCount>0 ? prevCount : 0;
     updChartToIdx();
+    addDecisionLog('🔔 '+dateStr+' 장 시작 (09:00)', '강세섹터 분석 완료 — 매매 시작', '백테스트');
     sim.playing=true;
     _syncPlayBtn();
     runStep();
@@ -2555,8 +2557,48 @@ ${trades.slice(-10).map(t=>`${t.side==="buy"?"매수":"매도"} ${t.nm} ${t.pric
     const text=data.content?.[0]?.text||"분석 실패";
     el.style.whiteSpace="pre-wrap";
     el.style.color="var(--ts)";
-    el.textContent=text;
-  }catch(e){el.textContent="API 오류";}
+    el.style.whiteSpace='pre-wrap';
+    el.style.color='var(--ts)';
+    // 텍스트 + AI 즉시반영 버튼
+    el.innerHTML = `<div style="white-space:pre-wrap;margin-bottom:8px;">${text.replace(/</g,'&lt;')}</div>
+      <button onclick="applyCoachingToAI()" data-coaching="${encodeURIComponent(text)}" style="background:var(--p);color:#fff;border:none;padding:6px 14px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;">⚡ AI에 즉시 반영 (영구 저장)</button>
+      <button onclick="alert('이미 누적된 코칭은 학습 메모리 노트(좌측 🎓)에서 확인 가능합니다.')" style="background:none;color:var(--tm);border:1px solid var(--br);padding:6px 10px;border-radius:6px;font-size:10px;cursor:pointer;margin-left:4px;">ℹ 누적 확인</button>`;
+    window._lastCoachingText = text;
+  }catch(e){el.textContent="API 오류: "+e.message;}
+}
+
+// AI 복기 분석 결과를 학습 메모리에 영구 저장 — 이후 모든 매매 결정에 반영
+function applyCoachingToAI(){
+  try{
+    const text = window._lastCoachingText || '';
+    if(!text){ showAlert('반영 실패', '복기 분석 결과가 없습니다'); return; }
+    // 학습 메모리에 누적 (카테고리: 복기)
+    if(!window.learningMemory) window.learningMemory = [];
+    const date = sim.date || new Date().toISOString().slice(0,10);
+    // 한 번에 여러 항목으로 쪼개서 저장
+    const lines = text.split(/\n+/).filter(l => l.trim().length > 8);
+    lines.slice(0, 8).forEach(line => {
+      learningMemory.push({ date, category:'복기', text: line.trim() });
+    });
+    if(learningMemory.length > 80) learningMemory = learningMemory.slice(-80);
+    window.learningMemory = learningMemory;
+    // 영구 저장
+    try{
+      saveToServer('htsLearningMemory', JSON.stringify(learningMemory));
+      localStorage.setItem('htsLearningMemory', JSON.stringify(learningMemory));
+    }catch(_e){}
+    // 별도 코칭 히스토리에도 누적
+    try{
+      const hist = JSON.parse(localStorage.getItem('htsCoachingHistory') || '[]');
+      hist.push({ ts: Date.now(), date, text });
+      if(hist.length > 50) hist.shift();
+      saveToServer('htsCoachingHistory', JSON.stringify(hist));
+      localStorage.setItem('htsCoachingHistory', JSON.stringify(hist));
+    }catch(_e){}
+    if(typeof updateLearnerStage === 'function') updateLearnerStage();
+    showAlert('✅ AI에 반영 완료', '복기 분석이 학습 메모리에 누적됐어요.\n다음 모든 매매 결정 프롬프트에 자동 첨부됩니다.\n좌측 🎓 노트로 확인 가능.');
+    if(typeof addDecisionLog === 'function') addDecisionLog('🎓 코칭 반영', lines.length+'개 항목 학습 메모리에 저장', '학습');
+  }catch(e){ showAlert('반영 오류', e.message); }
 }
 
 // 자신만의 셋업 개발 AI (Phase 10-10)
@@ -5462,6 +5504,30 @@ function renderStats(){
   renderStatsEnhanced();
   renderSymbolPnl();
   renderTimeline();
+  // 📅 날짜별 손익 텍스트 리스트
+  try{
+    const dpEl = document.getElementById('dailyPnlList');
+    if(dpEl){
+      const dm={};
+      sells.forEach(t=>{ dm[t.date] = (dm[t.date]||0) + (t.pnl||0); });
+      const _dates = Object.keys(dm).sort();
+      let cum = 0;
+      const rows = _dates.map(d=>{
+        const v = dm[d]; cum += v;
+        const col = v>=0?'var(--g)':'var(--r)';
+        const cumCol = cum>=0?'var(--g)':'var(--r)';
+        return `<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;border-radius:6px;background:var(--bg);">
+          <span style="font-family:var(--mono);font-size:11px;">${d}</span>
+          <span style="display:flex;gap:12px;align-items:baseline;">
+            <span style="font-family:var(--mono);font-size:12px;font-weight:700;color:${col};">${v>=0?'+':''}${v.toLocaleString()}원</span>
+            <span style="font-size:9px;color:var(--tm);">누적</span>
+            <span style="font-family:var(--mono);font-size:10px;color:${cumCol};">${cum>=0?'+':''}${cum.toLocaleString()}원</span>
+          </span>
+        </div>`;
+      }).join('');
+      dpEl.innerHTML = rows || '<div style="font-size:10px;color:var(--tm);text-align:center;padding:10px;">매도 기록이 없습니다</div>';
+    }
+  }catch(_e){ console.warn('dailyPnl:', _e.message); }
 }
 
 // ═══════════════════════════════
@@ -5539,6 +5605,8 @@ function renderJPage(){
   const js=safeParseJSON(localStorage.getItem("htsJournals"), "{}");
   // 안전 sort: date 누락된 entry 필터링 후 정렬
   const entries=Object.values(js).filter(e=>e && e.date).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  const jlEl = document.getElementById('journalList');
+  console.log('[renderJPage] entries:', entries.length, 'journalList exists:', !!jlEl);
   // 통계/차트는 항상 갱신 (거래 없어도 빈 카드 표시)
   try{ renderJournalStats(); }catch(e){ console.warn('stats:', e.message); }
   // 가장 최근 AI 코칭 박스 — 열자마자 보임
@@ -5571,7 +5639,10 @@ function renderJPage(){
     }
   }catch(e){ console.warn('latest coaching:', e.message); }
   if(!entries.length){document.getElementById("journalList").innerHTML="<div style='font-size:12px;color:var(--tm);text-align:center;padding:40px;'>거래 내역이 없습니다.</div>";return;}
-  document.getElementById("journalList").innerHTML=entries.map(e=>{
+  const _jl = document.getElementById("journalList");
+  if(!_jl){ console.warn('[renderJPage] journalList DOM 없음'); return; }
+  _jl.innerHTML=entries.map(e=>{
+    try{
     const aiTag = e.aiTradeCount ? `<span style="font-size:9px;background:rgba(139,92,246,.15);color:var(--p);padding:1px 5px;border-radius:3px;font-weight:700;margin-left:4px;">🤖 AI ${e.aiTradeCount}건</span>` : '';
     const manTag = e.manualTradeCount ? `<span style="font-size:9px;background:rgba(49,130,246,.12);color:var(--b);padding:1px 5px;border-radius:3px;margin-left:2px;">${e.manualTradeCount}건</span>` : '';
     const savedTag = e.aiGenerated ? '<span style="font-size:8px;color:var(--p);">🤖</span>' : '<span style="font-size:8px;color:var(--tm);">📝</span>';
@@ -5600,6 +5671,10 @@ function renderJPage(){
       ${e.improvement&&e.improvement!=='-'?`<div class="jd-note tip" style="font-size:10px;">💡 ${e.improvement}</div>`:""}
       ${e.score_total?`<div style="text-align:right;font-size:8px;color:var(--tm);">원칙:${e.score_principle||"-"} 타점:${e.score_timing||"-"} 심리:${e.score_psychology||"-"} <b>종합:${e.score_total}</b>/10</div>`:""}
     </div>`;
+    }catch(_e){
+      console.warn('[renderJPage] entry 렌더 실패', e.date, _e.message);
+      return `<div class="jday" style="border-left:3px solid var(--r);"><div class="jd-hdr"><span class="jd-dt">${e.date||'?'}</span><span class="jd-pnl">렌더 오류</span></div><div style="font-size:10px;color:var(--r);padding:6px;">${(_e.message||'').slice(0,100)}</div></div>`;
+    }
   }).join("");
 }
 // ═══════════════════════════════════════════════
