@@ -2171,8 +2171,19 @@ function submitOrder(autoExec){
     const pos=mock.positions[activeTk];
     if(!pos||pos.qty<qty){if(!autoExec)showAlert("보유 부족",`보유 ${pos?.qty||0}주 주문 ${qty}주`);return false;}
     const pnl=(pr-pos.avgPrice)*qty-fee-tax;
-    if(pos.creditType&&pos.creditType!=="cash"&&pos.creditAmt>0){const r=qty/pos.qty,ret=pos.creditAmt*r;if(pos.creditType==="credit")mock.creditUsed=Math.max(0,mock.creditUsed-ret);else mock.marginUsed=Math.max(0,mock.marginUsed-ret);pos.creditAmt-=ret;}
-    mock.cash+=tot-fee-tax;pos.qty-=qty;
+    // ★ 신용/미수 사용분 먼저 갚고 나머지를 cash로 (잔고 뻥튀기 버그 수정)
+    let _proceeds = tot - fee - tax; // 매도 받은 순금액
+    let _repay = 0;
+    if(pos.creditType && pos.creditType!=="cash" && pos.creditAmt>0){
+      const r = qty/pos.qty;
+      const ret = pos.creditAmt * r; // 이번 매도분의 신용 부채
+      _repay = Math.min(_proceeds, ret); // proceeds 한도 내에서만 갚음
+      if(pos.creditType==="credit") mock.creditUsed = Math.max(0, mock.creditUsed - _repay);
+      else mock.marginUsed = Math.max(0, mock.marginUsed - _repay);
+      pos.creditAmt = Math.max(0, pos.creditAmt - ret);
+    }
+    mock.cash += (_proceeds - _repay); // 부채 갚고 남은 만큼만 cash로
+    pos.qty -= qty;
     if(pos.qty<=0){delete mock.positions[activeTk];}
     mock.todayPnl+=pnl;mock.todayTrades++;
     if(pnl<0){mock.lossSeries++;mock.winSeries=0;}
@@ -5376,7 +5387,18 @@ function liveUpdate(){
 // STATS
 // ═══════════════════════════════
 function renderStats(){
-  const sells=mock.trades.filter(t=>t.side==="sell");
+  const allTrades = mock.trades || [];
+  // mock.trades 0건이면 명확한 안내
+  if(allTrades.length === 0){
+    const grid = document.getElementById('statsGrid');
+    if(grid) grid.innerHTML = '<div style="grid-column:1/-1;background:rgba(255,153,0,0.08);border:1px dashed var(--a);border-radius:8px;padding:14px;text-align:center;font-size:11px;color:var(--ts);line-height:1.6;">📊 매매 내역이 0건입니다.<br><b>백테스트나 매수</b>를 해야 통계가 채워집니다.<br><span style="font-size:9px;">🔍 디버그 버튼으로 자동매매 상태 확인하세요.</span></div>';
+    const ml = document.getElementById('mistakeList');
+    if(ml) ml.innerHTML = '<div style="font-size:10px;color:var(--tm);text-align:center;padding:10px;">매매 발생 후 표시됩니다</div>';
+    if(typeof pnlChart!=='undefined' && pnlChart && pnlChart.destroy) pnlChart.destroy();
+    return;
+  }
+  console.log('[renderStats] trades:', allTrades.length, 'sells:', allTrades.filter(t=>t.side==='sell').length);
+  const sells=allTrades.filter(t=>t.side==="sell");
   const wins=sells.filter(t=>t.pnl>0),losses=sells.filter(t=>t.pnl<=0);
   const wr=sells.length?Math.round(wins.length/sells.length*100):0;
   const aw=wins.length?Math.round(wins.reduce((a,t)=>a+t.pnl,0)/wins.length):0;
@@ -5813,7 +5835,7 @@ async function genAllJournals(ev){
       try{
         await Promise.race([
           autoSaveJournalOnTrade(date),
-          new Promise((_, rej) => setTimeout(()=>rej(new Error('timeout 15s — Claude 한도/네트워크')), 15000)),
+          new Promise((_, rej) => setTimeout(()=>rej(new Error('timeout 10s — Claude 한도/네트워크')), 10000)),
         ]);
         done++;
         _consecFail = 0;
@@ -7532,7 +7554,7 @@ async function autoSaveJournalOnTrade(forceDate){
       '"phase_check":"적용Phase","mentor_comment":"멘토한마디(결과/과정 통합)"}';
     // fetch + timeout (30초) — 멈춤 방지
     const ctrl = new AbortController();
-    const _timer = setTimeout(()=>ctrl.abort(), 15000); // 15초 — Claude 응답 느리면 빠르게 fail
+    const _timer = setTimeout(()=>ctrl.abort(), 8000); // 8초 — 한도 초과 시 즉시 다음
     const res = await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},signal:ctrl.signal,body:JSON.stringify({model:'claude-haiku-4-5',max_tokens:500,messages:[{role:'user',content:prompt}]})});
     clearTimeout(_timer);
     const data=await res.json();
