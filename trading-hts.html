@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#ffffff">
-<meta name="build-ts" content="1779453181267">
+<meta name="build-ts" content="1779454573318">
 <title>TraidAIr HTS</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 
@@ -560,6 +560,7 @@ canvas{image-rendering:pixelated;}
     <button class="ibtn" onclick="openModal('settings')" title="설정">⚙</button>
     <button class="ibtn red" onclick="endMock()" title="종료">■</button>
     <button class="ibtn" onclick="refreshAllData()" title="전체 새로고침" style="background:var(--g);color:#fff;border-color:var(--g);">↺</button>
+    <button class="ibtn" onclick="debugTraidair()" title="상태 진단 (매매·일지·자동매매 상태 확인)" style="background:#9333ea;color:#fff;border-color:#9333ea;font-weight:700;">🔍</button>
     <div class="badge mock" id="modeBadge"><div class="bdot"></div><span id="modeText">모의투자</span></div>
     <div class="clk" id="clk">--:--:--</div>
     <!-- 실시간 지수 표시 -->
@@ -1919,6 +1920,47 @@ function _btnBusy(btn, label){
   btn.style.opacity = '0.6';
   return ()=>{ btn.innerHTML = _orig; btn.disabled = _disabled; btn.style.opacity=''; };
 }
+
+// ── 디버그 패널 — 사용자가 직접 상태 확인 가능 ──
+window.debugTraidair = function debugTraidair(){
+  const tk = (mock.trades||[]).length;
+  const sells = (mock.trades||[]).filter(t=>t.side==='sell').length;
+  const buys = tk - sells;
+  const dates = [...new Set((mock.trades||[]).map(t=>t.date))].sort();
+  const wgs = (WGS||[]).map((g,i)=>`WGS[${i}]=${g.length}`).join(' / ');
+  const siCount = Object.keys(window._sectorInfo||{}).length;
+  const journals = Object.keys(JSON.parse(localStorage.getItem('htsJournals')||'{}')).length;
+  const lec = window.lectureContent ? lectureContent.length+'자' : '없음';
+  const learn = (window.learningMemory||[]).length;
+  const autoR = autoState.running?'✅ 작동중 (Lv'+autoState.level+')':'❌ 정지';
+  const bt = (window.backtest&&backtest.running)?`✅ ${backtest.dayIdx}/${backtest.totalDays}일`:'❌ 정지';
+  const msg = `
+[TraidAIr 상태 진단]
+━━━━━━━━━━━━━━━━━━━━━━
+💰 자본: 현금 ${(mock.cash||0).toLocaleString()}원 / 보유 ${Object.keys(mock.positions||{}).length}종목
+
+📊 매매 기록: 전체 ${tk}건 (매수 ${buys} / 매도 ${sells})
+   거래일: ${dates.length}일 ${dates.length>0?'('+dates[0]+' ~ '+dates[dates.length-1]+')':''}
+
+🤖 자동매매: ${autoR}
+🚀 백테스트: ${bt}
+
+📌 관심그룹: ${wgs}
+🔥 강세섹터 종목: ${siCount}개
+📓 매매일지: ${journals}일치
+📚 강의: ${lec}
+🎓 학습노트: ${learn}건
+
+[진단]
+${tk===0 ? '⚠ 매매 0건 — 자동매매가 안 돌았거나 진입 조건 미달.\n   백테스트 끝까지 돌렸는지 확인. autoState.cfg.brk가 true면 연속 손절로 중지됐을 수도.' :
+  sells===0 ? '⚠ 매도 0건 — 매수만 했음. 마감 청산이 작동 안 함. 백테스트 끝나면 청산되는지 확인.' :
+  journals===0 ? '⚠ 매매는 있는데 일지 0개 — autoSaveJournalOnTrade 실패. AI 일지 생성 버튼 눌러서 확인.' :
+  '✅ 데이터 정상'}
+━━━━━━━━━━━━━━━━━━━━━━`;
+  alert(msg);
+  console.log('[TraidAIr 디버그]', { mock, autoState, backtest:window.backtest, WGS, sectorInfo:window._sectorInfo, journals:JSON.parse(localStorage.getItem('htsJournals')||'{}') });
+  return msg;
+};
 
 // Claude 호출 헬퍼 — 모든 호출에 멘토 시스템 프롬프트 자동 첨부
 async function claudeAsk(opts){
@@ -3990,6 +4032,7 @@ function submitOrder(autoExec){
     const newOrigQty=prevSO?(prevSO.origQty||0)+qty:qty;
     stopOrders[activeTk]={stop:stopPr,t1:t1Pr,t2:t2Pr,t1done:prevSO?prevSO.t1done:false,t2done:prevSO?prevSO.t2done:false,trail:trailMode,trailHigh:Math.max(pr,prevSO?.trailHigh||0),origQty:newOrigQty,origStop:stopPr};
     mock.trades.push({date:sim.date,tk:activeTk,nm:stk.nm,side:"buy",price:pr,pr:pr,ts:Date.now(),barTime:(sim.candles[sim.idx]||{}).t||"",qty,fee:Math.round(fee),pnl:0,creditType:credType,auto:autoExec||false,time:new Date().toLocaleTimeString("ko-KR",{hour:"2-digit"})});
+    console.log('[BUY]', sim.date, stk.nm, qty+'주', pr+'원', '| total trades:', mock.trades.length);
   checkBrainDong("buy",pr,qty,stk);
   } else {
     const pos=mock.positions[activeTk];
@@ -4009,6 +4052,7 @@ function submitOrder(autoExec){
       }
     }
     mock.trades.push({date:sim.date,tk:activeTk,nm:stk.nm,side:"sell",price:pr,pr:pr,ts:Date.now(),barTime:(sim.candles[sim.idx]||{}).t||"",qty,fee:Math.round(fee+tax),pnl:Math.round(pnl),creditType:credType,auto:autoExec||false,time:new Date().toLocaleTimeString("ko-KR",{hour:"2-digit"})});
+    console.log('[SELL]', sim.date, stk.nm, qty+'주', pr+'원', '손익:', Math.round(pnl)+'원', '| total trades:', mock.trades.length);
   bdMetrics.lastSellTime=Date.now();checkBrainDong("sell",pr,qty,stk);
     if(cfg.al){const lr=-mock.todayPnl/cfg.capital*100;if(lr>=cfg.dayloss)showAlert("⚠ 일일 손실 한도",`한도 ${cfg.dayloss}% 도달\n매매 중단 권고.`);}
   }
@@ -8935,7 +8979,7 @@ function collectMarketCtx(){
 (function(){
   const meta = document.querySelector('meta[name="build-ts"]');
   const myBuildTs = meta ? meta.getAttribute('content') : '';
-  if(!myBuildTs || myBuildTs === '1779453181267') return; // 로컬 빌드 안 한 경우
+  if(!myBuildTs || myBuildTs === '1779454573318') return; // 로컬 빌드 안 한 경우
   let reloaded = false;
   async function check(){
     if(reloaded) return;
