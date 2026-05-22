@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#ffffff">
-<meta name="build-ts" content="1779395886746">
+<meta name="build-ts" content="1779432686484">
 <title>TraidAIr HTS</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 
@@ -7322,16 +7322,19 @@ function renderJPage(){
     const aiTag = e.aiTradeCount ? `<span style="font-size:9px;background:rgba(139,92,246,.15);color:var(--p);padding:1px 5px;border-radius:3px;font-weight:700;margin-left:4px;">🤖 AI ${e.aiTradeCount}건</span>` : '';
     const manTag = e.manualTradeCount ? `<span style="font-size:9px;background:rgba(49,130,246,.12);color:var(--b);padding:1px 5px;border-radius:3px;margin-left:2px;">${e.manualTradeCount}건</span>` : '';
     const savedTag = e.aiGenerated ? '<span style="font-size:8px;color:var(--p);">🤖</span>' : '<span style="font-size:8px;color:var(--tm);">📝</span>';
+    const _rg = e.result_grade || ((e.pnl||0)>0 ? '수익' : (e.pnl||0)<0 ? '손실' : '무변동');
+    const _rgCol = (e.pnl||0)>0 ? 'var(--g)' : (e.pnl||0)<0 ? 'var(--r)' : 'var(--tm)';
+    const _pg = e.process_grade ? `<span style="font-size:8px;background:var(--bg);color:var(--ts);padding:1px 5px;border-radius:3px;margin-left:3px;">과정 ${e.process_grade}</span>` : '';
     return `<div class="jday">
       <div class="jd-hdr">
-        <span class="jd-dt">${e.date} ${savedTag}</span>
+        <span class="jd-dt">${e.date} ${savedTag} <span style="background:${_rgCol};color:#fff;padding:1px 6px;border-radius:4px;font-size:9px;font-weight:700;margin-left:4px;">결과 ${_rg}</span>${_pg}</span>
         <span style="display:flex;align-items:center;gap:6px;">
-          <span class="jd-pnl ${(e.pnl||0)>=0?"cu":"cd"}">${(e.pnl||0)>=0?"+":""}${(e.pnl||0).toLocaleString()}원</span>
+          <span class="jd-pnl ${(e.pnl||0)>=0?"cu":"cd"}" style="font-size:14px;font-weight:800;">${(e.pnl||0)>=0?"+":""}${(e.pnl||0).toLocaleString()}원</span>
           <button data-copy="${e.date}" onclick="copyJEntry('${e.date}')" title="마크다운 복사" style="background:none;border:1px solid var(--br);border-radius:4px;color:var(--ts);font-size:10px;cursor:pointer;padding:1px 6px;">📋</button>
           <button onclick="delJEntry('${e.date}')" title="삭제" style="background:none;border:none;color:var(--tm);font-size:14px;cursor:pointer;padding:0 4px;line-height:1;">&times;</button>
         </span>
       </div>
-      <div class="jd-sub">${e.total||0}건 ${aiTag}${manTag} · 승률${e.total?Math.round(e.wins/e.total*100):0}%</div>
+      <div class="jd-sub">${e.total||0}건 ${aiTag}${manTag} · 승률${e.total?Math.round(e.wins/e.total*100):0}% ${(e.pnl||0)>0 && e.total && Math.round(e.wins/e.total*100)<50 ? '<span style="color:var(--g);font-size:9px;font-weight:700;">📈 손익비 우수</span>' : ''}${(e.pnl||0)<0 && e.total && Math.round(e.wins/e.total*100)>=60 ? '<span style="color:var(--r);font-size:9px;font-weight:700;">⚠ 손익비 불량</span>' : ''}</div>
       ${e.summary?`<b style="font-size:12px;">${e.summary}</b>`:e.trades?`<div style="font-size:10px;color:var(--tm);">매매 ${e.total||0}건 기록됨</div>`:''}
       <div class="jd-ai" style="margin-top:5px;line-height:1.7;">
         ${e.market_context?`<div class="jd-note" style="border-left:3px solid var(--b);padding-left:6px;margin-bottom:3px;font-size:10px;">📊 ${e.market_context}</div>`:""}
@@ -8865,7 +8868,7 @@ function collectMarketCtx(){
 (function(){
   const meta = document.querySelector('meta[name="build-ts"]');
   const myBuildTs = meta ? meta.getAttribute('content') : '';
-  if(!myBuildTs || myBuildTs === '1779395886746') return; // 로컬 빌드 안 한 경우
+  if(!myBuildTs || myBuildTs === '1779432686484') return; // 로컬 빌드 안 한 경우
   let reloaded = false;
   async function check(){
     if(reloaded) return;
@@ -9255,7 +9258,26 @@ async function autoSaveJournalOnTrade(forceDate){
   try{
     const logs=(window._decisionLog||[]).slice(-20).map(function(d){return '['+(d.phase||'')+'] '+d.title+': '+(d.body||'');}).join('\n');
     const _lecJ = typeof getLectureContext==='function' ? getLectureContext(2500) : '';
-    const prompt='단타 트레이딩 멘토. 오늘 매매를 강의 원칙 기준으로 평가해서 매매일지 작성.\n\n'+_lecJ+'\n날짜: '+date+'\n매매내역:\n'+str+'\n\nAI결정로그:\n'+(logs||'없음')+'\n\n손익: '+(pnl>=0?'+':'')+pnl.toLocaleString()+'원 ('+total+'건 중 '+wins+'건 수익)\n\n위 강의 원칙 기준으로 평가해줘. JSON만:\n{"why_bought":"매수이유 (어떤 강의 규칙 적용?)","why_sold":"청산이유 (강의 청산 조건 부합?)","good":"잘한점 (강의 기준)","bad":"반성할점 — 강의 어떤 규칙을 어겼나","psychology":"심리평가","improvement":"개선행동 (강의에서 권장하는 행동)","phase_check":"적용 Phase/원칙과 준수여부","mentor_comment":"멘토한마디 (강의 핵심 한 줄 인용)"}';
+    const _winRate = total>0 ? Math.round(wins/total*100) : 0;
+    const _resultGrade = pnl>0 ? '수익(GAIN)' : pnl<0 ? '손실(LOSS)' : '무변동(FLAT)';
+    const prompt='단타 트레이딩 멘토. 오늘 매매를 강의 원칙 기준으로 평가해서 매매일지 작성.\n\n'+_lecJ+
+      '\n날짜: '+date+
+      '\n결과: '+_resultGrade+' / 손익 '+(pnl>=0?'+':'')+pnl.toLocaleString()+'원 / 승률 '+_winRate+'% ('+wins+'/'+total+')'+
+      '\n\n매매내역:\n'+str+
+      '\n\nAI결정로그:\n'+(logs||'없음')+
+      '\n\n[평가 원칙 — 반드시 지킬 것]\n'+
+      '1. 결과(손익)와 과정(원칙 준수)을 분리해서 평가\n'+
+      '2. 손익이 +면 절대 "실패"라고 하지 말 것. 과정에 문제 있어도 "결과는 성공, 다만 X 위험"으로 표현\n'+
+      '3. 손익이 -면 "실패" 명확히 — 단 과정이 좋았다면 "과정 OK였으나 시장 운"으로 구분\n'+
+      '4. 승률 낮아도 손익 +면 "큰 익절 + 작은 손절" 손익비 잘 잡았다는 신호 — 칭찬할 것\n'+
+      '5. 승률 높아도 손익 -면 "작은 익절 + 큰 손절" 손익비 잘못 — 강하게 지적\n\n'+
+      'JSON만:\n'+
+      '{"result_grade":"성공/실패/혼합","process_grade":"성공/실패/혼합",'+
+      '"summary":"한줄 총평(결과와 과정 모두 언급)",'+
+      '"why_bought":"매수이유","why_sold":"청산이유",'+
+      '"good":"잘한점","bad":"반성할점(손익+면 부드럽게)",'+
+      '"psychology":"심리평가","improvement":"개선행동",'+
+      '"phase_check":"적용Phase","mentor_comment":"멘토한마디(결과/과정 통합)"}';
     // fetch + timeout (30초) — 멈춤 방지
     const ctrl = new AbortController();
     const _timer = setTimeout(()=>ctrl.abort(), 30000);
@@ -9266,7 +9288,7 @@ async function autoSaveJournalOnTrade(forceDate){
     const m=text.match(/\{[\s\S]*\}/);
     if(!m)throw new Error('JSON파싱실패');
     const ai=JSON.parse(m[0]);
-    const aiEntry={summary:date+' 매매 '+tt.length+'건 / '+(pnl>=0?'+':'')+pnl.toLocaleString()+'원',why_bought:ai.why_bought||'-',why_sold:ai.why_sold||'-',good:ai.good||'-',bad:ai.bad||'-',psychology:ai.psychology||'-',improvement:ai.improvement||'-',phase_check:ai.phase_check||'-',mentor_comment:ai.mentor_comment||'-',aiGenerated:true,trades:str};
+    const aiEntry={summary:ai.summary||(date+' 매매 '+tt.length+'건 / '+(pnl>=0?'+':'')+pnl.toLocaleString()+'원'),result_grade:ai.result_grade||(pnl>0?'성공':pnl<0?'실패':'혼합'),process_grade:ai.process_grade||'-',why_bought:ai.why_bought||'-',why_sold:ai.why_sold||'-',good:ai.good||'-',bad:ai.bad||'-',psychology:ai.psychology||'-',improvement:ai.improvement||'-',phase_check:ai.phase_check||'-',mentor_comment:ai.mentor_comment||'-',aiGenerated:true,trades:str};
     saveJEntry(date,aiEntry,pnl,wins,total,str);
     // 학습 메모리 누적 (다음 매매 결정에 자동 반영)
     try{ appendLesson(date, ai); }catch(_e){}
