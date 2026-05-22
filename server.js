@@ -262,14 +262,25 @@ const server = http.createServer(async (req, res) => {
         res.end(JSON.stringify({ error: 'Claude API 키 없음. 설정창에서 키를 입력하세요.' }));
         return;
       }
-      // 시스템 프롬프트가 누락된 호출에 멘토 페르소나 자동 주입
+      // 시스템 프롬프트 자동 주입 + prompt caching 적용 (input 토큰 ~90% 절감)
+      // 1024 토큰 이상이어야 cache 적용됨. MENTOR_SYSTEM은 약 1100자/약 800토큰
+      // → ephemeral 5분 캐시. 같은 system 반복 호출 시 input 비용 1/10
       let bodyToSend = body;
       try{
         const parsed = JSON.parse(body);
-        if(!parsed.system){
-          parsed.system = MENTOR_SYSTEM;
-          bodyToSend = JSON.stringify(parsed);
+        // system이 문자열이면 cache_control 가능한 구조로 변환
+        if(typeof parsed.system === 'string' && parsed.system){
+          parsed.system = [{ type:'text', text: parsed.system, cache_control:{ type:'ephemeral' } }];
         }
+        if(!parsed.system){
+          parsed.system = [{ type:'text', text: MENTOR_SYSTEM, cache_control:{ type:'ephemeral' } }];
+        }
+        // 단순/빠른 작업은 haiku 4.5로 자동 다운그레이드 (cost 1/3)
+        // model이 sonnet-4-5인데 max_tokens가 300 이하면 haiku로 변경
+        if(parsed.model === 'claude-sonnet-4-5' && (parsed.max_tokens||0) <= 300){
+          parsed.model = 'claude-haiku-4-5';
+        }
+        bodyToSend = JSON.stringify(parsed);
       }catch(e){ /* 파싱 실패 시 원본 그대로 전달 */ }
       const opts = {
         hostname: 'api.anthropic.com',

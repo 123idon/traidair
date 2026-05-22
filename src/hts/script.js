@@ -3631,7 +3631,8 @@ async function _runScreeningAsync(){
 function runAutoStep(cs){
   if(!autoState.running)return;
   // 백테스트 중 봉 단위 강세섹터 갱신 (시뮬 시간 기준 60봉마다 = 약 1시간)
-  if(window.backtest&&backtest.running && (sim.idx % 60 === 0) && sim.idx > 0){
+  // 백테스트: 봉 단위로 강세섹터 갱신 (1분봉 기준 120봉=2시간 마다 → 비용 ↓)
+  if(window.backtest&&backtest.running && (sim.idx % 120 === 0) && sim.idx > 0){
     if(typeof refreshHotSectors==='function' && !window._sectorRefreshing){
       window._sectorRefreshing = true;
       refreshHotSectors(false).finally(()=>{ window._sectorRefreshing = false; });
@@ -5676,7 +5677,7 @@ JSON만:
  {"title":"기능명 (5자내외)","why":"왜 필요한지 통계 근거 1줄","what":"무엇을 만들지 2~3줄","impact":"예상 성능 영향","priority":"높음/중간/낮음"},
  ...총 3개
 ]}`;
-    const res = await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:1200,messages:[{role:'user',content:prompt}]})});
+    const res = await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:600,messages:[{role:'user',content:prompt}]})});
     const data = await res.json();
     const txt = (data.content&&data.content[0]&&data.content[0].text)||'{}';
     const m = txt.match(/\{[\s\S]*\}/);
@@ -7118,7 +7119,7 @@ window.onload=()=>{
   // 차트 큰 헤더 초기화 + 강세 섹터 패널 초기 렌더 / 주기적 갱신
   setTimeout(()=>{updChartHeader&&updChartHeader();renderHotSectors&&renderHotSectors();refreshHotSectors&&refreshHotSectors(false);updateLearnerStage&&updateLearnerStage();renderLiveTrades&&renderLiveTrades();refreshLecture&&refreshLecture(false);}, 400);
   // 5분마다 강세 섹터 자동 갱신 (모의투자라도 변동이 보이게)
-  setInterval(()=>{refreshHotSectors&&refreshHotSectors(false);}, 5*60*1000);
+  setInterval(()=>{refreshHotSectors&&refreshHotSectors(false);}, 30*60*1000); // 30분
 };
 // 강세 섹터 캐시 렌더링 (localStorage에서 가져옴)
 function renderHotSectors(){
@@ -7162,7 +7163,7 @@ function renderHotSectors(){
 let _hotSecLast=0;
 async function refreshHotSectors(force){
   const now=Date.now();
-  if(!force && now-_hotSecLast < 5*60*1000) return; // 5분 쿨다운
+  if(!force && now-_hotSecLast < 30*60*1000) return; // 30분 쿨다운 (이전 5분 → 비용 6배 절감)
   _hotSecLast=now;
   const btn=document.getElementById('hotSecRefreshBtn');
   if(btn){btn.textContent='…';btn.disabled=true;}
@@ -7239,7 +7240,7 @@ async function syncCandidatesToWatchlist(){
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
         model:'claude-sonnet-4-5',
-        max_tokens:1500,
+        max_tokens:900,
         messages:[{role:'user',content:prompt}]
       })
     });
@@ -7440,7 +7441,7 @@ async function autoSaveJournalOnTrade(forceDate){
     // fetch + timeout (30초) — 멈춤 방지
     const ctrl = new AbortController();
     const _timer = setTimeout(()=>ctrl.abort(), 30000);
-    const res = await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},signal:ctrl.signal,body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:800,messages:[{role:'user',content:prompt}]})});
+    const res = await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},signal:ctrl.signal,body:JSON.stringify({model:'claude-haiku-4-5',max_tokens:500,messages:[{role:'user',content:prompt}]})});
     clearTimeout(_timer);
     const data=await res.json();
     const text=(data.content&&data.content[0]&&data.content[0].text)||'{}';
