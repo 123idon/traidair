@@ -61,14 +61,14 @@ window.addEventListener('error', function(e){
   window._jsErrors.push(info);
   if(window._jsErrors.length > 100) window._jsErrors.shift();
   console.error('[JS ERROR]', info);
-  try{ addDecisionLog && addDecisionLog('🐛 JS 에러', (e.message||'').slice(0,80), 'NOGO'); }catch(_e){}
+  // AI 현황 결정 로그에는 띄우지 않음 — 노이즈 방지. 🔍 디버그 패널에서만 확인 가능.
 });
 window.addEventListener('unhandledrejection', function(e){
   const info = { ts: Date.now(), msg: 'Promise rejected: '+(e.reason && (e.reason.message || e.reason.toString()) || 'unknown') };
   window._jsErrors.push(info);
   if(window._jsErrors.length > 100) window._jsErrors.shift();
   console.error('[PROMISE REJECT]', info);
-  try{ addDecisionLog && addDecisionLog('🐛 비동기 에러', info.msg.slice(0,80), 'NOGO'); }catch(_e){}
+  // AI 현황엔 안 띄움 — 사용자 화면 노이즈 방지
 });
 
 // ── 디버그 패널 — 사용자가 직접 상태 확인 가능 ──
@@ -1619,6 +1619,7 @@ async function stopBacktest(){
   _backtestReport();
 }
 async function _backtestLoadDay(dateStr){
+  if(!window.backtest || !backtest.running) return; // ★ 정지된 백테스트 재시작 차단
   backtest.currentDate=dateStr;
   sim.date=dateStr;
   const md=document.getElementById('mockDate'); if(md) md.value=dateStr;
@@ -1670,6 +1671,7 @@ async function _backtestLoadDay(dateStr){
   }, _wait);
 }
 async function _backtestEndOfDay(){
+  if(!window.backtest || !backtest.running) return; // ★ 정지 후 호출되더라도 즉시 종료
   // 현재 날짜 결과 집계
   const dt=backtest.currentDate;
   // ★ 안전망: 다음날 시작 전 모든 보유 종목 강제 청산 (당일매매 원칙)
@@ -5504,6 +5506,9 @@ function renderStats(){
   renderStatsEnhanced();
   renderSymbolPnl();
   renderTimeline();
+  // 주간/월간 통계 자동 호출
+  try{ renderWeeklyStats && renderWeeklyStats(); }catch(e){ console.warn('weekly:', e.message); }
+  try{ renderMonthlyStats && renderMonthlyStats(); }catch(e){ console.warn('monthly:', e.message); }
   // 📅 날짜별 손익 텍스트 리스트
   try{
     const dpEl = document.getElementById('dailyPnlList');
@@ -5603,8 +5608,11 @@ function _renderJEntry(e){
 
 function renderJPage(){
   const js=safeParseJSON(localStorage.getItem("htsJournals"), "{}");
-  // 안전 sort: date 누락된 entry 필터링 후 정렬
-  const entries=Object.values(js).filter(e=>e && e.date).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  // ★ 키 자체가 date — entry에 date 필드 없어도 키로 보강
+  const entries=Object.entries(js)
+    .map(([key, v]) => ({...(v||{}), date: (v && v.date) || key}))
+    .filter(e=>e.date)
+    .sort((a,b)=>String(b.date).localeCompare(String(a.date)));
   const jlEl = document.getElementById('journalList');
   console.log('[renderJPage] entries:', entries.length, 'journalList exists:', !!jlEl);
   // 통계/차트는 항상 갱신 (거래 없어도 빈 카드 표시)
