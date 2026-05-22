@@ -5541,6 +5541,22 @@ function _journalStatsData(){
 
 function renderJournalStats(){
   const d = _journalStatsData();
+  const tradesLen = (mock.trades||[]).length;
+  // 빈 상태 안내
+  if(tradesLen === 0){
+    const kpiEl = document.getElementById('jKpiRow');
+    if(kpiEl){
+      kpiEl.innerHTML = `<div style="grid-column:1/-1;background:rgba(255,153,0,0.08);border:1px dashed var(--a);border-radius:8px;padding:14px;text-align:center;font-size:11px;line-height:1.6;color:var(--ts);">
+        📊 매매 내역이 0건입니다.<br>
+        <b>백테스트를 돌리거나 수동 매매</b>해서 거래가 발생해야 통계/일지가 채워져요.<br>
+        <span style="font-size:9px;color:var(--tm);">자동매매가 켜져있어도 진입 조건을 충족하는 종목이 없으면 매매가 안 됩니다.</span>
+      </div>`;
+    }
+    const cv = document.getElementById('jPnlChart');
+    if(cv){ const ctx=cv.getContext('2d'); ctx.clearRect(0,0,cv.width,cv.height); ctx.fillStyle='#8c9db5'; ctx.font='11px sans-serif'; ctx.textAlign='center'; ctx.fillText('매매가 발생하면 누적 손익이 표시됩니다', cv.width/2, cv.height/2); }
+    const bd = document.getElementById('jBreakdown'); if(bd) bd.innerHTML='';
+    return;
+  }
   const kpiEl = document.getElementById('jKpiRow');
   if(kpiEl){
     const pnlCol = d.totalPnl>=0 ? 'var(--g)' : 'var(--r)';
@@ -5549,7 +5565,9 @@ function renderJournalStats(){
       kpi('총 손익', (d.totalPnl>=0?'+':'')+d.totalPnl.toLocaleString()+'원', pnlCol) +
       kpi('승률', d.sells.length ? d.winRate.toFixed(1)+'%' : '-') +
       kpi('손익비', d.rr>0 ? '1:'+d.rr.toFixed(2) : '-') +
-      kpi('매매일', d.curve.length+'일');
+      kpi('매매일', d.curve.length+'일') +
+      kpi('전체 매매', tradesLen+'건', 'var(--b)') +
+      kpi('매도 완료', d.sells.length+'건');
   }
   // 누적손익 차트
   const cv = document.getElementById('jPnlChart');
@@ -5734,6 +5752,7 @@ async function genAllJournals(ev){
     }
     let done = 0, fail = 0;
     toast.innerHTML = `🤖 일지 작성 중 0 / ${todo.length}`;
+    let _consecFail = 0;
     for(const date of todo){
       const _t0 = Date.now();
       let _timerId;
@@ -5743,14 +5762,24 @@ async function genAllJournals(ev){
       try{
         await Promise.race([
           autoSaveJournalOnTrade(date),
-          new Promise((_, rej) => setTimeout(()=>rej(new Error('timeout 35s')), 35000)),
+          new Promise((_, rej) => setTimeout(()=>rej(new Error('timeout 15s — Claude 한도/네트워크')), 15000)),
         ]);
         done++;
+        _consecFail = 0;
       }catch(e){
         fail++;
+        _consecFail++;
         console.warn('일지 실패 '+date+':', e.message);
         toast.innerHTML = `⚠ ${date} 실패 (${e.message}) — 다음으로...`;
-        await new Promise(r=>setTimeout(r,800));
+        await new Promise(r=>setTimeout(r,500));
+        // 연속 3회 실패 → API 한도/네트워크 문제 → 중단
+        if(_consecFail >= 3){
+          clearInterval(_timerId);
+          toast.innerHTML = `❌ Claude API 응답 실패 3연속 — Anthropic 한도/네트워크 확인 필요. ${done}/${todo.length} 완료, 중단합니다.`;
+          setTimeout(()=>{ try{toast.remove();}catch(_e){} }, 5000);
+          renderJPage();
+          return;
+        }
       }finally{
         clearInterval(_timerId);
       }
@@ -7452,7 +7481,7 @@ async function autoSaveJournalOnTrade(forceDate){
       '"phase_check":"적용Phase","mentor_comment":"멘토한마디(결과/과정 통합)"}';
     // fetch + timeout (30초) — 멈춤 방지
     const ctrl = new AbortController();
-    const _timer = setTimeout(()=>ctrl.abort(), 30000);
+    const _timer = setTimeout(()=>ctrl.abort(), 15000); // 15초 — Claude 응답 느리면 빠르게 fail
     const res = await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},signal:ctrl.signal,body:JSON.stringify({model:'claude-haiku-4-5',max_tokens:500,messages:[{role:'user',content:prompt}]})});
     clearTimeout(_timer);
     const data=await res.json();
