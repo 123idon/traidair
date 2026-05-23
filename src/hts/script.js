@@ -2789,35 +2789,54 @@ JSON만 답해:
 // ═══════════════════════════════
 async function runAIPatternAnalysis(){
   const el=document.getElementById("aiPatternResult"); if(!el)return;
-  const trades=mock.trades||[];
-  if(trades.length<3){el.textContent="거래 내역이 3개 이상 있어야 분석 가능합니다.";return;}
-  el.innerHTML='<span style="color:var(--tm);font-style:italic;">AI 패턴 분석 중...</span>';
-  const wins=trades.filter(t=>t.pnl>0);
-  const losses=trades.filter(t=>t.pnl<0);
-  const summary=`총 ${trades.length}회 | 수익 ${wins.length}회 | 손실 ${losses.length}회
+  const trades=(mock.trades||[]).filter(t=>t.side==='sell');
+  if(trades.length<3){el.textContent="매도 내역이 3개 이상 있어야 분석 가능합니다.";return;}
+  el.innerHTML='<span style="color:var(--tm);font-style:italic;">AI 패턴 분석 중... (전체 '+trades.length+'건 분석)</span>';
+  const wins=trades.filter(t=>(t.pnl||0)>0);
+  const losses=trades.filter(t=>(t.pnl||0)<0);
+  const avgWin=wins.length?Math.round(wins.reduce((a,t)=>a+(t.pnl||0),0)/wins.length):0;
+  const avgLoss=losses.length?Math.round(losses.reduce((a,t)=>a+(t.pnl||0),0)/losses.length):0;
+  const totalPnl=trades.reduce((a,t)=>a+(t.pnl||0),0);
+  const summary=`총 매도 ${trades.length}회 | 수익 ${wins.length}회 | 손실 ${losses.length}회
 승률 ${(wins.length/trades.length*100).toFixed(0)}%
-평균 수익: ${wins.length?Math.round(wins.reduce((a,t)=>a+t.pnl,0)/wins.length).toLocaleString():"0"}원
-평균 손실: ${losses.length?Math.round(losses.reduce((a,t)=>a+t.pnl,0)/losses.length).toLocaleString():"0"}원
-최대 연속 손실: ${mock.lossSeries}회`;
+평균 수익: ${avgWin.toLocaleString()}원 | 평균 손실: ${avgLoss.toLocaleString()}원
+총 손익: ${totalPnl>=0?'+':''}${totalPnl.toLocaleString()}원`;
+  const winDetail=wins.length?wins.slice(-15).map(t=>`+${Math.round(t.pnl||0).toLocaleString()}원 ${t.nm} ${(t.price||0).toLocaleString()}원 (${t.time||t.barTime||''}) ${t.auto?'AI':'수동'}`).join('\n'):'(수익 거래 없음)';
+  const lossDetail=losses.length?losses.slice(-15).map(t=>`${Math.round(t.pnl||0).toLocaleString()}원 ${t.nm} ${(t.price||0).toLocaleString()}원 (${t.time||t.barTime||''}) ${t.auto?'AI':'수동'}`).join('\n'):'(손실 거래 없음)';
+  const byStock={};
+  trades.forEach(t=>{
+    if(!byStock[t.nm]) byStock[t.nm]={wins:0,losses:0,pnl:0};
+    if((t.pnl||0)>0) byStock[t.nm].wins++; else byStock[t.nm].losses++;
+    byStock[t.nm].pnl+=(t.pnl||0);
+  });
+  const stockSummary=Object.entries(byStock).sort((a,b)=>b[1].pnl-a[1].pnl)
+    .map(([nm,s])=>`${nm}: ${s.wins}승${s.losses}패 ${s.pnl>=0?'+':''}${Math.round(s.pnl).toLocaleString()}원`).join(' | ');
   try{
     const res=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({model:"claude-sonnet-4-5",max_tokens:600,
+      body:JSON.stringify({model:"claude-sonnet-4-5",max_tokens:800,
         messages:[{role:"user",content:`단타 트레이딩 멘토. Phase 12 복기 분석을 해줘.
 
 매매 통계:
 ${summary}
 
-최근 거래:
-${trades.slice(-10).map(t=>`${t.side==="buy"?"매수":"매도"} ${t.nm} ${t.price?.toLocaleString()}원 ${t.pnl>=0?"+":""}${t.pnl?.toLocaleString()}원`).join("\n")}
+★ 수익 거래 내역 (최근 ${Math.min(15,wins.length)}건/${wins.length}건):
+${winDetail}
+
+★ 손실 거래 내역 (최근 ${Math.min(15,losses.length)}건/${losses.length}건):
+${lossDetail}
+
+종목별 성적:
+${stockSummary}
 
 분석해줘:
-1. 수익 나는 패턴 Top 2 (구체적으로)
-2. 손실 나는 패턴 Top 2 (구체적으로)
+1. 수익 나는 패턴 Top 2 (수익 거래에서 공통점 추출 — 시간대/종목/진입가격대/AI여부)
+2. 손실 나는 패턴 Top 2 (손실 거래에서 공통점 추출)
 3. 강점 매매 스타일 (한줄)
 4. 개선 우선순위 1가지
 5. 개인화 원칙 제안 (진입/손절/익절 각 1줄)
 
-각 항목에 Phase 번호 포함. 200자 이내.`}]})});
+수익 거래가 있으면 반드시 패턴을 찾아줘. 없으면 "수익 데이터 부족"으로.
+각 항목에 Phase 번호 포함. 300자 이내.`}]})});
     const data=await res.json();
     const text=data.content?.[0]?.text||"분석 실패";
     el.style.whiteSpace="pre-wrap";
