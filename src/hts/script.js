@@ -3643,8 +3643,8 @@ function stopAuto(){
   try{ addMsg('ai','⏹ AI 자동매매 중지.'); }catch(_e){}
 }
 function scheduleScreening(){
-  if(!autoState.running)return;
-  runScreening();
+  if(!autoState.running && (!window.backtest || !backtest.running)) return;
+  try{ runScreening(); }catch(e){ console.warn('screening err:', e); }
   // 배속이 빠를수록 더 자주 스크리닝 (그래야 봉을 따라잡음)
   const _spd = (sim&&sim.speed)||1;
   const interval = _spd >= 1000 ? 120 : _spd >= 300 ? 300 : _spd >= 60 ? 800 : 5000;
@@ -8212,14 +8212,6 @@ async function _saveJournalToNotion(date,entry,pnl,trades){
     addMsg('ai','📝 Notion 일지 저장 완료');
   }catch(e){console.warn('Notion저장실패:',e.message);}
 }
-
-// scheduleScreening에 종목 선택 통합
-function scheduleScreening(){
-  if(!autoState.running && (!window.backtest || !backtest.running)) return;
-  try{ runScreening(); }catch(e){ console.warn('screening err:', e); }
-  autoTimer=setTimeout(scheduleScreening, 5000);
-}
-
 
 // ─── AI 실시간 사고 패널 ───
 function updAIThought(s){
