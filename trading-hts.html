@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#ffffff">
-<meta name="build-ts" content="1779561100755">
+<meta name="build-ts" content="1779561847616">
 <title>TraidAIr HTS</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 
@@ -2271,7 +2271,8 @@ function rng32(seed){let a=seed|0;return()=>{a=a+0x6D2B79F5|0;let t=Math.imul(a^
 // _genSimCandles와 동일한 시드 로직 사용 — 일관된 데이터
 function _peekSimCandlesFor(tk, dateStr, untilIdx){
   try{
-    const stk = (typeof STOCKS!=='undefined' ? STOCKS : []).find(s=>s.tk===tk) || {tk, nm:tk, base:50000};
+    const stk = (typeof STOCKS!=='undefined' ? STOCKS : []).find(s=>s.tk===tk);
+    if(!stk) return [];
     let base = stk.base || 50000;
     const tkSeed = tk.split('').reduce((a,c)=>a+c.charCodeAt(0),0);
     const intervals = parseInt((typeof sim!=='undefined' && sim.tf) || '1') || 1;
@@ -6291,6 +6292,14 @@ async function execAutoBuy(pr, stk, score, techTag){
   var _btRunning = window.backtest && backtest.running;
   if(!autoState.running && !_btRunning)return;
   if(autoState.level<3 && !_btRunning)return;
+  // 가격 이상 감지: base 대비 50% 이상 차이나면 차단
+  if(stk.base && pr > 0){
+    var _diff = Math.abs(pr - stk.base) / stk.base;
+    if(_diff > 0.5){
+      addDecisionLog('['+stk.nm+'] ⚠ 가격 이상','실행가 '+fW(pr)+' vs 기준가 '+fW(stk.base)+' ('+Math.round(_diff*100)+'% 차이) — 매수 차단','NOGO');
+      return;
+    }
+  }
   if(mock.lossSeries>=3&&autoState.cfg.brk){
     addMsg("ai","⏸ 연속 손절 3회 — 이번 매수 건너뜀\n[Phase 11: 뇌동매매 방지]");
     // 백테스트 중에는 stopAuto 호출 금지 (자동매매 영구 중단 방지)
@@ -9723,7 +9732,7 @@ function collectMarketCtx(){
 (function(){
   const meta = document.querySelector('meta[name="build-ts"]');
   const myBuildTs = meta ? meta.getAttribute('content') : '';
-  if(!myBuildTs || myBuildTs === '1779561100755') return; // 로컬 빌드 안 한 경우
+  if(!myBuildTs || myBuildTs === '1779561847616') return; // 로컬 빌드 안 한 경우
   let reloaded = false;
   async function check(){
     if(reloaded) return;
@@ -10036,9 +10045,9 @@ async function syncCandidatesToWatchlist(){
     let _rejected = 0;
     result.sectors.forEach(function(sec){
       (sec.stocks||[]).forEach(function(stk){
-        // 종목코드 정규화: 5자리도 허용, 앞에 0 추가
+        // 종목코드 정규화: 4~5자리도 허용, 6자리로 패딩
         let _tk = String(stk.tk||'').trim().replace(/[^\d]/g,'');
-        if(_tk.length===5) _tk = '0'+_tk;
+        while(_tk.length>0 && _tk.length<6) _tk = '0'+_tk;
         // 코드가 유효하지 않으면 종목명으로 STOCKS에서 검색
         if(!/^\d{6}$/.test(_tk) && stk.nm){
           var _found = STOCKS.find(function(s){ return s.nm === stk.nm || s.nm.indexOf(stk.nm)!==-1 || stk.nm.indexOf(s.nm)!==-1; });
