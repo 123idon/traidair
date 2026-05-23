@@ -1590,10 +1590,11 @@ function openLearningMemo(){
         `).join('') : '<div style="font-size:11px;color:var(--tm);padding:20px;text-align:center;">아직 학습된 노트가 없습니다. 백테스트나 매매를 마치면 자동으로 쌓여요.</div>'}
       </div>
       <div style="margin-top:10px;display:flex;justify-content:flex-end;gap:6px;flex-wrap:wrap;">
-        <button class="ibtn" onclick="rebuildLearningFromJournals();document.getElementById('lmDlg').remove();openLearningMemo();" style="font-size:10px;border:1.5px solid var(--g);color:var(--g);">일지에서 복구</button>
-        <button class="ibtn" onclick="_autoTrimLearning();saveToServer('htsLearningMemory',JSON.stringify(learningMemory));document.getElementById('lmDlg').remove();openLearningMemo();addMsg('ai','🧹 빠른 정리 완료 ('+learningMemory.length+'개 남음)');" style="font-size:10px;border:1.5px solid var(--a);color:var(--a);">빠른 정리</button>
+        <button class="ibtn" onclick="restoreLearningBackup();document.getElementById('lmDlg').remove();openLearningMemo();" style="font-size:10px;border:1.5px solid var(--g);color:var(--g);">백업 복원</button>
+        <button class="ibtn" onclick="rebuildLearningFromJournals();document.getElementById('lmDlg').remove();setTimeout(openLearningMemo,300);" style="font-size:10px;border:1.5px solid var(--g);color:var(--g);">일지에서 복구</button>
+        <button class="ibtn" onclick="_backupLearning();_autoTrimLearning();saveToServer('htsLearningMemory',JSON.stringify(learningMemory));document.getElementById('lmDlg').remove();openLearningMemo();addMsg('ai','🧹 빠른 정리 완료 ('+learningMemory.length+'개 남음)');" style="font-size:10px;border:1.5px solid var(--a);color:var(--a);">빠른 정리</button>
         <button class="ibtn" onclick="cleanupLearning().then(()=>{try{document.getElementById('lmDlg').remove();openLearningMemo();}catch(e){}});" style="font-size:10px;background:var(--b);color:#fff;">AI 정리</button>
-        <button class="ibtn red" onclick="if(confirm('전체 학습 노트를 초기화할까요?')){learningMemory=[];learnedDates=[];saveToServer('htsLearningMemory','[]');saveToServer('htsLearnedDates','[]');document.getElementById('lmDlg').remove();updateLearnerStage();}" style="font-size:10px;">전체 초기화</button>
+        <button class="ibtn red" onclick="if(confirm('전체 학습 노트를 초기화할까요?')){_backupLearning();learningMemory=[];learnedDates=[];saveToServer('htsLearningMemory','[]');saveToServer('htsLearnedDates','[]');document.getElementById('lmDlg').remove();updateLearnerStage();}" style="font-size:10px;">전체 초기화</button>
       </div>
     </div>
   `;
@@ -3197,8 +3198,29 @@ function deleteLearningItem(idx){
   renderLearningMgmt();
   updateLearnerStage();
 }
+function _backupLearning(){
+  if(!learningMemory||!learningMemory.length) return;
+  const bk=JSON.stringify(learningMemory);
+  localStorage.setItem('htsLearningMemory_backup',bk);
+  saveToServer('htsLearningMemory_backup',bk);
+}
+function restoreLearningBackup(){
+  const bk=localStorage.getItem('htsLearningMemory_backup');
+  if(!bk){addMsg('ai','⚠ 백업 데이터가 없습니다.');return;}
+  try{
+    const arr=JSON.parse(bk);
+    if(!Array.isArray(arr)||!arr.length){addMsg('ai','⚠ 백업이 비어있습니다.');return;}
+    learningMemory=arr;
+    window.learningMemory=arr;
+    localStorage.setItem('htsLearningMemory',bk);
+    saveToServer('htsLearningMemory',bk);
+    updateLearnerStage();
+    addMsg('ai','✅ 학습 노트 백업 복원 완료: '+arr.length+'개');
+  }catch(e){addMsg('ai','⚠ 복원 실패: '+e.message);}
+}
 async function cleanupLearning(){
   if(!learningMemory||!learningMemory.length){showAlert('학습 노트','정리할 노트가 없습니다.');return;}
+  _backupLearning();
   const btn=document.querySelector('[onclick*="cleanupLearning"]');
   if(btn){btn.textContent='정리중...';btn.disabled=true;}
   const _backup = JSON.parse(JSON.stringify(learningMemory));
