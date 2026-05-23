@@ -8056,7 +8056,11 @@ async function syncCandidatesToWatchlist(){
     // CANDS 업데이트
     CANDS = newTks.slice(0,3).map(function(tk,i){
       const info = sectorInfo[tk]||{};
-      return {tk:tk, why:info.sector+'('+info.rank+'위) '+info.reason, score:95-i*5};
+      const _stk = STOCKS.find(function(s){return s.tk===tk;})||{};
+      const _why = info.sector
+        ? info.sector+'('+info.rank+'위) '+(info.reason||'')
+        : (_stk.sec ? _stk.sec+' — AI 선정' : 'AI 선정');
+      return {tk:tk, why:_why, score:95-i*5};
     });
     renderCands();
 
