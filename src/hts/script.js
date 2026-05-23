@@ -2478,8 +2478,8 @@ function submitOrder(autoExec){
   saveMock(); renderPort(); renderTradeLog(); updCash(); updPnl(); updCredLim();
   try{ renderLiveTrades&&renderLiveTrades(); }catch(_e){}
 
-  // ── KIS 실계좌/모의투자 실제 주문 전송
-  if (kisConfig.appKey && kisConfig.account) {
+  // ── KIS 실계좌/모의투자 실제 주문 전송 (백테스트 중에는 생략)
+  if (kisConfig.appKey && kisConfig.account && !(window.backtest && backtest.running)) {
     const orderType = oType === 'market' ? 'market' : 'limit';
     sendKisOrder(oSide, activeTk, qty, pr, orderType).then(result => {
       if (result.ok) {
@@ -4237,7 +4237,7 @@ async function _runScreeningAsync(){
       var data=await res.json();
       var text=(data.content&&data.content[0]&&data.content[0].text)||'{}';
       var m=text.match(/\{[\s\S]*\}/);
-      var ai=m?JSON.parse(m[0]):{};
+      var ai=m?robustJsonParse(text):{};
       if(ai.decision==='BUY'&&ai.confidence>=65){
         var _factorsTxt = ai.factors ? ('근거: '+ai.factors+'\n') : '';
         addDecisionLog('['+best.stk.nm+'] ✅ AI매수 (신뢰도'+ai.confidence+'%)',ai.reason+(ai.factors?(' | '+ai.factors):''),'Phase8통과');
@@ -7295,9 +7295,8 @@ async function runIdxAIPrediction(){
       messages:[{role:'user',content:`지금 시장 초단기(5~15분) 방향 예측. RSI:${rsi} 거래량:${vol}배 현재가:${lc.c.toLocaleString()}. JSON만: {"dir":"상승예상"또는"하락예상"또는"횡보","confidence":75}`}]
     },'지수예측');
     const text=data.content?.[0]?.text||'';
-    const m=text.match(/\{[\s\S]*\}/);
-    if(!m)return;
-    const p=JSON.parse(m[0]);
+    const p=robustJsonParse(text);
+    if(!p.dir) return;
     const el=document.getElementById('idx-pred');
     if(!el)return;
     const isUp=p.dir?.includes('상승');
@@ -7640,7 +7639,7 @@ RSI:${rsi} 거래량:${volR}배 종목:${STOCKS.find(s=>s.tk===activeTk)?.nm||ac
     const text=data.content?.[0]?.text||'';
     const m=text.match(/\{[\s\S]*\}/);
     if(!m) throw new Error('파싱실패');
-    const sectors=(JSON.parse(m[0]).sectors||[]).sort((a,b)=>b.score-a.score);
+    const sectors=(robustJsonParse(text).sectors||[]).sort((a,b)=>b.score-a.score);
     const prevNames=_prevSectorRank.map(s=>s.name);
     const newOnes=sectors.filter((s,i)=>i<3&&!prevNames.slice(0,3).includes(s.name));
     _prevSectorRank=sectors;
@@ -8118,9 +8117,7 @@ async function syncCandidatesToWatchlist(){
     // 코드 블록/주석 제거 (Claude가 ```json ... ``` 으로 감싸는 경우 대응)
     text = text.replace(/```json\s*/gi,'').replace(/```\s*/g,'').replace(/\/\/.*$/gm,'');
     // 마지막 } 까지 매칭 (greedy)
-    const m = text.match(/\{[\s\S]*\}/);
-    if(!m) throw new Error('JSON 파싱 실패');
-    const result = JSON.parse(m[0]);
+    const result = robustJsonParse(text);
     if(!result.sectors||!result.sectors.length) throw new Error('섹터 데이터 없음');
     if(result.market_view) addMsg('ai', '📊 오늘 시장: ' + result.market_view);
 
@@ -8376,7 +8373,8 @@ async function _autoSaveJournalOnTradeInner(date){
     const text=(data.content&&data.content[0]&&data.content[0].text)||'{}';
     const m=text.match(/\{[\s\S]*\}/);
     if(!m)throw new Error('JSON파싱실패');
-    const ai=JSON.parse(m[0]);
+    const ai=robustJsonParse(text);
+    if(!ai||!ai.summary) throw new Error('AI 응답 파싱 실패');
     const aiEntry={summary:ai.summary||(date+' 매매 '+tt.length+'건 / '+(pnl>=0?'+':'')+pnl.toLocaleString()+'원'),result_grade:ai.result_grade||(pnl>0?'성공':pnl<0?'실패':'혼합'),process_grade:ai.process_grade||'-',why_bought:ai.why_bought||'-',why_sold:ai.why_sold||'-',good:ai.good||'-',bad:ai.bad||'-',psychology:ai.psychology||'-',improvement:ai.improvement||'-',phase_check:ai.phase_check||'-',mentor_comment:ai.mentor_comment||'-',aiGenerated:true,trades:str};
     saveJEntry(date,aiEntry,pnl,wins,total,str);
     // 학습 메모리 누적 (다음 매매 결정에 자동 반영)
