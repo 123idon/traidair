@@ -3589,6 +3589,23 @@ async function _runScreeningAsync(){
       continue;
     }
 
+    // ═══ 눌림목 전용 필터 — 눌림목 패턴만 진입 ═══
+    var _pullbackOK = false;
+    if(lc.c >= lma20){
+      // 5MA 부근(±2%) 또는 5MA~20MA 구간 = 눌림목 영역
+      var _nearMA5 = Math.abs(lc.c - lma5) / (lma5||1) <= 0.02;
+      var _between = lc.c <= lma5 && lc.c >= lma20;
+      // 20MA 바로 위에서 지지 (20MA ±1.5%)
+      var _nearMA20 = lc.c >= lma20 && (lc.c - lma20) / (lma20||1) <= 0.015;
+      if(_nearMA5 || _between || _nearMA20) _pullbackOK = true;
+    }
+    if(!_pullbackOK){
+      addDecisionLog('['+stk.nm+'] 눌림목 아님',
+        lc.c < lma20 ? '20MA 이탈(추세붕괴)' : '5MA 이격 과대(추격매수 위험)',
+        'PASS');
+      continue;
+    }
+
     // ═══ 확신도 점수 (모든 필수 통과 후 가산) ═══
     var score=0,tags=[];
     // 1. 추세 강도
@@ -3635,6 +3652,10 @@ async function _runScreeningAsync(){
     window._priorScores[tk] = score;
     // 9. RSI 상승 반전 (이전 RSI<현재 RSI)
     if(lrsi > prevRsi+3 && lrsi<=60){score+=1;tags.push('RSI반전');}
+    // 10. 눌림목 품질 가산 — MA 지지 + 거래량 감소 후 회복
+    if(lc.c >= lma5*0.99 && lc.c <= lma5*1.01 && lma5>lma20){score+=2;tags.push('눌림목정석');}
+    var _v3avg = vls.length>=4 ? (vls[vls.length-4]+vls[vls.length-3]+vls[vls.length-2])/3 : avg5v;
+    if(_v3avg < avg5v*0.8 && volR >= 1.0){score+=1;tags.push('거래량회복');}
 
     scored.push({tk:tk,stk:stk,score:score,tags:tags,lc:lc,lma5:lma5,lrsi:lrsi,volR:volR});
   }
@@ -3657,7 +3678,7 @@ async function _runScreeningAsync(){
   });
   if(newCands.length){CANDS=newCands;renderCands();}
 
-  addDecisionLog('[중앙AI] 스크리닝',topList,'종목선정');
+  addDecisionLog('[중앙AI] 눌림목 스크리닝',topList,'종목선정');
 
   // ── 장중 갈아타기 로직 ──
   // 현재 보유 종목이 있고, 그 종목보다 훨씬 좋은 종목이 발견되면 청산 후 갈아타기
@@ -3746,8 +3767,9 @@ async function _runScreeningAsync(){
       var _learn = typeof getLearningContext==='function' ? getLearningContext(10) : '';
       var _lec = typeof getLectureContext==='function' ? getLectureContext(2500) : '';
       var prompt='단타 트레이딩 멘토. 자동매매 최종 진입 여부.\n\n'+
-        '⚠️ 절대 원칙: 아래 강의 매매 원칙은 100% 따라야 한다. 강의에 어긋나는 진입은 \"PASS\". 의심스러우면 PASS.\n'+
-        '강의에 명시된 매매 기법(눌림목/돌파/첫봉/갭상승/이슈테마)에 해당하지 않으면 \"PASS\".\n\n'+
+        '⚠️ 절대 원칙: 눌림목 매매만 진행. 다른 기법(돌파/첫봉/갭상승/이슈테마/스캘핑)은 모두 \"PASS\".\n'+
+        '눌림목 조건: 상승추세(20MA↑) + 5MA 또는 20MA 지지 + 거래량 감소 후 회복. 이 조건 불충족이면 \"PASS\".\n'+
+        '아래 강의 매매 원칙도 100% 따를 것. 의심스러우면 PASS.\n\n'+
         _lec +
         _learn +
         '【종목】 '+best.stk.nm+'('+best.tk+') '+best.stk.sec+'\n'+
