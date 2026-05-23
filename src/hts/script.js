@@ -1058,35 +1058,7 @@ function drawChart(){
     var _trades=(mock.trades||[]).filter(function(t){
       return t.tk===activeTk&&t.date===sim.date&&(t.side==='buy'||t.side==='sell');
     });
-    _trades.forEach(function(t){
-      var matchIdx=-1;
-      if(t.barTime){
-        for(var bi=0;bi<cs.length;bi++){
-          if(cs[bi].t===t.barTime){matchIdx=bi;break;}
-        }
-      }
-      if(matchIdx<0) return;
-      var x=toX(matchIdx);
-      var _tpr=t.price||t.pr||0;
-      if(!_tpr) return;
-      var yPr=toY(_tpr);
-      var isBuy=t.side==='buy';
-      ctx.save();
-      ctx.fillStyle=isBuy?'#00c471':'#ff4757';
-      ctx.strokeStyle=isBuy?'#008855':'#cc1133';
-      ctx.lineWidth=1.5;
-      ctx.beginPath();
-      if(isBuy){
-        ctx.moveTo(x,yPr+14);ctx.lineTo(x-5,yPr+4);ctx.lineTo(x+5,yPr+4);
-      }else{
-        ctx.moveTo(x,yPr-14);ctx.lineTo(x-5,yPr-4);ctx.lineTo(x+5,yPr-4);
-      }
-      ctx.closePath();ctx.fill();ctx.stroke();
-      ctx.fillStyle=isBuy?'#00c471':'#ff4757';
-      ctx.font='bold 8px monospace';
-      ctx.textAlign='center';
-      ctx.fillText(_tW(pr),x,isBuy?yPr+25:yPr-17);
-      ctx.restore();
+    // 매매 마커(화살표/B/S) 제거됨
     });
   }catch(_me){}
   // AI 타점 오버레이
@@ -2003,7 +1975,7 @@ function backtestDiagnose(){
   d.push('전체 거래: '+(mock.trades||[]).length+'건');
   d.push('잔고: '+fW(mock.cash)+'원');
   d.push('lossSeries: '+mock.lossSeries);
-  d.push('todayPnl: '+mock.toW(dayPnl)+'원');
+  d.push('todayPnl: '+fW(mock.todayPnl)+'원');
   var dayLossRate = -mock.todayPnl/(cfg.capital||10000000)*100;
   d.push('일손실률: '+dayLossRate.toFixed(1)+'% (한도 '+cfg.dayloss+'%)');
   // 3. 포지션
@@ -5980,7 +5952,7 @@ function updChartHeader(){
       eval += pr * p.qty;
     });
     const totalPnl = (mock.todayPnl||0);
-    const he = document.getElementById('hdrCash'); if(he) he.textContent = Math.roundW(mock.cash)+'원';
+    const he = document.getElementById('hdrCash'); if(he) he.textContent = fW(mock.cash)+'원';
     const ev = document.getElementById('hdrEval'); if(ev) ev.textContent = Math.round(eval).toLocaleString()+'원';
     const pn = document.getElementById('hdrPnl');
     if(pn){
@@ -7058,62 +7030,7 @@ function updatePhase8Live(){
     row('STEP7 손절가', so ? `${fW(so.stop)}원` : '미설정', stopOk);
 }
 
-// ── B/S 타점 — 봉 좌표와 일치하도록 수정 ──
-function drawSignalOverlay(){
-  const canvas = document.getElementById('signalChart');
-  const mainCv = document.getElementById('mainChart');
-  if(!canvas || !mainCv) return;
-  const W = mainCv.width||700, H = mainCv.height||400;
-  if(canvas.width!==W || canvas.height!==H){ canvas.width=W; canvas.height=H; }
-  const ctx = canvas.getContext('2d');
-  ctx.clearRect(0,0,W,H);
-  if(!_aiSignals.length) return;
-
-  const cs = _cvCs();
-  if(!cs.length) return;
-
-  // drawChart와 동일한 좌표계
-  const PL=4, PR=54, PT=8, PB=22, SB=12;
-  const volH = inds.vol ? Math.floor(H*0.20) : 0;
-  const mainH = H - PT - PB - volH - SB;
-  const cw = W - PL - PR;
-
-  const prices = cs.flatMap(c=>[c.h,c.l]).filter(v=>v>0);
-  if(!prices.length) return;
-  let yMin = Math.min(...prices), yMax = Math.max(...prices);
-  const yPad = (yMax-yMin)*0.06 || yMin*0.005 || 1;
-  yMin -= yPad; yMax += yPad;
-  const yR = yMax - yMin || 1;
-
-  const toX = i => PL + (i+0.5) * (cw/cs.length);
-  const toY = v => PT + mainH * (1 - (v-yMin)/yR);
-
-  _aiSignals.forEach(sig => {
-    if(sig.idx < 0 || sig.idx >= cs.length) return;
-    const c = cs[sig.idx];
-    const x = toX(sig.idx);
-    const isBuy = sig.type === 'buy';
-    // B=빨간, S=파란 (요청대로)
-    const col = isBuy ? '#dc2626' : '#2563eb';
-    const yBase = isBuy ? toY(c.l) : toY(c.h);
-
-    ctx.save();
-    ctx.fillStyle = col;
-    // 삼각형
-    ctx.beginPath();
-    if(isBuy){
-      ctx.moveTo(x, yBase+14);
-      ctx.lineTo(x-7, yBase+24);
-      ctx.lineTo(x+7, yBase+24);
-    } else {
-      ctx.moveTo(x, yBase-14);
-      ctx.lineTo(x-7, yBase-24);
-      ctx.lineTo(x+7, yBase-24);
-    }
-    ctx.fill();
-    ctx.restore();
-  });
-}
+function drawSignalOverlay(){}
 
 // ── API 키 만료/한도 감지 + 어떤 API인지 추정 ──
 function checkApiKeyExpiry(errorMsg, hint){
