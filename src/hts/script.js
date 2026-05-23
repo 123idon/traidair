@@ -3168,8 +3168,9 @@ function renderTradeDetailLog(){
 // ═══ 학습 프롬프트 관리 — 개별 삭제 + AI 정리 ═══
 function renderLearningMgmt(){
   const el=document.getElementById('learningMgmtPanel'); if(!el) return;
+  const cnt=document.getElementById('learnCount'); if(cnt) cnt.textContent=(learningMemory||[]).length+'개';
   if(!learningMemory||!learningMemory.length){el.innerHTML='<div style="text-align:center;color:var(--tm);padding:20px;">학습 노트가 없습니다.</div>';return;}
-  const cats={반성:'var(--r)',개선:'var(--b)',멘토:'var(--p)',심리:'var(--a)'};
+  const cats={반성:'var(--r)',개선:'var(--b)',멘토:'var(--p)',심리:'var(--a)',복기:'var(--g)'};
   el.innerHTML=learningMemory.map((l,i)=>{
     const col=cats[l.category]||'var(--tm)';
     return`<div style="display:flex;align-items:flex-start;gap:6px;padding:6px 8px;background:var(--bg);border-radius:6px;border-left:3px solid ${col};" data-li="${i}">
@@ -3872,8 +3873,12 @@ async function _runScreeningAsync(){
 
     // ═══ 필수 게이트 (모두 통과해야 진입 후보) ═══
     var gateFails=[];
+    // G0: 워밍업 — 오늘 봉 20개 이상 쌓인 후 매매 (데이터 부족 상태 진입 방지)
+    var _prevCount = (_kisChartMeta&&_kisChartMeta.prevCount)||0;
+    var _todayBars = (sim.idx||0) - _prevCount;
+    if(_todayBars < 20) gateFails.push('워밍업('+_todayBars+'/20봉)');
     // G1: 시간대 — 9:30~14:00 (시초 변동성/마감 직전 제외)
-    if(_mins>0 && (_mins<570 || _mins>840)) gateFails.push('시간대'+_hh+':'+String(_mm).padStart(2,'0'));
+    if(_mins<570 || _mins>840) gateFails.push('시간대'+_hh+':'+String(_mm).padStart(2,'0'));
     // G2: 강한 하락 추세 차단 (5MA 아래 + 5<20 + 가격이 20MA 2% 이상 아래)
     if(lc.c<lma5 && lma5<lma20 && lc.c<lma20*0.98) gateFails.push('5MA이탈+데드크로스');
     // G3: 3연속 음봉

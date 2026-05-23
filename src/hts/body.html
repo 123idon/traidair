@@ -784,8 +784,10 @@
       <div class="chart-card-t" style="display:flex;align-items:center;justify-content:space-between;">
         <span>🧠 학습 프롬프트 관리</span>
         <div style="display:flex;gap:5px;">
+          <span id="learnCount" style="font-size:9px;color:var(--tm);padding:2px 4px;"></span>
           <button onclick="renderLearningMgmt()" style="padding:2px 7px;border-radius:4px;border:1px solid var(--br);background:var(--bg);color:var(--ts);font-size:9px;cursor:pointer;">↺</button>
-          <button onclick="cleanupLearning()" style="padding:2px 7px;border-radius:4px;border:none;background:var(--r);color:#fff;font-size:9px;cursor:pointer;">정리</button>
+          <button onclick="_autoTrimLearning();renderLearningMgmt();saveToServer('htsLearningMemory',JSON.stringify(learningMemory));addMsg('ai','🧹 일반적 조언 자동 삭제 완료 ('+learningMemory.length+'개 남음)');" style="padding:2px 7px;border-radius:4px;border:1px solid var(--a);background:var(--bg);color:var(--a);font-size:9px;cursor:pointer;" title="일반적 조언(전략유지/정상 등) 즉시 삭제">빠른정리</button>
+          <button onclick="cleanupLearning()" style="padding:2px 7px;border-radius:4px;border:none;background:var(--r);color:#fff;font-size:9px;cursor:pointer;" title="AI가 중복/불필요 항목 분석 후 정리">AI정리</button>
         </div>
       </div>
       <div id="learningMgmtPanel" style="display:flex;flex-direction:column;gap:4px;max-height:350px;overflow-y:auto;font-size:10px;"></div>
