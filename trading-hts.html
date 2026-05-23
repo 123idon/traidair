@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#ffffff">
-<meta name="build-ts" content="1779540365592">
+<meta name="build-ts" content="1779540883686">
 <title>TraidAIr HTS</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 
@@ -3759,27 +3759,29 @@ function renderBacktestPanel(){
 }
 function backtestDiagnose(){
   var d = [];
+  var isRunning = backtest.running;
   // 1. 시스템 상태
   d.push('═══ 시스템 상태 ═══');
-  d.push('backtest.running: '+(backtest.running?'✅':'❌'));
+  d.push('backtest.running: '+(isRunning?'✅ 실행 중':'❌ 정지 (백테스트를 먼저 시작하세요)'));
   d.push('sim.playing: '+(sim.playing?'✅':'❌'));
   d.push('autoState.running: '+(autoState.running?'✅':'❌'));
   d.push('autoState.level: '+autoState.level);
-  d.push('autoTimer 활성: '+(autoTimer?'✅':'❌ (스크리닝 중단!)'));
-  d.push('_autoScreenRunning 락: '+(_autoScreenRunning?'🔒 잠김':'✅ 해제'));
-  d.push('sim.idx: '+sim.idx+'/'+sim.candles.length);
+  var timerOk = !!autoTimer;
+  var timerShouldRun = isRunning || autoState.running;
+  d.push('autoTimer: '+(timerOk?'✅ 활성':(timerShouldRun?'❌ 없음 (실행 중인데 멈춤)':'— (정지 중이라 정상)')));
+  d.push('_autoScreenRunning 락: '+(_autoScreenRunning?'🔒 잠김 (문제!)':'✅ 해제'));
+  var prevCount = (_kisChartMeta&&_kisChartMeta.prevCount)||Math.floor(sim.candles.length/2);
+  var inToday = sim.idx >= prevCount;
+  d.push('sim.idx: '+sim.idx+'/'+sim.candles.length+(inToday?' (당일 진행 중)':' (전일 마지막 — 아직 시작 전)'));
   d.push('sim.date: '+sim.date);
   d.push('sim.speed: x'+sim.speed);
   // 2. 매매 현황
   d.push('\n═══ 매매 현황 ═══');
   var todayT = (mock.trades||[]).filter(function(t){return t.date===sim.date;});
-  d.push('오늘 거래: '+todayT.length+'건');
-  d.push('전체 거래: '+(mock.trades||[]).length+'건');
+  d.push('오늘('+sim.date+') 거래: '+todayT.length+'건');
+  d.push('전체 거래: '+(mock.trades||[]).length+'건 / 백테스트 '+(backtest.dayIdx||0)+'일 진행');
   d.push('잔고: '+mock.cash.toLocaleString()+'원');
-  d.push('lossSeries: '+mock.lossSeries);
-  d.push('todayPnl: '+mock.todayPnl.toLocaleString()+'원');
-  var dayLossRate = -mock.todayPnl/(cfg.capital||10000000)*100;
-  d.push('일손실률: '+dayLossRate.toFixed(1)+'% (한도 '+cfg.dayloss+'%)');
+  d.push('lossSeries: '+mock.lossSeries+' / todayPnl: '+(mock.todayPnl>=0?'+':'')+mock.todayPnl.toLocaleString()+'원');
   // 3. 포지션
   var held = Object.entries(mock.positions||{}).filter(function(e){return e[1]&&e[1].qty>0;});
   d.push('\n═══ 보유 포지션 ═══');
@@ -3792,51 +3794,55 @@ function backtestDiagnose(){
       d.push('  stopOrder: '+(so?'손절 '+so.stop+' T1 '+so.t1+' T2 '+so.t2:'❌ 없음!'));
     });
   } else { d.push('(없음)'); }
-  // 4. 스크리닝 풀
-  d.push('\n═══ 종목 풀 ═══');
+  // 4. 스크리닝 풀 + 각 종목 게이트 결과
+  d.push('\n═══ 종목 풀 게이트 진단 ═══');
   var pool=new Set();
   (WGS[0]||[]).forEach(function(t){pool.add(t);});
   (WGS[1]||[]).forEach(function(t){pool.add(t);});
   Object.keys(window._sectorInfo||{}).forEach(function(t){pool.add(t);});
   pool.add(activeTk);
-  d.push('WGS[0]: '+(WGS[0]||[]).length+'개');
-  d.push('WGS[1]: '+(WGS[1]||[]).length+'개');
-  d.push('_sectorInfo: '+Object.keys(window._sectorInfo||{}).length+'개');
-  d.push('전체 풀: '+pool.size+'개');
-  // 5. 게이트 테스트 — 활성 종목 즉석 점검
-  d.push('\n═══ 활성 종목 게이트 테스트 ═══');
-  var cs=getCandles(20);
-  if(cs.length>=10){
-    var cls=cs.map(function(c){return c.c;});
-    var lc=cs[cs.length-1],pc=cs[cs.length-2]||lc,pc2=cs[cs.length-3]||pc;
-    var ma5=calcMA(cls,5),ma20=calcMA(cls,20);
-    var lma5=ma5[ma5.length-1]||0,lma20=ma20[ma20.length-1]||0;
-    var lrsi=parseFloat((calcRSI(cls,14).slice(-1)[0]||50).toFixed(1));
-    var vls=cs.map(function(c){return c.v;}); var avg5v=vls.slice(-6,-1).reduce(function(a,b){return a+b;},0)/5||1; var volR=vls[vls.length-1]/avg5v;
-    var body=Math.abs(lc.c-lc.o),upperWick=lc.h-Math.max(lc.c,lc.o);
-    d.push('종목: '+(STOCKS.find(function(s){return s.tk===activeTk;})||{nm:activeTk}).nm);
-    d.push('가격: '+lc.c+' | 5MA: '+Math.round(lma5)+' | 20MA: '+Math.round(lma20));
-    d.push('RSI: '+lrsi+' | 거래량비: x'+volR.toFixed(1));
-    var gf=[];
-    var _mins2=(parseInt(String(lc.t||'').split(':')[0])||0)*60+(parseInt(String(lc.t||'').split(':')[1])||0);
-    if(_mins2>0&&(_mins2<570||_mins2>840)) gf.push('시간대');
-    if(lc.c<lma5&&lma5<lma20&&lc.c<lma20*0.98) gf.push('데드크로스');
-    if(lc.c<lc.o&&pc.c<pc.o&&pc2.c<pc2.o) gf.push('3연속음봉');
-    if(lrsi>=72) gf.push('과매수RSI');
-    if(lc.c>pc.c*1.03) gf.push('급등');
-    if(body>0&&upperWick>body*2) gf.push('윗꼬리');
-    d.push('게이트: '+(gf.length?'❌ '+gf.join(', '):'✅ 전부 통과'));
-    // 점수 추정
-    var score=0;
-    if(lma5>lma20) score+=1;
-    if(lc.c>lma5&&lc.c<lma5*1.015) score+=2;
-    if(lc.c>lma20) score+=1;
-    if(volR>=1.5) score+=2; else if(volR>=1.2) score+=1;
-    if(lrsi>=50&&lrsi<=65) score+=2; else if(lrsi>=40&&lrsi<70) score+=1;
-    if(lc.c>lc.o&&(body/(lc.h-lc.l||1))>=0.6) score+=2;
-    d.push('추정 점수: '+score+'/12 (진입 임계: 4)');
-  } else { d.push('캔들 부족 ('+cs.length+'개 < 10개)'); }
-  // 6. 일지 현황
+  d.push('WGS[0]: '+(WGS[0]||[]).length+'개 | WGS[1]: '+(WGS[1]||[]).length+'개 | sectorInfo: '+Object.keys(window._sectorInfo||{}).length+'개');
+  d.push('전체 풀: '+pool.size+'개 종목');
+  // 현재 캔들 기준으로 풀 전체 게이트 체크
+  var passCount=0, failCount=0;
+  Array.from(pool).forEach(function(tk){
+    try{
+      var stk=STOCKS.find(function(s){return s.tk===tk;})||{nm:tk};
+      var _cs = (tk===activeTk) ? getCandles(20) : [];
+      if(tk===activeTk && _cs.length>=10){
+        var _cls=_cs.map(function(c){return c.c;});
+        var _lc=_cs[_cs.length-1],_pc=_cs[_cs.length-2]||_lc,_pc2=_cs[_cs.length-3]||_pc;
+        var _ma5=calcMA(_cls,5),_ma20=calcMA(_cls,20);
+        var _lma5=_ma5[_ma5.length-1]||0,_lma20=_ma20[_ma20.length-1]||0;
+        var _lrsi=parseFloat((calcRSI(_cls,14).slice(-1)[0]||50).toFixed(1));
+        var _vls=_cs.map(function(c){return c.v;}); var _avg5v=_vls.slice(-6,-1).reduce(function(a,b){return a+b;},0)/5||1; var _volR=_vls[_vls.length-1]/_avg5v;
+        var _body=Math.abs(_lc.c-_lc.o),_uw=_lc.h-Math.max(_lc.c,_lc.o);
+        var _hm=String(_lc.t||'').split(':'),_hh=parseInt(_hm[0])||0,_mm=parseInt(_hm[1])||0,_mins=_hh*60+_mm;
+        var _gf=[];
+        if(_mins>0&&(_mins<570||_mins>840)) _gf.push('시간대('+_hh+':'+String(_mm).padStart(2,'0')+')');
+        if(_lc.c<_lma5&&_lma5<_lma20&&_lc.c<_lma20*0.98) _gf.push('데드크로스');
+        if(_lc.c<_lc.o&&_pc.c<_pc.o&&_pc2.c<_pc2.o) _gf.push('3연속음봉');
+        if(_lrsi>=72) _gf.push('RSI과매수'+_lrsi);
+        if(_lc.c>_pc.c*1.03) _gf.push('급등');
+        if(_body>0&&_uw>_body*2) _gf.push('윗꼬리');
+        var _score=0;
+        if(_lma5>_lma20) _score+=1;
+        if(_lc.c>_lma5&&_lc.c<_lma5*1.015) _score+=2;
+        if(_lc.c>_lma20) _score+=1;
+        if(_volR>=1.5) _score+=2; else if(_volR>=1.2) _score+=1;
+        if(_lrsi>=50&&_lrsi<=65) _score+=2; else if(_lrsi>=40&&_lrsi<70) _score+=1;
+        if(_lc.c>_lc.o&&(_body/(_lc.h-_lc.l||1))>=0.6) _score+=2;
+        if(_gf.length){ failCount++; d.push('  ❌ '+stk.nm+'(활성) — '+_gf.join('·')+' | 점수 '+_score+'/12 | RSI '+_lrsi+' | 거래량x'+_volR.toFixed(1)); }
+        else { passCount++; d.push('  ✅ '+stk.nm+'(활성) — 게이트 통과 | 점수 '+_score+'/12'); }
+      } else {
+        d.push('  ⚪ '+stk.nm+' — 캔들 없음 (비활성 종목)');
+      }
+    }catch(_e){ d.push('  ⚠ '+tk+' 오류: '+_e.message); }
+  });
+  d.push('→ 통과: '+passCount+'개 | 실패: '+failCount+'개');
+  if(inToday && passCount===0 && pool.size>0) d.push('⚠ 모든 종목이 게이트 실패 — 시장 전체 하락장이거나 조건 미달');
+  if(!inToday) d.push('ℹ 현재 전일 마지막 봉 위치 — 백테스트 시작 후 당일로 진입해야 게이트 작동');
+  // 5. 일지 현황
   d.push('\n═══ 매매일지 ═══');
   var js=safeParseJSON(localStorage.getItem('htsJournals'),'{}');
   var jCount=Object.keys(js).length;
@@ -3845,24 +3851,21 @@ function backtestDiagnose(){
     var last=Object.entries(js).sort(function(a,b){return String(b[0]).localeCompare(String(a[0]));}).slice(0,3);
     last.forEach(function(e){
       var v=e[1]||{};
-      d.push('  '+e[0]+': '+(v.aiGenerated?'🤖':'📝')+' '+(v.summary||'(내용없음)').slice(0,40));
+      d.push('  '+e[0]+': '+(v.aiGenerated?'🤖':'📝')+' '+(v.summary||'(내용없음)').slice(0,50));
     });
   }
-  // 7. 학습 메모리
-  d.push('\n═══ 학습 메모리 ═══');
-  d.push('노트: '+(learningMemory||[]).length+'건');
-  d.push('학습일: '+(learnedDates||[]).length+'일');
-  // 문제 감지
+  // 6. 문제 감지 (실제 실행 중일 때만 의미 있는 것만)
   d.push('\n═══ 🔴 문제 감지 ═══');
   var issues=[];
-  if(!autoTimer) issues.push('autoTimer 없음 → scheduleScreening 중단');
-  if(!autoState.running && backtest.running) issues.push('autoState 꺼짐 (backtest 진행 중인데)');
-  if(_autoScreenRunning) issues.push('_autoScreenRunning 잠김 → 스크리닝 못 돌아감');
-  if(!sim.playing && backtest.running) issues.push('sim.playing=false → 시뮬 멈춤');
-  if(held.length>0 && !Object.keys(stopOrders).some(function(t){return held.find(function(h){return h[0]===t;});})) issues.push('보유중인데 stopOrder 없음');
-  if(pool.size===0) issues.push('종목 풀 비어있음');
-  if(mock.cash<=0) issues.push('잔고 0원');
-  if(!issues.length) issues.push('✅ 감지된 문제 없음');
+  if(isRunning && !autoTimer) issues.push('❌ autoTimer 없음 → scheduleScreening 중단 (백테스트 중인데 스크리닝 안 돌아감)');
+  if(!autoState.running && isRunning) issues.push('❌ autoState 꺼짐 (백테스트 진행 중인데 자동매매 OFF)');
+  if(_autoScreenRunning) issues.push('❌ _autoScreenRunning 락 잠김 → 스크리닝 불가 (페이지 새로고침 필요)');
+  if(!sim.playing && isRunning) issues.push('❌ sim.playing=false → 시뮬 멈춤');
+  if(held.length>0 && !Object.keys(stopOrders).some(function(t){return held.find(function(h){return h[0]===t;});})) issues.push('❌ 보유 중인데 stopOrder 없음 → 자동 청산 안 됨');
+  if(pool.size===0) issues.push('❌ 종목 풀 비어있음 → 강세섹터 재조회 필요');
+  if(mock.cash<=0) issues.push('❌ 잔고 0원');
+  if(!isRunning) issues.push('ℹ 백테스트 미실행 상태 — 백테스트를 시작한 후 다시 검진하세요');
+  if(!issues.length) issues.push('✅ 실행 중 이상 없음');
   d.push(issues.join('\n'));
   showAlert('🔍 백테스트 검진', d.join('\n'));
 }
@@ -9540,7 +9543,7 @@ function collectMarketCtx(){
 (function(){
   const meta = document.querySelector('meta[name="build-ts"]');
   const myBuildTs = meta ? meta.getAttribute('content') : '';
-  if(!myBuildTs || myBuildTs === '1779540365592') return; // 로컬 빌드 안 한 경우
+  if(!myBuildTs || myBuildTs === '1779540883686') return; // 로컬 빌드 안 한 경우
   let reloaded = false;
   async function check(){
     if(reloaded) return;
