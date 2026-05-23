@@ -6036,8 +6036,11 @@ function renderJPage(){
       <div class="jd-ai" style="margin-top:5px;line-height:1.7;">
         ${e.market_context?`<div class="jd-note" style="border-left:3px solid var(--b);padding-left:6px;margin-bottom:3px;font-size:10px;">📊 ${e.market_context}</div>`:""}
         ${e.why_bought&&e.why_bought!=='기록 없음'?`<div style="font-size:10px;margin-bottom:3px;"><span style="color:var(--r);font-weight:700;">진입:</span> ${e.why_bought}</div>`:""}
-        ${e.why_sold&&e.why_sold!=='기록 없음'?`<div style="font-size:10px;margin-bottom:3px;"><span style="color:var(--b);font-weight:700;">청산:</span> ${e.why_sold}</div>`:""}
-        ${e.psychology&&e.psychology!=='-'?`<div class="jd-note" style="border-left:3px solid var(--a);padding-left:6px;margin-bottom:3px;font-size:10px;">🧠 ${e.psychology}</div>`:""}
+        ${e.why_sold&&e.why_sold!=='기록 없음'&&e.why_sold!=='-'?`<div style="font-size:10px;margin-bottom:3px;"><span style="color:var(--b);font-weight:700;">청산:</span> ${e.why_sold}</div>`:""}
+        ${e.good&&e.good!=='-'?`<div style="font-size:10px;margin-bottom:3px;border-left:3px solid var(--g);padding-left:6px;">✅ ${e.good}</div>`:""}
+        ${e.bad&&e.bad!=='-'?`<div style="font-size:10px;margin-bottom:3px;border-left:3px solid var(--r);padding-left:6px;">🔴 ${e.bad}</div>`:""}
+        ${e.psychology&&e.psychology!=='-'&&e.psychology!=='정상'?`<div style="font-size:10px;margin-bottom:3px;border-left:3px solid var(--a);padding-left:6px;">🧠 ${e.psychology}</div>`:""}
+        ${e.mentor_comment&&e.mentor_comment!=='-'?`<div style="font-size:10px;margin-bottom:3px;border-left:3px solid var(--p);padding-left:6px;">🎯 ${e.mentor_comment}</div>`:""}
         ${!e.aiGenerated&&!e.summary?`<div style="font-size:9px;color:var(--tm);font-style:italic;">AI 일지 미생성 — 상단 🤖 버튼으로 생성하세요</div>`:""}
       </div>
       ${e.mistakes&&e.mistakes!=='-'?`<div class="jd-note err" style="font-size:10px;">🔴 ${e.mistakes}</div>`:""}
@@ -8186,8 +8189,7 @@ async function _saveJournalToNotion(date,entry,pnl,trades){
 }
 
 // scheduleScreening에 종목 선택 통합
-async function scheduleScreening(){
-  // 백테스트 중이면 autoState와 무관하게 계속 스크리닝
+function scheduleScreening(){
   if(!autoState.running && (!window.backtest || !backtest.running)) return;
   try{ runScreening(); }catch(e){ console.warn('screening err:', e); }
   autoTimer=setTimeout(scheduleScreening, 5000);
