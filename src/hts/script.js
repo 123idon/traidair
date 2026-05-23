@@ -1053,14 +1053,7 @@ function drawChart(){
 
   mChart={_ok:true};
 
-  // ── 매수/매도 체결 마커 ──
-  try{
-    var _trades=(mock.trades||[]).filter(function(t){
-      return t.tk===activeTk&&t.date===sim.date&&(t.side==='buy'||t.side==='sell');
-    });
-    // 매매 마커(화살표/B/S) 제거됨
-    });
-  }catch(_me){}
+  // 매매 마커(화살표/B/S) 제거됨
   // AI 타점 오버레이
   drawSignalOverlay();
 }
@@ -7230,7 +7223,7 @@ function _updateDashboardMarket(d){
     const el = document.getElementById(id);
     if(!el || !data?.price) continue;
     const up = (data.chgPct||0) >= 0;
-    el.innerHTML = `<span class="${up?'cu':'cd'}" style="font-family:var(--mono);font-weight:700;">${datW(a.price)}</span>
+    el.innerHTML = `<span class="${up?'cu':'cd'}" style="font-family:var(--mono);font-weight:700;">${fW(data.price)}</span>
       <span class="${up?'cu':'cd'}" style="font-size:8px;">${up?'+':''}${(data.chgPct||0).toFixed(2)}%</span>
       ${data.lastUpdatedKST?`<span style="font-size:7px;color:var(--tm);display:block;">${data.lastUpdatedKST.slice(11,19)} 기준</span>`:''}`;
   }

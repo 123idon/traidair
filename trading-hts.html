@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#ffffff">
-<meta name="build-ts" content="1779559125616">
+<meta name="build-ts" content="1779559290898">
 <title>TraidAIr HTS</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 
@@ -2950,14 +2950,7 @@ function drawChart(){
 
   mChart={_ok:true};
 
-  // ── 매수/매도 체결 마커 ──
-  try{
-    var _trades=(mock.trades||[]).filter(function(t){
-      return t.tk===activeTk&&t.date===sim.date&&(t.side==='buy'||t.side==='sell');
-    });
-    // 매매 마커(화살표/B/S) 제거됨
-    });
-  }catch(_me){}
+  // 매매 마커(화살표/B/S) 제거됨
   // AI 타점 오버레이
   drawSignalOverlay();
 }
@@ -9127,7 +9120,7 @@ function _updateDashboardMarket(d){
     const el = document.getElementById(id);
     if(!el || !data?.price) continue;
     const up = (data.chgPct||0) >= 0;
-    el.innerHTML = `<span class="${up?'cu':'cd'}" style="font-family:var(--mono);font-weight:700;">${datW(a.price)}</span>
+    el.innerHTML = `<span class="${up?'cu':'cd'}" style="font-family:var(--mono);font-weight:700;">${fW(data.price)}</span>
       <span class="${up?'cu':'cd'}" style="font-size:8px;">${up?'+':''}${(data.chgPct||0).toFixed(2)}%</span>
       ${data.lastUpdatedKST?`<span style="font-size:7px;color:var(--tm);display:block;">${data.lastUpdatedKST.slice(11,19)} 기준</span>`:''}`;
   }
@@ -9696,7 +9689,7 @@ function collectMarketCtx(){
 (function(){
   const meta = document.querySelector('meta[name="build-ts"]');
   const myBuildTs = meta ? meta.getAttribute('content') : '';
-  if(!myBuildTs || myBuildTs === '1779559125616') return; // 로컬 빌드 안 한 경우
+  if(!myBuildTs || myBuildTs === '1779559290898') return; // 로컬 빌드 안 한 경우
   let reloaded = false;
   async function check(){
     if(reloaded) return;
