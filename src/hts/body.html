@@ -28,7 +28,7 @@
     <button class="ibtn" onclick="openModal('settings')" title="설정">⚙</button>
     <button class="ibtn red" onclick="endMock()" title="종료">■</button>
     <button class="ibtn" onclick="refreshAllData()" title="전체 새로고침" style="background:var(--g);color:#fff;border-color:var(--g);">↺</button>
-    <button class="ibtn" onclick="debugTraidair()" title="상태 진단 (매매·일지·자동매매 상태 확인)" style="background:#9333ea;color:#fff;border-color:#9333ea;font-weight:700;">🔍</button>
+    <button class="ibtn" onclick="debugTraidair()" title="상태 진단" style="background:#9333ea;color:#fff;border-color:#9333ea;font-weight:700;">🔍</button>
     <div class="badge mock" id="modeBadge"><div class="bdot"></div><span id="modeText">모의투자</span></div>
     <div class="clk" id="clk">--:--:--</div>
     <!-- 실시간 지수 표시 -->
@@ -767,6 +767,27 @@
     <div class="chart-card">
       <div class="chart-card-t">⚠ 반복 실수 Top 3</div>
       <div id="mistakeList" style="font-size:11px;color:var(--tm);">거래 내역이 없습니다.</div>
+    </div>
+
+    <!-- 매매 상세 기록 (날짜별 진입/청산 사유) -->
+    <div class="chart-card">
+      <div class="chart-card-t" style="display:flex;align-items:center;justify-content:space-between;">
+        <span>📋 매매 상세 기록</span>
+        <button onclick="renderTradeDetailLog()" style="padding:2px 7px;border-radius:4px;border:1px solid var(--br);background:var(--bg);color:var(--ts);font-size:9px;cursor:pointer;">↺</button>
+      </div>
+      <div id="tradeDetailLog" style="display:flex;flex-direction:column;gap:6px;max-height:400px;overflow-y:auto;font-size:10px;"></div>
+    </div>
+
+    <!-- 학습 프롬프트 관리 -->
+    <div class="chart-card">
+      <div class="chart-card-t" style="display:flex;align-items:center;justify-content:space-between;">
+        <span>🧠 학습 프롬프트 관리</span>
+        <div style="display:flex;gap:5px;">
+          <button onclick="renderLearningMgmt()" style="padding:2px 7px;border-radius:4px;border:1px solid var(--br);background:var(--bg);color:var(--ts);font-size:9px;cursor:pointer;">↺</button>
+          <button onclick="cleanupLearning()" style="padding:2px 7px;border-radius:4px;border:none;background:var(--r);color:#fff;font-size:9px;cursor:pointer;">정리</button>
+        </div>
+      </div>
+      <div id="learningMgmtPanel" style="display:flex;flex-direction:column;gap:4px;max-height:350px;overflow-y:auto;font-size:10px;"></div>
     </div>
 
     <!-- 주간/월간 통계 (Phase 12-7) -->
