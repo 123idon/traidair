@@ -1590,6 +1590,8 @@ function openLearningMemo(){
         `).join('') : '<div style="font-size:11px;color:var(--tm);padding:20px;text-align:center;">아직 학습된 노트가 없습니다. 백테스트나 매매를 마치면 자동으로 쌓여요.</div>'}
       </div>
       <div style="margin-top:10px;display:flex;justify-content:flex-end;gap:6px;">
+        <button class="ibtn" onclick="_autoTrimLearning();saveToServer('htsLearningMemory',JSON.stringify(learningMemory));document.getElementById('lmDlg').remove();openLearningMemo();addMsg('ai','🧹 빠른 정리 완료 ('+learningMemory.length+'개 남음)');" style="font-size:10px;border:1.5px solid var(--a);color:var(--a);">빠른 정리</button>
+        <button class="ibtn" onclick="cleanupLearning().then(()=>{try{document.getElementById('lmDlg').remove();openLearningMemo();}catch(e){}});" style="font-size:10px;background:var(--b);color:#fff;">AI 정리</button>
         <button class="ibtn red" onclick="if(confirm('전체 학습 노트를 초기화할까요?')){learningMemory=[];learnedDates=[];saveToServer('htsLearningMemory','[]');saveToServer('htsLearnedDates','[]');document.getElementById('lmDlg').remove();updateLearnerStage();}" style="font-size:10px;">전체 초기화</button>
       </div>
     </div>

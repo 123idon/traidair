@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#ffffff">
-<meta name="build-ts" content="1779553546284">
+<meta name="build-ts" content="1779553740127">
 <title>TraidAIr HTS</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 
@@ -3487,6 +3487,8 @@ function openLearningMemo(){
         `).join('') : '<div style="font-size:11px;color:var(--tm);padding:20px;text-align:center;">아직 학습된 노트가 없습니다. 백테스트나 매매를 마치면 자동으로 쌓여요.</div>'}
       </div>
       <div style="margin-top:10px;display:flex;justify-content:flex-end;gap:6px;">
+        <button class="ibtn" onclick="_autoTrimLearning();saveToServer('htsLearningMemory',JSON.stringify(learningMemory));document.getElementById('lmDlg').remove();openLearningMemo();addMsg('ai','🧹 빠른 정리 완료 ('+learningMemory.length+'개 남음)');" style="font-size:10px;border:1.5px solid var(--a);color:var(--a);">빠른 정리</button>
+        <button class="ibtn" onclick="cleanupLearning().then(()=>{try{document.getElementById('lmDlg').remove();openLearningMemo();}catch(e){}});" style="font-size:10px;background:var(--b);color:#fff;">AI 정리</button>
         <button class="ibtn red" onclick="if(confirm('전체 학습 노트를 초기화할까요?')){learningMemory=[];learnedDates=[];saveToServer('htsLearningMemory','[]');saveToServer('htsLearnedDates','[]');document.getElementById('lmDlg').remove();updateLearnerStage();}" style="font-size:10px;">전체 초기화</button>
       </div>
     </div>
@@ -9606,7 +9608,7 @@ function collectMarketCtx(){
 (function(){
   const meta = document.querySelector('meta[name="build-ts"]');
   const myBuildTs = meta ? meta.getAttribute('content') : '';
-  if(!myBuildTs || myBuildTs === '1779553546284') return; // 로컬 빌드 안 한 경우
+  if(!myBuildTs || myBuildTs === '1779553740127') return; // 로컬 빌드 안 한 경우
   let reloaded = false;
   async function check(){
     if(reloaded) return;
