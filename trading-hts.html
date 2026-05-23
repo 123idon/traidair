@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#ffffff">
-<meta name="build-ts" content="1779526276035">
+<meta name="build-ts" content="1779534921354">
 <title>TraidAIr HTS</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 
@@ -3613,17 +3613,20 @@ async function _backtestEndOfDay(){
       try{ sim.playing=false; _syncPlayBtn(); await _p; }catch(e){}
     }
   } else {
-    // 매매 없는 날도 "관망" 일지로 기록 → 백테스트 통계에 반영
+    // 매매 없는 날도 "관망" 일지로 기록 + 구체적 사유
     try{
+      const _reason = window._lastNoTradeReason || '진입 조건 미달';
       const noTradeEntry = {
-        summary: dt+' 매매 없음 (관망)',
-        why_bought:'진입 신호 없음', why_sold:'-',
-        good:'필수 게이트 미달 종목 진입 회피', bad:'-',
-        psychology:'-', improvement:'-', phase_check:'관망',
-        mentor_comment:'기다림도 매매다',
+        summary: dt+' 관망 — '+_reason,
+        why_bought:'미진입: '+_reason, why_sold:'-',
+        good:'조건 불충분 시 관망 유지', bad:'-',
+        psychology:'인내심 유지', improvement:'다양한 기법 시그널 재점검',
+        phase_check:'관망', result_grade:'관망',
+        mentor_comment:'기다림도 매매다. 사유: '+_reason,
         aiGenerated: false, trades:'(매매 없음)',
       };
       if(typeof saveJEntry==='function') saveJEntry(dt, noTradeEntry, 0, 0, 0, '');
+      window._lastNoTradeReason = null;
     }catch(_e){}
   }
   // 다음 영업일?
@@ -5508,18 +5511,23 @@ async function _runScreeningAsync(){
     window._priorScores[tk] = score;
     // 9. RSI 상승 반전 (이전 RSI<현재 RSI)
     if(lrsi > prevRsi+3 && lrsi<=60){score+=1;tags.push('RSI반전');}
-    // 10. 패턴 감지 + 눌림목 우선 가산
+    // 10. 패턴 감지 + 패턴별 가산
     var _isPullback = lc.c>=lma20 && (Math.abs(lc.c-lma5)/(lma5||1)<=0.02 || (lc.c<=lma5&&lc.c>=lma20) || (lc.c>=lma20&&(lc.c-lma20)/(lma20||1)<=0.015));
     var _isBreakout = lc.c>prev20High*0.998 && volR>=1.5;
     var _isGap = pc && lc.o>pc.c*1.01;
+    var _isFirstBar = sim.idx<=6 && lc.c>lc.o && volR>=1.3;
+    var _isMomentum = volR>=2 && lrsi>=50 && lc.c>lc.o;
     var _v3avg = vls.length>=4 ? (vls[vls.length-4]+vls[vls.length-3]+vls[vls.length-2])/3 : avg5v;
     if(_isPullback){
       score+=3;tags.push('눌림목');
       if(lc.c>=lma5*0.99 && lc.c<=lma5*1.01 && lma5>lma20){score+=2;tags.push('눌림목정석');}
       if(_v3avg<avg5v*0.8 && volR>=1.0){score+=1;tags.push('거래량회복');}
-    } else if(_isBreakout){tags.push('돌파');}
-    else if(_isGap){tags.push('갭상승');}
-    else{tags.push('기타패턴');}
+    }
+    if(_isBreakout){score+=3;tags.push('돌파');}
+    if(_isGap){score+=2;tags.push('갭상승');}
+    if(_isFirstBar){score+=2;tags.push('첫봉');}
+    if(_isMomentum && !_isBreakout){score+=1;tags.push('이슈테마');}
+    if(!_isPullback && !_isBreakout && !_isGap && !_isFirstBar && !_isMomentum){tags.push('기타패턴');}
     // 11. 대장첫숨 — 이슈/재료 동반 필수 + 기관수급 강세섹터 대장주 장대양봉 후 첫 음봉
     var _siPat = (window._sectorInfo||{})[tk];
     var _isLeader = _siPat && _siPat.rank<=3 && (_siPat.role==='대장주'||_siPat.momentum==='강함');
@@ -5539,7 +5547,11 @@ async function _runScreeningAsync(){
   }
 
   if(!scored.length){
-    addDecisionLog('전종목 조건미달','관심종목 모두 하락추세 또는 데이터없음','관망');
+    // 관망 사유를 구체적으로 남김 (일지에 반영)
+    var _noTradeReason = '전 '+allTks.length+'종목 필수게이트 미달';
+    if(dayLossRate>=cfg.dayloss*0.7) _noTradeReason += ' / 일손실 누적 '+dayLossRate.toFixed(1)+'%';
+    addDecisionLog('전종목 조건미달', _noTradeReason, '관망');
+    window._lastNoTradeReason = _noTradeReason;
     return;
   }
 
@@ -5556,7 +5568,7 @@ async function _runScreeningAsync(){
   });
   if(newCands.length){CANDS=newCands;renderCands();}
 
-  addDecisionLog('[중앙AI] 스크리닝(눌림목우선)',topList,'종목선정');
+  addDecisionLog('[중앙AI] 스크리닝',topList,'종목선정');
 
   // ── 장중 갈아타기 로직 ──
   // 현재 보유 종목이 있고, 그 종목보다 훨씬 좋은 종목이 발견되면 청산 후 갈아타기
@@ -5593,8 +5605,11 @@ async function _runScreeningAsync(){
   const _tech = typeof detectTechnique === "function" ? detectTechnique(scored[0]?.lc||{}) : {};
   if(_tech.technique === "스캘핑"){addDecisionLog("스캘핑 차단","스캘핑 기법 금지 설정","NOGO");return;}
   if(best.score<3){
-    addDecisionLog('['+best.stk.nm+'] 관망',best.tags.join(' ')||'조건미달','관망');
-    updAdvBoxes('관망 — '+best.stk.nm+' ('+best.score+'점)','기술적 조건 미달');
+    var _whyPass = best.tags.join(' ')||'조건미달';
+    _whyPass += ' (최고 '+best.score+'점/5점 필요)';
+    addDecisionLog('['+best.stk.nm+'] 관망', _whyPass, '관망');
+    updAdvBoxes('관망 — '+best.stk.nm+' ('+best.score+'점)', _whyPass);
+    window._lastNoTradeReason = best.stk.nm+' '+_whyPass;
     return;
   }
 
@@ -5624,9 +5639,13 @@ async function _runScreeningAsync(){
       var _bestTech = best.tags.indexOf('대장첫숨')!==-1?'대장첫숨':'';
       try{ await execAutoBuy(lcQ.c, best.stk, best.score, _bestTech); }catch(_e){}
     } else if(best.score >= 2){
-      addDecisionLog('['+best.stk.nm+'] 👀 관찰 ('+best.score+'점)', best.tags.join(' · '), '대기');
+      var _whyWait = best.tags.join(' · ')+' — 점수 부족('+best.score+'/5)';
+      addDecisionLog('['+best.stk.nm+'] 👀 관찰', _whyWait, '대기');
+      window._lastNoTradeReason = best.stk.nm+' '+_whyWait;
     } else {
-      addDecisionLog('['+best.stk.nm+'] ⏸ 약함 ('+best.score+'점)', best.tags.join(' · ')||'조건 불충분', '관망');
+      var _whyWeak = (best.tags.join(' · ')||'조건 불충분')+' — 점수 부족('+best.score+'/5)';
+      addDecisionLog('['+best.stk.nm+'] ⏸ 약함', _whyWeak, '관망');
+      window._lastNoTradeReason = best.stk.nm+' '+_whyWeak;
     }
     return;
   }
@@ -5647,8 +5666,9 @@ async function _runScreeningAsync(){
       var _lec = typeof getLectureContext==='function' ? getLectureContext(2500) : '';
       var prompt='단타 트레이딩 멘토. 자동매매 최종 진입 여부.\n\n'+
         '⚠️ 절대 원칙: 아래 강의 매매 원칙은 100% 따라야 한다. 강의에 어긋나는 진입은 \"PASS\". 의심스러우면 PASS.\n'+
-        '눌림목매매를 최우선으로 하되, 대장첫숨/돌파/첫봉/갭상승/이슈테마도 조건 확실하면 진입 가능.\n'+
+        '모든 매매 기법 적극 활용: 눌림목/대장첫숨/돌파/첫봉/갭상승/이슈테마.\n'+
         '눌림목: 상승추세(20MA↑)+5MA/20MA지지+거래량감소후회복.\n'+
+        '돌파: 20봉 신고가+거래량 150%↑. 갭상승: 갭업 후 양봉 확정. 첫봉: 시초 6봉 내 양봉+거래량.\n'+
         '대장첫숨: 이슈/재료 동반 필수 + 기관수급 강세섹터 대장주 장대양봉 후 첫 음봉 → 비중 1/3 신중 진입. 이슈/재료 없으면 절대 대장첫숨 아님.\n\n'+
         _lec +
         _learn +
@@ -9233,7 +9253,7 @@ function collectMarketCtx(){
 (function(){
   const meta = document.querySelector('meta[name="build-ts"]');
   const myBuildTs = meta ? meta.getAttribute('content') : '';
-  if(!myBuildTs || myBuildTs === '1779526276035') return; // 로컬 빌드 안 한 경우
+  if(!myBuildTs || myBuildTs === '1779534921354') return; // 로컬 빌드 안 한 경우
   let reloaded = false;
   async function check(){
     if(reloaded) return;
