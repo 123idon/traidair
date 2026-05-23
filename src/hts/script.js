@@ -1502,16 +1502,22 @@ function appendLesson(date, ai){
   if(ai.mentor_comment && ai.mentor_comment !== '-') items.push({date, category:'멘토', text:ai.mentor_comment});
   if(ai.psychology && ai.psychology !== '-') items.push({date, category:'심리', text:ai.psychology});
   if(!items.length) return;
-  // ★ 같은 날짜 + 같은 텍스트 중복 방지
   const newItems = items.filter(item =>
     !learningMemory.some(m => m.date===item.date && m.text===item.text)
   );
   if(!newItems.length) return;
+  // 유사 텍스트 자동 중복 제거 (70% 이상 겹치면 최신 것만 유지)
+  newItems.forEach(ni => {
+    const dupeIdx = learningMemory.findIndex(m =>
+      m.category === ni.category && _textSimilarity(m.text, ni.text) > 0.7
+    );
+    if(dupeIdx >= 0) learningMemory.splice(dupeIdx, 1);
+  });
   learningMemory.push(...newItems);
-  // 최근 80개만 유지 (오래된 건 자연 망각)
   if(learningMemory.length > 80) learningMemory = learningMemory.slice(-80);
+  // 40개 넘으면 자동 정리 (일반적 조언 제거)
+  if(learningMemory.length > 40) _autoTrimLearning();
   window.learningMemory = learningMemory;
-  // 학습 일자 목록 (진화 단계 계산용)
   if(!learnedDates.includes(date)){
     learnedDates.push(date);
     if(learnedDates.length > 200) learnedDates = learnedDates.slice(-200);
@@ -1521,17 +1527,37 @@ function appendLesson(date, ai){
   saveToServer('htsLearningMemory', JSON.stringify(learningMemory));
   updateLearnerStage();
 }
+function _textSimilarity(a, b){
+  if(!a||!b) return 0;
+  const wa=new Set(a.split(/\s+/)), wb=new Set(b.split(/\s+/));
+  let overlap=0;
+  wa.forEach(w=>{ if(wb.has(w)) overlap++; });
+  return overlap / Math.max(wa.size, wb.size);
+}
+function _autoTrimLearning(){
+  const vague = ['전략 유지','유지','정상','양호','인내심 유지','시그널 재점검','관찰','확인','점검'];
+  learningMemory = learningMemory.filter(m => {
+    const t = (m.text||'').trim();
+    if(t.length < 5) return false;
+    if(vague.includes(t)) return false;
+    if(t === '-' || t === '없음') return false;
+    return true;
+  });
+}
 function getLearningContext(maxItems){
   if(!learningMemory || !learningMemory.length) return '';
   const recent = learningMemory.slice(-(maxItems||12));
-  // 카테고리별 그룹화
   const byCat={};
   recent.forEach(l=>{ (byCat[l.category]=byCat[l.category]||[]).push(l.text); });
-  let out = '【지금까지 깨달은 것 — 같은 실수 반복 금지】\n';
-  Object.keys(byCat).forEach(c=>{
+  let out = '═══ 🚨 학습 노트 (반드시 준수) 🚨 ═══\n';
+  out += '⚠ 아래는 과거 실수에서 뽑은 핵심 교훈. 이걸 무시하면 같은 손실 반복됨.\n';
+  const priority = ['반성','개선','멘토','심리','복기'];
+  priority.forEach(c=>{
+    if(!byCat[c]) return;
     byCat[c].slice(-3).forEach(t=>{ out += `• [${c}] ${t}\n`; });
   });
-  return out + '\n';
+  out += '═══ 위 학습 내용을 판단에 반영했다면, 응답에 어떤 항목을 반영했는지 명시할 것 ═══\n\n';
+  return out;
 }
 function getLearnerStage(){
   const n = learnedDates.length;
@@ -3181,8 +3207,8 @@ async function cleanupLearning(){
     const data=await res.json();
     const text=(data.content&&data.content[0]&&data.content[0].text)||'{}';
     const m=text.match(/\{[\s\S]*\}/);
-    if(!m) throw new Error('파싱실패');
-    const result=JSON.parse(m[0]);
+    const result=m?robustJsonParse(text):{};
+    if(!result.keep) throw new Error('파싱실패');
     const keepSet=new Set(result.keep||[]);
     const before=learningMemory.length;
     learningMemory=learningMemory.filter((_,i)=>keepSet.has(i));
@@ -4083,8 +4109,8 @@ async function _runScreeningAsync(){
         (_newsItems ? '【최근 공시】\n'+_newsItems+'\n' : '')+
         (_mkt && _mkt!=='데이터없음' ? '【시황】\n'+_mkt+'\n' : '')+
         '【리스크】 손절 '+stopPr.toLocaleString()+' | 목표 '+t1Pr.toLocaleString()+' | R/R 1:'+rr+'\n\n'+
-        '※ 위에 학습 노트가 있다면 반드시 반영해서 같은 실수를 반복하지 말 것.\n'+
-        'JSON만: {"decision":"BUY"또는"PASS","confidence":0-100,"reason":"왜 매수/관망인지 2줄(학습노트 반영시 명시)","factors":"근거한 데이터 3가지","risk":"리스크1줄","waitFor":"PASS시조건"}';
+        '🚨 학습 노트에 해당하는 상황이면 반드시 PASS. 학습 노트 위반 시 confidence를 30 이하로.\n'+
+        'JSON만: {"decision":"BUY"또는"PASS","confidence":0-100,"reason":"왜 매수/관망인지 2줄","learning_applied":"반영한 학습 항목 또는 해당없음","factors":"근거한 데이터 3가지","risk":"리스크1줄","waitFor":"PASS시조건"}';
       // Claude 호출에 8초 timeout — 응답 안 오면 cancel하고 진입 PASS
       var _ctrl = new AbortController();
       var _to = setTimeout(()=>_ctrl.abort(), 8000);
@@ -6296,9 +6322,7 @@ JSON만:
     const res = await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:600,messages:[{role:'user',content:prompt}]})});
     const data = await res.json();
     const txt = (data.content&&data.content[0]&&data.content[0].text)||'{}';
-    const m = txt.match(/\{[\s\S]*\}/);
-    if(!m) throw new Error('JSON 파싱 실패');
-    const ai = JSON.parse(m[0]);
+    const ai = robustJsonParse(txt);
     const sugs = ai.suggestions || [];
     if(!sugs.length){ body.innerHTML = '<div style="color:var(--tm);">제안 없음</div>'; return; }
     body.innerHTML = sugs.map((s,i)=>{
@@ -7631,10 +7655,23 @@ function safeParseJSON(str, fallback){
   if(str===null||str===undefined) return fallback;
   try{
     const r=JSON.parse(str);
-    // 타입 검증: fallback이 배열이면 배열, 객체면 객체여야 함
     if(Array.isArray(fallback)&&!Array.isArray(r)) return fallback;
     return r;
-  }catch(e){return fallback;}
+  }catch(e){
+    try{
+      const cleaned=str.replace(/,\s*([}\]])/g,'$1').replace(/[\x00-\x1f]/g,' ');
+      const r2=JSON.parse(cleaned);
+      if(Array.isArray(fallback)&&!Array.isArray(r2)) return fallback;
+      return r2;
+    }catch(e2){return fallback;}
+  }
+}
+function robustJsonParse(text){
+  const m=text.match(/\{[\s\S]*\}/);
+  if(!m) return {};
+  try{ return JSON.parse(m[0]); }catch(e){}
+  try{ return JSON.parse(m[0].replace(/,\s*([}\]])/g,'$1')); }catch(e2){}
+  return {};
 }
 const _analysisCache={};
 function _getCachedAnalysis(key){
