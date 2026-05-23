@@ -28,7 +28,8 @@
     <button class="ibtn" onclick="openModal('settings')" title="설정">⚙</button>
     <button class="ibtn red" onclick="endMock()" title="종료">■</button>
     <button class="ibtn" onclick="refreshAllData()" title="전체 새로고침" style="background:var(--g);color:#fff;border-color:var(--g);">↺</button>
-    <button class="ibtn" onclick="debugTraidair()" title="상태 진단 (매매·일지·자동매매 상태 확인)" style="background:#9333ea;color:#fff;border-color:#9333ea;font-weight:700;">🔍</button>
+    <button class="ibtn" onclick="debugTraidair()" title="상태 진단" style="background:#9333ea;color:#fff;border-color:#9333ea;font-weight:700;">🔍</button>
+    <button class="ibtn" onclick="backtestDiagnose()" title="백테스트 검진 (매매 안됨/일지 안됨 원인 분석)" style="background:var(--a);color:#fff;border-color:var(--a);font-weight:700;">🩺</button>
     <div class="badge mock" id="modeBadge"><div class="bdot"></div><span id="modeText">모의투자</span></div>
     <div class="clk" id="clk">--:--:--</div>
     <!-- 실시간 지수 표시 -->
