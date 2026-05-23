@@ -3247,10 +3247,21 @@ async function cleanupLearning(){
   }
   if(btn){btn.textContent='AI정리';btn.disabled=false;}
 }
-function rebuildLearningFromJournals(){
-  const js=safeParseJSON(localStorage.getItem('htsJournals'),'{}');
+async function rebuildLearningFromJournals(){
+  let js=safeParseJSON(localStorage.getItem('htsJournals'),'{}');
+  if(!Object.keys(js).length){
+    addMsg('ai','📡 로컬에 일지 없음 — 서버에서 가져오는 중...');
+    try{
+      const r=await fetch('/api/user-data');
+      const d=await r.json();
+      if(d.ok&&d.data){
+        const raw=d.data.htsJournals||d.data['htsJournals'];
+        if(raw){ js=typeof raw==='string'?JSON.parse(raw):raw; localStorage.setItem('htsJournals',typeof raw==='string'?raw:JSON.stringify(raw)); }
+      }
+    }catch(e){}
+  }
   const entries=Object.values(js).filter(e=>e&&e.date);
-  if(!entries.length){addMsg('ai','⚠ 일지 데이터가 없어서 복구 불가');return;}
+  if(!entries.length){addMsg('ai','⚠ 로컬·서버 모두 일지 데이터 없음. 백테스트를 한 번 돌리면 일지가 자동 생성됩니다.');return;}
   const rebuilt=[];
   entries.forEach(e=>{
     const d=e.date;

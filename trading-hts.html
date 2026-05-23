@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#ffffff">
-<meta name="build-ts" content="1779554252008">
+<meta name="build-ts" content="1779554439286">
 <title>TraidAIr HTS</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 
@@ -5144,10 +5144,21 @@ async function cleanupLearning(){
   }
   if(btn){btn.textContent='AI정리';btn.disabled=false;}
 }
-function rebuildLearningFromJournals(){
-  const js=safeParseJSON(localStorage.getItem('htsJournals'),'{}');
+async function rebuildLearningFromJournals(){
+  let js=safeParseJSON(localStorage.getItem('htsJournals'),'{}');
+  if(!Object.keys(js).length){
+    addMsg('ai','📡 로컬에 일지 없음 — 서버에서 가져오는 중...');
+    try{
+      const r=await fetch('/api/user-data');
+      const d=await r.json();
+      if(d.ok&&d.data){
+        const raw=d.data.htsJournals||d.data['htsJournals'];
+        if(raw){ js=typeof raw==='string'?JSON.parse(raw):raw; localStorage.setItem('htsJournals',typeof raw==='string'?raw:JSON.stringify(raw)); }
+      }
+    }catch(e){}
+  }
   const entries=Object.values(js).filter(e=>e&&e.date);
-  if(!entries.length){addMsg('ai','⚠ 일지 데이터가 없어서 복구 불가');return;}
+  if(!entries.length){addMsg('ai','⚠ 로컬·서버 모두 일지 데이터 없음. 백테스트를 한 번 돌리면 일지가 자동 생성됩니다.');return;}
   const rebuilt=[];
   entries.forEach(e=>{
     const d=e.date;
@@ -9653,7 +9664,7 @@ function collectMarketCtx(){
 (function(){
   const meta = document.querySelector('meta[name="build-ts"]');
   const myBuildTs = meta ? meta.getAttribute('content') : '';
-  if(!myBuildTs || myBuildTs === '1779554252008') return; // 로컬 빌드 안 한 경우
+  if(!myBuildTs || myBuildTs === '1779554439286') return; // 로컬 빌드 안 한 경우
   let reloaded = false;
   async function check(){
     if(reloaded) return;
