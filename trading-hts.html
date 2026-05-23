@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#ffffff">
-<meta name="build-ts" content="1779538918897">
+<meta name="build-ts" content="1779539321101">
 <title>TraidAIr HTS</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 
@@ -561,7 +561,6 @@ canvas{image-rendering:pixelated;}
     <button class="ibtn red" onclick="endMock()" title="종료">■</button>
     <button class="ibtn" onclick="refreshAllData()" title="전체 새로고침" style="background:var(--g);color:#fff;border-color:var(--g);">↺</button>
     <button class="ibtn" onclick="debugTraidair()" title="상태 진단" style="background:#9333ea;color:#fff;border-color:#9333ea;font-weight:700;">🔍</button>
-    <button class="ibtn" onclick="backtestDiagnose()" title="백테스트 검진 (매매 안됨/일지 안됨 원인 분석)" style="background:var(--a);color:#fff;border-color:var(--a);font-weight:700;">🩺</button>
     <div class="badge mock" id="modeBadge"><div class="bdot"></div><span id="modeText">모의투자</span></div>
     <div class="clk" id="clk">--:--:--</div>
     <!-- 실시간 지수 표시 -->
@@ -3888,6 +3887,7 @@ function openBacktestDialog(){
         </div>
       </div>
       <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button class="ibtn" onclick="backtestDiagnose()" style="font-size:11px;background:var(--a);color:#fff;border-color:var(--a);">🩺 오류 테스트</button>
         <button class="ibtn" onclick="document.getElementById('btDialog').remove()" style="font-size:11px;">취소</button>
         <button class="ibtn pur" onclick="(function(){const s=document.getElementById('btStart').value;const e=document.getElementById('btEnd').value;if(!s||!e||s>e){alert('날짜 확인');return;}document.getElementById('btDialog').remove();startBacktest(s,e);})()" style="font-size:11px;">▶ 시작</button>
       </div>
@@ -9537,7 +9537,7 @@ function collectMarketCtx(){
 (function(){
   const meta = document.querySelector('meta[name="build-ts"]');
   const myBuildTs = meta ? meta.getAttribute('content') : '';
-  if(!myBuildTs || myBuildTs === '1779538918897') return; // 로컬 빌드 안 한 경우
+  if(!myBuildTs || myBuildTs === '1779539321101') return; // 로컬 빌드 안 한 경우
   let reloaded = false;
   async function check(){
     if(reloaded) return;

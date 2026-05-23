@@ -1993,6 +1993,7 @@ function openBacktestDialog(){
         </div>
       </div>
       <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button class="ibtn" onclick="backtestDiagnose()" style="font-size:11px;background:var(--a);color:#fff;border-color:var(--a);">🩺 오류 테스트</button>
         <button class="ibtn" onclick="document.getElementById('btDialog').remove()" style="font-size:11px;">취소</button>
         <button class="ibtn pur" onclick="(function(){const s=document.getElementById('btStart').value;const e=document.getElementById('btEnd').value;if(!s||!e||s>e){alert('날짜 확인');return;}document.getElementById('btDialog').remove();startBacktest(s,e);})()" style="font-size:11px;">▶ 시작</button>
       </div>
