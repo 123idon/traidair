@@ -3647,14 +3647,19 @@ async function _runScreeningAsync(){
     } else if(_isBreakout){tags.push('돌파');}
     else if(_isGap){tags.push('갭상승');}
     else{tags.push('기타패턴');}
-    // 11. 대장첫숨 — 기관수급 강세섹터 대장주 장대양봉 후 첫 음봉
+    // 11. 대장첫숨 — 이슈/재료 동반 필수 + 기관수급 강세섹터 대장주 장대양봉 후 첫 음봉
     var _siPat = (window._sectorInfo||{})[tk];
     var _isLeader = _siPat && _siPat.rank<=3 && (_siPat.role==='대장주'||_siPat.momentum==='강함');
+    var _hasTheme = _siPat && _siPat.reason && _siPat.reason.length>2;
+    var _hasNews = (typeof window._newsItems!=='undefined' && Array.isArray(_newsItems)) && _newsItems.some(function(n){return (n.tk||n.code)===tk||(n.title||'').indexOf(stk.nm)!==-1;});
+    var _hasIssue = _hasTheme || _hasNews;
     var _pcBody = Math.abs(pc.c-pc.o), _pcRange = pc.h-pc.l||1;
     var _prevBigBull = pc.c>pc.o && _pcBody/_pcRange>=0.6 && (pc.c-pc.o)/pc.o*100>=1.5;
     var _curBear = lc.c<lc.o;
-    if(_isLeader && _prevBigBull && _curBear){
+    if(_isLeader && _prevBigBull && _curBear && _hasIssue){
       score+=4;tags.push('대장첫숨');
+    } else if(_isLeader && _prevBigBull && _curBear && !_hasIssue){
+      addDecisionLog('['+stk.nm+'] 대장첫숨 조건부 미달','장대양봉+첫음봉 OK, 이슈/재료 미확인 — 진입 보류','PASS');
     }
 
     scored.push({tk:tk,stk:stk,score:score,tags:tags,lc:lc,lma5:lma5,lrsi:lrsi,volR:volR});
@@ -3771,7 +3776,7 @@ async function _runScreeningAsync(){
         '⚠️ 절대 원칙: 아래 강의 매매 원칙은 100% 따라야 한다. 강의에 어긋나는 진입은 \"PASS\". 의심스러우면 PASS.\n'+
         '눌림목매매를 최우선으로 하되, 대장첫숨/돌파/첫봉/갭상승/이슈테마도 조건 확실하면 진입 가능.\n'+
         '눌림목: 상승추세(20MA↑)+5MA/20MA지지+거래량감소후회복.\n'+
-        '대장첫숨: 기관수급 강세섹터 대장주가 장대양봉 찍은 후 첫 음봉 → 비중 1/3로 신중 진입.\n\n'+
+        '대장첫숨: 이슈/재료 동반 필수 + 기관수급 강세섹터 대장주 장대양봉 후 첫 음봉 → 비중 1/3 신중 진입. 이슈/재료 없으면 절대 대장첫숨 아님.\n\n'+
         _lec +
         _learn +
         '【종목】 '+best.stk.nm+'('+best.tk+') '+best.stk.sec+'\n'+
@@ -4061,7 +4066,7 @@ const TECHNIQUES = {
   "첫봉": {phase:"10-3", cond:"시가 후 첫봉 양봉 + 거래량 150%+", stop:"첫봉 저가", target:"전일 고점"},
   "갭상승": {phase:"10-2", cond:"갭업 후 첫봉 양봉 확정", stop:"갭 아래 (시가)", target:"이전 저항 or +5%"},
   "이슈테마": {phase:"10-6", cond:"재료 A급 이상 + 선도주 + 거래량 1위", stop:"시가 이탈", target:"R/R 1:2"},
-  "대장첫숨": {phase:"10-7", cond:"기관수급 강세섹터 대장주 장대양봉 후 첫 음봉 — 비중 1/3 신중 진입", stop:"장대양봉 시가 이탈", target:"장대양봉 고가"},
+  "대장첫숨": {phase:"10-7", cond:"이슈/재료 동반 필수 + 기관수급 강세섹터 대장주 장대양봉 후 첫 음봉 — 비중 1/3 신중 진입", stop:"장대양봉 시가 이탈", target:"장대양봉 고가"},
 };
 
 async function detectTechnique(cs, stk){
@@ -4090,13 +4095,16 @@ async function detectTechnique(cs, stk){
   const isGap=lc.o>pc.c*1.01;
   const isFirstBar=sim.idx<=6; // 처음 6봉 이내
   const isMomentum=rsi>=50&&volRatio>=1.5&&chgPct>0;
-  // 대장첫숨: 강세섹터 대장주 장대양봉 후 첫 음봉
+  // 대장첫숨: 이슈/재료 동반 필수 + 강세섹터 대장주 장대양봉 후 첫 음봉
   const _siDet = stk ? (window._sectorInfo||{})[stk.tk||''] : null;
   const _isLeaderDet = _siDet && _siDet.rank<=3 && (_siDet.role==='대장주'||_siDet.momentum==='강함');
+  const _hasThemeDet = _siDet && _siDet.reason && _siDet.reason.length>2;
+  const _hasNewsDet = (typeof window._newsItems!=='undefined' && Array.isArray(window._newsItems)) && window._newsItems.some(function(n){return (n.tk||n.code)===(stk.tk||'')||(n.title||'').indexOf(stk.nm||'')!==-1;});
+  const _hasIssueDet = _hasThemeDet || _hasNewsDet;
   const _pcBd = Math.abs(pc.c-pc.o), _pcRng = pc.h-pc.l||1;
   const _prevBigBullDet = pc.c>pc.o && _pcBd/_pcRng>=0.6 && (pc.c-pc.o)/pc.o*100>=1.5;
   const _curBearDet = lc.c<lc.o;
-  const isLeaderDip = _isLeaderDet && _prevBigBullDet && _curBearDet;
+  const isLeaderDip = _isLeaderDet && _prevBigBullDet && _curBearDet && _hasIssueDet;
   let technique="눌림목", score=0;
   if(isLeaderDip){technique="대장첫숨";score=4;}
   else if(isBreakout){technique="돌파";score=4;}
