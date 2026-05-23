@@ -3647,6 +3647,15 @@ async function _runScreeningAsync(){
     } else if(_isBreakout){tags.push('돌파');}
     else if(_isGap){tags.push('갭상승');}
     else{tags.push('기타패턴');}
+    // 11. 대장첫숨 — 기관수급 강세섹터 대장주 장대양봉 후 첫 음봉
+    var _siPat = (window._sectorInfo||{})[tk];
+    var _isLeader = _siPat && _siPat.rank<=3 && (_siPat.role==='대장주'||_siPat.momentum==='강함');
+    var _pcBody = Math.abs(pc.c-pc.o), _pcRange = pc.h-pc.l||1;
+    var _prevBigBull = pc.c>pc.o && _pcBody/_pcRange>=0.6 && (pc.c-pc.o)/pc.o*100>=1.5;
+    var _curBear = lc.c<lc.o;
+    if(_isLeader && _prevBigBull && _curBear){
+      score+=4;tags.push('대장첫숨');
+    }
 
     scored.push({tk:tk,stk:stk,score:score,tags:tags,lc:lc,lma5:lma5,lrsi:lrsi,volR:volR});
   }
@@ -3734,7 +3743,8 @@ async function _runScreeningAsync(){
     if(best.score >= 5 || (best.score >= 3 && hasConfirm)){
       var lcQ=best.lc;
       addDecisionLog('['+best.stk.nm+'] ✅ 진입 ('+best.score+'점)', best.tags.join(' · '), best.score>=5?'강한신호':'확정시그널');
-      try{ await execAutoBuy(lcQ.c, best.stk, best.score); }catch(_e){}
+      var _bestTech = best.tags.indexOf('대장첫숨')!==-1?'대장첫숨':'';
+      try{ await execAutoBuy(lcQ.c, best.stk, best.score, _bestTech); }catch(_e){}
     } else if(best.score >= 2){
       addDecisionLog('['+best.stk.nm+'] 👀 관찰 ('+best.score+'점)', best.tags.join(' · '), '대기');
     } else {
@@ -3759,8 +3769,9 @@ async function _runScreeningAsync(){
       var _lec = typeof getLectureContext==='function' ? getLectureContext(2500) : '';
       var prompt='단타 트레이딩 멘토. 자동매매 최종 진입 여부.\n\n'+
         '⚠️ 절대 원칙: 아래 강의 매매 원칙은 100% 따라야 한다. 강의에 어긋나는 진입은 \"PASS\". 의심스러우면 PASS.\n'+
-        '눌림목매매를 최우선으로 하되, 돌파/첫봉/갭상승/이슈테마도 조건이 확실하면 진입 가능.\n'+
-        '눌림목: 상승추세(20MA↑)+5MA/20MA지지+거래량감소후회복. 가장 높은 가산점.\n\n'+
+        '눌림목매매를 최우선으로 하되, 대장첫숨/돌파/첫봉/갭상승/이슈테마도 조건 확실하면 진입 가능.\n'+
+        '눌림목: 상승추세(20MA↑)+5MA/20MA지지+거래량감소후회복.\n'+
+        '대장첫숨: 기관수급 강세섹터 대장주가 장대양봉 찍은 후 첫 음봉 → 비중 1/3로 신중 진입.\n\n'+
         _lec +
         _learn +
         '【종목】 '+best.stk.nm+'('+best.tk+') '+best.stk.sec+'\n'+
@@ -3789,7 +3800,8 @@ async function _runScreeningAsync(){
         addDecisionLog('['+best.stk.nm+'] ✅ AI매수 (신뢰도'+ai.confidence+'%)',ai.reason+(ai.factors?(' | '+ai.factors):''),'Phase8통과');
         addMsg('ai','🤖 AI자동매수\n\n종목: '+best.stk.nm+' '+lc2.c.toLocaleString()+'원\n신뢰도: '+ai.confidence+'%\n\n✅ '+ai.reason+'\n'+_factorsTxt+'⚠ '+ai.risk+'\n\n손절: '+stopPr.toLocaleString()+' | 목표: '+t1Pr.toLocaleString()+' | R/R 1:'+rr);
         updAdvBoxes('✅ 매수결정 — '+best.stk.nm,'신뢰도 '+ai.confidence+'%\n'+ai.reason+(ai.factors?('\n근거: '+ai.factors):''));
-        await execAutoBuy(lc2.c, best.stk, best.score);
+        var _bestTech2 = best.tags.indexOf('대장첫숨')!==-1?'대장첫숨':'';
+        await execAutoBuy(lc2.c, best.stk, best.score, _bestTech2);
       }else{
         var _factorsTxt2 = ai.factors ? (' | '+ai.factors) : '';
         addDecisionLog('['+best.stk.nm+'] ⏸ AI관망',(ai.reason||'조건미충족')+_factorsTxt2,'2단계차단');
@@ -3863,7 +3875,7 @@ function runAutoStep(cs){
     }catch(_e){}
   }
 }
-async function execAutoBuy(pr, stk, score){
+async function execAutoBuy(pr, stk, score, techTag){
   if(!autoState.running||autoState.level<3)return;
   if(mock.lossSeries>=3&&autoState.cfg.brk){addMsg("ai","⏸ 연속 손절 3회 — 자동매매 일시정지\n[Phase 11: 뇌동매매 방지]");stopAuto();return;}
   // 확신도(score)에 따라 비중 차등 — 타점 명확하면 화끈하게
@@ -3877,6 +3889,8 @@ async function execAutoBuy(pr, stk, score){
   }else{
     posPct = Math.max(5, Math.min(80, autoState.cfg.pos||30));
   }
+  // 대장첫숨: 신중 진입 — 비중 1/3로 제한
+  if(techTag==='대장첫숨'){ posPct=Math.min(posPct, 33); }
   // 사용자 cfg 상한 존중 (cfg.pos를 사용자가 60%로 올려놓았다면 그 이상은 안 감)
   posPct = Math.min(posPct, Math.max(20, autoState.cfg.pos||50));
   // 신용 한도 포함 가용 자금 (잔고 + 신용한도 - 사용중)
@@ -4047,6 +4061,7 @@ const TECHNIQUES = {
   "첫봉": {phase:"10-3", cond:"시가 후 첫봉 양봉 + 거래량 150%+", stop:"첫봉 저가", target:"전일 고점"},
   "갭상승": {phase:"10-2", cond:"갭업 후 첫봉 양봉 확정", stop:"갭 아래 (시가)", target:"이전 저항 or +5%"},
   "이슈테마": {phase:"10-6", cond:"재료 A급 이상 + 선도주 + 거래량 1위", stop:"시가 이탈", target:"R/R 1:2"},
+  "대장첫숨": {phase:"10-7", cond:"기관수급 강세섹터 대장주 장대양봉 후 첫 음봉 — 비중 1/3 신중 진입", stop:"장대양봉 시가 이탈", target:"장대양봉 고가"},
 };
 
 async function detectTechnique(cs, stk){
@@ -4075,8 +4090,16 @@ async function detectTechnique(cs, stk){
   const isGap=lc.o>pc.c*1.01;
   const isFirstBar=sim.idx<=6; // 처음 6봉 이내
   const isMomentum=rsi>=50&&volRatio>=1.5&&chgPct>0;
+  // 대장첫숨: 강세섹터 대장주 장대양봉 후 첫 음봉
+  const _siDet = stk ? (window._sectorInfo||{})[stk.tk||''] : null;
+  const _isLeaderDet = _siDet && _siDet.rank<=3 && (_siDet.role==='대장주'||_siDet.momentum==='강함');
+  const _pcBd = Math.abs(pc.c-pc.o), _pcRng = pc.h-pc.l||1;
+  const _prevBigBullDet = pc.c>pc.o && _pcBd/_pcRng>=0.6 && (pc.c-pc.o)/pc.o*100>=1.5;
+  const _curBearDet = lc.c<lc.o;
+  const isLeaderDip = _isLeaderDet && _prevBigBullDet && _curBearDet;
   let technique="눌림목", score=0;
-  if(isBreakout){technique="돌파";score=4;}
+  if(isLeaderDip){technique="대장첫숨";score=4;}
+  else if(isBreakout){technique="돌파";score=4;}
   else if(isGap&&isFirstBar){technique="갭상승";score=4;}
   else if(isFirstBar&&lc.c>lc.o&&volRatio>=1.5){technique="첫봉";score=3;}
   else if(isPullback){technique="눌림목";score=3;}
@@ -7515,7 +7538,7 @@ async function syncCandidatesToWatchlist(){
       `5. **차트 기술적**: 정배열, 신고가 돌파, 거래량 동반 상승, RSI 50~65 안전구간\n` +
       `6. **선도주 ↔ 후속주**: 섹터 대장주 + 동반 상승 2부 종목\n` +
       `7. **시장 환경 정합**: 코스피 방향성·환율·미국 시장 흐름과 맞는 섹터\n` +
-      `8. **시간대 적합성**: ${_phase}에 진입하기 좋은 종목 (강의의 매매 기법 — 눌림목/돌파/첫봉/갭상승/이슈테마 중 어떤 게 적합?)\n\n` +
+      `8. **시간대 적합성**: ${_phase}에 진입하기 좋은 종목 (강의의 매매 기법 — 눌림목/대장첫숨/돌파/첫봉/갭상승/이슈테마 중 어떤 게 적합?)\n\n` +
       `## 출력 — JSON만 (다른 텍스트 X)\n` +
       `{\n` +
       `  "market_view":"오늘 시장 한줄 요약 (방향/리스크)",\n` +
@@ -7525,7 +7548,7 @@ async function syncCandidatesToWatchlist(){
       `      "name":"섹터명",\n` +
       `      "reason":"강세 근거 (거래대금·수급·재료를 수치로)",\n` +
       `      "momentum":"강함/보통/약함",\n` +
-      `      "technique":"강의 매매기법명 (눌림목/돌파/첫봉/갭상승/이슈테마 중)",\n` +
+      `      "technique":"강의 매매기법명 (눌림목/대장첫숨/돌파/첫봉/갭상승/이슈테마 중)",\n` +
       `      "risk":"이 섹터 리스크 1줄",\n` +
       `      "stocks":[\n` +
       `        {"tk":"종목코드6자리","nm":"종목명","role":"대장주/후속주","reason":"선정이유","entry":"진입 시나리오 1줄","stop":"손절 기준","short_ratio":"공매도 잔고비율 (예: 1.2%, 모르면 -)","short_trend":"공매도 추세 (감소/유지/증가/모름)"}\n` +
