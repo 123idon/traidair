@@ -2142,7 +2142,7 @@ function updPrice(c){
   updOSum(); updPnl();
 }
 function updPnl(){
-  let tot=0;Object.entries(mock.positions).forEach(([tk,pos])=>{const s=STOCKS.find(s=>s.tk===tk);if(s)tot+=(s.pr-pos.avgPrice)*pos.qty;});
+  let tot=0;Object.entries(mock.positions||{}).forEach(([tk,pos])=>{const s=STOCKS.find(s=>s.tk===tk);if(s&&pos)tot+=(s.pr-pos.avgPrice)*pos.qty;});
   const up=tot>=0;
   const _pnlEl=document.getElementById("msPnl");if(_pnlEl){_pnlEl.textContent=(up?"+":"")+Math.round(tot).toLocaleString()+"원";_pnlEl.className="ms-v "+(up?"cu":"cd");}
   const _pctEl=document.getElementById("msPct");if(_pctEl){_pctEl.textContent=(up?"+":"")+(tot/cfg.capital*100).toFixed(2)+"%";_pctEl.className="ms-v "+(up?"cu":"cd");}
@@ -2944,7 +2944,7 @@ function calcPyramid(){
   // R/R 재계산
   const so = stopOrders[activeTk];
   const stopDist = so?Math.abs(newAvg-so.stop)/newAvg*100:3;
-  const t1Dist = so?Math.abs(so.t1-newAvg)/newAvg*100:6;
+  const t1Dist = (so&&so.t1)?Math.abs(so.t1-newAvg)/newAvg*100:6;
   const rr = stopDist>0?t1Dist/stopDist:0;
   const rrOk = rr>=1.5;
   el.innerHTML = `<div style="color:${isReverse?'var(--g)':'var(--a)'};">${isReverse?'✅ 역피라미드 적합':'⚠ 추가분이 큼 — 더 줄일 것'}</div>`+
@@ -3029,7 +3029,7 @@ function checkPsychWarnings(){
     const pnlPct=(stk.pr-pos.avgPrice)/pos.avgPrice*100;
     const so=stopOrders[tk];
     if(pnlPct>0&&pnlPct<1&&so&&stk.pr<so.t1){
-      warnings.push(`처분효과 주의: ${stk.nm} +${pnlPct.toFixed(1)}% — 목표가(${so.t1.toLocaleString()}) 미달. 조기청산 충동 = 처분효과`);
+      warnings.push(`처분효과 주의: ${stk.nm} +${pnlPct.toFixed(1)}% — 목표가(${so.t1?.toLocaleString()||'미설정'}) 미달. 조기청산 충동 = 처분효과`);
     }
     if(pnlPct>3&&so&&!so.t1done){
       // 좋은 상태 — 홀딩 격려
@@ -4527,7 +4527,7 @@ async function runFullAnalysis(){
 5MA: ${lma5} / 20MA: ${lma20} / 60MA: ${lma60}
 RSI: ${rsi} / 거래량비율: ${volR}배
 감지된 기법: ${tech?.technique||"불명확"}
-${pos?`보유: ${pos.qty}주 평단 ${Math.round(pos.avgPrice).toLocaleString()}원${so?` 손절${so.stop.toLocaleString()} 목표${so.t1.toLocaleString()}`:""}`:""} 
+${pos?`보유: ${pos.qty}주 평단 ${Math.round(pos.avgPrice).toLocaleString()}원${so?` 손절${(so.stop||0).toLocaleString()} 목표${(so.t1||0).toLocaleString()}`:""}`:""}
 
 Phase 8 STEP 0~7 간략 점검 결과를 JSON으로 답해:
 {
@@ -4913,7 +4913,7 @@ async function updateAIAdvisor(){
     const up=stk.pr>=pos.avgPrice;
     if(so&&stk.pr<=so.stop*1.01){
       actionText=`⚠️ 손절선 근처예요\n지금 ${so.stop.toLocaleString()}원이 손절 기준\n감정 빼고 원칙대로 해요`;
-    } else if(so&&!so.t1done&&stk.pr>=so.t1*0.99){
+    } else if(so&&!so.t1done&&so.t1&&stk.pr>=so.t1*0.99){
       actionText=`🎯 1차 목표가 왔어요!\n${so.t1.toLocaleString()}원 근처\n절반은 팔고 나머지는 홀딩해요`;
     } else {
       actionText=`${up?'✅':'⚠️'} 보유 중 ${up?'+':''}${pnlPct}%\n${up?'흐름 좋아요. 목표가까지 홀딩':'손절선 다시 확인해요'}`;
@@ -5471,7 +5471,7 @@ function buildSys(){
     const p=parseFloat(pnlPct);
     const t1ok=so&&lc.c>=so.t1;
     exitCtx=`\n[Phase 9 청산전략] 보유${pos.qty}주 평단${Math.round(pos.avgPrice).toLocaleString()}원 (${p>=0?"+":""}${pnlPct}%)
-손절선:${so?so.stop.toLocaleString()+"원":"미설정⚠"} | 1차목표:${so?so.t1.toLocaleString()+"원":"미설정"}
+손절선:${so&&so.stop?so.stop.toLocaleString()+"원":"미설정⚠"} | 1차목표:${so&&so.t1?so.t1.toLocaleString()+"원":"미설정"}
 ${p>=3?"1차 익절(50%) 검토 → 즉시 손절선 본전화":p<=-3?"손절선 근접 → 즉각 대응 준비":p>=1?"홀딩 유지 → 트레일링 스탑 점검":"보유 중 관찰"}
 ${t1ok?"⚡ 1차 목표 도달 → 50% 익절 실행 권고":""}`;
   }
@@ -5656,7 +5656,7 @@ function renderPort(){
     const pos=mock.positions[tk],stk=STOCKS.find(s=>s.tk===tk)||{nm:tk,pr:0};
     const pnl=(stk.pr-pos.avgPrice)*pos.qty,pct=((stk.pr-pos.avgPrice)/pos.avgPrice*100).toFixed(2),up=pnl>=0;
     const so=stopOrders[tk];
-    const bgs=(pos.creditType&&pos.creditType!=="cash"?`<span class="pi-b cred">${pos.creditType==="credit"?"신용":"미수"}</span>`:"")+(so?`<span class="pi-b stop">손절${so.stop.toLocaleString()}</span>`:"")+(so&&!so.t1done?`<span class="pi-b tgt">목표${so.t1.toLocaleString()}</span>`:"")+(so?.trail!=="off"?`<span class="pi-b trail">트레일</span>`:"")+(pos.auto?`<span class="pi-b ai">AI</span>`:"");
+    const bgs=(pos.creditType&&pos.creditType!=="cash"?`<span class="pi-b cred">${pos.creditType==="credit"?"신용":"미수"}</span>`:"")+(so?`<span class="pi-b stop">손절${so.stop.toLocaleString()}</span>`:"")+(so&&!so.t1done&&so.t1?`<span class="pi-b tgt">목표${so.t1.toLocaleString()}</span>`:"")+(so?.trail!=="off"?`<span class="pi-b trail">트레일</span>`:"")+(pos.auto?`<span class="pi-b ai">AI</span>`:"");
     return `<div class="pi" onclick="selectStk('${tk}');switchToSell()"><div class="pi-h"><span class="pi-tk">${stk.nm}</span><span class="pi-pnl ${up?"cu":"cd"}">${up?"+":""}${Math.round(pnl).toLocaleString()}원</span></div><div class="pi-s"><span>${pos.qty.toLocaleString()}주 평단${Math.round(pos.avgPrice).toLocaleString()}</span><span class="${up?"cu":"cd"}">${up?"+":""}${pct}%</span></div>${bgs?`<div style="margin-top:2px;display:flex;gap:2px;flex-wrap:wrap;">${bgs}</div>`:""}</div>`;
   }).join("");
 }
