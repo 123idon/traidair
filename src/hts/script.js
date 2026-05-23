@@ -2224,7 +2224,7 @@ function submitOrder(autoExec){
     const prevSO=stopOrders[activeTk];
     const newOrigQty=prevSO?(prevSO.origQty||0)+qty:qty;
     stopOrders[activeTk]={stop:stopPr,t1:t1Pr,t2:t2Pr,t1done:prevSO?prevSO.t1done:false,t2done:prevSO?prevSO.t2done:false,trail:trailMode,trailHigh:Math.max(pr,prevSO?.trailHigh||0),origQty:newOrigQty,origStop:stopPr};
-    mock.trades.push({date:sim.date,tk:activeTk,nm:stk.nm,side:"buy",price:pr,pr:pr,ts:Date.now(),barTime:(sim.candles[sim.idx]||{}).t||"",qty,fee:Math.round(fee),pnl:0,creditType:credType,auto:autoExec||false,time:new Date().toLocaleTimeString("ko-KR",{hour:"2-digit"})});
+    mock.trades.push({date:sim.date,tk:activeTk,nm:stk.nm,side:"buy",price:pr,pr:pr,ts:Date.now(),barTime:(sim.candles[sim.idx]||{}).t||"",qty,fee:Math.round(fee),pnl:0,creditType:credType,auto:autoExec||false,time:(sim.candles[sim.idx]||{}).t||""});
     console.log('[BUY]', sim.date, stk.nm, qty+'주', pr+'원', '| total trades:', mock.trades.length);
   checkBrainDong("buy",pr,qty,stk);
   } else {
@@ -2255,7 +2255,7 @@ function submitOrder(autoExec){
           "연속 수익 "+mock.winSeries+"회!\n\n지금이 가장 위험한 순간입니다.\n\n• 비중 절대 늘리지 않음\n• 체크리스트 더 꼼꼼히\n• 연속수익은 운과 실력을 구분할 수 없음");
       }
     }
-    mock.trades.push({date:sim.date,tk:activeTk,nm:stk.nm,side:"sell",price:pr,pr:pr,ts:Date.now(),barTime:(sim.candles[sim.idx]||{}).t||"",qty,fee:Math.round(fee+tax),pnl:Math.round(pnl),creditType:credType,auto:autoExec||false,time:new Date().toLocaleTimeString("ko-KR",{hour:"2-digit"})});
+    mock.trades.push({date:sim.date,tk:activeTk,nm:stk.nm,side:"sell",price:pr,pr:pr,ts:Date.now(),barTime:(sim.candles[sim.idx]||{}).t||"",qty,fee:Math.round(fee+tax),pnl:Math.round(pnl),creditType:credType,auto:autoExec||false,time:(sim.candles[sim.idx]||{}).t||""});
     console.log('[SELL]', sim.date, stk.nm, qty+'주', pr+'원', '손익:', Math.round(pnl)+'원', '| total trades:', mock.trades.length);
   bdMetrics.lastSellTime=Date.now();checkBrainDong("sell",pr,qty,stk);
     if(cfg.al){const lr=-mock.todayPnl/cfg.capital*100;if(lr>=cfg.dayloss)showAlert("⚠ 일일 손실 한도",`한도 ${cfg.dayloss}% 도달\n매매 중단 권고.`);}
@@ -7726,11 +7726,14 @@ async function autoSelectBestStock(){
 // ══════════════════════════════════════════════
 // 장 시간 필터 (09:00~15:30)
 function isMarketHourTrade(trade){
-  // time 필드가 있으면 그 기준, 없으면 포함
-  if(!trade.time) return true;
+  var t = trade.time || trade.barTime || '';
+  if(!t) return true;
   try{
-    const [h,m] = trade.time.split(':').map(Number);
-    const mins = h*60+m;
+    // "HH:MM" 포맷만 처리 (한국어 "오후 2시" 등은 통과)
+    if(t.indexOf(':') === -1) return true;
+    const [h,m] = t.split(':').map(Number);
+    if(isNaN(h)) return true;
+    const mins = h*60+(m||0);
     return mins >= 9*60 && mins <= 15*60+30;
   }catch(e){ return true; }
 }
@@ -7741,8 +7744,12 @@ function getMarketTrades(date){
 
 async function autoSaveJournalOnTrade(forceDate){
   const date=forceDate||sim.date;
-  const tt=(mock.trades||[]).filter(function(t){return t.date===date&&isMarketHourTrade(t);}); // 장시간 기준
-  if(!tt.length)return;
+  var tt=(mock.trades||[]).filter(function(t){return t.date===date&&isMarketHourTrade(t);});
+  // 장시간 필터 후 0건이지만 해당 날짜 거래 자체는 있으면 → 필터 무시 (time 형식 문제 방지)
+  if(!tt.length){
+    tt=(mock.trades||[]).filter(function(t){return t.date===date;});
+    if(!tt.length) return;
+  }
   const sells=tt.filter(function(t){return t.side==='sell';});
   const pnl=sells.reduce(function(a,t){return a+t.pnl;},0);
   const wins=sells.filter(function(t){return t.pnl>0;}).length;
