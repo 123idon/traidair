@@ -575,9 +575,12 @@ function genCandles(tk,dt){
         sim.candles = candles;
         const prevCount = _kisChartMeta.prevCount || 0;
         const todayCount = _kisChartMeta.todayCount || candles.length;
-        // sim.idx: 전일 마지막 봉에서 시작 (전일 분봉 끝 + 오늘 첫 봉 전)
-        // 오늘 봉이 있으면 전일 마지막 봉에서 멈춤, 없으면 끝에서 시작
-        sim.idx = prevCount > 0 ? prevCount - 1 : candles.length - 1;
+        // 백테스트 중 KIS 비동기 콜백에서 sim.idx 리셋 금지 (날짜 루프 방지)
+        if(!(window.backtest && backtest.running)){
+          sim.idx = prevCount > 0 ? prevCount - 1 : candles.length - 1;
+        } else {
+          sim.idx = Math.min(sim.idx, candles.length - 1);
+        }
         chartViewCount = Math.min(Math.max(prevCount + 20, 80), candles.length);
         chartViewStart = Math.max(0, candles.length - chartViewCount);
         if(candles.length > 0) updPrice(candles[sim.idx]);
@@ -724,8 +727,9 @@ function _genSimCandles(tk,dt){
       base=c;
     }
     sim.candles=res;
-    // 일봉: 전체 보이도록 idx = 마지막
-    sim.idx=res.length-1;
+    // 일봉: 전체 보이도록 idx = 마지막 (백테스트 중이면 유지)
+    if(!(window.backtest && backtest.running)) sim.idx=res.length-1;
+    else sim.idx=Math.min(sim.idx, res.length-1);
     chartViewCount=Math.min(res.length,120);
     chartViewStart=Math.max(0,res.length-chartViewCount);
     if(res.length>0)updPrice(res[res.length-1]);
@@ -764,9 +768,13 @@ function _genSimCandles(tk,dt){
   // 시뮬에서도 KIS와 동일하게 메타데이터 채움 (전일+당일 표시용)
   _kisChartMeta={prevCount:prevCandles.length,todayCount:todayCandles.length,prevDate:_prevDate,todayDate:_curDt};
   _kisChartMeta._prevCount=prevCandles.length;
-  // 전일 마지막 봉에서 시작 (당일 첫 봉 전 — 자연스러운 진입점)
-  sim.idx=prevCandles.length>0?prevCandles.length-1:0;
-  if(res.length>0)updPrice(res[sim.idx]);
+  // 백테스트 중 종목 전환 시 sim.idx 리셋 금지 (날짜 루프 방지)
+  if(!(window.backtest && backtest.running)){
+    sim.idx=prevCandles.length>0?prevCandles.length-1:0;
+  } else {
+    sim.idx=Math.min(sim.idx, res.length-1);
+  }
+  if(res.length>0)updPrice(res[Math.max(0,sim.idx)]);
   return res;
 }
 
