@@ -1053,7 +1053,38 @@ function drawChart(){
 
   mChart={_ok:true};
 
-  // 매매 마커(화살표/B/S) 제거됨
+  // ── 실제 매수/매도 체결 마커 (화살표만, 텍스트 없음) ──
+  try{
+    var _trades=(mock.trades||[]).filter(function(t){
+      return t.tk===activeTk&&t.date===sim.date&&(t.side==='buy'||t.side==='sell');
+    });
+    _trades.forEach(function(t){
+      var matchIdx=-1;
+      if(t.barTime){
+        for(var bi=0;bi<cs.length;bi++){
+          if(cs[bi].t===t.barTime){matchIdx=bi;break;}
+        }
+      }
+      if(matchIdx<0) return;
+      var x=toX(matchIdx);
+      var _tpr=t.price||t.pr||0;
+      if(!_tpr) return;
+      var yPr=toY(_tpr);
+      var isBuy=t.side==='buy';
+      ctx.save();
+      ctx.fillStyle=isBuy?'#00c471':'#ff4757';
+      ctx.strokeStyle=isBuy?'#008855':'#cc1133';
+      ctx.lineWidth=1.5;
+      ctx.beginPath();
+      if(isBuy){
+        ctx.moveTo(x,yPr+14);ctx.lineTo(x-5,yPr+4);ctx.lineTo(x+5,yPr+4);
+      }else{
+        ctx.moveTo(x,yPr-14);ctx.lineTo(x-5,yPr-4);ctx.lineTo(x+5,yPr-4);
+      }
+      ctx.closePath();ctx.fill();ctx.stroke();
+      ctx.restore();
+    });
+  }catch(_me){}
   // AI 타점 오버레이
   drawSignalOverlay();
 }
