@@ -1383,7 +1383,7 @@ function _syncPlayBtn(){
 function runStep(){
   if(!sim.playing)return;
   sim.idx=Math.min(sim.idx+1,sim.candles.length-1);
-  updChartToIdx();
+  try{ updChartToIdx(); }catch(e){ console.error('updChartToIdx:', e); }
   if(sim.idx>=sim.candles.length-1){
     // 백테스트 모드면 다음 영업일로 자동 점프
     if(window.backtest && backtest.running){
@@ -1713,10 +1713,19 @@ async function _backtestLoadDay(dateStr){
   }, _wait);
 }
 async function _backtestEndOfDay(){
-  if(!window.backtest || !backtest.running) return; // ★ 정지 후 호출되더라도 즉시 종료
-  // 현재 날짜 결과 집계
+  if(!window.backtest || !backtest.running) return;
   const dt=backtest.currentDate;
-  // ★ 안전망: 다음날 시작 전 모든 보유 종목 강제 청산 (당일매매 원칙)
+  // ★ 전체를 try-catch로 감싸서 어떤 에러가 나도 다음 날 반드시 로드
+  try{ await _backtestEndOfDayInner(dt); }catch(e){ console.error('_backtestEndOfDay 에러:', e); }
+  // ★ 다음 영업일 무조건 로드 (위에서 에러 나도 여기까지 옴)
+  backtest.dayIdx = (backtest.dayIdx||0);
+  if(backtest.dayIdx >= backtest.totalDays){ stopBacktest(); return; }
+  const next=_nextBusinessDay(dt);
+  if(!next || next > backtest.endDate){ stopBacktest(); return; }
+  _backtestLoadDay(next);
+}
+async function _backtestEndOfDayInner(dt){
+  // ★ 안전망: 다음날 시작 전 모든 보유 종목 강제 청산
   try{
     Object.keys(mock.positions||{}).forEach(tk=>{
       const pos=mock.positions[tk]; if(!pos||pos.qty<=0) return;
@@ -1782,17 +1791,6 @@ async function _backtestEndOfDay(){
     }
     window._lastNoTradeReason = null;
   }catch(_e){ console.warn('일지 저장 실패:', _e.message); }
-  // 다음 영업일?
-  if(backtest.dayIdx >= backtest.totalDays){
-    stopBacktest();
-    return;
-  }
-  const next=_nextBusinessDay(dt);
-  if(next > backtest.endDate){
-    stopBacktest();
-    return;
-  }
-  _backtestLoadDay(next);
 }
 function _backtestReport(){
   const totalPnl = backtest.dailyResults.reduce((s,d)=>s+d.pnl,0);
@@ -3495,7 +3493,7 @@ let _autoScreenRunning = false;
 let _lastAutoScreenTime = 0;
 
 function runScreening(){
-  if(!autoState.running) return;
+  if(!autoState.running && (!window.backtest || !backtest.running)) return;
   const now = Date.now();
   // 중복 실행 방지 (이전 스크리닝이 진행 중이거나 3초 이내)
   if(_autoScreenRunning) return;
@@ -3553,7 +3551,7 @@ async function _runScreeningAsync(){
     addDecisionLog('⚠ 일손실 한도 도달','오늘 손실 '+dayLossRate.toFixed(1)+'% (한도 '+cfg.dayloss+'%) — 오늘 매매 중단','NOGO');
     return;
   }
-  if(mock.lossSeries>=3&&autoState.cfg.brk){
+  if(mock.lossSeries>=3&&autoState.cfg.brk && (!window.backtest || !backtest.running)){
     addDecisionLog('⚠ 연속손절 '+mock.lossSeries+'회','매매 중단','Phase11');
     return;
   }
@@ -3939,8 +3937,15 @@ function runAutoStep(cs){
   }
 }
 async function execAutoBuy(pr, stk, score, techTag){
-  if(!autoState.running||autoState.level<3)return;
-  if(mock.lossSeries>=3&&autoState.cfg.brk){addMsg("ai","⏸ 연속 손절 3회 — 자동매매 일시정지\n[Phase 11: 뇌동매매 방지]");stopAuto();return;}
+  var _btRunning = window.backtest && backtest.running;
+  if(!autoState.running && !_btRunning)return;
+  if(autoState.level<3 && !_btRunning)return;
+  if(mock.lossSeries>=3&&autoState.cfg.brk){
+    addMsg("ai","⏸ 연속 손절 3회 — 이번 매수 건너뜀\n[Phase 11: 뇌동매매 방지]");
+    // 백테스트 중에는 stopAuto 호출 금지 (자동매매 영구 중단 방지)
+    if(!window.backtest || !backtest.running) stopAuto();
+    return;
+  }
   // 확신도(score)에 따라 비중 차등 — 타점 명확하면 화끈하게
   // score>=12 강한신호 50% / >=10 강함 40% / >=8 보통 30% / 그 외 기본
   let posPct;
@@ -7966,9 +7971,10 @@ async function _saveJournalToNotion(date,entry,pnl,trades){
 
 // scheduleScreening에 종목 선택 통합
 async function scheduleScreening(){
-  if(!autoState.running)return;
-  runScreening();
-  autoTimer=setTimeout(scheduleScreening,5000);
+  // 백테스트 중이면 autoState와 무관하게 계속 스크리닝
+  if(!autoState.running && (!window.backtest || !backtest.running)) return;
+  try{ runScreening(); }catch(e){ console.warn('screening err:', e); }
+  autoTimer=setTimeout(scheduleScreening, 5000);
 }
 
 
