@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#ffffff">
-<meta name="build-ts" content="1779544176437">
+<meta name="build-ts" content="1779544283120">
 <title>TraidAIr HTS</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 
@@ -3649,11 +3649,12 @@ async function _backtestEndOfDayInner(dt){
     });
   }catch(_e){}
   // ★ 청산 실패 잔여 포지션 강제 삭제 (submitOrder 오류로 남은 경우)
-  Object.keys(mock.positions||{}).forEach(tk=>{
-    if(mock.positions[tk]&&mock.positions[tk].qty>0){
-      const stk=STOCKS.find(s=>s.tk===tk);
-      mock.cash+=mock.positions[tk].qty*(stk?stk.pr:mock.positions[tk].avgPrice||0);
-      delete mock.positions[tk]; delete stopOrders[tk];
+  Object.keys(mock.positions||{}).forEach(function(tk2){
+    const _pos2=mock.positions[tk2];
+    if(_pos2&&_pos2.qty>0){
+      const _stk2=STOCKS.find(s=>s.tk===tk2);
+      mock.cash+=_pos2.qty*(_stk2?_stk2.pr:_pos2.avgPrice||0);
+      delete mock.positions[tk2]; delete stopOrders[tk2];
     }
   });
   const todayTrades=(mock.trades||[]).filter(t=>t.date===dt);
@@ -9574,7 +9575,7 @@ function collectMarketCtx(){
 (function(){
   const meta = document.querySelector('meta[name="build-ts"]');
   const myBuildTs = meta ? meta.getAttribute('content') : '';
-  if(!myBuildTs || myBuildTs === '1779544176437') return; // 로컬 빌드 안 한 경우
+  if(!myBuildTs || myBuildTs === '1779544283120') return; // 로컬 빌드 안 한 경우
   let reloaded = false;
   async function check(){
     if(reloaded) return;

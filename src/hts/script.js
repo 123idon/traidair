@@ -1755,11 +1755,12 @@ async function _backtestEndOfDayInner(dt){
     });
   }catch(_e){}
   // ★ 청산 실패 잔여 포지션 강제 삭제 (submitOrder 오류로 남은 경우)
-  Object.keys(mock.positions||{}).forEach(tk=>{
-    if(mock.positions[tk]&&mock.positions[tk].qty>0){
-      const stk=STOCKS.find(s=>s.tk===tk);
-      mock.cash+=mock.positions[tk].qty*(stk?stk.pr:mock.positions[tk].avgPrice||0);
-      delete mock.positions[tk]; delete stopOrders[tk];
+  Object.keys(mock.positions||{}).forEach(function(tk2){
+    const _pos2=mock.positions[tk2];
+    if(_pos2&&_pos2.qty>0){
+      const _stk2=STOCKS.find(s=>s.tk===tk2);
+      mock.cash+=_pos2.qty*(_stk2?_stk2.pr:_pos2.avgPrice||0);
+      delete mock.positions[tk2]; delete stopOrders[tk2];
     }
   });
   const todayTrades=(mock.trades||[]).filter(t=>t.date===dt);
