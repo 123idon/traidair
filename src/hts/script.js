@@ -866,6 +866,9 @@ function _cvCs(){
 
 // ── 메인 차트 렌더 ──────────────────────────────
 function drawChart(){
+  try{ _drawChartInner(); }catch(e){ console.error('drawChart 에러:', e); }
+}
+function _drawChartInner(){
   const canvas=document.getElementById("mainChart");
   if(!canvas)return;
   // 부모 div(.chart-main)의 실제 크기로 canvas 설정
@@ -883,12 +886,12 @@ function drawChart(){
   const cs=_cvCs();
   // 디버그: cinfo에 실제 상태 표시
   const ci=document.getElementById('cinfo');
-  if(ci)ci.textContent=`W=${W} H=${H} 봉=${cs.length} tf=${sim.tf}`;
+  if(ci&&cs.length){const _lc=cs[Math.min(sim.idx,cs.length-1)]||cs[cs.length-1];if(_lc)ci.textContent=`O${fW(_lc.o)} H${fW(_lc.h)} L${fW(_lc.l)} C${fW(_lc.c)} V${fW(_lc.v)}`;}
   if(!cs.length){ctx.clearRect(0,0,W,H);return;}
   const cls=cs.map(c=>c.c),vls=cs.map(c=>c.v);
 
   // 패딩
-  const PR=54,PL=4,PT=8,PB=22;
+  const PR=72,PL=4,PT=8,PB=22;
   const SB=12; // 스크롤바 높이
   const volH=inds.vol?Math.floor(H*0.20):0;
   const mainH=H-PT-PB-volH-SB;
