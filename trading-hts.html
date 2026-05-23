@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#ffffff">
-<meta name="build-ts" content="1779539585904">
+<meta name="build-ts" content="1779540304316">
 <title>TraidAIr HTS</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 
@@ -5537,8 +5537,8 @@ function stopAuto(){
   try{ addMsg('ai','⏹ AI 자동매매 중지.'); }catch(_e){}
 }
 function scheduleScreening(){
-  if(!autoState.running)return;
-  runScreening();
+  if(!autoState.running && (!window.backtest || !backtest.running)) return;
+  try{ runScreening(); }catch(e){ console.warn('screening err:', e); }
   // 배속이 빠를수록 더 자주 스크리닝 (그래야 봉을 따라잡음)
   const _spd = (sim&&sim.speed)||1;
   const interval = _spd >= 1000 ? 120 : _spd >= 300 ? 300 : _spd >= 60 ? 800 : 5000;
@@ -9540,7 +9540,7 @@ function collectMarketCtx(){
 (function(){
   const meta = document.querySelector('meta[name="build-ts"]');
   const myBuildTs = meta ? meta.getAttribute('content') : '';
-  if(!myBuildTs || myBuildTs === '1779539585904') return; // 로컬 빌드 안 한 경우
+  if(!myBuildTs || myBuildTs === '1779540304316') return; // 로컬 빌드 안 한 경우
   let reloaded = false;
   async function check(){
     if(reloaded) return;
@@ -10106,14 +10106,6 @@ async function _saveJournalToNotion(date,entry,pnl,trades){
     addMsg('ai','📝 Notion 일지 저장 완료');
   }catch(e){console.warn('Notion저장실패:',e.message);}
 }
-
-// scheduleScreening에 종목 선택 통합
-function scheduleScreening(){
-  if(!autoState.running && (!window.backtest || !backtest.running)) return;
-  try{ runScreening(); }catch(e){ console.warn('screening err:', e); }
-  autoTimer=setTimeout(scheduleScreening, 5000);
-}
-
 
 // ─── AI 실시간 사고 패널 ───
 function updAIThought(s){
