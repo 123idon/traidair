@@ -7821,9 +7821,9 @@ function collectMarketCtx(){
   const cls = cs.map(c=>c.c);
   const rsi = (calcRSI(cls,9).slice(-1)[0]||50).toFixed(1);
   const lines = [];
-  if(idx.kospi?.price) lines.push(`KOSPI: ${idx.kospi.price.toLocaleString()} (${idx.kospi.chgPct>=0?'+':''}${idx.kospi.chgPct}%) [${idx.kospi.lastUpdatedKST?.slice(11,19)||'--'}]`);
-  if(idx.kosdq?.price) lines.push(`KOSDQ: ${idx.kosdq.price.toLocaleString()} (${idx.kosdq.chgPct>=0?'+':''}${idx.kosdq.chgPct}%) [${idx.kosdq.lastUpdatedKST?.slice(11,19)||'--'}]`);
-  if(idx.nasdaq?.price) lines.push(`나스닥: ${idx.nasdaq.price.toLocaleString()} (${idx.nasdaq.chgPct>=0?'+':''}${idx.nasdaq.chgPct}%) [${idx.nasdaq.lastUpdatedKST?.slice(11,19)||'--'}]`);
+  if(idx.kospi?.price) lines.push(`KOSPI: ${fW(idx.kospi.price)} (${idx.kospi.chgPct>=0?'+':''}${idx.kospi.chgPct}%) [${idx.kospi.lastUpdatedKST?.slice(11,19)||'--'}]`);
+  if(idx.kosdq?.price) lines.push(`KOSDQ: ${fW(idx.kosdq.price)} (${idx.kosdq.chgPct>=0?'+':''}${idx.kosdq.chgPct}%) [${idx.kosdq.lastUpdatedKST?.slice(11,19)||'--'}]`);
+  if(idx.nasdaq?.price) lines.push(`나스닥: ${fW(idx.nasdaq.price)} (${idx.nasdaq.chgPct>=0?'+':''}${idx.nasdaq.chgPct}%) [${idx.nasdaq.lastUpdatedKST?.slice(11,19)||'--'}]`);
   if(idx.usdkrw?.price) lines.push(`USD/KRW: ${idx.usdkrw.price} [${idx.usdkrw.lastUpdatedKST?.slice(11,19)||'--'}]`);
   if(idx.vix?.price) lines.push(`VIX: ${idx.vix.price} [${idx.vix.lastUpdatedKST?.slice(11,19)||'--'}]`);
   if(curCandle) lines.push(`차트: RSI ${rsi} | 현재봉 O${fW(curCandle.o)} H${fW(curCandle.h)} L${fW(curCandle.l)} C${fW(curCandle.c)}`);
