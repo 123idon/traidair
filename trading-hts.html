@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#ffffff">
-<meta name="build-ts" content="1779553740127">
+<meta name="build-ts" content="1779554093717">
 <title>TraidAIr HTS</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 
@@ -3486,7 +3486,8 @@ function openLearningMemo(){
           </div>
         `).join('') : '<div style="font-size:11px;color:var(--tm);padding:20px;text-align:center;">아직 학습된 노트가 없습니다. 백테스트나 매매를 마치면 자동으로 쌓여요.</div>'}
       </div>
-      <div style="margin-top:10px;display:flex;justify-content:flex-end;gap:6px;">
+      <div style="margin-top:10px;display:flex;justify-content:flex-end;gap:6px;flex-wrap:wrap;">
+        <button class="ibtn" onclick="rebuildLearningFromJournals();document.getElementById('lmDlg').remove();openLearningMemo();" style="font-size:10px;border:1.5px solid var(--g);color:var(--g);">일지에서 복구</button>
         <button class="ibtn" onclick="_autoTrimLearning();saveToServer('htsLearningMemory',JSON.stringify(learningMemory));document.getElementById('lmDlg').remove();openLearningMemo();addMsg('ai','🧹 빠른 정리 완료 ('+learningMemory.length+'개 남음)');" style="font-size:10px;border:1.5px solid var(--a);color:var(--a);">빠른 정리</button>
         <button class="ibtn" onclick="cleanupLearning().then(()=>{try{document.getElementById('lmDlg').remove();openLearningMemo();}catch(e){}});" style="font-size:10px;background:var(--b);color:#fff;">AI 정리</button>
         <button class="ibtn red" onclick="if(confirm('전체 학습 노트를 초기화할까요?')){learningMemory=[];learnedDates=[];saveToServer('htsLearningMemory','[]');saveToServer('htsLearnedDates','[]');document.getElementById('lmDlg').remove();updateLearnerStage();}" style="font-size:10px;">전체 초기화</button>
@@ -5095,23 +5096,29 @@ function deleteLearningItem(idx){
 }
 async function cleanupLearning(){
   if(!learningMemory||!learningMemory.length){showAlert('학습 노트','정리할 노트가 없습니다.');return;}
-  const btn=document.querySelector('[onclick="cleanupLearning()"]');
+  const btn=document.querySelector('[onclick*="cleanupLearning"]');
   if(btn){btn.textContent='정리중...';btn.disabled=true;}
+  const _backup = JSON.parse(JSON.stringify(learningMemory));
   try{
-    const prompt='아래 학습 노트들을 분석해서 중복/불필요한 항목을 제거하고 핵심만 남겨줘.\n'+
-      '같은 내용 반복 → 1개로, 너무 일반적인 조언(예: "전략 유지") → 삭제, 구체적 실수/개선만 남길것.\n\n'+
+    const prompt='아래 학습 노트에서 **삭제할** 항목 번호만 알려줘.\n'+
+      '삭제 기준: 완전 중복, 마크다운 헤더만 있는 줄(## 제목), 5자 미만, "전략유지/정상/양호" 같은 일반 조언.\n'+
+      '⚠ 구체적 실수/개선/멘토 조언은 절대 삭제 금지. 애매하면 유지.\n\n'+
       '현재 노트:\n'+learningMemory.map((l,i)=>`[${i}] ${l.category}|${l.date}|${l.text}`).join('\n')+
-      '\n\nJSON만: {"keep":[유지할 인덱스 번호들], "reason":"정리 사유 한줄"}';
+      '\n\nJSON만: {"remove":[삭제할 인덱스 번호들], "reason":"정리 사유 한줄"}';
     const res=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-haiku-4-5',max_tokens:300,messages:[{role:'user',content:prompt}]})});
+      body:JSON.stringify({model:'claude-haiku-4-5',max_tokens:500,messages:[{role:'user',content:prompt}]})});
     const data=await res.json();
     const text=(data.content&&data.content[0]&&data.content[0].text)||'{}';
-    const m=text.match(/\{[\s\S]*\}/);
-    const result=m?robustJsonParse(text):{};
-    if(!result.keep) throw new Error('파싱실패');
-    const keepSet=new Set(result.keep||[]);
+    const result=robustJsonParse(text);
+    if(!result.remove || !Array.isArray(result.remove)) throw new Error('파싱실패');
+    const removeSet=new Set(result.remove);
     const before=learningMemory.length;
-    learningMemory=learningMemory.filter((_,i)=>keepSet.has(i));
+    if(removeSet.size > before * 0.7){
+      addMsg('ai','⚠ AI가 70% 이상 삭제 시도 → 안전장치 발동. 삭제 취소.');
+      if(btn){btn.textContent='AI정리';btn.disabled=false;}
+      return;
+    }
+    learningMemory=learningMemory.filter((_,i)=>!removeSet.has(i));
     window.learningMemory=learningMemory;
     localStorage.setItem('htsLearningMemory',JSON.stringify(learningMemory));
     saveToServer('htsLearningMemory',JSON.stringify(learningMemory));
@@ -5119,9 +5126,35 @@ async function cleanupLearning(){
     updateLearnerStage();
     addMsg('ai','🧹 학습 노트 정리 완료\n'+before+'개 → '+learningMemory.length+'개\n'+(result.reason||''));
   }catch(e){
-    addMsg('ai','⚠ 정리 실패: '+e.message);
+    learningMemory = _backup;
+    window.learningMemory = _backup;
+    addMsg('ai','⚠ 정리 실패 (복원됨): '+e.message);
   }
-  if(btn){btn.textContent='정리';btn.disabled=false;}
+  if(btn){btn.textContent='AI정리';btn.disabled=false;}
+}
+function rebuildLearningFromJournals(){
+  const js=safeParseJSON(localStorage.getItem('htsJournals'),'{}');
+  const entries=Object.values(js).filter(e=>e&&e.date);
+  if(!entries.length){addMsg('ai','⚠ 일지 데이터가 없어서 복구 불가');return;}
+  const rebuilt=[];
+  entries.forEach(e=>{
+    const d=e.date;
+    if(e.bad && e.bad!=='-' && e.bad!=='없음' && e.bad.length>=5) rebuilt.push({date:d,category:'반성',text:e.bad});
+    if(e.improvement && e.improvement!=='-' && e.improvement.length>=5) rebuilt.push({date:d,category:'개선',text:e.improvement});
+    if(e.mentor_comment && e.mentor_comment!=='-' && e.mentor_comment.length>=5) rebuilt.push({date:d,category:'멘토',text:e.mentor_comment});
+    if(e.psychology && e.psychology!=='-' && e.psychology!=='정상' && e.psychology.length>=5) rebuilt.push({date:d,category:'심리',text:e.psychology});
+    if(e.mistakes && e.mistakes!=='-' && e.mistakes.length>=5) rebuilt.push({date:d,category:'반성',text:e.mistakes});
+  });
+  const unique=[];
+  rebuilt.forEach(r=>{
+    if(!unique.some(u=>u.date===r.date&&u.text===r.text)) unique.push(r);
+  });
+  learningMemory=unique.slice(-80);
+  window.learningMemory=learningMemory;
+  localStorage.setItem('htsLearningMemory',JSON.stringify(learningMemory));
+  saveToServer('htsLearningMemory',JSON.stringify(learningMemory));
+  updateLearnerStage();
+  addMsg('ai','✅ 일지에서 학습 노트 복구 완료: '+learningMemory.length+'개 항목');
 }
 
 function renderWeeklyStats(){
@@ -9608,7 +9641,7 @@ function collectMarketCtx(){
 (function(){
   const meta = document.querySelector('meta[name="build-ts"]');
   const myBuildTs = meta ? meta.getAttribute('content') : '';
-  if(!myBuildTs || myBuildTs === '1779553740127') return; // 로컬 빌드 안 한 경우
+  if(!myBuildTs || myBuildTs === '1779554093717') return; // 로컬 빌드 안 한 경우
   let reloaded = false;
   async function check(){
     if(reloaded) return;
