@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#ffffff">
-<meta name="build-ts" content="1779536034525">
+<meta name="build-ts" content="1779536556362">
 <title>TraidAIr HTS</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 
@@ -4164,10 +4164,20 @@ function submitOrder(autoExec){
 // STOP ORDER MONITOR
 // ═══════════════════════════════
 function checkStopOrders(){
-  if(document.hidden)return; // 탭 비활성 시 스킵
+  // 백테스트 중이면 탭 비활성 체크 스킵 (백그라운드에서도 손절/익절 작동)
+  if(!window.backtest || !backtest.running){
+    if(document.hidden) return;
+  }
   Object.entries(stopOrders).forEach(([tk,so])=>{
     const stk=STOCKS.find(s=>s.tk===tk);if(!stk)return;
     const pos=mock.positions[tk];if(!pos||pos.qty<=0){delete stopOrders[tk];return;}
+    // ★ 비활성 종목 가격 동기화 — 시뮬 캔들에서 현재 봉 가격 추출
+    if(tk !== activeTk){
+      try{
+        const _cs = _peekSimCandlesFor(tk, sim.date, sim.idx);
+        if(_cs && _cs.length > 0) stk.pr = _cs[Math.min(sim.idx, _cs.length-1)].c;
+      }catch(_e){}
+    }
     const pr=stk.pr;
     // Trailing update
     if(so.trail==="pct"&&pr>so.trailHigh){so.trailHigh=pr;so.stop=Math.round(pr*(1-autoState.cfg.stop/100));}
@@ -9259,7 +9269,7 @@ function collectMarketCtx(){
 (function(){
   const meta = document.querySelector('meta[name="build-ts"]');
   const myBuildTs = meta ? meta.getAttribute('content') : '';
-  if(!myBuildTs || myBuildTs === '1779536034525') return; // 로컬 빌드 안 한 경우
+  if(!myBuildTs || myBuildTs === '1779536556362') return; // 로컬 빌드 안 한 경우
   let reloaded = false;
   async function check(){
     if(reloaded) return;
@@ -9330,8 +9340,10 @@ window.onload=()=>{
   tick(); setInterval(tick,1000);
   setInterval(liveUpdate,2200);
   setInterval(checkStopOrders,800);
-  setInterval(refreshWatchlistPrices, 5000); // 관심종목 가격 5초마다 순차 갱신
+  setInterval(refreshWatchlistPrices, 5000);
   setInterval(autoAdvUpdate,5000);
+  // ★ 자체 진단 — 30초마다 매매 시스템 헬스 체크
+  setInterval(_selfDiagnose, 30000);
   setTimeout(async()=>{
     await checkDartApiStatus();
     updateAIAdvisor();
@@ -9352,6 +9364,76 @@ window.onload=()=>{
   // 5분마다 강세 섹터 자동 갱신 (모의투자라도 변동이 보이게)
   setInterval(()=>{refreshHotSectors&&refreshHotSectors(false);}, 30*60*1000); // 30분
 };
+
+// ═══════════════════════════════════════════════
+// 자체 진단 시스템 — 매매 멈춤/일지 누락 등 자동 감지 및 복구
+// ═══════════════════════════════════════════════
+window._diagState = { lastTradeCount:0, lastScreenTime:0, stuckAlerted:false, noTradeBarCount:0 };
+function _selfDiagnose(){
+  if(!window.backtest || !backtest.running) return;
+  var ds = window._diagState;
+  var now = Date.now();
+  var issues = [];
+  // 1. autoState 꺼짐 감지 → 자동 복구
+  if(!autoState.running){
+    autoState.running=true; autoState.level=autoLevel||4;
+    if(!autoTimer) scheduleScreening();
+    issues.push('자동매매 꺼짐 → 재시작');
+  }
+  // 2. 스크리닝 멈춤 감지 (autoTimer 없음)
+  if(autoState.running && !autoTimer){
+    scheduleScreening();
+    issues.push('스크리닝 타이머 없음 → 재시작');
+  }
+  // 3. 포지션 보유 중인데 stopOrders 없음 → 손절/익절 미설정
+  var heldPositions = Object.entries(mock.positions||{}).filter(function(e){return e[1]&&e[1].qty>0;});
+  heldPositions.forEach(function(e){
+    var tk=e[0];
+    if(!stopOrders[tk]){
+      var pos=e[1], stk=STOCKS.find(function(s){return s.tk===tk;});
+      if(stk && pos.avg){
+        var stopPr = Math.round(pos.avg*(1-(autoState.cfg.stop||3)/100));
+        var t1Pr = Math.round(pos.avg*(1+(autoState.cfg.t1||3)/100));
+        var t2Pr = Math.round(pos.avg*(1+(autoState.cfg.t2||5)/100));
+        stopOrders[tk]={stop:stopPr,t1:t1Pr,t2:t2Pr,t1done:false,t2done:false,trail:autoState.cfg.trail||'off',trailHigh:pos.avg,origQty:pos.qty,origStop:stopPr};
+        issues.push(stk.nm+' 손절/익절 미설정 → 자동 설정 (손절 '+stopPr.toLocaleString()+')');
+      }
+    }
+  });
+  // 4. 장기 미매매 감지 (60봉 이상 보유만 하고 매매 없음)
+  var curTradeCount = (mock.trades||[]).filter(function(t){return t.date===sim.date;}).length;
+  if(curTradeCount === ds.lastTradeCount){
+    ds.noTradeBarCount += 6;
+  } else {
+    ds.noTradeBarCount = 0;
+    ds.lastTradeCount = curTradeCount;
+  }
+  if(ds.noTradeBarCount >= 120 && heldPositions.length > 0 && !ds.stuckAlerted){
+    ds.stuckAlerted = true;
+    issues.push('120봉('+Math.round(ds.noTradeBarCount/60)+'시간) 매매 없음 + 포지션 보유 중 — 손절선/시장 확인');
+    addMsg('ai','⚠ 자체 진단: 장기 보유 감지\n보유 '+heldPositions.length+'종목, '+Math.round(ds.noTradeBarCount/60)+'시간 매매 없음\n손절선이 작동하는지 확인하세요.');
+  }
+  // 5. sim.playing이 false인데 백테스트 진행 중
+  if(!sim.playing && backtest.running){
+    sim.playing=true;
+    _syncPlayBtn();
+    runStep();
+    issues.push('시뮬레이션 멈춤 → 재시작');
+  }
+  // 로그 출력
+  if(issues.length){
+    addDecisionLog('🔧 자체 진단', issues.join(' | '), '시스템');
+    console.log('[자체진단]', issues);
+  }
+  // 날짜 변경 시 리셋
+  if(ds._prevDate && ds._prevDate !== sim.date){
+    ds.noTradeBarCount = 0;
+    ds.stuckAlerted = false;
+    ds.lastTradeCount = 0;
+  }
+  ds._prevDate = sim.date;
+}
+
 // 강세 섹터 캐시 렌더링 (localStorage에서 가져옴)
 function renderHotSectors(){
   const el=document.getElementById('hotSectorList');
