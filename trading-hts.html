@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#ffffff">
-<meta name="build-ts" content="1779544485668">
+<meta name="build-ts" content="1779546759843">
 <title>TraidAIr HTS</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 
@@ -4159,6 +4159,7 @@ function getCredAvail(){if(credType==="credit")return Math.max(0,Math.round(mock
 function onCredChange(){
   credType=document.getElementById("credSel").value;
   const info=document.getElementById("credInfo");
+  if(!info) return;
   if(credType==="cash"){info.style.display="none";}
   else{info.style.display="block";const avail=getCredAvail();info.textContent=credType==="credit"?`신용 가능: ${avail.toLocaleString()}원 (이자 연 ${cfg.crate}%)`:`미수 가능: ${avail.toLocaleString()}원 (이자 연 ${cfg.mrate}% | 미결제→반대매매)`;}
   updOSum();
@@ -7689,7 +7690,7 @@ function onSearch(q){
   if(!q){hideSrch();return;}
   const res=STOCKS.filter(s=>s.nm.includes(q)||s.tk.includes(q)||(s.sec&&s.sec.includes(q))).slice(0,8);
   if(!res.length){hideSrch();return;}
-  const el=document.getElementById("srchDrop");el.style.display="block";
+  const el=document.getElementById("srchDrop");if(!el)return;el.style.display="block";
   el.innerHTML=res.map(s=>{
     const c=((s.pr-s.base)/s.base*100).toFixed(2),up=c>=0;
     const capCol=s.cap==="대형"?"var(--b)":s.cap==="중형"?"var(--a)":"var(--ts)";
@@ -7709,7 +7710,7 @@ function onSearch(q){
     </div>`;
   }).join("");
 }
-function hideSrch(){document.getElementById("srchDrop").style.display="none";}
+function hideSrch(){const _sd=document.getElementById("srchDrop");if(_sd)_sd.style.display="none";}
 function togInd(nm,el){inds[nm]=!inds[nm];el.classList.toggle("on",inds[nm]);if(!inds[nm]){if(nm==="rsi"){const rs=document.getElementById("rsiSub");if(rs)rs.classList.add("hide");}if(nm==="macd"){const ms=document.getElementById("macdSub");if(ms)ms.classList.add("hide");}}drawChart();}
 
 // ═══════════════════════════════
@@ -8522,7 +8523,8 @@ function lTab(el,id){document.querySelectorAll(".lpt").forEach(t=>t.classList.re
 function rTab(el,id){document.querySelectorAll(".rpt").forEach(t=>t.classList.remove("on"));el.classList.add("on");document.querySelectorAll(".rpb").forEach(b=>{b.classList.remove("on");b.style.display="none";});const t=document.getElementById(id);if(t){t.style.display="block";t.classList.add("on");}}
 function brTab(el,id){document.querySelectorAll(".brpt").forEach(t=>t.classList.remove("on"));el.classList.add("on");document.querySelectorAll(".brpb").forEach(b=>{b.classList.remove("on");b.style.display="none";});const t=document.getElementById(id);if(t){t.style.display=id==="brpb-ai"?"flex":"block";t.classList.add("on");}}
 function openModal(id){
-  document.getElementById("modal-"+id).classList.add("show");
+  const _m=document.getElementById("modal-"+id);if(!_m)return;
+  _m.classList.add("show");
   if(id==="settings"){
     const keys=["capital","dayloss","maxpos","clim","mlim","crate","mrate","bf","sf","tx"];
     keys.forEach(k=>{const el=document.getElementById("cfg-"+k);if(el)el.value=cfg[k];});
@@ -8533,7 +8535,7 @@ function openModal(id){
   }
   if(id==="journal"){const tt=mock.trades.filter(t=>t.date===sim.date);const pnl=tt.filter(t=>t.side==="sell").reduce((a,t)=>a+t.pnl,0);document.getElementById("jModalBody").innerHTML=tt.length?`<div style="font-size:11px;color:var(--ts);">${sim.date} 거래 ${tt.length}건 · 손익 ${pnl>=0?"+":""}${pnl.toLocaleString()}원</div><div style="font-size:10px;color:var(--tm);margin-top:5px;">AI 일지 생성 버튼을 눌러주세요.</div>`:"<div style='font-size:11px;color:var(--tm);'>오늘 거래가 없습니다.</div>";}
 }
-function closeModal(id){document.getElementById("modal-"+id).classList.remove("show");}
+function closeModal(id){const _m=document.getElementById("modal-"+id);if(_m)_m.classList.remove("show");}
 function showAlert(t,m){document.getElementById("alertTtl").textContent=t;document.getElementById("alertMsg").textContent=m;openModal("alert");}
 document.querySelectorAll(".modal-bg").forEach(el=>{el.addEventListener("click",e=>{if(e.target===el){const id=el.id.replace("modal-","");closeModal(id);}});});
 
@@ -9575,7 +9577,7 @@ function collectMarketCtx(){
 (function(){
   const meta = document.querySelector('meta[name="build-ts"]');
   const myBuildTs = meta ? meta.getAttribute('content') : '';
-  if(!myBuildTs || myBuildTs === '1779544485668') return; // 로컬 빌드 안 한 경우
+  if(!myBuildTs || myBuildTs === '1779546759843') return; // 로컬 빌드 안 한 경우
   let reloaded = false;
   async function check(){
     if(reloaded) return;
@@ -9651,13 +9653,8 @@ window.onload=()=>{
   // ★ 자체 진단 — 30초마다 매매 시스템 헬스 체크
   setInterval(_selfDiagnose, 30000);
   setTimeout(async()=>{
-    await checkDartApiStatus();
-    updateAIAdvisor();
-    fetchDartNews();
-    runFullAnalysis();
-    renderIntraCheck();
-    updateTimeGuide();
-    calcMarketStrength();
+    try{ await checkDartApiStatus(); }catch(_e){}
+    try{ updateAIAdvisor(); fetchDartNews(); runFullAnalysis(); renderIntraCheck(); updateTimeGuide(); calcMarketStrength(); }catch(_e){}
   },800);
   setInterval(()=>{updateTimeGuide();},30000);
   setInterval(()=>fetchDartNews(),30000);
