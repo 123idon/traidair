@@ -1992,8 +1992,11 @@ function openBacktestDialog(){
           • 분봉(${sim.tf}분) 기준. 1분봉+x600 ≈ 39초/일.
         </div>
       </div>
+      <div style="background:rgba(245,158,11,0.08);border:1px solid var(--a);border-radius:8px;padding:8px 10px;margin-bottom:10px;">
+        <button onclick="backtestDiagnose()" style="width:100%;padding:8px;border-radius:6px;border:none;background:var(--a);color:#fff;font-size:12px;font-weight:700;cursor:pointer;">🩺 백테스트 오류 테스트</button>
+        <div style="font-size:9px;color:var(--tm);text-align:center;margin-top:4px;">매매 안 됨 / 일지 안 됨 등 원인 분석</div>
+      </div>
       <div style="display:flex;gap:8px;justify-content:flex-end;">
-        <button class="ibtn" onclick="backtestDiagnose()" style="font-size:11px;background:var(--a);color:#fff;border-color:var(--a);">🩺 오류 테스트</button>
         <button class="ibtn" onclick="document.getElementById('btDialog').remove()" style="font-size:11px;">취소</button>
         <button class="ibtn pur" onclick="(function(){const s=document.getElementById('btStart').value;const e=document.getElementById('btEnd').value;if(!s||!e||s>e){alert('날짜 확인');return;}document.getElementById('btDialog').remove();startBacktest(s,e);})()" style="font-size:11px;">▶ 시작</button>
       </div>
@@ -7957,6 +7960,11 @@ async function syncCandidatesToWatchlist(){
         // 종목코드 정규화: 5자리도 허용, 앞에 0 추가
         let _tk = String(stk.tk||'').trim().replace(/[^\d]/g,'');
         if(_tk.length===5) _tk = '0'+_tk;
+        // 코드가 유효하지 않으면 종목명으로 STOCKS에서 검색
+        if(!/^\d{6}$/.test(_tk) && stk.nm){
+          var _found = STOCKS.find(function(s){ return s.nm === stk.nm || s.nm.indexOf(stk.nm)!==-1 || stk.nm.indexOf(s.nm)!==-1; });
+          if(_found) _tk = _found.tk;
+        }
         stk.tk = _tk;
         if(/^\d{6}$/.test(_tk) && !newTks.includes(_tk)){
           newTks.push(stk.tk);
@@ -7991,8 +7999,24 @@ async function syncCandidatesToWatchlist(){
     });
     if(_rejected>0) addMsg('ai', '⚠ 종목코드 형식 오류 '+_rejected+'건 무시 (6자리 숫자 아님)');
     if(!newTks.length){
-      addMsg('ai', '⚠ Claude가 유효한 종목코드를 반환 안 함. 강의 페이지 확인 또는 다시 시도.');
-      return;
+      // 종목명으로 STOCKS에서 재검색 시도
+      result.sectors.forEach(function(sec){
+        (sec.stocks||[]).forEach(function(stk){
+          if(!stk.nm) return;
+          var _match = STOCKS.find(function(s){ return s.nm===stk.nm || s.nm.indexOf(stk.nm)!==-1; });
+          if(_match && !newTks.includes(_match.tk)){
+            newTks.push(_match.tk);
+            sectorInfo[_match.tk] = {rank:sec.rank, sector:sec.name, reason:stk.reason||sec.reason, nm:_match.nm, role:stk.role||'', technique:sec.technique||'', momentum:sec.momentum||'', risk:sec.risk||'', entry:stk.entry||'', stop:stk.stop||'', short_ratio:stk.short_ratio||'', short_trend:stk.short_trend||''};
+          }
+        });
+      });
+      if(!newTks.length){
+        // 최후 수단: STOCKS에서 다양한 섹터 종목 자동 선정
+        var _bySec={};
+        STOCKS.forEach(function(s){ if(s.sec && !_bySec[s.sec]) _bySec[s.sec]=s.tk; });
+        Object.values(_bySec).slice(0,6).forEach(function(t){ newTks.push(t); });
+        addMsg('ai', '⚠ Claude 종목코드 인식 실패 — STOCKS에서 섹터별 자동 선정 '+newTks.length+'종목');
+      }
     }
 
     // WGS[0]에 추가 (앞에 삽입). 한도(WG_MAX[0]) 내에서
