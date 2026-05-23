@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#ffffff">
-<meta name="build-ts" content="1779534921354">
+<meta name="build-ts" content="1779536034525">
 <title>TraidAIr HTS</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 
@@ -3529,6 +3529,12 @@ async function _backtestLoadDay(dateStr){
   sim.date=dateStr;
   const md=document.getElementById('mockDate'); if(md) md.value=dateStr;
   mock.todayPnl=0; mock.todayTrades=0; mock.lossSeries=0;
+  // ★ 백테스트 중 자동매매가 꺼졌으면(연속 손절 brk) 매일 다시 켜기
+  if(backtest.running && !autoState.running){
+    autoState.running=true; autoState.level=autoLevel||4;
+    if(!autoTimer) scheduleScreening();
+    addDecisionLog('🔄 자동매매 재시작','새 날짜 — 연속손절 리셋','백테스트');
+  }
   // 대시보드 iframe에 날짜 전파 (백테스트 매일 데이터 갱신)
   try{
     const _df=document.getElementById("dashFrame");
@@ -9253,7 +9259,7 @@ function collectMarketCtx(){
 (function(){
   const meta = document.querySelector('meta[name="build-ts"]');
   const myBuildTs = meta ? meta.getAttribute('content') : '';
-  if(!myBuildTs || myBuildTs === '1779534921354') return; // 로컬 빌드 안 한 경우
+  if(!myBuildTs || myBuildTs === '1779536034525') return; // 로컬 빌드 안 한 경우
   let reloaded = false;
   async function check(){
     if(reloaded) return;
@@ -9646,9 +9652,29 @@ async function autoSaveJournalOnTrade(forceDate){
   const sells=tt.filter(function(t){return t.side==='sell';});
   const pnl=sells.reduce(function(a,t){return a+t.pnl;},0);
   const wins=sells.filter(function(t){return t.pnl>0;}).length;
+  const losses=sells.filter(function(t){return t.pnl<0;}).length;
   const total=sells.length;
+  const _winRate = total>0 ? Math.round(wins/total*100) : 0;
+  const _resultGrade = pnl>0 ? '수익' : pnl<0 ? '손실' : '무변동';
   const str=tt.map(function(t){return (t.side==='buy'?'매수':'매도')+' '+t.nm+' '+t.qty+'주 @'+t.price.toLocaleString()+(t.pnl!==undefined?' ('+(t.pnl>=0?'+':'')+Math.round(t.pnl).toLocaleString()+'원)':'');}).join('\n');
-  const baseEntry={summary:date+' 매매 '+tt.length+'건 / '+(pnl>=0?'+':'')+pnl.toLocaleString()+'원',why_bought:'AI분석중',why_sold:'AI분석중',mistakes:'-',psychology:'-',phase_check:'-',improvement:'-',aiGenerated:false,trades:str};
+  // 기본 일지 — AI 없이도 유의미한 내용 (AI 실패 시 이것만 남음)
+  const _buyTrades = tt.filter(function(t){return t.side==='buy';});
+  const _buyNames = [...new Set(_buyTrades.map(function(t){return t.nm;}))].join(', ');
+  const _sellSummary = sells.map(function(t){return t.nm+' '+(t.pnl>=0?'+':'')+Math.round(t.pnl).toLocaleString()+'원';}).join(' / ');
+  const baseEntry={
+    summary: date+' '+_resultGrade+' | '+tt.length+'건 '+(pnl>=0?'+':'')+pnl.toLocaleString()+'원 (승률 '+_winRate+'%)',
+    result_grade: _resultGrade,
+    why_bought: _buyNames ? '매수: '+_buyNames : '매수 내역 없음',
+    why_sold: _sellSummary || '청산 내역 없음',
+    good: pnl>0 ? '수익 실현 성공' : wins>0 ? '일부 종목 수익 확보' : '매매 시도',
+    bad: pnl<0 ? '손실 '+Math.round(pnl).toLocaleString()+'원 발생' : '-',
+    psychology: losses>=3 ? '연속 손절 주의' : total>0 ? '정상 매매' : '-',
+    improvement: pnl<0 ? '손절 기준 재점검 필요' : '현 전략 유지',
+    phase_check: '-',
+    mistakes: '-',
+    aiGenerated: false,
+    trades: str
+  };
   saveJEntry(date,baseEntry,pnl,wins,total,str);
   try{
     const logs=(window._decisionLog||[]).slice(-20).map(function(d){return '['+(d.phase||'')+'] '+d.title+': '+(d.body||'');}).join('\n');
@@ -9675,7 +9701,7 @@ async function autoSaveJournalOnTrade(forceDate){
       '"phase_check":"적용Phase","mentor_comment":"멘토한마디(결과/과정 통합)"}';
     // fetch + timeout (30초) — 멈춤 방지
     const ctrl = new AbortController();
-    const _timer = setTimeout(()=>ctrl.abort(), 8000); // 8초 — 한도 초과 시 즉시 다음
+    const _timer = setTimeout(()=>ctrl.abort(), 15000); // 15초 — 일지는 중요하므로 넉넉히
     const res = await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},signal:ctrl.signal,body:JSON.stringify({model:'claude-haiku-4-5',max_tokens:500,messages:[{role:'user',content:prompt}]})});
     clearTimeout(_timer);
     const data=await res.json();
