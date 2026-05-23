@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#ffffff">
-<meta name="build-ts" content="1779536556362">
+<meta name="build-ts" content="1779537357039">
 <title>TraidAIr HTS</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 
@@ -3610,31 +3610,51 @@ async function _backtestEndOfDay(){
   backtest.dayIdx++;
   addDecisionLog(`📅 ${dt} 마감`, `매매 ${todayTrades.length}건 | 손익 ${dayPnl>=0?'+':''}${dayPnl.toLocaleString()}원 | 승 ${wins}·패 ${losses}`, '백테스트');
   renderBacktestPanel();
-  // 매매가 있으면 AI 일지 자동 작성 (학습 누적)
-  if(todayTrades.length > 0 && typeof autoSaveJournalOnTrade === 'function'){
-    addDecisionLog(`📓 ${dt} 일지 작성`, sim.speed>=300?'백그라운드 (빠른 배속)':'AI 평가 대기 중', '학습');
-    const _p = autoSaveJournalOnTrade(dt).catch(e=>console.warn('일지:', e.message));
-    backtest.pendingJournals.push(_p);
-    if(sim.speed < 300){
-      try{ sim.playing=false; _syncPlayBtn(); await _p; }catch(e){}
-    }
-  } else {
-    // 매매 없는 날도 "관망" 일지로 기록 + 구체적 사유
-    try{
+  // ★ 매매일지: 매매 유무에 상관없이 반드시 생성
+  try{
+    if(todayTrades.length > 0){
+      // 매매가 있는 날: 즉시 기본 일지 저장 (AI 실패해도 내용 보장)
+      const _sells = todayTrades.filter(t=>t.side==='sell');
+      const _buyNames = [...new Set(todayTrades.filter(t=>t.side==='buy').map(t=>t.nm))].join(', ');
+      const _sellSummary = _sells.map(t=>t.nm+' '+(t.pnl>=0?'+':'')+Math.round(t.pnl||0).toLocaleString()+'원').join(' / ');
+      const _wr = _sells.length>0 ? Math.round(wins/_sells.length*100) : 0;
+      const _rg = dayPnl>0?'수익':dayPnl<0?'손실':'무변동';
+      const _baseJ = {
+        summary: dt+' '+_rg+' | '+todayTrades.length+'건 '+(dayPnl>=0?'+':'')+dayPnl.toLocaleString()+'원 (승률 '+_wr+'%)',
+        result_grade: _rg,
+        why_bought: _buyNames ? '매수: '+_buyNames : '-',
+        why_sold: _sellSummary || '-',
+        good: dayPnl>0 ? '수익 실현' : wins>0 ? '일부 수익' : '매매 시도',
+        bad: dayPnl<0 ? '손실 '+Math.round(dayPnl).toLocaleString()+'원' : '-',
+        psychology: losses>=3 ? '연속 손절 주의' : '정상',
+        improvement: dayPnl<0 ? '손절 기준 점검' : '전략 유지',
+        aiGenerated: false,
+        trades: todayTrades.map(t=>(t.side==='buy'?'매수':'매도')+' '+t.nm+' '+t.qty+'주 @'+t.price.toLocaleString()+(t.pnl?(' ('+(t.pnl>=0?'+':'')+Math.round(t.pnl).toLocaleString()+'원)'):'')).join('\n'),
+      };
+      saveJEntry(dt, _baseJ, dayPnl, wins, _sells.length, _baseJ.trades);
+      addDecisionLog(`📓 ${dt} 일지 저장`, todayTrades.length+'건 기록', '학습');
+      // AI 평가도 시도 (실패해도 위 기본 일지가 남음)
+      if(typeof autoSaveJournalOnTrade === 'function'){
+        const _p = autoSaveJournalOnTrade(dt).catch(e=>console.warn('AI일지:', e.message));
+        backtest.pendingJournals.push(_p);
+      }
+    } else {
+      // 관망일
       const _reason = window._lastNoTradeReason || '진입 조건 미달';
       const noTradeEntry = {
         summary: dt+' 관망 — '+_reason,
-        why_bought:'미진입: '+_reason, why_sold:'-',
-        good:'조건 불충분 시 관망 유지', bad:'-',
-        psychology:'인내심 유지', improvement:'다양한 기법 시그널 재점검',
-        phase_check:'관망', result_grade:'관망',
-        mentor_comment:'기다림도 매매다. 사유: '+_reason,
-        aiGenerated: false, trades:'(매매 없음)',
+        result_grade: '관망',
+        why_bought: '미진입: '+_reason, why_sold: '-',
+        good: '조건 불충분 시 관망 유지', bad: '-',
+        psychology: '인내심 유지', improvement: '시그널 재점검',
+        phase_check: '관망',
+        mentor_comment: '기다림도 매매다',
+        aiGenerated: false, trades: '(매매 없음)',
       };
-      if(typeof saveJEntry==='function') saveJEntry(dt, noTradeEntry, 0, 0, 0, '');
-      window._lastNoTradeReason = null;
-    }catch(_e){}
-  }
+      saveJEntry(dt, noTradeEntry, 0, 0, 0, '');
+    }
+    window._lastNoTradeReason = null;
+  }catch(_e){ console.warn('일지 저장 실패:', _e.message); }
   // 다음 영업일?
   if(backtest.dayIdx >= backtest.totalDays){
     stopBacktest();
@@ -5391,6 +5411,8 @@ async function _runScreeningAsync(){
     STOCKS.slice(0,5).forEach(s=>pool.add(s.tk));
     pool.add(activeTk);
   }
+  // 활성 종목은 항상 풀에 포함
+  pool.add(activeTk);
   var allTks=Array.from(pool).filter(Boolean);
   // 다양성 페널티 계산용: 최근 8개 매매에서 같은 종목 출현 횟수
   var _recentTks = (mock.trades||[]).slice(-8).map(function(t){return t.tk;});
@@ -5464,8 +5486,8 @@ async function _runScreeningAsync(){
     var gateFails=[];
     // G1: 시간대 — 9:30~14:00 (시초 변동성/마감 직전 제외)
     if(_mins>0 && (_mins<570 || _mins>840)) gateFails.push('시간대'+_hh+':'+String(_mm).padStart(2,'0'));
-    // G2: 강한 하락 추세 차단 (5MA 아래 + 5<20)
-    if(lc.c<lma5 && lma5<lma20) gateFails.push('5MA이탈+데드크로스');
+    // G2: 강한 하락 추세 차단 (5MA 아래 + 5<20 + 가격이 20MA 2% 이상 아래)
+    if(lc.c<lma5 && lma5<lma20 && lc.c<lma20*0.98) gateFails.push('5MA이탈+데드크로스');
     // G3: 3연속 음봉
     if(lc.c<lc.o && pc.c<pc.o && pc2.c<pc2.o) gateFails.push('3연속음봉');
     // G4: 과매수 (RSI>=72)
@@ -5563,9 +5585,8 @@ async function _runScreeningAsync(){
   }
 
   if(!scored.length){
-    // 관망 사유를 구체적으로 남김 (일지에 반영)
-    var _noTradeReason = '전 '+allTks.length+'종목 필수게이트 미달';
-    if(dayLossRate>=cfg.dayloss*0.7) _noTradeReason += ' / 일손실 누적 '+dayLossRate.toFixed(1)+'%';
+    var _noTradeReason = '전 '+allTks.length+'종목 게이트 미달 (보유중 제외 '+Object.keys(mock.positions||{}).filter(function(t){return mock.positions[t]&&mock.positions[t].qty>0;}).length+'종목)';
+    if(dayLossRate>=cfg.dayloss*0.7) _noTradeReason += ' / 일손실 '+dayLossRate.toFixed(1)+'%';
     addDecisionLog('전종목 조건미달', _noTradeReason, '관망');
     window._lastNoTradeReason = _noTradeReason;
     return;
@@ -5620,9 +5641,9 @@ async function _runScreeningAsync(){
   // 스캘핑 기법 완전 차단
   const _tech = typeof detectTechnique === "function" ? detectTechnique(scored[0]?.lc||{}) : {};
   if(_tech.technique === "스캘핑"){addDecisionLog("스캘핑 차단","스캘핑 기법 금지 설정","NOGO");return;}
-  if(best.score<3){
+  if(best.score<2){
     var _whyPass = best.tags.join(' ')||'조건미달';
-    _whyPass += ' (최고 '+best.score+'점/5점 필요)';
+    _whyPass += ' (최고 '+best.score+'점/4점 필요)';
     addDecisionLog('['+best.stk.nm+'] 관망', _whyPass, '관망');
     updAdvBoxes('관망 — '+best.stk.nm+' ('+best.score+'점)', _whyPass);
     window._lastNoTradeReason = best.stk.nm+' '+_whyPass;
@@ -5644,12 +5665,13 @@ async function _runScreeningAsync(){
         return;
       }
     }
-    // 진입 등급 (백테스트는 매매 발생이 핵심 — 임계 더 낮춤):
-    // - score≥5: BUY
-    // - score≥3 + 확정시그널: BUY
+    // 진입 등급 (백테스트 모드 — 학습용이므로 적극적):
+    // - score≥4: BUY
+    // - score≥3 + 확정시그널 또는 패턴태그: BUY
     // - score≥2: 관찰
     const hasConfirm = best.tags.indexOf('확정시그널') !== -1;
-    if(best.score >= 5 || (best.score >= 3 && hasConfirm)){
+    const hasPattern = best.tags.indexOf('눌림목')!==-1 || best.tags.indexOf('돌파')!==-1 || best.tags.indexOf('갭상승')!==-1 || best.tags.indexOf('첫봉')!==-1 || best.tags.indexOf('대장첫숨')!==-1;
+    if(best.score >= 4 || (best.score >= 3 && (hasConfirm || hasPattern))){
       var lcQ=best.lc;
       addDecisionLog('['+best.stk.nm+'] ✅ 진입 ('+best.score+'점)', best.tags.join(' · '), best.score>=5?'강한신호':'확정시그널');
       var _bestTech = best.tags.indexOf('대장첫숨')!==-1?'대장첫숨':'';
@@ -9269,7 +9291,7 @@ function collectMarketCtx(){
 (function(){
   const meta = document.querySelector('meta[name="build-ts"]');
   const myBuildTs = meta ? meta.getAttribute('content') : '';
-  if(!myBuildTs || myBuildTs === '1779536556362') return; // 로컬 빌드 안 한 경우
+  if(!myBuildTs || myBuildTs === '1779537357039') return; // 로컬 빌드 안 한 경우
   let reloaded = false;
   async function check(){
     if(reloaded) return;
