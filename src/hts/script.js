@@ -8078,7 +8078,9 @@ async function syncCandidatesToWatchlist(){
     // CANDS 업데이트
     CANDS = newTks.slice(0,3).map(function(tk,i){
       const info = sectorInfo[tk]||{};
-      return {tk:tk, why:info.sector+'('+info.rank+'위) '+info.reason, score:95-i*5};
+      const _sec = info.sector||''; const _rnk = info.rank; const _rsn = info.reason||'';
+      const _why = _sec ? _sec+(_rnk ? '('+_rnk+'위)' : '')+(_rsn ? ' '+_rsn : '') : _rsn || '강세섹터 편입';
+      return {tk:tk, why:_why, score:95-i*5};
     });
     renderCands();
 

@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#ffffff">
-<meta name="build-ts" content="1779549366552">
+<meta name="build-ts" content="1779549730988">
 <title>TraidAIr HTS</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 
@@ -9562,7 +9562,7 @@ function collectMarketCtx(){
 (function(){
   const meta = document.querySelector('meta[name="build-ts"]');
   const myBuildTs = meta ? meta.getAttribute('content') : '';
-  if(!myBuildTs || myBuildTs === '1779549366552') return; // 로컬 빌드 안 한 경우
+  if(!myBuildTs || myBuildTs === '1779549730988') return; // 로컬 빌드 안 한 경우
   let reloaded = false;
   async function check(){
     if(reloaded) return;
@@ -9973,7 +9973,9 @@ async function syncCandidatesToWatchlist(){
     // CANDS 업데이트
     CANDS = newTks.slice(0,3).map(function(tk,i){
       const info = sectorInfo[tk]||{};
-      return {tk:tk, why:info.sector+'('+info.rank+'위) '+info.reason, score:95-i*5};
+      const _sec = info.sector||''; const _rnk = info.rank; const _rsn = info.reason||'';
+      const _why = _sec ? _sec+(_rnk ? '('+_rnk+'위)' : '')+(_rsn ? ' '+_rsn : '') : _rsn || '강세섹터 편입';
+      return {tk:tk, why:_why, score:95-i*5};
     });
     renderCands();
 
