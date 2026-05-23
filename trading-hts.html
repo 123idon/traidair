@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#ffffff">
-<meta name="build-ts" content="1779554093717">
+<meta name="build-ts" content="1779554252008">
 <title>TraidAIr HTS</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 
@@ -5100,34 +5100,46 @@ async function cleanupLearning(){
   if(btn){btn.textContent='정리중...';btn.disabled=true;}
   const _backup = JSON.parse(JSON.stringify(learningMemory));
   try{
-    const prompt='아래 학습 노트에서 **삭제할** 항목 번호만 알려줘.\n'+
-      '삭제 기준: 완전 중복, 마크다운 헤더만 있는 줄(## 제목), 5자 미만, "전략유지/정상/양호" 같은 일반 조언.\n'+
-      '⚠ 구체적 실수/개선/멘토 조언은 절대 삭제 금지. 애매하면 유지.\n\n'+
-      '현재 노트:\n'+learningMemory.map((l,i)=>`[${i}] ${l.category}|${l.date}|${l.text}`).join('\n')+
-      '\n\nJSON만: {"remove":[삭제할 인덱스 번호들], "reason":"정리 사유 한줄"}';
+    const prompt='너는 트레이딩 멘토. 아래 학습 노트를 정리해서 **최종 버전**을 만들어줘.\n\n'+
+      '정리 원칙:\n'+
+      '- 같은 교훈이 여러 번 반복되면 가장 구체적인 1개로 병합\n'+
+      '- 마크다운 헤더(##, #)만 있는 줄은 삭제\n'+
+      '- "전략 유지", "정상", "양호" 같은 의미없는 조언은 삭제\n'+
+      '- 구체적 실수, 손절 기준, 멘토 조언 등 중요한 건 반드시 유지\n'+
+      '- 비슷한 내용은 하나로 합쳐서 더 강력하게 표현\n'+
+      '- 최소 5개 이상 남길 것\n\n'+
+      '현재 노트 ('+learningMemory.length+'개):\n'+
+      learningMemory.map((l,i)=>`- [${l.category}] ${l.text}`).join('\n')+
+      '\n\nJSON만: {"notes":[{"category":"반성|개선|멘토|심리","text":"정리된 내용"},...], "summary":"뭘 했는지 한줄"}';
     const res=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-haiku-4-5',max_tokens:500,messages:[{role:'user',content:prompt}]})});
+      body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:1500,messages:[{role:'user',content:prompt}]})});
     const data=await res.json();
     const text=(data.content&&data.content[0]&&data.content[0].text)||'{}';
     const result=robustJsonParse(text);
-    if(!result.remove || !Array.isArray(result.remove)) throw new Error('파싱실패');
-    const removeSet=new Set(result.remove);
+    if(!result.notes||!Array.isArray(result.notes)||result.notes.length<3){
+      throw new Error('AI 결과 부족 ('+((result.notes||[]).length)+'개)');
+    }
     const before=learningMemory.length;
-    if(removeSet.size > before * 0.7){
-      addMsg('ai','⚠ AI가 70% 이상 삭제 시도 → 안전장치 발동. 삭제 취소.');
+    const today=typeof todayStr==='function'?todayStr():new Date().toISOString().slice(0,10);
+    learningMemory=result.notes.map(n=>({
+      date:today, category:n.category||'개선', text:(n.text||'').trim()
+    })).filter(n=>n.text.length>=5);
+    if(learningMemory.length < Math.min(5, before)){
+      learningMemory=_backup;
+      window.learningMemory=_backup;
+      addMsg('ai','⚠ AI 정리 결과가 너무 적음 ('+result.notes.length+'개) → 복원됨');
       if(btn){btn.textContent='AI정리';btn.disabled=false;}
       return;
     }
-    learningMemory=learningMemory.filter((_,i)=>!removeSet.has(i));
     window.learningMemory=learningMemory;
     localStorage.setItem('htsLearningMemory',JSON.stringify(learningMemory));
     saveToServer('htsLearningMemory',JSON.stringify(learningMemory));
     renderLearningMgmt();
     updateLearnerStage();
-    addMsg('ai','🧹 학습 노트 정리 완료\n'+before+'개 → '+learningMemory.length+'개\n'+(result.reason||''));
+    addMsg('ai','🧹 학습 노트 AI 정리 완료\n'+before+'개 → '+learningMemory.length+'개\n'+(result.summary||''));
   }catch(e){
-    learningMemory = _backup;
-    window.learningMemory = _backup;
+    learningMemory=_backup;
+    window.learningMemory=_backup;
     addMsg('ai','⚠ 정리 실패 (복원됨): '+e.message);
   }
   if(btn){btn.textContent='AI정리';btn.disabled=false;}
@@ -9641,7 +9653,7 @@ function collectMarketCtx(){
 (function(){
   const meta = document.querySelector('meta[name="build-ts"]');
   const myBuildTs = meta ? meta.getAttribute('content') : '';
-  if(!myBuildTs || myBuildTs === '1779554093717') return; // 로컬 빌드 안 한 경우
+  if(!myBuildTs || myBuildTs === '1779554252008') return; // 로컬 빌드 안 한 경우
   let reloaded = false;
   async function check(){
     if(reloaded) return;
