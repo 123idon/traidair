@@ -1858,9 +1858,119 @@ function renderBacktestPanel(){
         <div style="width:${pct}%;background:var(--b);height:100%;transition:width .3s;"></div>
       </div>
       <span style="font-family:var(--mono);font-size:10px;font-weight:700;color:${realtimePnl>=0?'var(--g)':'var(--r)'};">${realtimePnl>=0?'+':''}${realtimePnl.toLocaleString()}원</span>
+      <button class="ibtn" onclick="backtestDiagnose()" style="font-size:9px;padding:2px 6px;background:var(--a);color:#fff;border:none;">🔍 검진</button>
       ${backtest.running ? '<button class="ibtn red" onclick="stopBacktest()" style="font-size:9px;padding:2px 6px;">■ 중지</button>' : '<button class="ibtn" onclick="document.getElementById(\'backtestPanel\').style.display=\'none\'" style="font-size:9px;padding:2px 6px;">닫기</button>'}
     </div>
   `;
+}
+function backtestDiagnose(){
+  var d = [];
+  // 1. 시스템 상태
+  d.push('═══ 시스템 상태 ═══');
+  d.push('backtest.running: '+(backtest.running?'✅':'❌'));
+  d.push('sim.playing: '+(sim.playing?'✅':'❌'));
+  d.push('autoState.running: '+(autoState.running?'✅':'❌'));
+  d.push('autoState.level: '+autoState.level);
+  d.push('autoTimer 활성: '+(autoTimer?'✅':'❌ (스크리닝 중단!)'));
+  d.push('_autoScreenRunning 락: '+(_autoScreenRunning?'🔒 잠김':'✅ 해제'));
+  d.push('sim.idx: '+sim.idx+'/'+sim.candles.length);
+  d.push('sim.date: '+sim.date);
+  d.push('sim.speed: x'+sim.speed);
+  // 2. 매매 현황
+  d.push('\n═══ 매매 현황 ═══');
+  var todayT = (mock.trades||[]).filter(function(t){return t.date===sim.date;});
+  d.push('오늘 거래: '+todayT.length+'건');
+  d.push('전체 거래: '+(mock.trades||[]).length+'건');
+  d.push('잔고: '+mock.cash.toLocaleString()+'원');
+  d.push('lossSeries: '+mock.lossSeries);
+  d.push('todayPnl: '+mock.todayPnl.toLocaleString()+'원');
+  var dayLossRate = -mock.todayPnl/(cfg.capital||10000000)*100;
+  d.push('일손실률: '+dayLossRate.toFixed(1)+'% (한도 '+cfg.dayloss+'%)');
+  // 3. 포지션
+  var held = Object.entries(mock.positions||{}).filter(function(e){return e[1]&&e[1].qty>0;});
+  d.push('\n═══ 보유 포지션 ═══');
+  if(held.length){
+    held.forEach(function(e){
+      var tk=e[0],pos=e[1];
+      var stk=STOCKS.find(function(s){return s.tk===tk;})||{nm:tk,pr:0};
+      var so=stopOrders[tk];
+      d.push(stk.nm+' '+pos.qty+'주 @'+pos.avg+' (현재 '+stk.pr+')');
+      d.push('  stopOrder: '+(so?'손절 '+so.stop+' T1 '+so.t1+' T2 '+so.t2:'❌ 없음!'));
+    });
+  } else { d.push('(없음)'); }
+  // 4. 스크리닝 풀
+  d.push('\n═══ 종목 풀 ═══');
+  var pool=new Set();
+  (WGS[0]||[]).forEach(function(t){pool.add(t);});
+  (WGS[1]||[]).forEach(function(t){pool.add(t);});
+  Object.keys(window._sectorInfo||{}).forEach(function(t){pool.add(t);});
+  pool.add(activeTk);
+  d.push('WGS[0]: '+(WGS[0]||[]).length+'개');
+  d.push('WGS[1]: '+(WGS[1]||[]).length+'개');
+  d.push('_sectorInfo: '+Object.keys(window._sectorInfo||{}).length+'개');
+  d.push('전체 풀: '+pool.size+'개');
+  // 5. 게이트 테스트 — 활성 종목 즉석 점검
+  d.push('\n═══ 활성 종목 게이트 테스트 ═══');
+  var cs=getCandles(20);
+  if(cs.length>=10){
+    var cls=cs.map(function(c){return c.c;});
+    var lc=cs[cs.length-1],pc=cs[cs.length-2]||lc,pc2=cs[cs.length-3]||pc;
+    var ma5=calcMA(cls,5),ma20=calcMA(cls,20);
+    var lma5=ma5[ma5.length-1]||0,lma20=ma20[ma20.length-1]||0;
+    var lrsi=parseFloat((calcRSI(cls,14).slice(-1)[0]||50).toFixed(1));
+    var vls=cs.map(function(c){return c.v;}); var avg5v=vls.slice(-6,-1).reduce(function(a,b){return a+b;},0)/5||1; var volR=vls[vls.length-1]/avg5v;
+    var body=Math.abs(lc.c-lc.o),upperWick=lc.h-Math.max(lc.c,lc.o);
+    d.push('종목: '+(STOCKS.find(function(s){return s.tk===activeTk;})||{nm:activeTk}).nm);
+    d.push('가격: '+lc.c+' | 5MA: '+Math.round(lma5)+' | 20MA: '+Math.round(lma20));
+    d.push('RSI: '+lrsi+' | 거래량비: x'+volR.toFixed(1));
+    var gf=[];
+    var _mins2=(parseInt(String(lc.t||'').split(':')[0])||0)*60+(parseInt(String(lc.t||'').split(':')[1])||0);
+    if(_mins2>0&&(_mins2<570||_mins2>840)) gf.push('시간대');
+    if(lc.c<lma5&&lma5<lma20&&lc.c<lma20*0.98) gf.push('데드크로스');
+    if(lc.c<lc.o&&pc.c<pc.o&&pc2.c<pc2.o) gf.push('3연속음봉');
+    if(lrsi>=72) gf.push('과매수RSI');
+    if(lc.c>pc.c*1.03) gf.push('급등');
+    if(body>0&&upperWick>body*2) gf.push('윗꼬리');
+    d.push('게이트: '+(gf.length?'❌ '+gf.join(', '):'✅ 전부 통과'));
+    // 점수 추정
+    var score=0;
+    if(lma5>lma20) score+=1;
+    if(lc.c>lma5&&lc.c<lma5*1.015) score+=2;
+    if(lc.c>lma20) score+=1;
+    if(volR>=1.5) score+=2; else if(volR>=1.2) score+=1;
+    if(lrsi>=50&&lrsi<=65) score+=2; else if(lrsi>=40&&lrsi<70) score+=1;
+    if(lc.c>lc.o&&(body/(lc.h-lc.l||1))>=0.6) score+=2;
+    d.push('추정 점수: '+score+'/12 (진입 임계: 4)');
+  } else { d.push('캔들 부족 ('+cs.length+'개 < 10개)'); }
+  // 6. 일지 현황
+  d.push('\n═══ 매매일지 ═══');
+  var js=safeParseJSON(localStorage.getItem('htsJournals'),'{}');
+  var jCount=Object.keys(js).length;
+  d.push('일지 수: '+jCount+'건');
+  if(jCount>0){
+    var last=Object.entries(js).sort(function(a,b){return String(b[0]).localeCompare(String(a[0]));}).slice(0,3);
+    last.forEach(function(e){
+      var v=e[1]||{};
+      d.push('  '+e[0]+': '+(v.aiGenerated?'🤖':'📝')+' '+(v.summary||'(내용없음)').slice(0,40));
+    });
+  }
+  // 7. 학습 메모리
+  d.push('\n═══ 학습 메모리 ═══');
+  d.push('노트: '+(learningMemory||[]).length+'건');
+  d.push('학습일: '+(learnedDates||[]).length+'일');
+  // 문제 감지
+  d.push('\n═══ 🔴 문제 감지 ═══');
+  var issues=[];
+  if(!autoTimer) issues.push('autoTimer 없음 → scheduleScreening 중단');
+  if(!autoState.running && backtest.running) issues.push('autoState 꺼짐 (backtest 진행 중인데)');
+  if(_autoScreenRunning) issues.push('_autoScreenRunning 잠김 → 스크리닝 못 돌아감');
+  if(!sim.playing && backtest.running) issues.push('sim.playing=false → 시뮬 멈춤');
+  if(held.length>0 && !Object.keys(stopOrders).some(function(t){return held.find(function(h){return h[0]===t;});})) issues.push('보유중인데 stopOrder 없음');
+  if(pool.size===0) issues.push('종목 풀 비어있음');
+  if(mock.cash<=0) issues.push('잔고 0원');
+  if(!issues.length) issues.push('✅ 감지된 문제 없음');
+  d.push(issues.join('\n'));
+  showAlert('🔍 백테스트 검진', d.join('\n'));
 }
 function openBacktestDialog(){
   const today = todayStr();
@@ -2960,6 +3070,110 @@ function renderTimeline(){
       </div>`;
     }).join('')}
   </div>`;
+}
+
+// ═══ 매매 상세 기록 — 날짜별 종목/진입사유/매도사유 ═══
+function renderTradeDetailLog(){
+  const el=document.getElementById('tradeDetailLog'); if(!el) return;
+  const trades=mock.trades||[];
+  const sells=trades.filter(t=>t.side==='sell');
+  if(!sells.length){el.innerHTML='<div style="text-align:center;color:var(--tm);padding:20px;">매도 기록이 없습니다.</div>';return;}
+  const js=safeParseJSON(localStorage.getItem('htsJournals'),'{}');
+  const byDate={};
+  sells.forEach(t=>{
+    if(!byDate[t.date]) byDate[t.date]=[];
+    const buy=trades.find(b=>b.side==='buy'&&b.tk===t.tk&&b.date===t.date);
+    byDate[t.date].push({sell:t, buy:buy});
+  });
+  const dates=Object.keys(byDate).sort().reverse();
+  el.innerHTML=dates.map(d=>{
+    const pairs=byDate[d];
+    const dayPnl=pairs.reduce((s,p)=>s+(p.sell.pnl||0),0);
+    const j=js[d]||{};
+    const pnlCol=dayPnl>=0?'var(--g)':'var(--r)';
+    return`<div style="background:var(--pan);border-radius:8px;padding:10px;border-left:3px solid ${pnlCol};">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+        <span style="font-weight:700;font-size:11px;">${d}</span>
+        <span style="font-family:var(--mono);font-weight:700;color:${pnlCol};">${dayPnl>=0?'+':''}${Math.round(dayPnl).toLocaleString()}원</span>
+      </div>
+      ${pairs.map(p=>{
+        const col=(p.sell.pnl||0)>=0?'var(--g)':'var(--r)';
+        return`<div style="padding:4px 0;border-top:1px solid var(--br);">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="font-weight:600;">${p.sell.nm}</span>
+            <span style="font-size:9px;color:var(--tm);">${p.sell.qty}주</span>
+            <span style="font-family:var(--mono);font-size:10px;font-weight:700;color:${col};margin-left:auto;">${(p.sell.pnl||0)>=0?'+':''}${Math.round(p.sell.pnl||0).toLocaleString()}</span>
+          </div>
+          <div style="font-size:9px;color:var(--ts);margin-top:2px;">
+            ${p.buy?`<span style="color:var(--b);">▲ 진입</span> ${(p.buy.price||0).toLocaleString()}원 (${p.buy.time||'-'}) ${p.buy.auto?'🤖':'👤'}`:''}
+            → <span style="color:var(--r);">▼ 청산</span> ${(p.sell.price||0).toLocaleString()}원 (${p.sell.time||'-'})
+          </div>
+        </div>`;
+      }).join('')}
+      ${j.why_bought&&j.why_bought!=='-'?`<div style="font-size:9px;margin-top:4px;border-left:2px solid var(--b);padding-left:6px;color:var(--ts);">📌 진입: ${j.why_bought}</div>`:''}
+      ${j.why_sold&&j.why_sold!=='-'?`<div style="font-size:9px;border-left:2px solid var(--r);padding-left:6px;color:var(--ts);">📌 청산: ${j.why_sold}</div>`:''}
+      ${j.mentor_comment&&j.mentor_comment!=='-'?`<div style="font-size:9px;border-left:2px solid var(--p);padding-left:6px;color:var(--p);">🎯 ${j.mentor_comment}</div>`:''}
+    </div>`;
+  }).join('');
+}
+
+// ═══ 학습 프롬프트 관리 — 개별 삭제 + AI 정리 ═══
+function renderLearningMgmt(){
+  const el=document.getElementById('learningMgmtPanel'); if(!el) return;
+  if(!learningMemory||!learningMemory.length){el.innerHTML='<div style="text-align:center;color:var(--tm);padding:20px;">학습 노트가 없습니다.</div>';return;}
+  const cats={반성:'var(--r)',개선:'var(--b)',멘토:'var(--p)',심리:'var(--a)'};
+  el.innerHTML=learningMemory.map((l,i)=>{
+    const col=cats[l.category]||'var(--tm)';
+    return`<div style="display:flex;align-items:flex-start;gap:6px;padding:6px 8px;background:var(--bg);border-radius:6px;border-left:3px solid ${col};" data-li="${i}">
+      <div style="flex:1;">
+        <div style="display:flex;gap:4px;align-items:center;margin-bottom:2px;">
+          <span style="font-size:8px;color:${col};font-weight:700;">${l.category}</span>
+          <span style="font-size:8px;color:var(--tm);">${l.date||'-'}</span>
+        </div>
+        <div style="font-size:10px;line-height:1.5;color:var(--ts);">${l.text}</div>
+      </div>
+      <button onclick="deleteLearningItem(${i})" style="border:none;background:none;color:var(--tm);font-size:14px;cursor:pointer;padding:0 4px;line-height:1;" title="삭제">&times;</button>
+    </div>`;
+  }).join('');
+}
+function deleteLearningItem(idx){
+  if(!learningMemory||idx<0||idx>=learningMemory.length) return;
+  learningMemory.splice(idx,1);
+  window.learningMemory=learningMemory;
+  localStorage.setItem('htsLearningMemory',JSON.stringify(learningMemory));
+  saveToServer('htsLearningMemory',JSON.stringify(learningMemory));
+  renderLearningMgmt();
+  updateLearnerStage();
+}
+async function cleanupLearning(){
+  if(!learningMemory||!learningMemory.length){showAlert('학습 노트','정리할 노트가 없습니다.');return;}
+  const btn=document.querySelector('[onclick="cleanupLearning()"]');
+  if(btn){btn.textContent='정리중...';btn.disabled=true;}
+  try{
+    const prompt='아래 학습 노트들을 분석해서 중복/불필요한 항목을 제거하고 핵심만 남겨줘.\n'+
+      '같은 내용 반복 → 1개로, 너무 일반적인 조언(예: "전략 유지") → 삭제, 구체적 실수/개선만 남길것.\n\n'+
+      '현재 노트:\n'+learningMemory.map((l,i)=>`[${i}] ${l.category}|${l.date}|${l.text}`).join('\n')+
+      '\n\nJSON만: {"keep":[유지할 인덱스 번호들], "reason":"정리 사유 한줄"}';
+    const res=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:'claude-haiku-4-5',max_tokens:300,messages:[{role:'user',content:prompt}]})});
+    const data=await res.json();
+    const text=(data.content&&data.content[0]&&data.content[0].text)||'{}';
+    const m=text.match(/\{[\s\S]*\}/);
+    if(!m) throw new Error('파싱실패');
+    const result=JSON.parse(m[0]);
+    const keepSet=new Set(result.keep||[]);
+    const before=learningMemory.length;
+    learningMemory=learningMemory.filter((_,i)=>keepSet.has(i));
+    window.learningMemory=learningMemory;
+    localStorage.setItem('htsLearningMemory',JSON.stringify(learningMemory));
+    saveToServer('htsLearningMemory',JSON.stringify(learningMemory));
+    renderLearningMgmt();
+    updateLearnerStage();
+    addMsg('ai','🧹 학습 노트 정리 완료\n'+before+'개 → '+learningMemory.length+'개\n'+(result.reason||''));
+  }catch(e){
+    addMsg('ai','⚠ 정리 실패: '+e.message);
+  }
+  if(btn){btn.textContent='정리';btn.disabled=false;}
 }
 
 function renderWeeklyStats(){
@@ -5655,6 +5869,8 @@ function renderStats(){
   renderStatsEnhanced();
   renderSymbolPnl();
   renderTimeline();
+  try{ renderTradeDetailLog(); }catch(e){}
+  try{ renderLearningMgmt(); }catch(e){}
   // 주간/월간 통계 자동 호출
   try{ renderWeeklyStats && renderWeeklyStats(); }catch(e){ console.warn('weekly:', e.message); }
   try{ renderMonthlyStats && renderMonthlyStats(); }catch(e){ console.warn('monthly:', e.message); }

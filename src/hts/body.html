@@ -769,6 +769,27 @@
       <div id="mistakeList" style="font-size:11px;color:var(--tm);">거래 내역이 없습니다.</div>
     </div>
 
+    <!-- 매매 상세 기록 (날짜별 진입/청산 사유) -->
+    <div class="chart-card">
+      <div class="chart-card-t" style="display:flex;align-items:center;justify-content:space-between;">
+        <span>📋 매매 상세 기록</span>
+        <button onclick="renderTradeDetailLog()" style="padding:2px 7px;border-radius:4px;border:1px solid var(--br);background:var(--bg);color:var(--ts);font-size:9px;cursor:pointer;">↺</button>
+      </div>
+      <div id="tradeDetailLog" style="display:flex;flex-direction:column;gap:6px;max-height:400px;overflow-y:auto;font-size:10px;"></div>
+    </div>
+
+    <!-- 학습 프롬프트 관리 -->
+    <div class="chart-card">
+      <div class="chart-card-t" style="display:flex;align-items:center;justify-content:space-between;">
+        <span>🧠 학습 프롬프트 관리</span>
+        <div style="display:flex;gap:5px;">
+          <button onclick="renderLearningMgmt()" style="padding:2px 7px;border-radius:4px;border:1px solid var(--br);background:var(--bg);color:var(--ts);font-size:9px;cursor:pointer;">↺</button>
+          <button onclick="cleanupLearning()" style="padding:2px 7px;border-radius:4px;border:none;background:var(--r);color:#fff;font-size:9px;cursor:pointer;">정리</button>
+        </div>
+      </div>
+      <div id="learningMgmtPanel" style="display:flex;flex-direction:column;gap:4px;max-height:350px;overflow-y:auto;font-size:10px;"></div>
+    </div>
+
     <!-- 주간/월간 통계 (Phase 12-7) -->
     <div class="chart-card">
       <div class="chart-card-t" style="display:flex;align-items:center;justify-content:space-between;">
