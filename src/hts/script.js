@@ -412,13 +412,13 @@ function _peekSimCandlesFor(tk, dateStr, untilIdx){
 
 
 // ── 서버 데이터 저장/로드 (모의투자 계좌, 매매일지, 통계 영구 보존) ──
-const _saveTimers = {}; // ★ 키별 개별 타이머 (단일 타이머면 마지막 키만 저장됨)
+let _saveTimer = null;
 function saveToServer(key, value) {
   // 즉시 localStorage에 저장 (빠른 복원)
   try { localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value)); } catch(e) {}
-  // 서버에 비동기 저장 (키별 디바운스 1초)
-  clearTimeout(_saveTimers[key]);
-  _saveTimers[key] = setTimeout(() => {
+  // 서버에 비동기 저장 (디바운스 1초)
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(() => {
     fetch('/api/user-data/' + key, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -466,8 +466,6 @@ function loadState(){
   // 서버에서 최신 데이터 로드 (비동기, 완료 후 UI 갱신)
   loadFromServer().then(ok => {
     if(ok) {
-      // ★ 백테스트 실행 중이면 mock 덮어쓰기 금지 (잔고 뻥튀기 방지)
-      if(window.backtest && backtest.running) return;
       // 서버 데이터로 덮어쓰기
       const m2=localStorage.getItem("htsMock");
       if(m2){const p=JSON.parse(m2);mock={...mock,...p};mock.cash=mock.cash||cfg.capital;if(!mock.positions)mock.positions={};if(!mock.trades)mock.trades=[];}
@@ -577,9 +575,12 @@ function genCandles(tk,dt){
         sim.candles = candles;
         const prevCount = _kisChartMeta.prevCount || 0;
         const todayCount = _kisChartMeta.todayCount || candles.length;
-        // sim.idx: 전일 마지막 봉에서 시작 (전일 분봉 끝 + 오늘 첫 봉 전)
-        // 오늘 봉이 있으면 전일 마지막 봉에서 멈춤, 없으면 끝에서 시작
-        sim.idx = prevCount > 0 ? prevCount - 1 : candles.length - 1;
+        // 백테스트 중 KIS 비동기 콜백에서 sim.idx 리셋 금지 (날짜 루프 방지)
+        if(!(window.backtest && backtest.running)){
+          sim.idx = prevCount > 0 ? prevCount - 1 : candles.length - 1;
+        } else {
+          sim.idx = Math.min(sim.idx, candles.length - 1);
+        }
         chartViewCount = Math.min(Math.max(prevCount + 20, 80), candles.length);
         chartViewStart = Math.max(0, candles.length - chartViewCount);
         if(candles.length > 0) updPrice(candles[sim.idx]);
@@ -726,8 +727,9 @@ function _genSimCandles(tk,dt){
       base=c;
     }
     sim.candles=res;
-    // 일봉: 전체 보이도록 idx = 마지막
-    sim.idx=res.length-1;
+    // 일봉: 전체 보이도록 idx = 마지막 (백테스트 중이면 유지)
+    if(!(window.backtest && backtest.running)) sim.idx=res.length-1;
+    else sim.idx=Math.min(sim.idx, res.length-1);
     chartViewCount=Math.min(res.length,120);
     chartViewStart=Math.max(0,res.length-chartViewCount);
     if(res.length>0)updPrice(res[res.length-1]);
@@ -766,9 +768,13 @@ function _genSimCandles(tk,dt){
   // 시뮬에서도 KIS와 동일하게 메타데이터 채움 (전일+당일 표시용)
   _kisChartMeta={prevCount:prevCandles.length,todayCount:todayCandles.length,prevDate:_prevDate,todayDate:_curDt};
   _kisChartMeta._prevCount=prevCandles.length;
-  // 전일 마지막 봉에서 시작 (당일 첫 봉 전 — 자연스러운 진입점)
-  sim.idx=prevCandles.length>0?prevCandles.length-1:0;
-  if(res.length>0)updPrice(res[sim.idx]);
+  // 백테스트 중 종목 전환 시 sim.idx 리셋 금지 (날짜 루프 방지)
+  if(!(window.backtest && backtest.running)){
+    sim.idx=prevCandles.length>0?prevCandles.length-1:0;
+  } else {
+    sim.idx=Math.min(sim.idx, res.length-1);
+  }
+  if(res.length>0)updPrice(res[Math.max(0,sim.idx)]);
   return res;
 }
 
@@ -1622,14 +1628,12 @@ async function startBacktest(startDate, endDate){
     try{ await refreshHotSectors(true); }catch(_e){}
   }
   backtest.running=true;
-  backtest.pendingJournals = [];
   try{ window._bgKeepAliveStart && _bgKeepAliveStart(); }catch(e){}
   backtest.startDate=days[0];
   backtest.endDate=days[days.length-1];
   backtest.totalDays=days.length;
   backtest.dayIdx=0;
   backtest.startCash=mock.cash;
-  backtest._frozenCash = mock.cash;
   backtest.startPnl=mock.todayPnl||0;
   backtest.dailyResults=[];
   // 자동매매 자동 시작 (level 3 이상 권장)
@@ -1647,7 +1651,7 @@ async function stopBacktest(){
   try{ window._bgKeepAliveStop && _bgKeepAliveStop(); }catch(e){}
   sim.playing=false;
   if(sim.timer){clearTimeout(sim.timer);sim.timer=null;}
-  // ★ 백테스트 종료 시 스크리닝 타이머 정리 (미정리 시 좀비 스크리닝 지속)
+  // ★ 백테스트 종료 시 스크리닝 타이머 정리 (autoTimer 미정리 시 좀비 스크리닝 지속)
   if(autoTimer){clearTimeout(autoTimer);autoTimer=null;}
   _autoScreenRunning=false;
   // ★ pending setTimeout 모두 cancel (다음날 자동 시작 차단)
@@ -1687,9 +1691,9 @@ async function _backtestLoadDay(dateStr){
       setTimeout(()=>{try{_df.contentWindow._skipHtsSync=false;}catch(e){}},100);
     }
   }catch(_e){}
-  // ★ 강세섹터: 첫날만 API 호출, 이후는 캐시 사용 (매일 호출 시 30초씩 멈추는 문제 해결)
-  if(typeof refreshHotSectors==='function' && backtest.dayIdx <= 0){
-    addDecisionLog('📊 '+dateStr+' 강세섹터 분석', '첫날 데이터 가져오는 중...', '백테스트');
+  // ★ 매일 강세섹터 새로 가져오기 (사용자 요청: 딜레이 있어도 정확하게)
+  if(typeof refreshHotSectors==='function'){
+    addDecisionLog('📊 '+dateStr+' 강세섹터 분석', '새 날짜 데이터 가져오는 중...', '백테스트');
     try{ await refreshHotSectors(true); }catch(_e){ console.warn('섹터 fetch:', _e.message); }
   }
   // 종목 자동 전환: 강세 1위 종목 우선, 없으면 WGS[0] 첫 종목
@@ -1741,11 +1745,7 @@ async function _backtestEndOfDayInner(dt){
   try{
     Object.keys(mock.positions||{}).forEach(tk=>{
       const pos=mock.positions[tk]; if(!pos||pos.qty<=0) return;
-      const stk=STOCKS.find(s=>s.tk===tk);
-      if(!stk){
-        // 종목 정보 없으면 현금 환산 없이 포지션만 삭제 (무결성 보장)
-        delete mock.positions[tk]; delete stopOrders[tk]; return;
-      }
+      const stk=STOCKS.find(s=>s.tk===tk); if(!stk) return;
       const sv=activeTk,svSide=oSide,svType=oType,svCred=credType;
       activeTk=tk; oSide="sell"; oType="market"; credType="cash";
       document.getElementById("ofQty").value=pos.qty;
@@ -1754,15 +1754,6 @@ async function _backtestEndOfDayInner(dt){
       addDecisionLog(`[${stk.nm}] 종가 청산`, '백테스트 다음날 이전 강제 청산', '백테스트');
     });
   }catch(_e){}
-  // ★ 청산 실패 잔여 포지션 강제 삭제 (submitOrder 오류로 남은 경우)
-  Object.keys(mock.positions||{}).forEach(function(tk2){
-    const _pos2=mock.positions[tk2];
-    if(_pos2&&_pos2.qty>0){
-      const _stk2=STOCKS.find(s=>s.tk===tk2);
-      mock.cash+=_pos2.qty*(_stk2?_stk2.pr:_pos2.avgPrice||0);
-      delete mock.positions[tk2]; delete stopOrders[tk2];
-    }
-  });
   const todayTrades=(mock.trades||[]).filter(t=>t.date===dt);
   const wins=todayTrades.filter(t=>t.side==='sell'&&(t.pnl||0)>0).length;
   const losses=todayTrades.filter(t=>t.side==='sell'&&(t.pnl||0)<0).length;
@@ -1890,29 +1881,27 @@ function renderBacktestPanel(){
 }
 function backtestDiagnose(){
   var d = [];
-  var isRunning = backtest.running;
   // 1. 시스템 상태
   d.push('═══ 시스템 상태 ═══');
-  d.push('backtest.running: '+(isRunning?'✅ 실행 중':'❌ 정지 (백테스트를 먼저 시작하세요)'));
+  d.push('backtest.running: '+(backtest.running?'✅':'❌'));
   d.push('sim.playing: '+(sim.playing?'✅':'❌'));
   d.push('autoState.running: '+(autoState.running?'✅':'❌'));
   d.push('autoState.level: '+autoState.level);
-  var timerOk = !!autoTimer;
-  var timerShouldRun = isRunning || autoState.running;
-  d.push('autoTimer: '+(timerOk?'✅ 활성':(timerShouldRun?'❌ 없음 (실행 중인데 멈춤)':'— (정지 중이라 정상)')));
-  d.push('_autoScreenRunning 락: '+(_autoScreenRunning?'🔒 잠김 (문제!)':'✅ 해제'));
-  var prevCount = (_kisChartMeta&&_kisChartMeta.prevCount)||Math.floor(sim.candles.length/2);
-  var inToday = sim.idx >= prevCount;
-  d.push('sim.idx: '+sim.idx+'/'+sim.candles.length+(inToday?' (당일 진행 중)':' (전일 마지막 — 아직 시작 전)'));
+  d.push('autoTimer 활성: '+(autoTimer?'✅':'❌ (스크리닝 중단!)'));
+  d.push('_autoScreenRunning 락: '+(_autoScreenRunning?'🔒 잠김':'✅ 해제'));
+  d.push('sim.idx: '+sim.idx+'/'+sim.candles.length);
   d.push('sim.date: '+sim.date);
   d.push('sim.speed: x'+sim.speed);
   // 2. 매매 현황
   d.push('\n═══ 매매 현황 ═══');
   var todayT = (mock.trades||[]).filter(function(t){return t.date===sim.date;});
-  d.push('오늘('+sim.date+') 거래: '+todayT.length+'건');
-  d.push('전체 거래: '+(mock.trades||[]).length+'건 / 백테스트 '+(backtest.dayIdx||0)+'일 진행');
+  d.push('오늘 거래: '+todayT.length+'건');
+  d.push('전체 거래: '+(mock.trades||[]).length+'건');
   d.push('잔고: '+mock.cash.toLocaleString()+'원');
-  d.push('lossSeries: '+mock.lossSeries+' / todayPnl: '+(mock.todayPnl>=0?'+':'')+mock.todayPnl.toLocaleString()+'원');
+  d.push('lossSeries: '+mock.lossSeries);
+  d.push('todayPnl: '+mock.todayPnl.toLocaleString()+'원');
+  var dayLossRate = -mock.todayPnl/(cfg.capital||10000000)*100;
+  d.push('일손실률: '+dayLossRate.toFixed(1)+'% (한도 '+cfg.dayloss+'%)');
   // 3. 포지션
   var held = Object.entries(mock.positions||{}).filter(function(e){return e[1]&&e[1].qty>0;});
   d.push('\n═══ 보유 포지션 ═══');
@@ -1921,59 +1910,55 @@ function backtestDiagnose(){
       var tk=e[0],pos=e[1];
       var stk=STOCKS.find(function(s){return s.tk===tk;})||{nm:tk,pr:0};
       var so=stopOrders[tk];
-      d.push(stk.nm+' '+pos.qty+'주 @'+(pos.avgPrice||pos.avg||0)+' (현재 '+stk.pr+')');
+      d.push(stk.nm+' '+pos.qty+'주 @'+pos.avg+' (현재 '+stk.pr+')');
       d.push('  stopOrder: '+(so?'손절 '+so.stop+' T1 '+so.t1+' T2 '+so.t2:'❌ 없음!'));
     });
   } else { d.push('(없음)'); }
-  // 4. 스크리닝 풀 + 각 종목 게이트 결과
-  d.push('\n═══ 종목 풀 게이트 진단 ═══');
+  // 4. 스크리닝 풀
+  d.push('\n═══ 종목 풀 ═══');
   var pool=new Set();
   (WGS[0]||[]).forEach(function(t){pool.add(t);});
   (WGS[1]||[]).forEach(function(t){pool.add(t);});
   Object.keys(window._sectorInfo||{}).forEach(function(t){pool.add(t);});
   pool.add(activeTk);
-  d.push('WGS[0]: '+(WGS[0]||[]).length+'개 | WGS[1]: '+(WGS[1]||[]).length+'개 | sectorInfo: '+Object.keys(window._sectorInfo||{}).length+'개');
-  d.push('전체 풀: '+pool.size+'개 종목');
-  // 현재 캔들 기준으로 풀 전체 게이트 체크
-  var passCount=0, failCount=0;
-  Array.from(pool).forEach(function(tk){
-    try{
-      var stk=STOCKS.find(function(s){return s.tk===tk;})||{nm:tk};
-      var _cs = (tk===activeTk) ? getCandles(20) : [];
-      if(tk===activeTk && _cs.length>=10){
-        var _cls=_cs.map(function(c){return c.c;});
-        var _lc=_cs[_cs.length-1],_pc=_cs[_cs.length-2]||_lc,_pc2=_cs[_cs.length-3]||_pc;
-        var _ma5=calcMA(_cls,5),_ma20=calcMA(_cls,20);
-        var _lma5=_ma5[_ma5.length-1]||0,_lma20=_ma20[_ma20.length-1]||0;
-        var _lrsi=parseFloat((calcRSI(_cls,14).slice(-1)[0]||50).toFixed(1));
-        var _vls=_cs.map(function(c){return c.v;}); var _avg5v=_vls.slice(-6,-1).reduce(function(a,b){return a+b;},0)/5||1; var _volR=_vls[_vls.length-1]/_avg5v;
-        var _body=Math.abs(_lc.c-_lc.o),_uw=_lc.h-Math.max(_lc.c,_lc.o);
-        var _hm=String(_lc.t||'').split(':'),_hh=parseInt(_hm[0])||0,_mm=parseInt(_hm[1])||0,_mins=_hh*60+_mm;
-        var _gf=[];
-        if(_mins>0&&(_mins<570||_mins>840)) _gf.push('시간대('+_hh+':'+String(_mm).padStart(2,'0')+')');
-        if(_lc.c<_lma5&&_lma5<_lma20&&_lc.c<_lma20*0.98) _gf.push('데드크로스');
-        if(_lc.c<_lc.o&&_pc.c<_pc.o&&_pc2.c<_pc2.o) _gf.push('3연속음봉');
-        if(_lrsi>=72) _gf.push('RSI과매수'+_lrsi);
-        if(_lc.c>_pc.c*1.03) _gf.push('급등');
-        if(_body>0&&_uw>_body*2) _gf.push('윗꼬리');
-        var _score=0;
-        if(_lma5>_lma20) _score+=1;
-        if(_lc.c>_lma5&&_lc.c<_lma5*1.015) _score+=2;
-        if(_lc.c>_lma20) _score+=1;
-        if(_volR>=1.5) _score+=2; else if(_volR>=1.2) _score+=1;
-        if(_lrsi>=50&&_lrsi<=65) _score+=2; else if(_lrsi>=40&&_lrsi<70) _score+=1;
-        if(_lc.c>_lc.o&&(_body/(_lc.h-_lc.l||1))>=0.6) _score+=2;
-        if(_gf.length){ failCount++; d.push('  ❌ '+stk.nm+'(활성) — '+_gf.join('·')+' | 점수 '+_score+'/12 | RSI '+_lrsi+' | 거래량x'+_volR.toFixed(1)); }
-        else { passCount++; d.push('  ✅ '+stk.nm+'(활성) — 게이트 통과 | 점수 '+_score+'/12'); }
-      } else {
-        d.push('  ⚪ '+stk.nm+' — 캔들 없음 (비활성 종목)');
-      }
-    }catch(_e){ d.push('  ⚠ '+tk+' 오류: '+_e.message); }
-  });
-  d.push('→ 통과: '+passCount+'개 | 실패: '+failCount+'개');
-  if(inToday && passCount===0 && pool.size>0) d.push('⚠ 모든 종목이 게이트 실패 — 시장 전체 하락장이거나 조건 미달');
-  if(!inToday) d.push('ℹ 현재 전일 마지막 봉 위치 — 백테스트 시작 후 당일로 진입해야 게이트 작동');
-  // 5. 일지 현황
+  d.push('WGS[0]: '+(WGS[0]||[]).length+'개');
+  d.push('WGS[1]: '+(WGS[1]||[]).length+'개');
+  d.push('_sectorInfo: '+Object.keys(window._sectorInfo||{}).length+'개');
+  d.push('전체 풀: '+pool.size+'개');
+  // 5. 게이트 테스트 — 활성 종목 즉석 점검
+  d.push('\n═══ 활성 종목 게이트 테스트 ═══');
+  var cs=getCandles(20);
+  if(cs.length>=10){
+    var cls=cs.map(function(c){return c.c;});
+    var lc=cs[cs.length-1],pc=cs[cs.length-2]||lc,pc2=cs[cs.length-3]||pc;
+    var ma5=calcMA(cls,5),ma20=calcMA(cls,20);
+    var lma5=ma5[ma5.length-1]||0,lma20=ma20[ma20.length-1]||0;
+    var lrsi=parseFloat((calcRSI(cls,14).slice(-1)[0]||50).toFixed(1));
+    var vls=cs.map(function(c){return c.v;}); var avg5v=vls.slice(-6,-1).reduce(function(a,b){return a+b;},0)/5||1; var volR=vls[vls.length-1]/avg5v;
+    var body=Math.abs(lc.c-lc.o),upperWick=lc.h-Math.max(lc.c,lc.o);
+    d.push('종목: '+(STOCKS.find(function(s){return s.tk===activeTk;})||{nm:activeTk}).nm);
+    d.push('가격: '+lc.c+' | 5MA: '+Math.round(lma5)+' | 20MA: '+Math.round(lma20));
+    d.push('RSI: '+lrsi+' | 거래량비: x'+volR.toFixed(1));
+    var gf=[];
+    var _mins2=(parseInt(String(lc.t||'').split(':')[0])||0)*60+(parseInt(String(lc.t||'').split(':')[1])||0);
+    if(_mins2>0&&(_mins2<570||_mins2>840)) gf.push('시간대');
+    if(lc.c<lma5&&lma5<lma20&&lc.c<lma20*0.98) gf.push('데드크로스');
+    if(lc.c<lc.o&&pc.c<pc.o&&pc2.c<pc2.o) gf.push('3연속음봉');
+    if(lrsi>=72) gf.push('과매수RSI');
+    if(lc.c>pc.c*1.03) gf.push('급등');
+    if(body>0&&upperWick>body*2) gf.push('윗꼬리');
+    d.push('게이트: '+(gf.length?'❌ '+gf.join(', '):'✅ 전부 통과'));
+    // 점수 추정
+    var score=0;
+    if(lma5>lma20) score+=1;
+    if(lc.c>lma5&&lc.c<lma5*1.015) score+=2;
+    if(lc.c>lma20) score+=1;
+    if(volR>=1.5) score+=2; else if(volR>=1.2) score+=1;
+    if(lrsi>=50&&lrsi<=65) score+=2; else if(lrsi>=40&&lrsi<70) score+=1;
+    if(lc.c>lc.o&&(body/(lc.h-lc.l||1))>=0.6) score+=2;
+    d.push('추정 점수: '+score+'/12 (진입 임계: 4)');
+  } else { d.push('캔들 부족 ('+cs.length+'개 < 10개)'); }
+  // 6. 일지 현황
   d.push('\n═══ 매매일지 ═══');
   var js=safeParseJSON(localStorage.getItem('htsJournals'),'{}');
   var jCount=Object.keys(js).length;
@@ -1982,21 +1967,24 @@ function backtestDiagnose(){
     var last=Object.entries(js).sort(function(a,b){return String(b[0]).localeCompare(String(a[0]));}).slice(0,3);
     last.forEach(function(e){
       var v=e[1]||{};
-      d.push('  '+e[0]+': '+(v.aiGenerated?'🤖':'📝')+' '+(v.summary||'(내용없음)').slice(0,50));
+      d.push('  '+e[0]+': '+(v.aiGenerated?'🤖':'📝')+' '+(v.summary||'(내용없음)').slice(0,40));
     });
   }
-  // 6. 문제 감지 (실제 실행 중일 때만 의미 있는 것만)
+  // 7. 학습 메모리
+  d.push('\n═══ 학습 메모리 ═══');
+  d.push('노트: '+(learningMemory||[]).length+'건');
+  d.push('학습일: '+(learnedDates||[]).length+'일');
+  // 문제 감지
   d.push('\n═══ 🔴 문제 감지 ═══');
   var issues=[];
-  if(isRunning && !autoTimer) issues.push('❌ autoTimer 없음 → scheduleScreening 중단 (백테스트 중인데 스크리닝 안 돌아감)');
-  if(!autoState.running && isRunning) issues.push('❌ autoState 꺼짐 (백테스트 진행 중인데 자동매매 OFF)');
-  if(_autoScreenRunning) issues.push('❌ _autoScreenRunning 락 잠김 → 스크리닝 불가 (페이지 새로고침 필요)');
-  if(!sim.playing && isRunning) issues.push('❌ sim.playing=false → 시뮬 멈춤');
-  if(held.length>0 && !Object.keys(stopOrders).some(function(t){return held.find(function(h){return h[0]===t;});})) issues.push('❌ 보유 중인데 stopOrder 없음 → 자동 청산 안 됨');
-  if(pool.size===0) issues.push('❌ 종목 풀 비어있음 → 강세섹터 재조회 필요');
-  if(mock.cash<=0) issues.push('❌ 잔고 0원');
-  if(!isRunning) issues.push('ℹ 백테스트 미실행 상태 — 백테스트를 시작한 후 다시 검진하세요');
-  if(!issues.length) issues.push('✅ 실행 중 이상 없음');
+  if(!autoTimer) issues.push('autoTimer 없음 → scheduleScreening 중단');
+  if(!autoState.running && backtest.running) issues.push('autoState 꺼짐 (backtest 진행 중인데)');
+  if(_autoScreenRunning) issues.push('_autoScreenRunning 잠김 → 스크리닝 못 돌아감');
+  if(!sim.playing && backtest.running) issues.push('sim.playing=false → 시뮬 멈춤');
+  if(held.length>0 && !Object.keys(stopOrders).some(function(t){return held.find(function(h){return h[0]===t;});})) issues.push('보유중인데 stopOrder 없음');
+  if(pool.size===0) issues.push('종목 풀 비어있음');
+  if(mock.cash<=0) issues.push('잔고 0원');
+  if(!issues.length) issues.push('✅ 감지된 문제 없음');
   d.push(issues.join('\n'));
   showAlert('🔍 백테스트 검진', d.join('\n'));
 }
@@ -2142,7 +2130,7 @@ function updPrice(c){
   updOSum(); updPnl();
 }
 function updPnl(){
-  let tot=0;Object.entries(mock.positions||{}).forEach(([tk,pos])=>{const s=STOCKS.find(s=>s.tk===tk);if(s&&pos)tot+=(s.pr-pos.avgPrice)*pos.qty;});
+  let tot=0;Object.entries(mock.positions).forEach(([tk,pos])=>{const s=STOCKS.find(s=>s.tk===tk);if(s)tot+=(s.pr-pos.avgPrice)*pos.qty;});
   const up=tot>=0;
   const _pnlEl=document.getElementById("msPnl");if(_pnlEl){_pnlEl.textContent=(up?"+":"")+Math.round(tot).toLocaleString()+"원";_pnlEl.className="ms-v "+(up?"cu":"cd");}
   const _pctEl=document.getElementById("msPct");if(_pctEl){_pctEl.textContent=(up?"+":"")+(tot/cfg.capital*100).toFixed(2)+"%";_pctEl.className="ms-v "+(up?"cu":"cd");}
@@ -2265,7 +2253,6 @@ function getCredAvail(){if(credType==="credit")return Math.max(0,Math.round(mock
 function onCredChange(){
   credType=document.getElementById("credSel").value;
   const info=document.getElementById("credInfo");
-  if(!info) return;
   if(credType==="cash"){info.style.display="none";}
   else{info.style.display="block";const avail=getCredAvail();info.textContent=credType==="credit"?`신용 가능: ${avail.toLocaleString()}원 (이자 연 ${cfg.crate}%)`:`미수 가능: ${avail.toLocaleString()}원 (이자 연 ${cfg.mrate}% | 미결제→반대매매)`;}
   updOSum();
@@ -2393,7 +2380,7 @@ function submitOrder(autoExec){
     const newOrigQty=prevSO?(prevSO.origQty||0)+qty:qty;
     stopOrders[activeTk]={stop:stopPr,t1:t1Pr,t2:t2Pr,t1done:prevSO?prevSO.t1done:false,t2done:prevSO?prevSO.t2done:false,trail:trailMode,trailHigh:Math.max(pr,prevSO?.trailHigh||0),origQty:newOrigQty,origStop:stopPr};
     mock.trades.push({date:sim.date,tk:activeTk,nm:stk.nm,side:"buy",price:pr,pr:pr,ts:Date.now(),barTime:(sim.candles[sim.idx]||{}).t||"",qty,fee:Math.round(fee),pnl:0,creditType:credType,auto:autoExec||false,time:(sim.candles[sim.idx]||{}).t||""});
-    if(mock.trades.length>500) mock.trades=mock.trades.slice(-500);
+    if(mock.trades.length>500) mock.trades=mock.trades.slice(-500); // localStorage 용량 관리
     console.log('[BUY]', sim.date, stk.nm, qty+'주', pr+'원', '| total trades:', mock.trades.length);
   checkBrainDong("buy",pr,qty,stk);
   } else {
@@ -2409,7 +2396,7 @@ function submitOrder(autoExec){
       _repay = Math.min(_proceeds, ret); // proceeds 한도 내에서만 갚음
       if(pos.creditType==="credit") mock.creditUsed = Math.max(0, mock.creditUsed - _repay);
       else mock.marginUsed = Math.max(0, mock.marginUsed - _repay);
-      pos.creditAmt = Math.max(0, pos.creditAmt - _repay);
+      pos.creditAmt = Math.max(0, pos.creditAmt - ret);
     }
     mock.cash += (_proceeds - _repay); // 부채 갚고 남은 만큼만 cash로
     pos.qty -= qty;
@@ -2425,7 +2412,7 @@ function submitOrder(autoExec){
       }
     }
     mock.trades.push({date:sim.date,tk:activeTk,nm:stk.nm,side:"sell",price:pr,pr:pr,ts:Date.now(),barTime:(sim.candles[sim.idx]||{}).t||"",qty,fee:Math.round(fee+tax),pnl:Math.round(pnl),creditType:credType,auto:autoExec||false,time:(sim.candles[sim.idx]||{}).t||""});
-    if(mock.trades.length>500) mock.trades=mock.trades.slice(-500);
+    if(mock.trades.length>500) mock.trades=mock.trades.slice(-500); // localStorage 용량 관리
     console.log('[SELL]', sim.date, stk.nm, qty+'주', pr+'원', '손익:', Math.round(pnl)+'원', '| total trades:', mock.trades.length);
   bdMetrics.lastSellTime=Date.now();checkBrainDong("sell",pr,qty,stk);
     if(cfg.al){const lr=-mock.todayPnl/cfg.capital*100;if(lr>=cfg.dayloss)showAlert("⚠ 일일 손실 한도",`한도 ${cfg.dayloss}% 도달\n매매 중단 권고.`);}
@@ -2945,7 +2932,7 @@ function calcPyramid(){
   // R/R 재계산
   const so = stopOrders[activeTk];
   const stopDist = so?Math.abs(newAvg-so.stop)/newAvg*100:3;
-  const t1Dist = (so&&so.t1)?Math.abs(so.t1-newAvg)/newAvg*100:6;
+  const t1Dist = so?Math.abs(so.t1-newAvg)/newAvg*100:6;
   const rr = stopDist>0?t1Dist/stopDist:0;
   const rrOk = rr>=1.5;
   el.innerHTML = `<div style="color:${isReverse?'var(--g)':'var(--a)'};">${isReverse?'✅ 역피라미드 적합':'⚠ 추가분이 큼 — 더 줄일 것'}</div>`+
@@ -3030,7 +3017,7 @@ function checkPsychWarnings(){
     const pnlPct=(stk.pr-pos.avgPrice)/pos.avgPrice*100;
     const so=stopOrders[tk];
     if(pnlPct>0&&pnlPct<1&&so&&stk.pr<so.t1){
-      warnings.push(`처분효과 주의: ${stk.nm} +${pnlPct.toFixed(1)}% — 목표가(${so.t1?.toLocaleString()||'미설정'}) 미달. 조기청산 충동 = 처분효과`);
+      warnings.push(`처분효과 주의: ${stk.nm} +${pnlPct.toFixed(1)}% — 목표가(${so.t1.toLocaleString()}) 미달. 조기청산 충동 = 처분효과`);
     }
     if(pnlPct>3&&so&&!so.t1done){
       // 좋은 상태 — 홀딩 격려
@@ -3713,7 +3700,7 @@ function updAdvBoxes(title, body){
   _updateAIStatusPanel(entry);
 }
 function addDecisionLog(action,reason,phase){
-  // ★ 전역 로그 배열 + 서버 영구 저장 (중복 정의 통합)
+  // ★ 전역 로그 배열 + 서버 영구 저장
   if(!window._decisionLog) window._decisionLog=[];
   const _entry={title:action,body:reason,phase,time:new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',second:'2-digit'})};
   window._decisionLog.push(_entry);
@@ -3992,8 +3979,8 @@ async function _runScreeningAsync(){
       const heldScore = heldScored ? heldScored.score : 0;
       // 차이 5점 이상 + 보유 종목 수익이거나 미세 손실 (-1% 이내)
       const heldStk = STOCKS.find(s=>s.tk===heldTk);
-      const curPr = heldStk ? heldStk.pr : (pos.avgPrice||0);
-      const heldPnlPct = pos.avgPrice ? ((curPr-pos.avgPrice)/pos.avgPrice*100) : 0;
+      const curPr = heldStk ? heldStk.pr : (pos.avg||0);
+      const heldPnlPct = pos.avg ? ((curPr-pos.avg)/pos.avg*100) : 0;
       if(best.score - heldScore >= 5 && heldPnlPct > -1.5){
         addDecisionLog(`🔄 갈아타기 신호`, `${heldStk?.nm||heldTk}(${heldScore}점, ${heldPnlPct.toFixed(1)}%) → ${best.stk.nm}(${best.score}점)`, '백테스트');
         // 보유 전량 매도
@@ -4172,7 +4159,7 @@ function runAutoStep(cs){
       if(pos && pos.qty>0 && ma5cur && cur2 && prev){
         // 조건: 5MA 이탈 (현재 종가 < 5MA) AND 직전 봉 5MA 위였음 AND 거래량 살아있음 → 모멘텀 약화
         const broke5MA = prev.c >= ma5prev && cur2.c < ma5cur*0.997;
-        const profitable = cur2.c > (pos.avgPrice||0); // 수익 중일 때만 자동 청산 (손실은 stopOrders가 처리)
+        const profitable = cur2.c > (pos.avg||0); // 수익 중일 때만 자동 청산 (손실은 stopOrders가 처리)
         if(broke5MA && profitable && volR>=0.7){
           const sv=activeTk,svSide=oSide,svType=oType,svCred=credType;
           oSide="sell";oType="market";credType="cash";
@@ -4528,7 +4515,7 @@ async function runFullAnalysis(){
 5MA: ${lma5} / 20MA: ${lma20} / 60MA: ${lma60}
 RSI: ${rsi} / 거래량비율: ${volR}배
 감지된 기법: ${tech?.technique||"불명확"}
-${pos?`보유: ${pos.qty}주 평단 ${Math.round(pos.avgPrice).toLocaleString()}원${so?` 손절${(so.stop||0).toLocaleString()} 목표${(so.t1||0).toLocaleString()}`:""}`:""}
+${pos?`보유: ${pos.qty}주 평단 ${Math.round(pos.avgPrice).toLocaleString()}원${so?` 손절${so.stop.toLocaleString()} 목표${so.t1.toLocaleString()}`:""}`:""} 
 
 Phase 8 STEP 0~7 간략 점검 결과를 JSON으로 답해:
 {
@@ -4914,7 +4901,7 @@ async function updateAIAdvisor(){
     const up=stk.pr>=pos.avgPrice;
     if(so&&stk.pr<=so.stop*1.01){
       actionText=`⚠️ 손절선 근처예요\n지금 ${so.stop.toLocaleString()}원이 손절 기준\n감정 빼고 원칙대로 해요`;
-    } else if(so&&!so.t1done&&so.t1&&stk.pr>=so.t1*0.99){
+    } else if(so&&!so.t1done&&stk.pr>=so.t1*0.99){
       actionText=`🎯 1차 목표가 왔어요!\n${so.t1.toLocaleString()}원 근처\n절반은 팔고 나머지는 홀딩해요`;
     } else {
       actionText=`${up?'✅':'⚠️'} 보유 중 ${up?'+':''}${pnlPct}%\n${up?'흐름 좋아요. 목표가까지 홀딩':'손절선 다시 확인해요'}`;
@@ -5472,7 +5459,7 @@ function buildSys(){
     const p=parseFloat(pnlPct);
     const t1ok=so&&lc.c>=so.t1;
     exitCtx=`\n[Phase 9 청산전략] 보유${pos.qty}주 평단${Math.round(pos.avgPrice).toLocaleString()}원 (${p>=0?"+":""}${pnlPct}%)
-손절선:${so&&so.stop?so.stop.toLocaleString()+"원":"미설정⚠"} | 1차목표:${so&&so.t1?so.t1.toLocaleString()+"원":"미설정"}
+손절선:${so?so.stop.toLocaleString()+"원":"미설정⚠"} | 1차목표:${so?so.t1.toLocaleString()+"원":"미설정"}
 ${p>=3?"1차 익절(50%) 검토 → 즉시 손절선 본전화":p<=-3?"손절선 근접 → 즉각 대응 준비":p>=1?"홀딩 유지 → 트레일링 스탑 점검":"보유 중 관찰"}
 ${t1ok?"⚡ 1차 목표 도달 → 50% 익절 실행 권고":""}`;
   }
@@ -5650,20 +5637,18 @@ function renderAlerts(){
   }).join("");
 }
 function renderPort(){
-  const c=document.getElementById("portItems");if(!c)return;
-  const keys=Object.keys(mock.positions);
+  const c=document.getElementById("portItems"),keys=Object.keys(mock.positions);
   if(!keys.length){c.innerHTML="<div style='font-size:9px;color:var(--tm);text-align:center;padding:12px 0;'>보유 종목 없음</div>";return;}
   c.innerHTML=keys.map(tk=>{
     const pos=mock.positions[tk],stk=STOCKS.find(s=>s.tk===tk)||{nm:tk,pr:0};
     const pnl=(stk.pr-pos.avgPrice)*pos.qty,pct=((stk.pr-pos.avgPrice)/pos.avgPrice*100).toFixed(2),up=pnl>=0;
     const so=stopOrders[tk];
-    const bgs=(pos.creditType&&pos.creditType!=="cash"?`<span class="pi-b cred">${pos.creditType==="credit"?"신용":"미수"}</span>`:"")+(so?`<span class="pi-b stop">손절${so.stop.toLocaleString()}</span>`:"")+(so&&!so.t1done&&so.t1?`<span class="pi-b tgt">목표${so.t1.toLocaleString()}</span>`:"")+(so?.trail!=="off"?`<span class="pi-b trail">트레일</span>`:"")+(pos.auto?`<span class="pi-b ai">AI</span>`:"");
+    const bgs=(pos.creditType&&pos.creditType!=="cash"?`<span class="pi-b cred">${pos.creditType==="credit"?"신용":"미수"}</span>`:"")+(so?`<span class="pi-b stop">손절${so.stop.toLocaleString()}</span>`:"")+(so&&!so.t1done?`<span class="pi-b tgt">목표${so.t1.toLocaleString()}</span>`:"")+(so?.trail!=="off"?`<span class="pi-b trail">트레일</span>`:"")+(pos.auto?`<span class="pi-b ai">AI</span>`:"");
     return `<div class="pi" onclick="selectStk('${tk}');switchToSell()"><div class="pi-h"><span class="pi-tk">${stk.nm}</span><span class="pi-pnl ${up?"cu":"cd"}">${up?"+":""}${Math.round(pnl).toLocaleString()}원</span></div><div class="pi-s"><span>${pos.qty.toLocaleString()}주 평단${Math.round(pos.avgPrice).toLocaleString()}</span><span class="${up?"cu":"cd"}">${up?"+":""}${pct}%</span></div>${bgs?`<div style="margin-top:2px;display:flex;gap:2px;flex-wrap:wrap;">${bgs}</div>`:""}</div>`;
   }).join("");
 }
 function renderTradeLog(){
-  const c=document.getElementById("tradeLog");if(!c)return;
-  const rec=[...mock.trades].reverse().slice(0,40);
+  const c=document.getElementById("tradeLog"),rec=[...mock.trades].reverse().slice(0,40);
   if(!rec.length){c.innerHTML="<div style='font-size:9px;color:var(--tm);text-align:center;padding:12px;'>거래 없음</div>";return;}
   c.innerHTML=rec.map(t=>`<div class="tl-i"><div class="tl-side ${t.side}">${t.side==="buy"?"매수":"매도"}</div><div class="tl-info">${t.nm}${t.auto?"<span style='color:var(--p);font-size:8px;'>[AI]</span>":""}<br>${t.price.toLocaleString()}×${t.qty}</div>${t.side==="sell"?`<div class="tl-pnl ${t.pnl>=0?"cu":"cd"}">${t.pnl>=0?"+":""}${t.pnl.toLocaleString()}원</div>`:""}</div>`).join("");
 }
@@ -5796,7 +5781,7 @@ function onSearch(q){
   if(!q){hideSrch();return;}
   const res=STOCKS.filter(s=>s.nm.includes(q)||s.tk.includes(q)||(s.sec&&s.sec.includes(q))).slice(0,8);
   if(!res.length){hideSrch();return;}
-  const el=document.getElementById("srchDrop");if(!el)return;el.style.display="block";
+  const el=document.getElementById("srchDrop");el.style.display="block";
   el.innerHTML=res.map(s=>{
     const c=((s.pr-s.base)/s.base*100).toFixed(2),up=c>=0;
     const capCol=s.cap==="대형"?"var(--b)":s.cap==="중형"?"var(--a)":"var(--ts)";
@@ -5816,7 +5801,7 @@ function onSearch(q){
     </div>`;
   }).join("");
 }
-function hideSrch(){const _sd=document.getElementById("srchDrop");if(_sd)_sd.style.display="none";}
+function hideSrch(){document.getElementById("srchDrop").style.display="none";}
 function togInd(nm,el){inds[nm]=!inds[nm];el.classList.toggle("on",inds[nm]);if(!inds[nm]){if(nm==="rsi"){const rs=document.getElementById("rsiSub");if(rs)rs.classList.add("hide");}if(nm==="macd"){const ms=document.getElementById("macdSub");if(ms)ms.classList.add("hide");}}drawChart();}
 
 // ═══════════════════════════════
@@ -6629,8 +6614,7 @@ function lTab(el,id){document.querySelectorAll(".lpt").forEach(t=>t.classList.re
 function rTab(el,id){document.querySelectorAll(".rpt").forEach(t=>t.classList.remove("on"));el.classList.add("on");document.querySelectorAll(".rpb").forEach(b=>{b.classList.remove("on");b.style.display="none";});const t=document.getElementById(id);if(t){t.style.display="block";t.classList.add("on");}}
 function brTab(el,id){document.querySelectorAll(".brpt").forEach(t=>t.classList.remove("on"));el.classList.add("on");document.querySelectorAll(".brpb").forEach(b=>{b.classList.remove("on");b.style.display="none";});const t=document.getElementById(id);if(t){t.style.display=id==="brpb-ai"?"flex":"block";t.classList.add("on");}}
 function openModal(id){
-  const _m=document.getElementById("modal-"+id);if(!_m)return;
-  _m.classList.add("show");
+  document.getElementById("modal-"+id).classList.add("show");
   if(id==="settings"){
     const keys=["capital","dayloss","maxpos","clim","mlim","crate","mrate","bf","sf","tx"];
     keys.forEach(k=>{const el=document.getElementById("cfg-"+k);if(el)el.value=cfg[k];});
@@ -6641,7 +6625,7 @@ function openModal(id){
   }
   if(id==="journal"){const tt=mock.trades.filter(t=>t.date===sim.date);const pnl=tt.filter(t=>t.side==="sell").reduce((a,t)=>a+t.pnl,0);document.getElementById("jModalBody").innerHTML=tt.length?`<div style="font-size:11px;color:var(--ts);">${sim.date} 거래 ${tt.length}건 · 손익 ${pnl>=0?"+":""}${pnl.toLocaleString()}원</div><div style="font-size:10px;color:var(--tm);margin-top:5px;">AI 일지 생성 버튼을 눌러주세요.</div>`:"<div style='font-size:11px;color:var(--tm);'>오늘 거래가 없습니다.</div>";}
 }
-function closeModal(id){const _m=document.getElementById("modal-"+id);if(_m)_m.classList.remove("show");}
+function closeModal(id){document.getElementById("modal-"+id).classList.remove("show");}
 function showAlert(t,m){document.getElementById("alertTtl").textContent=t;document.getElementById("alertMsg").textContent=m;openModal("alert");}
 document.querySelectorAll(".modal-bg").forEach(el=>{el.addEventListener("click",e=>{if(e.target===el){const id=el.id.replace("modal-","");closeModal(id);}});});
 
@@ -7759,8 +7743,13 @@ window.onload=()=>{
   // ★ 자체 진단 — 30초마다 매매 시스템 헬스 체크
   setInterval(_selfDiagnose, 30000);
   setTimeout(async()=>{
-    try{ await checkDartApiStatus(); }catch(_e){}
-    try{ updateAIAdvisor(); fetchDartNews(); runFullAnalysis(); renderIntraCheck(); updateTimeGuide(); calcMarketStrength(); }catch(_e){}
+    await checkDartApiStatus();
+    updateAIAdvisor();
+    fetchDartNews();
+    runFullAnalysis();
+    renderIntraCheck();
+    updateTimeGuide();
+    calcMarketStrength();
   },800);
   setInterval(()=>{updateTimeGuide();},30000);
   setInterval(()=>fetchDartNews(),30000);
@@ -7800,11 +7789,11 @@ function _selfDiagnose(){
     var tk=e[0];
     if(!stopOrders[tk]){
       var pos=e[1], stk=STOCKS.find(function(s){return s.tk===tk;});
-      if(stk && pos.avgPrice){
-        var stopPr = Math.round(pos.avgPrice*(1-(autoState.cfg.stop||3)/100));
-        var t1Pr = Math.round(pos.avgPrice*(1+(autoState.cfg.t1||3)/100));
-        var t2Pr = Math.round(pos.avgPrice*(1+(autoState.cfg.t2||5)/100));
-        stopOrders[tk]={stop:stopPr,t1:t1Pr,t2:t2Pr,t1done:false,t2done:false,trail:autoState.cfg.trail||'off',trailHigh:pos.avgPrice,origQty:pos.qty,origStop:stopPr};
+      if(stk && pos.avg){
+        var stopPr = Math.round(pos.avg*(1-(autoState.cfg.stop||3)/100));
+        var t1Pr = Math.round(pos.avg*(1+(autoState.cfg.t1||3)/100));
+        var t2Pr = Math.round(pos.avg*(1+(autoState.cfg.t2||5)/100));
+        stopOrders[tk]={stop:stopPr,t1:t1Pr,t2:t2Pr,t1done:false,t2done:false,trail:autoState.cfg.trail||'off',trailHigh:pos.avg,origQty:pos.qty,origStop:stopPr};
         issues.push(stk.nm+' 손절/익절 미설정 → 자동 설정 (손절 '+stopPr.toLocaleString()+')');
       }
     }
@@ -8089,11 +8078,7 @@ async function syncCandidatesToWatchlist(){
     // CANDS 업데이트
     CANDS = newTks.slice(0,3).map(function(tk,i){
       const info = sectorInfo[tk]||{};
-      const _stk = STOCKS.find(function(s){return s.tk===tk;})||{};
-      const _why = info.sector
-        ? info.sector+'('+info.rank+'위) '+(info.reason||'')
-        : (_stk.sec ? _stk.sec+' — AI 선정' : 'AI 선정');
-      return {tk:tk, why:_why, score:95-i*5};
+      return {tk:tk, why:info.sector+'('+info.rank+'위) '+info.reason, score:95-i*5};
     });
     renderCands();
 
