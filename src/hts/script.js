@@ -1043,7 +1043,7 @@ function drawChart(){
     if(idx>=0&&idx<cs.length){
       const c=cs[idx];
       const ci=document.getElementById('cinfo');
-      if(ci)ci.textContent=`O${c.o.toLocaleString()} H${c.h.toLocaleString()} L${c.l.toLocaleString()} C${c.c.toLocaleString()} V${c.W(v)}`;
+      if(ci)ci.textContent=`O${c.o.toLocaleString()} H${c.h.toLocaleString()} L${c.l.toLocaleString()} C${c.c.toLocaleString()} V${W(c.v)}`;
     }
   }
 
@@ -1927,8 +1927,8 @@ function _backtestReport(){
     `• 총 매매: ${totalTrades}건\n` +
     `• 총 손익: ${totalPnl>=0?'+':''}${W(totalPnl)}원 (${pnlPct}%)\n` +
     `• 승률: ${winRate}% (${totalWins}승 ${totalLosses}패)\n` +
-    (best ? `• 최고: ${best.date} (+${best.W(pnl)})\n` : '') +
-    (worst ? `• 최악: ${worst.date} (${worst.W(pnl)})\n` : '');
+    (best ? `• 최고: ${best.date} (+${W(best.pnl)})\n` : '') +
+    (worst ? `• 최악: ${worst.date} (${W(worst.pnl)})\n` : '');
   addMsg('ai', msg);
   showAlert('백테스트 결과', msg);
   // 매매일지 페이지 즉시 갱신 + 안내
@@ -2427,7 +2427,7 @@ function quickSell(pct){
   const stk=STOCKS.find(s=>s.tk===activeTk)||STOCKS[0];
   if(pct===100&&!confirm(`⚠ 전량 시장가 매도
 ${stk.nm} ${pos.qty}주
-현재가 ${stk.W(pr)}원
+현재가 ${W(stk.pr)}원
 
 즉시 실행하시겠습니까?`))return;
   // 상태 저장 후 매도 실행
@@ -2613,7 +2613,7 @@ function checkPriceAlerts(){
       if(hit){
         al.fired=true;
         showAlert(`📣 가격 알림: ${stk.nm}`,`${stk.nm}이(가) ${W(al.price)}원 ${al.dir==="above"?"이상":"이하"}에 도달했습니다.
-현재가: ${stk.W(pr)}원
+현재가: ${W(stk.pr)}원
 
 알림 목적: ${al.memo||"-"}`);
         setTimeout(()=>{priceAlerts.splice(i,1);renderAlerts();},100);
@@ -3808,7 +3808,7 @@ function setTrailPct(pct){
   const so=stopOrders[activeTk];if(!so)return;
   so.trail="pct";so.trailHigh=stk.pr;so.stop=Math.round(stk.pr*(1-pct/100));
   updateTrailPanel();
-  addDecisionLog(`트레일링 스탑 -${pct}% 설정`,`현재가 ${stk.W(pr)} → 손절 ${W(so.stop)}`,"Phase 9-3");
+  addDecisionLog(`트레일링 스탑 -${pct}% 설정`,`현재가 ${W(stk.pr)} → 손절 ${W(so.stop)}`,"Phase 9-3");
 }
 function setTrailMA5(){
   const so=stopOrders[activeTk];if(!so)return;
@@ -5098,7 +5098,7 @@ async function updateAIAdvisor(){
   const pos=mock.positions[activeTk];
 
   // ── 토스체 상황 설명 ──
-  const priceKr = stk.W(pr);
+  const priceKr = W(stk.pr);
   const maEmoji = maArr==='정배열'?'📈':maArr==='역배열'?'📉':'🔀';
   const rsiComment = lrsi>=70?'과열 구간이에요':lrsi<=30?'과매도 구간이에요':lrsi>=50?'모멘텀 살아있어요':'중립이에요';
   const volComment = parseFloat(volR)>=2?'거래량 폭발 🔥':parseFloat(volR)>=1.3?'거래량 증가 중':'거래량 보통';
@@ -5866,7 +5866,7 @@ function renderPort(){
 function renderTradeLog(){
   const c=document.getElementById("tradeLog"),rec=[...mock.trades].reverse().slice(0,40);
   if(!rec.length){c.innerHTML="<div style='font-size:9px;color:var(--tm);text-align:center;padding:12px;'>거래 없음</div>";return;}
-  c.innerHTML=rec.map(t=>`<div class="tl-i"><div class="tl-side ${t.side}">${t.side==="buy"?"매수":"매도"}</div><div class="tl-info">${t.nm}${t.auto?"<span style='color:var(--p);font-size:8px;'>[AI]</span>":""}<br>${W(t.price)}×${t.qty}</div>${t.side==="sell"?`<div class="tl-pnl ${t.pnl>=0?"cu":"cd"}">${t.pnl>=0?"+":""}${t.W(pnl)}원</div>`:""}</div>`).join("");
+  c.innerHTML=rec.map(t=>`<div class="tl-i"><div class="tl-side ${t.side}">${t.side==="buy"?"매수":"매도"}</div><div class="tl-info">${t.nm}${t.auto?"<span style='color:var(--p);font-size:8px;'>[AI]</span>":""}<br>${W(t.price)}×${t.qty}</div>${t.side==="sell"?`<div class="tl-pnl ${t.pnl>=0?"cu":"cd"}">${t.pnl>=0?"+":""}${W(t.pnl)}원</div>`:""}</div>`).join("");
 }
 
 // ═══════════════════════════════
@@ -6011,7 +6011,7 @@ function onSearch(q){
         <div style="font-size:9px;color:var(--ts);">${s.sec||""}</div>
       </div>
       <div style="text-align:right;flex-shrink:0;">
-        <div class="sri-pr ${up?"cu":"cd"}">${s.W(pr)}</div>
+        <div class="sri-pr ${up?"cu":"cd"}">${W(s.pr)}</div>
         <div style="font-size:9px;" class="${up?"cu":"cd"}">${up?"+":""}${c}%</div>
       </div>
     </div>`;
@@ -6150,7 +6150,7 @@ async function genJModal(){
   if(!tt.length){body.innerHTML="<div style='font-size:11px;color:var(--tm);'>오늘 거래 내역이 없습니다.</div>";return;}
   const pnl=tt.filter(t=>t.side==="sell").reduce((a,t)=>a+t.pnl,0);
   const wins=tt.filter(t=>t.side==="sell"&&t.pnl>0).length,total=tt.filter(t=>t.side==="sell").length;
-  const str=tt.map(t=>`${t.side==="buy"?"매수":"매도"} ${t.nm} ${t.qty}주 @${W(t.price)}${t.pnl?` 손익${t.pnl>=0?"+":""}${t.W(pnl)}원`:""} ${t.auto?"[AI매매]":""}`).join("\n");
+  const str=tt.map(t=>`${t.side==="buy"?"매수":"매도"} ${t.nm} ${t.qty}주 @${W(t.price)}${t.pnl?` 손익${t.pnl>=0?"+":""}${W(t.pnl)}원`:""} ${t.auto?"[AI매매]":""}`).join("\n");
 
   // ── 1. AI 없이도 즉시 기본 저장 ──
   const baseEntry = {
@@ -6376,7 +6376,7 @@ function renderJournalStats(){
     const pnlCol = d.totalPnl>=0 ? 'var(--g)' : 'var(--r)';
     const kpi = (label, val, col) => `<div style="background:var(--bg);border-radius:8px;padding:8px;text-align:center;"><div style="font-size:9px;color:var(--tm);margin-bottom:3px;">${label}</div><div style="font-size:14px;font-weight:800;color:${col||'var(--t)'};">${val}</div></div>`;
     kpiEl.innerHTML =
-      kpi('총 손익', (d.totalPnl>=0?'+':'')+d.W(totalPnl)+'원', pnlCol) +
+      kpi('총 손익', (d.totalPnl>=0?'+':'')+W(d.totalPnl)+'원', pnlCol) +
       kpi('승률', d.sells.length ? d.winRate.toFixed(1)+'%' : '-') +
       kpi('손익비', d.rr>0 ? '1:'+d.rr.toFixed(2) : '-') +
       kpi('매매일', d.curve.length+'일') +
@@ -6462,15 +6462,15 @@ function renderJournalStats(){
         <div>평균 손실: <b style="color:var(--r);">-${Math.round(d.avgLoss).toLocaleString()}원</b></div>
         <div>최대 연승: <b>${d.maxWin}회</b> · 최대 연패: <b>${d.maxLoss}회</b></div>
         <div>최대 낙폭(MDD): <b style="color:var(--r);">-${Math.round(d.mdd).toLocaleString()}원</b></div>
-        ${d.best?`<div>최고일: ${d.best.date} <b style="color:var(--g);">+${d.best.W(pnl)}</b></div>`:''}
-        ${d.worst?`<div>최악일: ${d.worst.date} <b style="color:var(--r);">${d.worst.W(pnl)}</b></div>`:''}
+        ${d.best?`<div>최고일: ${d.best.date} <b style="color:var(--g);">+${W(d.best.pnl)}</b></div>`:''}
+        ${d.worst?`<div>최악일: ${d.worst.date} <b style="color:var(--r);">${W(d.worst.pnl)}</b></div>`:''}
       </div>`;
     const topStk = `
       <div style="background:var(--bg);border-radius:8px;padding:10px;grid-column:1/-1;">
         <div style="font-size:10px;font-weight:700;margin-bottom:6px;">🏆 종목별 손익 TOP/BOTTOM</div>
-        ${d.topStocks.slice(0,3).map(s=>`<div style="display:flex;justify-content:space-between;font-size:10px;padding:2px 0;"><span>${s.nm} (${s.tk}) · ${s.count}건 · 승${s.wins}</span><b style="color:${s.pnl>=0?'var(--g)':'var(--r)'};">${s.pnl>=0?'+':''}${s.W(pnl)}원</b></div>`).join('')}
+        ${d.topStocks.slice(0,3).map(s=>`<div style="display:flex;justify-content:space-between;font-size:10px;padding:2px 0;"><span>${s.nm} (${s.tk}) · ${s.count}건 · 승${s.wins}</span><b style="color:${s.pnl>=0?'var(--g)':'var(--r)'};">${s.pnl>=0?'+':''}${W(s.pnl)}원</b></div>`).join('')}
         ${d.topStocks.length>3 ? '<div style="font-size:9px;color:var(--tm);margin:4px 0;text-align:center;">···</div>' : ''}
-        ${d.topStocks.slice(-2).reverse().filter(s=>!d.topStocks.slice(0,3).includes(s)).map(s=>`<div style="display:flex;justify-content:space-between;font-size:10px;padding:2px 0;"><span>${s.nm} (${s.tk}) · ${s.count}건 · 승${s.wins}</span><b style="color:${s.pnl>=0?'var(--g)':'var(--r)'};">${s.pnl>=0?'+':''}${s.W(pnl)}원</b></div>`).join('')}
+        ${d.topStocks.slice(-2).reverse().filter(s=>!d.topStocks.slice(0,3).includes(s)).map(s=>`<div style="display:flex;justify-content:space-between;font-size:10px;padding:2px 0;"><span>${s.nm} (${s.tk}) · ${s.count}건 · 승${s.wins}</span><b style="color:${s.pnl>=0?'var(--g)':'var(--r)'};">${s.pnl>=0?'+':''}${W(s.pnl)}원</b></div>`).join('')}
       </div>`;
     bd.innerHTML = aiVsMan + extras + topStk;
   }
@@ -6493,7 +6493,7 @@ async function askAIForFeatureSuggestion(ev){
 기존 기능: 자동매매(레벨1~4), 백테스트, 학습 메모리, 강세 섹터 자동감지, 매매일지 자동작성, AI 판단 로그.
 
 【통계】
-총손익 ${s.W(totalPnl)}원 / 매매 ${s.sells.length}건 / 승률 ${s.winRate.toFixed(1)}%
+총손익 ${W(s.totalPnl)}원 / 매매 ${s.sells.length}건 / 승률 ${s.winRate.toFixed(1)}%
 손익비 1:${s.rr.toFixed(2)} / MDD -${Math.round(s.mdd).toLocaleString()}원 / 최대연패 ${s.maxLoss}회
 AI손익 ${s.aiPnl.toLocaleString()} (승률 ${s.aiWinRate.toFixed(1)}%) vs 수동 ${s.manPnl.toLocaleString()} (${s.manWinRate.toFixed(1)}%)
 학습단계 ${stage?('Lv'+stage.lv+' '+stage.label):'미시작'}
