@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#ffffff">
-<meta name="build-ts" content="1779541044862">
+<meta name="build-ts" content="1779542958961">
 <title>TraidAIr HTS</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 
@@ -2360,6 +2360,8 @@ function loadState(){
   // 서버에서 최신 데이터 로드 (비동기, 완료 후 UI 갱신)
   loadFromServer().then(ok => {
     if(ok) {
+      // ★ 백테스트 실행 중이면 mock 덮어쓰기 금지 (잔고 뻥튀기 방지)
+      if(window.backtest && backtest.running) return;
       // 서버 데이터로 덮어쓰기
       const m2=localStorage.getItem("htsMock");
       if(m2){const p=JSON.parse(m2);mock={...mock,...p};mock.cash=mock.cash||cfg.capital;if(!mock.positions)mock.positions={};if(!mock.trades)mock.trades=[];}
@@ -3509,12 +3511,14 @@ async function startBacktest(startDate, endDate){
     try{ await refreshHotSectors(true); }catch(_e){}
   }
   backtest.running=true;
+  backtest.pendingJournals = [];
   try{ window._bgKeepAliveStart && _bgKeepAliveStart(); }catch(e){}
   backtest.startDate=days[0];
   backtest.endDate=days[days.length-1];
   backtest.totalDays=days.length;
   backtest.dayIdx=0;
   backtest.startCash=mock.cash;
+  backtest._frozenCash = mock.cash;
   backtest.startPnl=mock.todayPnl||0;
   backtest.dailyResults=[];
   // 자동매매 자동 시작 (level 3 이상 권장)
@@ -3569,9 +3573,9 @@ async function _backtestLoadDay(dateStr){
       setTimeout(()=>{try{_df.contentWindow._skipHtsSync=false;}catch(e){}},100);
     }
   }catch(_e){}
-  // ★ 매일 강세섹터 새로 가져오기 (사용자 요청: 딜레이 있어도 정확하게)
-  if(typeof refreshHotSectors==='function'){
-    addDecisionLog('📊 '+dateStr+' 강세섹터 분석', '새 날짜 데이터 가져오는 중...', '백테스트');
+  // ★ 강세섹터: 첫날만 API 호출, 이후는 캐시 사용 (매일 호출 시 30초씩 멈추는 문제 해결)
+  if(typeof refreshHotSectors==='function' && backtest.dayIdx <= 0){
+    addDecisionLog('📊 '+dateStr+' 강세섹터 분석', '첫날 데이터 가져오는 중...', '백테스트');
     try{ await refreshHotSectors(true); }catch(_e){ console.warn('섹터 fetch:', _e.message); }
   }
   // 종목 자동 전환: 강세 1위 종목 우선, 없으면 WGS[0] 첫 종목
@@ -9543,7 +9547,7 @@ function collectMarketCtx(){
 (function(){
   const meta = document.querySelector('meta[name="build-ts"]');
   const myBuildTs = meta ? meta.getAttribute('content') : '';
-  if(!myBuildTs || myBuildTs === '1779541044862') return; // 로컬 빌드 안 한 경우
+  if(!myBuildTs || myBuildTs === '1779542958961') return; // 로컬 빌드 안 한 경우
   let reloaded = false;
   async function check(){
     if(reloaded) return;
