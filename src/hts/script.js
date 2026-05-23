@@ -1562,6 +1562,45 @@ function _textSimilarity(a, b){
   wa.forEach(w=>{ if(wb.has(w)) overlap++; });
   return overlap / Math.max(wa.size, wb.size);
 }
+function _addLearningReply(stockNm, pnl, tk){
+  if(!learningMemory||!learningMemory.length) return;
+  const date=sim.date||'';
+  const buyTrade=(mock.trades||[]).filter(t=>t.tk===tk&&t.side==='buy'&&t.date===date).pop();
+  const ref=(buyTrade&&buyTrade.learningRef)||'';
+  const pnlStr=pnl>=0?'+'+pnl.toLocaleString():pnl.toLocaleString();
+  const icon=pnl>=0?'✅':'❌';
+  learningMemory.forEach(function(item){
+    if(!item.replies) item.replies=[];
+    var matched=false;
+    if(ref && ref!=='해당없음' && item.text.length>10){
+      var words=ref.split(/[\s,·]+/).filter(w=>w.length>=2);
+      var hits=words.filter(w=>item.text.includes(w)).length;
+      if(hits>=2||(words.length<=2&&hits>=1)) matched=true;
+    }
+    if(!matched){
+      var kw=[
+        {keys:['손절','stop','청산','-3%'],match:pnl<0&&Math.abs(pnl)<(buyTrade?buyTrade.price*buyTrade.qty*0.035:99999)},
+        {keys:['역추세','하락','물타기','떨어지는'],match:pnl<0},
+        {keys:['FOMO','놓치','급등','추격'],match:true},
+        {keys:['비중','10%','20%'],match:true},
+        {keys:['정배열','5MA','20MA','추세'],match:true},
+      ];
+      kw.forEach(function(k){
+        if(matched) return;
+        var found=k.keys.some(function(w){return item.text.includes(w);});
+        if(found&&k.match) matched=true;
+      });
+    }
+    if(!matched) return;
+    if(item.replies.some(r=>r.date===date&&r.stock===stockNm)) return;
+    item.replies.push({date:date,stock:stockNm,pnl:pnl,text:icon+' '+stockNm+' '+pnlStr+'원'});
+    if(item.replies.length>8) item.replies=item.replies.slice(-8);
+  });
+  try{
+    localStorage.setItem('htsLearningMemory',JSON.stringify(learningMemory));
+    saveToServer('htsLearningMemory',JSON.stringify(learningMemory));
+  }catch(_e){}
+}
 function _autoTrimLearning(){
   const vague = ['전략 유지','유지','정상','양호','인내심 유지','시그널 재점검','관찰','확인','점검'];
   learningMemory = learningMemory.filter(m => {
@@ -1610,12 +1649,18 @@ function openLearningMemo(){
       <div id="lmStageRow" style="margin-bottom:10px;"></div>
       <div style="font-size:10px;color:var(--tm);margin-bottom:8px;">매매일지에서 누적된 깨달음입니다. 다음 매매 결정 시 AI 프롬프트에 자동 첨부돼요.</div>
       <div style="max-height:50vh;overflow-y:auto;display:flex;flex-direction:column;gap:6px;">
-        ${learningMemory.length ? learningMemory.slice().reverse().map(l=>`
-          <div style="padding:6px 8px;background:var(--bg);border-radius:6px;border-left:3px solid ${l.category==='반성'?'var(--r)':l.category==='개선'?'var(--g)':l.category==='멘토'?'var(--b)':'var(--p)'};">
-            <div style="font-size:9px;color:var(--tm);margin-bottom:2px;">${l.date} · ${l.category}</div>
-            <div style="font-size:11px;line-height:1.5;">${(l.text||'').replace(/</g,'&lt;')}</div>
-          </div>
-        `).join('') : '<div style="font-size:11px;color:var(--tm);padding:20px;text-align:center;">아직 학습된 노트가 없습니다. 백테스트나 매매를 마치면 자동으로 쌓여요.</div>'}
+        ${learningMemory.length ? learningMemory.slice().reverse().map(l=>{
+          const catCol=l.category==='반성'?'var(--r)':l.category==='개선'?'var(--g)':l.category==='멘토'?'var(--b)':'var(--p)';
+          const replies=(l.replies||[]).map(r=>{
+            const rc=(r.pnl||0)>=0?'var(--g)':'var(--r)';
+            return '<div style="font-size:9px;padding:3px 6px;margin-top:3px;background:var(--pan);border-radius:4px;border-left:2px solid '+rc+';color:var(--ts);">'+
+              '<span style="color:var(--tm);">'+r.date+'</span> '+r.text+'</div>';
+          }).join('');
+          return '<div style="padding:6px 8px;background:var(--bg);border-radius:6px;border-left:3px solid '+catCol+';">'+
+            '<div style="font-size:9px;color:var(--tm);margin-bottom:2px;">'+l.date+' · '+l.category+(l.replies&&l.replies.length?' · <span style="color:var(--b);">💬'+l.replies.length+'</span>':'')+'</div>'+
+            '<div style="font-size:11px;line-height:1.5;">'+(l.text||'').replace(/</g,'&lt;')+'</div>'+
+            replies+'</div>';
+        }).join('') : '<div style="font-size:11px;color:var(--tm);padding:20px;text-align:center;">아직 학습된 노트가 없습니다. 백테스트나 매매를 마치면 자동으로 쌓여요.</div>'}
       </div>
       <div style="margin-top:10px;display:flex;justify-content:flex-end;gap:6px;flex-wrap:wrap;">
         <button class="ibtn" onclick="restoreLearningBackup();document.getElementById('lmDlg').remove();openLearningMemo();" style="font-size:10px;border:1.5px solid var(--g);color:var(--g);">백업 복원</button>
@@ -2437,7 +2482,7 @@ function submitOrder(autoExec){
     const prevSO=stopOrders[activeTk];
     const newOrigQty=prevSO?(prevSO.origQty||0)+qty:qty;
     stopOrders[activeTk]={stop:stopPr,t1:t1Pr,t2:t2Pr,t1done:prevSO?prevSO.t1done:false,t2done:prevSO?prevSO.t2done:false,trail:trailMode,trailHigh:Math.max(pr,prevSO?.trailHigh||0),origQty:newOrigQty,origStop:stopPr};
-    mock.trades.push({date:sim.date,tk:activeTk,nm:stk.nm,side:"buy",price:pr,pr:pr,ts:Date.now(),barTime:(sim.candles[sim.idx]||{}).t||"",qty,fee:Math.round(fee),pnl:0,creditType:credType,auto:autoExec||false,time:(sim.candles[sim.idx]||{}).t||""});
+    mock.trades.push({date:sim.date,tk:activeTk,nm:stk.nm,side:"buy",price:pr,pr:pr,ts:Date.now(),barTime:(sim.candles[sim.idx]||{}).t||"",qty,fee:Math.round(fee),pnl:0,creditType:credType,auto:autoExec||false,time:(sim.candles[sim.idx]||{}).t||"",learningRef:window._lastLearningApplied||""});
     if(mock.trades.length>500) mock.trades=mock.trades.slice(-500); // localStorage 용량 관리
     console.log('[BUY]', sim.date, stk.nm, qty+'주', pr+'원', '| total trades:', mock.trades.length);
   checkBrainDong("buy",pr,qty,stk);
@@ -2470,8 +2515,9 @@ function submitOrder(autoExec){
       }
     }
     mock.trades.push({date:sim.date,tk:activeTk,nm:stk.nm,side:"sell",price:pr,pr:pr,ts:Date.now(),barTime:(sim.candles[sim.idx]||{}).t||"",qty,fee:Math.round(fee+tax),pnl:Math.round(pnl),creditType:credType,auto:autoExec||false,time:(sim.candles[sim.idx]||{}).t||""});
-    if(mock.trades.length>500) mock.trades=mock.trades.slice(-500); // localStorage 용량 관리
+    if(mock.trades.length>500) mock.trades=mock.trades.slice(-500);
     console.log('[SELL]', sim.date, stk.nm, qty+'주', pr+'원', '손익:', Math.round(pnl)+'원', '| total trades:', mock.trades.length);
+    try{ _addLearningReply(stk.nm, Math.round(pnl), activeTk); }catch(_e){}
   bdMetrics.lastSellTime=Date.now();checkBrainDong("sell",pr,qty,stk);
     if(cfg.al){const lr=-mock.todayPnl/cfg.capital*100;if(lr>=cfg.dayloss)showAlert("⚠ 일일 손실 한도",`한도 ${cfg.dayloss}% 도달\n매매 중단 권고.`);}
   }
@@ -3224,13 +3270,19 @@ function renderLearningMgmt(){
   const cats={반성:'var(--r)',개선:'var(--b)',멘토:'var(--p)',심리:'var(--a)',복기:'var(--g)'};
   el.innerHTML=learningMemory.map((l,i)=>{
     const col=cats[l.category]||'var(--tm)';
+    const reps=(l.replies||[]).map(r=>{
+      const rc=(r.pnl||0)>=0?'var(--g)':'var(--r)';
+      return '<div style="font-size:8px;padding:2px 5px;margin-top:2px;border-radius:3px;border-left:2px solid '+rc+';background:var(--pan);color:var(--ts);">'+r.date+' '+r.text+'</div>';
+    }).join('');
     return`<div style="display:flex;align-items:flex-start;gap:6px;padding:6px 8px;background:var(--bg);border-radius:6px;border-left:3px solid ${col};" data-li="${i}">
       <div style="flex:1;">
         <div style="display:flex;gap:4px;align-items:center;margin-bottom:2px;">
           <span style="font-size:8px;color:${col};font-weight:700;">${l.category}</span>
           <span style="font-size:8px;color:var(--tm);">${l.date||'-'}</span>
+          ${l.replies&&l.replies.length?'<span style="font-size:8px;color:var(--b);">💬'+l.replies.length+'</span>':''}
         </div>
         <div style="font-size:10px;line-height:1.5;color:var(--ts);">${l.text}</div>
+        ${reps}
       </div>
       <button onclick="deleteLearningItem(${i})" style="border:none;background:none;color:var(--tm);font-size:14px;cursor:pointer;padding:0 4px;line-height:1;" title="삭제">&times;</button>
     </div>`;
@@ -4262,6 +4314,7 @@ async function _runScreeningAsync(){
         addDecisionLog('['+best.stk.nm+'] ✅ AI매수 (신뢰도'+ai.confidence+'%)',ai.reason+(ai.factors?(' | '+ai.factors):''),'Phase8통과');
         addMsg('ai','🤖 AI자동매수\n\n종목: '+best.stk.nm+' '+lc2.c.toLocaleString()+'원\n신뢰도: '+ai.confidence+'%\n\n✅ '+ai.reason+'\n'+_factorsTxt+'⚠ '+ai.risk+'\n\n손절: '+stopPr.toLocaleString()+' | 목표: '+t1Pr.toLocaleString()+' | R/R 1:'+rr);
         updAdvBoxes('✅ 매수결정 — '+best.stk.nm,'신뢰도 '+ai.confidence+'%\n'+ai.reason+(ai.factors?('\n근거: '+ai.factors):''));
+        window._lastLearningApplied = ai.learning_applied || '';
         var _bestTech2 = best.tags.indexOf('대장첫숨')!==-1?'대장첫숨':'';
         await execAutoBuy(lc2.c, best.stk, best.score, _bestTech2);
       }else{
