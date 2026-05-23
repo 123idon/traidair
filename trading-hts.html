@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#ffffff">
-<meta name="build-ts" content="1779546759843">
+<meta name="build-ts" content="1779547032474">
 <title>TraidAIr HTS</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 
@@ -4303,7 +4303,7 @@ function submitOrder(autoExec){
       _repay = Math.min(_proceeds, ret); // proceeds 한도 내에서만 갚음
       if(pos.creditType==="credit") mock.creditUsed = Math.max(0, mock.creditUsed - _repay);
       else mock.marginUsed = Math.max(0, mock.marginUsed - _repay);
-      pos.creditAmt = Math.max(0, pos.creditAmt - ret);
+      pos.creditAmt = Math.max(0, pos.creditAmt - _repay);
     }
     mock.cash += (_proceeds - _repay); // 부채 갚고 남은 만큼만 cash로
     pos.qty -= qty;
@@ -9577,7 +9577,7 @@ function collectMarketCtx(){
 (function(){
   const meta = document.querySelector('meta[name="build-ts"]');
   const myBuildTs = meta ? meta.getAttribute('content') : '';
-  if(!myBuildTs || myBuildTs === '1779546759843') return; // 로컬 빌드 안 한 경우
+  if(!myBuildTs || myBuildTs === '1779547032474') return; // 로컬 빌드 안 한 경우
   let reloaded = false;
   async function check(){
     if(reloaded) return;

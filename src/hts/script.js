@@ -2409,7 +2409,7 @@ function submitOrder(autoExec){
       _repay = Math.min(_proceeds, ret); // proceeds 한도 내에서만 갚음
       if(pos.creditType==="credit") mock.creditUsed = Math.max(0, mock.creditUsed - _repay);
       else mock.marginUsed = Math.max(0, mock.marginUsed - _repay);
-      pos.creditAmt = Math.max(0, pos.creditAmt - ret);
+      pos.creditAmt = Math.max(0, pos.creditAmt - _repay);
     }
     mock.cash += (_proceeds - _repay); // 부채 갚고 남은 만큼만 cash로
     pos.qty -= qty;
