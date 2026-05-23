@@ -916,7 +916,7 @@ function drawChart(){
     const y=PT+mainH*i/4;
     ctx.beginPath();ctx.moveTo(PL,y);ctx.lineTo(W-PR,y);ctx.stroke();
     const v=yMax-yR*i/4;
-    const label=v>=10000?Math.round(v/100)/10+'k':v>=1000?v.toLocaleString():v.toFixed(0);
+    const label=v.toLocaleString();
     ctx.fillText(label,W-PR+4,y+3);
   }
 
@@ -6093,7 +6093,7 @@ function renderStats(){
         const toY=v=>PT+ch*(1-(v-yMin)/yR); const toX=i=>PL+cw*(i/Math.max(cd.length-1,1));
         ctx.strokeStyle='rgba(0,0,0,.15)'; ctx.setLineDash([3,3]); ctx.beginPath(); ctx.moveTo(PL,toY(0)); ctx.lineTo(W-PR,toY(0)); ctx.stroke(); ctx.setLineDash([]);
         ctx.fillStyle='#8c9db5'; ctx.font='9px monospace'; ctx.textAlign='right';
-        [yMax,(yMax+yMin)/2,yMin].forEach(v=>ctx.fillText((v>=0?'+':'')+Math.round(v/1000)+'k', PL-4, toY(v)+3));
+        [yMax,(yMax+yMin)/2,yMin].forEach(v=>ctx.fillText((v>=0?'+':'')+Math.round(v).toLocaleString(), PL-4, toY(v)+3));
         const last=cd[cd.length-1]||0; const col=last>=0?'#05c072':'#dc3545';
         const grad=ctx.createLinearGradient(0,PT,0,PT+ch); grad.addColorStop(0,col==='#05c072'?'rgba(5,192,114,.25)':'rgba(220,53,69,.25)'); grad.addColorStop(1,'rgba(255,255,255,0)');
         ctx.fillStyle=grad; ctx.beginPath(); ctx.moveTo(toX(0),toY(0)); cd.forEach((c,i)=>ctx.lineTo(toX(i),toY(c))); ctx.lineTo(toX(cd.length-1),toY(0)); ctx.closePath(); ctx.fill();
@@ -6409,7 +6409,7 @@ function renderJournalStats(){
     ctx.fillStyle='#8c9db5'; ctx.font='9px monospace'; ctx.textAlign='right';
     [yMax, (yMax+yMin)/2, yMin].forEach(v=>{
       const y = toY(v);
-      ctx.fillText((v>=0?'+':'')+Math.round(v/1000)+'k', PL-4, y+3);
+      ctx.fillText((v>=0?'+':'')+Math.round(v).toLocaleString(), PL-4, y+3);
     });
     // 면적
     const grad = ctx.createLinearGradient(0, PT, 0, PT+ch);
@@ -7119,7 +7119,7 @@ function drawSignalOverlay(){
     // 가격 수치
     ctx.font = '7px JetBrains Mono,monospace';
     ctx.fillStyle = col;
-    const priceStr = (c.c/1000).toFixed(0)+'k';
+    const priceStr = c.c.toLocaleString();
     ctx.fillText(priceStr, x, isBuy?yBase+43:yBase-37);
     ctx.restore();
   });
