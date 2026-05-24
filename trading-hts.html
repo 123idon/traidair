@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#ffffff">
-<meta name="build-ts" content="1779631648369">
+<meta name="build-ts" content="1779632559163">
 <title>TraidAIr HTS</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 
@@ -3185,11 +3185,15 @@ function _geneToDesc(g){
 }
 function registerEvolvedTechnique(gene){
   var wr=gene.wins+gene.losses>0?Math.round(gene.wins/(gene.wins+gene.losses)*100):0;
-  var name=gene.name||('진화기법_G'+gene.generation);
+  var baseName=gene.name||('진화기법_G'+gene.generation);
+  var name=baseName;
+  var suffix=2;
+  while(TECHNIQUES[name]){name=baseName+'_'+suffix;suffix++;}
   var desc=_geneToDesc(gene);
-  TECHNIQUES[name]={phase:'EVO-'+gene.generation,cond:desc,stop:'진입가 -'+gene.stopPct.toFixed(1)+'%',target:'R/R 1:'+gene.targetMult.toFixed(1),evolved:true,gene:gene,winRate:wr};
-  addMsg('ai','🧬 신규 기법 등록: '+name+'\n• 조건: '+desc+'\n• 승률: '+wr+'%\n• R/R: 1:'+gene.targetMult.toFixed(1)+'\n• 세대: '+gene.generation);
-  addDecisionLog('🧬 신규기법 등록',name+' — '+desc,'진화');
+  var sc=_calcScore(wr,gene.wins&&gene.losses?(gene.wins/gene.losses):0,0);
+  TECHNIQUES[name]={phase:'EVO-'+gene.generation,cond:desc,stop:'진입가 -'+gene.stopPct.toFixed(1)+'%',target:'R/R 1:'+gene.targetMult.toFixed(1),evolved:true,gene:gene,winRate:wr,score:sc};
+  addMsg('ai','🧬 신규 기법 등록: '+name+'\n• 조건: '+desc+'\n• 점수: '+sc+'/100 (승률 '+wr+'%)\n• R/R: 1:'+gene.targetMult.toFixed(1)+'\n• 세대: '+gene.generation);
+  addDecisionLog('🧬 신규기법 등록',name+' — '+desc+' ('+sc+'점)','진화');
   return name;
 }
 async function _aiRefineGenes(){
@@ -3217,7 +3221,7 @@ async function _aiRefineGenes(){
   try{
     var data=await callClaude({model:"claude-sonnet-4-5",max_tokens:600,messages:[{role:"user",content:prompt}]},"추가진화 AI");
     var text=(data.content&&data.content[0]&&data.content[0].text)||'';
-    var jsonMatch=text.match(/\[[\s\S]*\]/);
+    var jsonMatch=text.match(/\[\s*\{[\s\S]*?\}\s*\]/);
     if(jsonMatch){
       var suggestions;try{suggestions=JSON.parse(jsonMatch[0]);}catch(_jp){var m2=text.match(/\{[\s\S]*?"name"[\s\S]*?\}/g);if(m2)suggestions=m2.map(function(s){try{return JSON.parse(s);}catch(_e){return null;}}).filter(Boolean);}
       if(!suggestions||!suggestions.length){addMsg('ai','⚠ AI 응답 파싱 실패');return;}
@@ -3265,6 +3269,7 @@ var _evoPlusSnapshot={bestFitness:0,bestWr:0,techs:0};
 function toggleEvoPlus(){
   if(_evoPlus.running){
     _evoPlus.running=false;
+    _evoPlusLoopBusy=false;
     if(_evoPlusAutoTimer){clearTimeout(_evoPlusAutoTimer);_evoPlusAutoTimer=null;}
     var btn=document.getElementById('evoPlusBtn');
     if(btn){btn.innerHTML='🧬+ 추가진화';btn.style.animation='';}
@@ -3293,9 +3298,12 @@ function toggleEvoPlus(){
     _runEvoPlusLoop();
   }
 }
+var _evoPlusLoopBusy=false;
 async function _runEvoPlusLoop(){
-  if(!_evoPlus.running)return;
-  await runEvoPlusRound();
+  if(!_evoPlus.running||_evoPlusLoopBusy)return;
+  _evoPlusLoopBusy=true;
+  try{await runEvoPlusRound();}catch(_e){console.warn('evoPlus round error:',_e);}
+  _evoPlusLoopBusy=false;
   if(!_evoPlus.running)return;
   _evoPlusAutoTimer=setTimeout(_runEvoPlusLoop,300);
 }
@@ -3327,7 +3335,7 @@ function renderEvoPlusPanel(){
           '<span style="min-width:28px;text-align:right;">'+wr+'%</span>'+
           '<span style="min-width:24px;text-align:right;color:var(--tm);">'+(g.wins+g.losses)+'건</span>';
         if(g.fitness>=40&&wr>=45){
-          html+='<button onclick="(function(){var f=_evoPlus.pool.find(function(x){return x.id===\''+g.id+'\'});if(f)registerEvolvedTechnique(f);})()" style="font-size:8px;padding:1px 4px;border:1px solid var(--g);color:var(--g);background:none;border-radius:3px;cursor:pointer;">등록</button>';
+          html+='<button data-gid="'+g.id.replace(/"/g,'&quot;')+'" onclick="var f=_evoPlus.pool.find(function(x){return x.id===this.dataset.gid}.bind(this));if(f)registerEvolvedTechnique(f);" style="font-size:8px;padding:1px 4px;border:1px solid var(--g);color:var(--g);background:none;border-radius:3px;cursor:pointer;">등록</button>';
         }
         html+='</div>';
       });
@@ -3342,32 +3350,32 @@ function renderEvoPlusPanel(){
     else{
       var html='';
       evolved.forEach(function(k){
-        var t=TECHNIQUES[k];var wr=t.winRate||0;
+        var t=TECHNIQUES[k];var sc=t.score||0;
+        var scCol=sc>=70?'var(--g)':sc>=50?'var(--b)':sc>=30?'var(--a)':'var(--r)';
         html+='<div style="font-size:9px;padding:2px 0;border-bottom:1px solid var(--br);display:flex;gap:4px;align-items:center;">'+
           '<span style="font-weight:700;color:var(--g);">✓</span>'+
           '<span style="font-weight:600;">'+k+'</span>'+
           '<span style="flex:1;color:var(--ts);font-size:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+t.cond+'</span>'+
-          '<span style="font-family:var(--mono);">'+wr+'%</span>'+
+          '<span style="font-family:var(--mono);font-weight:700;color:'+scCol+';">'+sc+'점</span>'+
         '</div>';
       });
       hallEl.innerHTML=html;
     }
   }
-  // 성능 변화 표시
-  if(_evoPlusSnapshot.deltaFit!==undefined){
-    var perf=document.getElementById('evoPlusHall');
-    if(perf&&_evoPlusSnapshot.afterFitness!==undefined){
-      var dF=_evoPlusSnapshot.deltaFit;var dW=_evoPlusSnapshot.deltaWr;var dT=_evoPlusSnapshot.deltaTech;
-      var dFc=dF>0?'var(--g)':dF<0?'var(--r)':'var(--tm)';
-      var dWc=dW>0?'var(--g)':dW<0?'var(--r)':'var(--tm)';
-      perf.innerHTML+=
-        '<div style="margin-top:6px;padding-top:5px;border-top:1px dashed var(--br);font-size:9px;">'+
-        '<div style="font-weight:700;color:var(--p);margin-bottom:2px;">📈 추가진화 성능 변화</div>'+
-        '<div>적합도: <b style="color:'+dFc+';">'+_evoPlusSnapshot.bestFitness.toFixed(0)+' → '+_evoPlusSnapshot.afterFitness.toFixed(0)+' ('+(dF>=0?'+':'')+dF.toFixed(0)+')</b></div>'+
-        '<div>승률: <b style="color:'+dWc+';">'+_evoPlusSnapshot.bestWr+'% → '+_evoPlusSnapshot.afterWr+'% ('+(dW>=0?'+':'')+dW+'%p)</b></div>'+
-        '<div>신규기법: <b>'+(dT>=0?'+':'')+dT+'개</b></div>'+
-        '</div>';
-    }
+  // 성능 변화 표시 (별도 요소에 — 중복 방지)
+  var perfDeltaEl=document.getElementById('evoPlusLog');
+  if(perfDeltaEl&&_evoPlusSnapshot.deltaFit!==undefined&&_evoPlusSnapshot.afterFitness!==undefined&&!_evoPlus.running){
+    var dF=_evoPlusSnapshot.deltaFit;var dW=_evoPlusSnapshot.deltaWr;var dT=_evoPlusSnapshot.deltaTech;
+    var dFc=dF>0?'var(--g)':dF<0?'var(--r)':'var(--tm)';
+    var dWc=dW>0?'var(--g)':dW<0?'var(--r)':'var(--tm)';
+    var deltaHtml=
+      '<div style="margin-bottom:6px;padding-bottom:5px;border-bottom:1px dashed var(--br);">'+
+      '<div style="font-weight:700;color:var(--p);margin-bottom:2px;">📈 성능 변화</div>'+
+      '<div>적합도: <b style="color:'+dFc+';">'+_evoPlusSnapshot.bestFitness.toFixed(0)+' → '+_evoPlusSnapshot.afterFitness.toFixed(0)+' ('+(dF>=0?'+':'')+dF.toFixed(0)+')</b></div>'+
+      '<div>승률: <b style="color:'+dWc+';">'+_evoPlusSnapshot.bestWr+'% → '+_evoPlusSnapshot.afterWr+'% ('+(dW>=0?'+':'')+dW+'%p)</b></div>'+
+      '<div>신규기법: <b>'+(dT>=0?'+':'')+dT+'개</b></div>'+
+      '</div>';
+    perfDeltaEl.insertAdjacentHTML('afterbegin',deltaHtml);
   }
   // 진화 로그
   var logEl=document.getElementById('evoPlusLog');
@@ -4756,7 +4764,7 @@ function _backtestReport(){
       var evolveMsg='\n🧬 진화 엔진 업데이트:\n';
       Object.keys(pp.byTech).forEach(function(k){
         var t=pp.byTech[k];if(t.count<2)return;
-        evolveMsg+=`  ${k}: ${t.grade}등급 승률${t.winRate}% R/R${t.rr}\n`;
+        evolveMsg+=`  ${k}: ${t.grade}등급 ${t.score}점 승률${t.winRate}% R/R${t.rr}\n`;
       });
       evolveMsg+=`  적응형→ 손절${_adaptiveCfg.stop}% 비중${_adaptiveCfg.pos}% 최소R/R${_adaptiveCfg.rr}`;
       msg+=evolveMsg;
@@ -10927,7 +10935,7 @@ function collectMarketCtx(){
 (function(){
   const meta = document.querySelector('meta[name="build-ts"]');
   const myBuildTs = meta ? meta.getAttribute('content') : '';
-  if(!myBuildTs || myBuildTs === '1779631648369') return; // 로컬 빌드 안 한 경우
+  if(!myBuildTs || myBuildTs === '1779632559163') return; // 로컬 빌드 안 한 경우
   let reloaded = false;
   async function check(){
     if(reloaded) return;
