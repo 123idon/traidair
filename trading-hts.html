@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#ffffff">
-<meta name="build-ts" content="1779616653741">
+<meta name="build-ts" content="1779616953110">
 <title>TraidAIr HTS</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 
@@ -396,24 +396,91 @@ input,select,textarea{-webkit-appearance:none;appearance:none;}
 }
 /* 768px 이상은 데스크탑/태블릿 4컬럼 그리드 사용 */
 @media(min-width:768px) and (max-width:1023px){
-  /* 태블릿: 데스크탑과 동일한 4컬럼 그리드 (폭만 축소) */
-  .hts{grid-template-columns:140px 1fr 160px 200px;grid-template-rows:minmax(0,1fr) 82px 64px;}
-  .lp{grid-column:1;grid-row:1/4;position:static;transform:none;width:auto;box-shadow:none;z-index:auto;overflow-y:auto;}
-  .rp{grid-column:3;grid-row:1/4;position:static;transform:none;width:auto;box-shadow:none;z-index:auto;overflow-y:auto;}
-  .brp{grid-column:4;grid-row:1/4;position:static;transform:none;width:auto;box-shadow:none;z-index:auto;overflow-y:auto;}
+  /* 태블릿: 데스크탑 4컬럼 그리드, 좁은 화면에 맞게 축소 */
+  .hts{grid-template-columns:120px 1fr 140px 170px;grid-template-rows:minmax(0,1fr) 72px 54px;}
+  .lp{grid-column:1;grid-row:1/4;position:static;transform:none;width:auto;box-shadow:none;z-index:auto;overflow-y:auto;overflow-x:hidden;}
+  .rp{grid-column:3;grid-row:1/4;position:static;transform:none;width:auto;box-shadow:none;z-index:auto;overflow-y:auto;overflow-x:hidden;}
+  .brp{grid-column:4;grid-row:1/4;position:static;transform:none;width:auto;box-shadow:none;z-index:auto;overflow-y:auto;overflow-x:hidden;}
   .mob-overlay{display:none !important;}
   .tab-quick-lp,.tab-quick-rp{display:none !important;}
-  .ibtn{font-size:10px;padding:3px 7px;}
-  .clk{display:none;}
-  #idxBar{gap:4px;font-size:9px;padding:0 6px;}
-  .mock-bar{flex-wrap:wrap;row-gap:3px;}
-  .spd-btn{padding:3px 5px;font-size:9px;}
-  .spd-wrap{flex-wrap:wrap;}
-  .spd-btn:nth-child(n+5){display:inline-flex !important;}
-  .chart-hdr{padding:5px 10px;gap:8px;}
-  .chart-hdr-nm{font-size:15px;}
-  .chart-hdr-pr{font-size:14px;}
+  .mob-tabbar{display:none !important;}
+  /* 상단바 */
+  .bar{gap:3px;padding:0 6px;height:38px;}
+  .logo{font-size:12px;}
+  .tab{padding:2px 7px;font-size:10px;}
+  .tabs{padding:2px;}
+  .ibtn{font-size:9px;padding:2px 5px;}
+  .srch-box{height:26px;width:120px;padding:0 6px;}
+  .srch-box input{font-size:10px;}
   .si{display:none;}
+  .clk{display:none;}
+  .badge{font-size:9px;padding:1px 5px;}
+  #idxBar{gap:3px;font-size:8px;padding:0 4px;}
+  .bar-r{gap:3px;}
+  /* 차트 영역 — 최대 높이 제한 해제 */
+  .cp{max-height:none;}
+  .chart-hdr{padding:4px 8px;gap:5px;}
+  .chart-hdr-nm{font-size:13px;}
+  .chart-hdr-tk{font-size:9px;}
+  .chart-hdr-pr{font-size:12px;}
+  .chart-hdr-ch{font-size:10px;}
+  .chart-hdr-l{gap:5px;}
+  .chart-hdr-r{gap:5px;}
+  .cinfo{font-size:8px;}
+  .tf-btn,.ind-btn{padding:2px 5px;font-size:8px;}
+  .cp-head{padding:4px 6px;gap:3px;row-gap:2px;}
+  /* 시뮬 바 */
+  .mock-bar{flex-wrap:wrap;row-gap:2px;padding:4px 6px;gap:4px;}
+  .dp label{font-size:8px;}
+  .dp input{font-size:9px;padding:3px 6px;width:90px;}
+  .play-btn{width:26px;height:26px;font-size:10px;}
+  .spd-btn{padding:2px 4px;font-size:8px;}
+  .spd-wrap{flex-wrap:wrap;gap:2px;}
+  .spd-l{font-size:8px;}
+  .spd-btn:nth-child(n+5){display:inline-flex !important;}
+  .ms{padding:1px 4px;}
+  .ms-l{font-size:7px;}
+  .ms-v{font-size:9px;}
+  .mst{gap:5px;}
+  /* 관심종목(좌측 패널) */
+  .lpt{font-size:9px;padding:6px 1px;}
+  .wg-tab{font-size:8px;padding:4px 1px;}
+  .wli{padding:4px 6px;gap:4px;}
+  .wl-tk{font-size:9px;width:30px;}
+  .wl-nm{font-size:9px;}
+  .wl-ch{font-size:8px;min-width:28px;}
+  .fi{padding:5px 6px;margin-bottom:3px;}
+  .fi-t{font-size:8px;}
+  .sec{padding:5px 6px;}
+  .sec-t{font-size:8px;}
+  /* 호가창(중앙 우측) */
+  .rpt{font-size:9px;padding:6px 1px;}
+  .ob-p{font-size:9px;width:48px;}
+  .ob-q{font-size:9px;}
+  .ob-cur-p{font-size:13px;}
+  .ob-cur-i{font-size:8px;}
+  .ob-r{padding:2px 5px;}
+  /* 주문/분석(우측 패널) */
+  .brpt{font-size:9px;padding:5px 1px;}
+  .cash-row{padding:5px 7px;}
+  .cash-lbl{font-size:8px;}
+  .cash-val{font-size:10px;}
+  .of{padding:5px;}
+  .of-t{font-size:10px;padding:5px;}
+  .of-l{font-size:8px;}
+  .of-i{font-size:10px;padding:4px 6px;width:90px;}
+  .of-sum{font-size:8px;}
+  .of-area{padding:4px 5px;}
+  .of-area-t{font-size:8px;}
+  .sub-btn{font-size:11px;padding:7px;}
+  .sub-btn.buy,.sub-btn.sell{font-size:11px;padding:7px;border-radius:8px;}
+  .pct-b{font-size:8px;padding:3px;}
+  .pi{padding:6px 7px;margin:3px 5px 0;}
+  .pi-tk{font-size:9px;}
+  .pi-pnl{font-size:10px;}
+  .pi-s{font-size:9px;}
+  .chart-card{margin-bottom:6px;}
+  .chart-card-t{font-size:10px;}
 }
 /* ── 모바일 / 폴드 접힘 (≤767px) ── */
 @media(max-width:767px){
@@ -9700,7 +9767,7 @@ function collectMarketCtx(){
 (function(){
   const meta = document.querySelector('meta[name="build-ts"]');
   const myBuildTs = meta ? meta.getAttribute('content') : '';
-  if(!myBuildTs || myBuildTs === '1779616653741') return; // 로컬 빌드 안 한 경우
+  if(!myBuildTs || myBuildTs === '1779616953110') return; // 로컬 빌드 안 한 경우
   let reloaded = false;
   async function check(){
     if(reloaded) return;
