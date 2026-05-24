@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#ffffff">
-<meta name="build-ts" content="1779617231200">
+<meta name="build-ts" content="1779619577609">
 <title>TraidAIr HTS</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 
@@ -3473,17 +3473,15 @@ function appendLesson(date, ai){
     !learningMemory.some(m => m.date===item.date && m.text===item.text)
   );
   if(!newItems.length) return;
-  // 유사 텍스트 자동 중복 제거 (70% 이상 겹치면 최신 것만 유지)
+  // 완전 동일 텍스트 중복만 제거 (유사도 제거 삭제)
   newItems.forEach(ni => {
     const dupeIdx = learningMemory.findIndex(m =>
-      m.category === ni.category && _textSimilarity(m.text, ni.text) > 0.7
+      m.category === ni.category && m.text.trim() === ni.text.trim()
     );
     if(dupeIdx >= 0) learningMemory.splice(dupeIdx, 1);
   });
   learningMemory.push(...newItems);
-  if(learningMemory.length > 80) learningMemory = learningMemory.slice(-80);
-  // 40개 넘으면 자동 정리 (일반적 조언 제거)
-  if(learningMemory.length > 40) _autoTrimLearning();
+  if(learningMemory.length > 200) learningMemory = learningMemory.slice(-200);
   window.learningMemory = learningMemory;
   if(!learnedDates.includes(date)){
     learnedDates.push(date);
@@ -3541,12 +3539,10 @@ function _addLearningReply(stockNm, pnl, tk){
   }catch(_e){}
 }
 function _autoTrimLearning(){
-  const vague = ['전략 유지','유지','정상','양호','인내심 유지','시그널 재점검','관찰','확인','점검'];
   learningMemory = learningMemory.filter(m => {
     const t = (m.text||'').trim();
-    if(t.length < 5) return false;
-    if(vague.includes(t)) return false;
-    if(t === '-' || t === '없음') return false;
+    if(t.length < 3) return false;
+    if(t === '-' || t === '없음' || t === '정상') return false;
     return true;
   });
 }
@@ -5278,14 +5274,13 @@ async function cleanupLearning(){
   addMsg('ai','🔄 AI 학습 정리 시작... ('+learningMemory.length+'개 분석 중)');
   var _backup = JSON.parse(JSON.stringify(learningMemory));
   try{
-    var prompt='너는 트레이딩 멘토. 아래 학습 노트를 정리해서 **최종 버전**을 만들어줘.\n\n'+
+    var prompt='너는 트레이딩 멘토. 아래 학습 노트에서 **중복된 내용만** 병합 정리해줘.\n\n'+
       '정리 원칙:\n'+
-      '- 같은 교훈이 여러 번 반복되면 가장 구체적인 1개로 병합\n'+
-      '- 마크다운 헤더(##, #)만 있는 줄은 삭제\n'+
-      '- "전략 유지", "정상", "양호" 같은 의미없는 조언은 삭제\n'+
-      '- 구체적 실수, 손절 기준, 멘토 조언 등 중요한 건 반드시 유지\n'+
-      '- 비슷한 내용은 하나로 합쳐서 더 강력하게 표현\n'+
-      '- 최소 5개 이상 남길 것\n\n'+
+      '- 완전히 같은 뜻의 내용이 2개 이상이면 → 가장 구체적인 1개로 병합\n'+
+      '- 중복이 아닌 항목은 원문 그대로 유지 (절대 삭제 금지)\n'+
+      '- 마크다운 헤더(##, #)만 있는 줄 → 삭제 가능\n'+
+      '- 내용이 있는 항목은 비슷해 보여도 유지 (각각 다른 상황의 교훈일 수 있음)\n'+
+      '- 원본 개수의 70% 이상을 반드시 유지할 것\n\n'+
       '현재 노트 ('+learningMemory.length+'개):\n'+
       learningMemory.map(function(l,i){return '- ['+l.category+'] '+l.text;}).join('\n')+
       '\n\nJSON만: {"notes":[{"category":"반성|개선|멘토|심리","text":"정리된 내용"},...], "summary":"뭘 했는지 한줄"}';
@@ -9787,7 +9782,7 @@ function collectMarketCtx(){
 (function(){
   const meta = document.querySelector('meta[name="build-ts"]');
   const myBuildTs = meta ? meta.getAttribute('content') : '';
-  if(!myBuildTs || myBuildTs === '1779617231200') return; // 로컬 빌드 안 한 경우
+  if(!myBuildTs || myBuildTs === '1779619577609') return; // 로컬 빌드 안 한 경우
   let reloaded = false;
   async function check(){
     if(reloaded) return;
