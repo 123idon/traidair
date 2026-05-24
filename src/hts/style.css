@@ -378,58 +378,26 @@ input,select,textarea{-webkit-appearance:none;appearance:none;}
   .hts{grid-template-columns:0 1fr 0 0;grid-template-rows:1fr;}
   .bar{gap:2px;padding:0 4px;height:40px;}
 }
-@media(max-width:1023px){
-  /* 그리드: 호가창(.rp) 숨기고 3컬럼 — 차트 영역에 minmax로 최소 폭/높이 보장 */
-  .hts{grid-template-columns:0 minmax(33vw,1fr) 0 200px;grid-template-rows:minmax(50vh,1fr) auto auto;}
-  /* 관심목록 슬라이드 패널로 전환 */
-  .lp{
-    position:fixed;z-index:300;
-    top:0;bottom:0;
-    left:0;width:min(75vw,240px);
-    background:var(--pan);box-shadow:var(--sh2);
-    transform:translateX(-100%);
-    transition:transform .25s cubic-bezier(.4,0,.2,1);
-    will-change:transform;
-    overflow-y:auto;
-  }
-  .lp.mob-open{transform:translateX(0);}
-  /* 호가창 슬라이드 패널로 전환 */
-  .rp{
-    position:fixed;z-index:300;
-    top:0;bottom:0;
-    right:0;width:min(75vw,220px);
-    background:var(--pan);box-shadow:var(--sh2);
-    transform:translateX(100%);
-    transition:transform .25s cubic-bezier(.4,0,.2,1);
-    will-change:transform;
-    overflow-y:auto;
-  }
-  .rp.mob-open{transform:translateX(0);}
-  /* 오버레이 */
-  .mob-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:299;}
-  .mob-overlay.on{display:block;}
-  /* 차트 헤더 가로스크롤 */
-  .cp-head{overflow-x:auto;overflow-y:hidden;flex-wrap:nowrap;-webkit-overflow-scrolling:touch;}
-  .cp-head::-webkit-scrollbar{display:none;}
-  /* 상단바 압축 */
-  .bar{gap:3px;padding:0 8px;}
-  .si{display:none;}
-}
-/* ── 태블릿 전용 퀵 접근 버튼 ── */
+/* 768px 이상은 데스크탑/태블릿 4컬럼 그리드 사용 */
 @media(min-width:768px) and (max-width:1023px){
-  .tab-quick-lp,.tab-quick-rp{display:flex !important;}
-  /* 폴드 펼침은 보통 884~960px — 상단바 컴팩트 + 시뮬바 wrap */
+  /* 태블릿: 데스크탑과 동일한 4컬럼 그리드 (폭만 축소) */
+  .hts{grid-template-columns:140px 1fr 160px 200px;grid-template-rows:minmax(0,1fr) 82px 64px;}
+  .lp{grid-column:1;grid-row:1/4;position:static;transform:none;width:auto;box-shadow:none;z-index:auto;overflow-y:auto;}
+  .rp{grid-column:3;grid-row:1/4;position:static;transform:none;width:auto;box-shadow:none;z-index:auto;overflow-y:auto;}
+  .brp{grid-column:4;grid-row:1/4;position:static;transform:none;width:auto;box-shadow:none;z-index:auto;overflow-y:auto;}
+  .mob-overlay{display:none !important;}
+  .tab-quick-lp,.tab-quick-rp{display:none !important;}
   .ibtn{font-size:10px;padding:3px 7px;}
   .clk{display:none;}
   #idxBar{gap:4px;font-size:9px;padding:0 6px;}
   .mock-bar{flex-wrap:wrap;row-gap:3px;}
   .spd-btn{padding:3px 5px;font-size:9px;}
   .spd-wrap{flex-wrap:wrap;}
-  /* nth-child 숨김 규칙 제거 (768~1023px에서는 모든 배속 버튼 보이도록) */
   .spd-btn:nth-child(n+5){display:inline-flex !important;}
   .chart-hdr{padding:5px 10px;gap:8px;}
   .chart-hdr-nm{font-size:15px;}
   .chart-hdr-pr{font-size:14px;}
+  .si{display:none;}
 }
 /* ── 모바일 / 폴드 접힘 (≤767px) ── */
 @media(max-width:767px){
