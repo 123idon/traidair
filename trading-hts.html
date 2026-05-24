@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#ffffff">
-<meta name="build-ts" content="1779619925556">
+<meta name="build-ts" content="1779620236264">
 <title>TraidAIr HTS</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 
@@ -580,6 +580,7 @@ canvas{image-rendering:pixelated;}
     <button class="tab on" id="tab-hts" onclick="goPage('hts',this)">📈 HTS</button>
     <button class="tab" id="tab-stats" onclick="goPage('stats',this)">📉 통계</button>
     <button class="tab" id="tab-journal" onclick="goPage('journal',this)">📓 일지</button>
+    <button class="tab" id="tab-features" onclick="goPage('features',this)">📋 기능</button>
   </div>
   <div class="srch-wrap">
     <div class="srch-box">
@@ -1613,6 +1614,152 @@ canvas{image-rendering:pixelated;}
       </div>
     </div>
 
+  </div>
+</div>
+
+<!-- ── 기능 목록 페이지 ── -->
+<div class="page" id="page-features">
+  <div class="stats-page" style="max-width:960px;">
+    <h2 style="font-size:18px;font-weight:800;margin-bottom:16px;">📋 TraidAIr 전체 기능 목록</h2>
+    <p style="font-size:11px;color:var(--ts);margin-bottom:20px;">작동 안 하는 기능이나 추가하고 싶은 기능을 체크해보세요. 총 180개+ 기능.</p>
+
+    <div id="featList" style="display:flex;flex-direction:column;gap:16px;">
+
+      <div class="chart-card"><div class="chart-card-t">📊 차트</div>
+        <div style="padding:8px;font-size:10px;line-height:2;color:var(--ts);">
+          <b>타임프레임</b> 1분/3분/5분/15분/1시간/일봉/1년/2년/3년 ·
+          <b>이동평균선</b> 5/20/60 MA 토글 ·
+          <b>거래량</b> 하단 바 차트 ·
+          <b>RSI</b> 14기간 서브차트 ·
+          <b>MACD</b> 12/26/9 서브차트 ·
+          <b>볼린저밴드</b> 20/2σ ·
+          <b>VWAP</b> 거래량가중평균가격 ·
+          <b>봉 개수</b> 30/60/100/200 선택 ·
+          <b>줌인/줌아웃/리셋</b> ·
+          <b>매매 체결 화살표</b> 매수(▲초록)/매도(▼빨강)
+        </div>
+      </div>
+
+      <div class="chart-card"><div class="chart-card-t">💰 매매</div>
+        <div style="padding:8px;font-size:10px;line-height:2;color:var(--ts);">
+          <b>매수/매도</b> 탭 전환 ·
+          <b>지정가/시장가</b> 주문 유형 ·
+          <b>현금/신용/미수</b> 거래방식 ·
+          <b>비중 계산</b> 10%/25%/50%/전량 ·
+          <b>손절가</b> 자동 -3% 또는 수동 ·
+          <b>트레일링 스탑</b> %방식/5MA ·
+          <b>분할 익절</b> 1차(50%)+2차(30%) ·
+          <b>R/R 비율</b> 자동 계산 ·
+          <b>수수료/세금</b> 포함 실질 손익 ·
+          <b>빠른 청산</b> 50%/전량 ·
+          <b>가격 알림</b> 특정가 이상/이하 ·
+          <b>호가창</b> 매수/매도 클릭 시 표시
+        </div>
+      </div>
+
+      <div class="chart-card"><div class="chart-card-t">🤖 자동매매</div>
+        <div style="padding:8px;font-size:10px;line-height:2;color:var(--ts);">
+          <b>Lv0</b> 완전수동 ·
+          <b>Lv1</b> AI 종목 추천 ·
+          <b>Lv2</b> 진입 신호 제시 ·
+          <b>Lv3</b> Claude 검토 후 자동 매수 ·
+          <b>Lv4</b> 완전자동 + 15:20 마감 청산 ·
+          <b>스크리닝</b> 종목풀 자동 검색 ·
+          <b>AI 매수 판단</b> Phase 8 체크리스트 기반 ·
+          <b>연속손절 중단</b> 3회 시 자동 정지 ·
+          <b>워밍업 게이트</b> 장 시작 20봉 대기
+        </div>
+      </div>
+
+      <div class="chart-card"><div class="chart-card-t">⏱ 백테스트</div>
+        <div style="padding:8px;font-size:10px;line-height:2;color:var(--ts);">
+          <b>날짜 범위</b> 시작/종료 설정 ·
+          <b>배속</b> x1~x1500 (x250 AI유지 최대) ·
+          <b>재생/일시정지</b> ·
+          <b>날짜 이동</b> ◀▶ ·
+          <b>진행률 표시</b> 바 + 퍼센트 ·
+          <b>당일/누적 손익</b> 실시간 ·
+          <b>백테스트 리포트</b> 기간별 통계 ·
+          <b>진단</b> 오류 자동 점검
+        </div>
+      </div>
+
+      <div class="chart-card"><div class="chart-card-t">🎓 학습</div>
+        <div style="padding:8px;font-size:10px;line-height:2;color:var(--ts);">
+          <b>학습 노트</b> 매매일지에서 교훈 자동 추출 ·
+          <b>학습자 레벨</b> Lv1(초보)~Lv4(전문가) ·
+          <b>AI 프롬프트 자동 첨부</b> 다음 매매에 반영 ·
+          <b>적용 결과 댓글</b> 매매 후 성공/실패 자동 기록 ·
+          <b>실패 교훈 분류</b> 성공률 50%↓ 자동 분리 ·
+          <b>빠른 정리</b> 무의미 항목 삭제 ·
+          <b>AI 정리</b> 중복만 병합 ·
+          <b>백업/복원</b> 정리 전 자동 백업 ·
+          <b>일지에서 복구</b> 일지 기반 재생성 ·
+          <b>노션 강의 동기화</b> 외부 강의 자동 로드
+        </div>
+      </div>
+
+      <div class="chart-card"><div class="chart-card-t">🔍 분석</div>
+        <div style="padding:8px;font-size:10px;line-height:2;color:var(--ts);">
+          <b>강세 섹터</b> 실시간 순위 ·
+          <b>DART 공시</b> 종목별 자동 조회 ·
+          <b>시장 뉴스</b> 경제 뉴스 ·
+          <b>재료 강도 분석</b> S/A/B/C 판정 ·
+          <b>AI 종합분석</b> 기술적+심리 분석 ·
+          <b>매매기법 감지</b> 눌림목/돌파/첫봉/갭상승 ·
+          <b>진입·청산 타점</b> 정확한 가격 제시 ·
+          <b>Phase 8 체크리스트</b> 진입 전 20항목 ·
+          <b>AI 패턴 분석</b> 수익/손실 공통점 추출 ·
+          <b>나만의 셋업 추출</b> 개인 성공 패턴
+        </div>
+      </div>
+
+      <div class="chart-card"><div class="chart-card-t">🛡 리스크 관리</div>
+        <div style="padding:8px;font-size:10px;line-height:2;color:var(--ts);">
+          <b>손절 자동실행</b> -3% 도달 시 시장가 ·
+          <b>트레일링 스탑</b> -2%/-3%/-5%/5MA ·
+          <b>분할 익절</b> 1차50%+2차30% ·
+          <b>일일 손실 한도</b> 초과 시 매매 중단 ·
+          <b>비중 한도</b> 종목당 최대% ·
+          <b>신용/미수 한도</b> 자동 추적 ·
+          <b>연속손절 감지</b> 3회 시 정지 ·
+          <b>과잉확신 경고</b> 5연승 시 주의 ·
+          <b>뇌동매매 감지</b> FOMO/복수매매/추격 ·
+          <b>가격 이상 차단</b> 기준가 50%+ 차이 시 매수 금지
+        </div>
+      </div>
+
+      <div class="chart-card"><div class="chart-card-t">⚙ 설정</div>
+        <div style="padding:8px;font-size:10px;line-height:2;color:var(--ts);">
+          <b>KIS API</b> 증권사 연동 (실거래/모의) ·
+          <b>DART API</b> 공시 조회 ·
+          <b>노션 토큰</b> 강의 동기화 ·
+          <b>수수료/세금</b> 매수·매도 각각 ·
+          <b>신용/미수 이자율</b> ·
+          <b>시작 자본금</b> ·
+          <b>손절/익절 기본값</b> ·
+          <b>일일 손실 한도</b>
+        </div>
+      </div>
+
+      <div class="chart-card"><div class="chart-card-t">🖥 UI/기타</div>
+        <div style="padding:8px;font-size:10px;line-height:2;color:var(--ts);">
+          <b>대시보드/HTS/통계/일지/기능</b> 탭 ·
+          <b>종목 검색</b> 이름/코드 ·
+          <b>관심종목 그룹</b> 5개 탭 ·
+          <b>호가창/체결창</b> ·
+          <b>보유/거래/미체결</b> 패널 ·
+          <b>AI 실시간 조언</b> 채팅 ·
+          <b>매매 타임라인</b> 진입→청산 ·
+          <b>누적 손익 곡선</b> ·
+          <b>API 사용량 추적</b> ·
+          <b>상태 진단</b> 앱 헬스체크 ·
+          <b>태블릿 최적화</b> 768px+ 4컬럼 ·
+          <b>모바일 대응</b> 슬라이드 패널
+        </div>
+      </div>
+
+    </div>
   </div>
 </div>
 
@@ -9799,7 +9946,7 @@ function collectMarketCtx(){
 (function(){
   const meta = document.querySelector('meta[name="build-ts"]');
   const myBuildTs = meta ? meta.getAttribute('content') : '';
-  if(!myBuildTs || myBuildTs === '1779619925556') return; // 로컬 빌드 안 한 경우
+  if(!myBuildTs || myBuildTs === '1779620236264') return; // 로컬 빌드 안 한 경우
   let reloaded = false;
   async function check(){
     if(reloaded) return;
