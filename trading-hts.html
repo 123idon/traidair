@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#ffffff">
-<meta name="build-ts" content="1779627498429">
+<meta name="build-ts" content="1779628242586">
 <title>TraidAIr HTS</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 
@@ -894,6 +894,36 @@ canvas{image-rendering:pixelated;}
           <div id="evolveLog" style="font-size:9px;color:var(--ts);max-height:80px;overflow-y:auto;line-height:1.5;"></div>
         </div>
       </div>
+      <!-- 추가진화 패널 -->
+      <div id="evoPlusPanel" style="display:none;padding:10px 14px;background:linear-gradient(135deg,rgba(5,192,114,0.05),rgba(49,130,246,0.03));border-bottom:1px solid rgba(5,192,114,.15);flex-shrink:0;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="font-size:14px;">🧬+</span>
+            <span style="font-size:12px;font-weight:800;color:var(--g);">추가진화</span>
+            <span id="evoPlusStatus" style="font-size:9px;padding:1px 6px;border-radius:3px;background:var(--bg);color:var(--tm);">대기</span>
+          </div>
+          <div style="display:flex;gap:4px;">
+            <button onclick="resetEvoPlus()" style="font-size:9px;padding:2px 6px;border-radius:4px;border:1px solid var(--br);background:var(--bg);color:var(--r);cursor:pointer;">초기화</button>
+            <button onclick="document.getElementById('evoPlusPanel').style.display='none'" style="background:none;border:none;color:var(--tm);font-size:14px;cursor:pointer;">&times;</button>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <!-- 상위 전략 -->
+          <div style="background:var(--pan);border-radius:8px;padding:8px 10px;border-left:3px solid var(--g);">
+            <div style="font-size:10px;font-weight:700;color:var(--g);margin-bottom:6px;">🏆 상위 전략 (적합도순)</div>
+            <div id="evoPlusTop" style="max-height:120px;overflow-y:auto;"></div>
+          </div>
+          <!-- 등록된 기법 -->
+          <div style="background:var(--pan);border-radius:8px;padding:8px 10px;border-left:3px solid var(--p);">
+            <div style="font-size:10px;font-weight:700;color:var(--p);margin-bottom:6px;">📋 등록된 진화기법</div>
+            <div id="evoPlusHall" style="max-height:120px;overflow-y:auto;"></div>
+          </div>
+        </div>
+        <div style="margin-top:8px;background:var(--pan);border-radius:8px;padding:8px 10px;">
+          <div style="font-size:10px;font-weight:700;color:var(--ts);margin-bottom:4px;">🔄 진화 로그</div>
+          <div id="evoPlusLog" style="font-size:9px;color:var(--ts);max-height:60px;overflow-y:auto;line-height:1.5;"></div>
+        </div>
+      </div>
       <!-- 실시간 거래 스트립 (최근 매매 6건, 자동 갱신) -->
       <div id="liveTradesStrip" style="display:none;padding:4px 10px;background:var(--bg);border-bottom:1px solid var(--br);flex-shrink:0;overflow-x:auto;white-space:nowrap;font-family:var(--mono);font-size:9px;line-height:1.4;-webkit-overflow-scrolling:touch;"></div>
       <div class="cp-head">
@@ -1019,6 +1049,7 @@ canvas{image-rendering:pixelated;}
       <button class="play-btn" id="playBtn" onclick="togPlay()" style="font-size:14px;line-height:1;">▶</button>
       <button class="ibtn pur" onclick="openBacktestDialog()" title="여러 영업일 연속 백테스트" style="font-size:10px;padding:3px 8px;">🚀 백테스트</button>
       <button class="ibtn" id="evolveBtn" onclick="toggleEvolve()" title="진화 엔진 — 원클릭 학습 시작/중지" style="font-size:10px;padding:3px 8px;background:linear-gradient(135deg,rgba(139,92,246,.15),rgba(49,130,246,.1));color:var(--p);border:1px solid rgba(139,92,246,.25);font-weight:700;">🧬 진화</button>
+      <button class="ibtn" id="evoPlusBtn" onclick="toggleEvoPlus()" title="추가진화 — 유전알고리즘+AI 신규 기법 발굴" style="font-size:10px;padding:3px 8px;background:linear-gradient(135deg,rgba(5,192,114,.12),rgba(49,130,246,.08));color:var(--g);border:1px solid rgba(5,192,114,.25);font-weight:700;">🧬+ 추가진화</button>
       <div class="spd-wrap">
         <span class="spd-l">배속</span>
         <button class="spd-btn" onclick="setSpd(this,1)">실시간</button>
@@ -2992,6 +3023,324 @@ function buildPerfSummary(){
   return lines.join('\n');
 }
 try{var _sp=localStorage.getItem('htsPerfProfile');if(_sp)_perfProfile=JSON.parse(_sp);computeAdaptiveConfig();}catch(_e){}
+
+// ═══════════════════════════════════════════════
+// 추가진화: 유전 알고리즘 + AI 하이브리드 기법 발굴
+// ═══════════════════════════════════════════════
+var _evoPlus={running:false,generation:0,pool:[],hall:[],log:[],bestFitness:0};
+try{var _ep=localStorage.getItem('htsEvoPlus');if(_ep){var _epd=JSON.parse(_ep);_evoPlus.pool=_epd.pool||[];_evoPlus.hall=_epd.hall||[];_evoPlus.generation=_epd.generation||0;_evoPlus.bestFitness=_epd.bestFitness||0;}}catch(_e){}
+function _saveEvoPlus(){try{localStorage.setItem('htsEvoPlus',JSON.stringify({pool:_evoPlus.pool,hall:_evoPlus.hall,generation:_evoPlus.generation,bestFitness:_evoPlus.bestFitness}));}catch(_e){}}
+function _randomGene(){
+  return{
+    id:'evo_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
+    name:'',generation:_evoPlus.generation+1,
+    maAlign:Math.random()<0.7?'short':Math.random()<0.5?'triple':'none',
+    volMin:1+(Math.random()*2.5),
+    rsiLow:25+Math.floor(Math.random()*25),
+    rsiHigh:55+Math.floor(Math.random()*20),
+    bodyRatio:0.3+Math.random()*0.4,
+    candleBull:Math.random()<0.7,
+    lowerWickMin:Math.random()<0.4?1.5:0,
+    useVwap:Math.random()<0.5,
+    useRisingLows:Math.random()<0.4,
+    usePrevBull:Math.random()<0.5,
+    useDivergence:Math.random()<0.3,
+    stopPct:2+Math.random()*2,
+    targetMult:1.5+Math.random()*1.5,
+    fitness:0,wins:0,losses:0,totalPnl:0,tested:0
+  };
+}
+function _crossover(a,b){
+  var child={};var keys=['maAlign','volMin','rsiLow','rsiHigh','bodyRatio','candleBull','lowerWickMin','useVwap','useRisingLows','usePrevBull','useDivergence','stopPct','targetMult'];
+  keys.forEach(function(k){child[k]=Math.random()<0.5?a[k]:b[k];});
+  child.id='evo_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
+  child.name='';child.generation=_evoPlus.generation+1;
+  child.fitness=0;child.wins=0;child.losses=0;child.totalPnl=0;child.tested=0;
+  return child;
+}
+function _mutate(gene){
+  var g=JSON.parse(JSON.stringify(gene));
+  var r=Math.random();
+  if(r<0.15){g.maAlign=['none','short','triple'][Math.floor(Math.random()*3)];}
+  else if(r<0.3){g.volMin=Math.max(0.8,g.volMin+(Math.random()-0.5)*1);}
+  else if(r<0.45){g.rsiLow=Math.max(15,Math.min(55,g.rsiLow+Math.floor((Math.random()-0.5)*10)));g.rsiHigh=Math.max(g.rsiLow+10,Math.min(80,g.rsiHigh+Math.floor((Math.random()-0.5)*10)));}
+  else if(r<0.55){g.bodyRatio=Math.max(0.1,Math.min(0.8,g.bodyRatio+(Math.random()-0.5)*0.2));}
+  else if(r<0.65){g.candleBull=!g.candleBull;}
+  else if(r<0.75){g.useVwap=!g.useVwap;g.useRisingLows=!g.useRisingLows;}
+  else if(r<0.85){g.stopPct=Math.max(1.5,Math.min(5,g.stopPct+(Math.random()-0.5)*1));}
+  else{g.targetMult=Math.max(1,Math.min(4,g.targetMult+(Math.random()-0.5)*0.5));}
+  g.id='evo_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
+  g.name='';g.generation=_evoPlus.generation+1;
+  g.fitness=0;g.wins=0;g.losses=0;g.totalPnl=0;g.tested=0;
+  return g;
+}
+function _testGeneOnCandles(gene,cs){
+  if(!cs||cs.length<20)return null;
+  var cls=cs.map(function(c){return c.c;}),vls=cs.map(function(c){return c.v;});
+  var ma5=calcMA(cls,5),ma20=calcMA(cls,20),ma60=calcMA(cls,60);
+  var rsiArr=calcRSI(cls,14);
+  var vwapArr=cs.length>=10?calcVWAP(cs):[];
+  var results={wins:0,losses:0,pnl:0};
+  for(var i=20;i<cs.length-5;i++){
+    var lc=cs[i],pc=cs[i-1],pc2=cs[i-2];
+    var lma5=ma5[i]||0,lma20=ma20[i]||0,lma60=ma60[i]||0;
+    var rsi=rsiArr[i]||50,prevRsi=rsiArr[i-1]||50;
+    var avg5v=0;for(var vi=i-5;vi<i;vi++)avg5v+=vls[vi]||0;avg5v/=5;
+    var volR=avg5v>0?vls[i]/avg5v:1;
+    var body=Math.abs(lc.c-lc.o),range=lc.h-lc.l||1;
+    var lowerW=Math.min(lc.c,lc.o)-lc.l;
+    if(gene.maAlign==='triple'&&!(lma5>lma20&&lma20>lma60))continue;
+    if(gene.maAlign==='short'&&!(lma5>lma20))continue;
+    if(volR<gene.volMin)continue;
+    if(rsi<gene.rsiLow||rsi>gene.rsiHigh)continue;
+    if(gene.candleBull&&lc.c<=lc.o)continue;
+    if(body/range<gene.bodyRatio)continue;
+    if(gene.lowerWickMin>0&&lowerW<body*gene.lowerWickMin)continue;
+    if(gene.useVwap&&vwapArr.length>i){if(lc.c<vwapArr[i]*0.998)continue;}
+    if(gene.useRisingLows&&i>=2){if(!(cs[i-2].l<cs[i-1].l&&cs[i-1].l<lc.l))continue;}
+    if(gene.usePrevBull&&pc.c<=pc.o)continue;
+    if(gene.useDivergence){if(!(cls[i]<cls[i-1]&&rsi>prevRsi+2))continue;}
+    var entryPr=lc.c;var stopPr=entryPr*(1-gene.stopPct/100);var targetPr=entryPr+((entryPr-stopPr)*gene.targetMult);
+    var hit=false,pnl=0;
+    for(var j=i+1;j<Math.min(i+10,cs.length);j++){
+      if(cs[j].l<=stopPr){pnl=stopPr-entryPr;hit=true;break;}
+      if(cs[j].h>=targetPr){pnl=targetPr-entryPr;hit=true;break;}
+    }
+    if(!hit)pnl=cs[Math.min(i+9,cs.length-1)].c-entryPr;
+    if(pnl>0)results.wins++;else results.losses++;
+    results.pnl+=pnl;
+  }
+  return results;
+}
+function _evalPool(){
+  var allTks=STOCKS.map(function(s){return s.tk;}).slice(0,10);
+  _evoPlus.pool.forEach(function(gene){
+    if(gene.tested)return;
+    var totalW=0,totalL=0,totalPnl=0;
+    allTks.forEach(function(tk){
+      var cs;try{cs=window.simCandles&&simCandles[tk]?simCandles[tk]:null;}catch(_e){}
+      if(!cs){try{cs=getCandles(200,tk);}catch(_e2){}}
+      if(!cs||cs.length<25)return;
+      var r=_testGeneOnCandles(gene,cs);
+      if(!r)return;
+      totalW+=r.wins;totalL+=r.losses;totalPnl+=r.pnl;
+    });
+    gene.wins=totalW;gene.losses=totalL;gene.totalPnl=totalPnl;gene.tested=1;
+    var total=totalW+totalL;
+    gene.fitness=total>=3?((totalW/total)*100*0.6+(totalPnl>0?Math.min(40,totalPnl/100):Math.max(-20,totalPnl/100))):0;
+  });
+}
+function _evolveGeneration(){
+  _evoPlus.generation++;
+  _evalPool();
+  _evoPlus.pool.sort(function(a,b){return b.fitness-a.fitness;});
+  var top=_evoPlus.pool.slice(0,6);
+  if(top.length&&top[0].fitness>_evoPlus.bestFitness)_evoPlus.bestFitness=top[0].fitness;
+  var newPool=top.slice();
+  for(var i=0;i<top.length-1&&newPool.length<12;i++){
+    newPool.push(_crossover(top[i],top[i+1]));
+  }
+  while(newPool.length<16){
+    if(top.length&&Math.random()<0.6){newPool.push(_mutate(top[Math.floor(Math.random()*top.length)]));}
+    else{newPool.push(_randomGene());}
+  }
+  _evoPlus.pool=newPool;
+  top.forEach(function(g){
+    if(g.fitness>=40&&!_evoPlus.hall.find(function(h){return h.id===g.id;})){
+      _evoPlus.hall.push(JSON.parse(JSON.stringify(g)));
+      if(_evoPlus.hall.length>10)_evoPlus.hall.shift();
+    }
+  });
+  _saveEvoPlus();
+  return top[0]||null;
+}
+function _geneToDesc(g){
+  var parts=[];
+  if(g.maAlign==='triple')parts.push('3중정배열');
+  else if(g.maAlign==='short')parts.push('단기정배열');
+  parts.push('거래량'+g.volMin.toFixed(1)+'배+');
+  parts.push('RSI'+g.rsiLow+'~'+g.rsiHigh);
+  if(g.candleBull)parts.push('양봉');
+  if(g.lowerWickMin>0)parts.push('아래꼬리');
+  if(g.useVwap)parts.push('VWAP지지');
+  if(g.useRisingLows)parts.push('저점상승');
+  if(g.usePrevBull)parts.push('전봉양봉');
+  if(g.useDivergence)parts.push('RSI다이버전스');
+  return parts.join('+');
+}
+function registerEvolvedTechnique(gene){
+  var wr=gene.wins+gene.losses>0?Math.round(gene.wins/(gene.wins+gene.losses)*100):0;
+  var name=gene.name||('진화기법_G'+gene.generation);
+  var desc=_geneToDesc(gene);
+  TECHNIQUES[name]={phase:'EVO-'+gene.generation,cond:desc,stop:'진입가 -'+gene.stopPct.toFixed(1)+'%',target:'R/R 1:'+gene.targetMult.toFixed(1),evolved:true,gene:gene,winRate:wr};
+  addMsg('ai','🧬 신규 기법 등록: '+name+'\n• 조건: '+desc+'\n• 승률: '+wr+'%\n• R/R: 1:'+gene.targetMult.toFixed(1)+'\n• 세대: '+gene.generation);
+  addDecisionLog('🧬 신규기법 등록',name+' — '+desc,'진화');
+  return name;
+}
+async function _aiRefineGenes(){
+  var top=_evoPlus.pool.slice().sort(function(a,b){return b.fitness-a.fitness;}).slice(0,3);
+  if(!top.length)return;
+  var sells=(mock.trades||[]).filter(function(t){return t.side==='sell';});
+  var winTrades=sells.filter(function(t){return(t.pnl||0)>0;}).slice(-10);
+  var lossTrades=sells.filter(function(t){return(t.pnl||0)<=0;}).slice(-10);
+  var tradeData='';
+  winTrades.forEach(function(t){tradeData+='[수익] '+t.nm+' '+(t.technique||'?')+' 손익+'+(t.pnl||0)+'\n';});
+  lossTrades.forEach(function(t){tradeData+='[손실] '+t.nm+' '+(t.technique||'?')+' 손익'+(t.pnl||0)+'\n';});
+  var topDesc=top.map(function(g,i){
+    var wr=g.wins+g.losses>0?Math.round(g.wins/(g.wins+g.losses)*100):0;
+    return(i+1)+'. 적합도'+g.fitness.toFixed(0)+' 승률'+wr+'% 조건: '+_geneToDesc(g);
+  }).join('\n');
+  var prompt='단타 매매 전략 진화 시스템이다. 아래 데이터를 분석해서 새 전략 조건을 제안해줘.\n\n'+
+    '[유전 알고리즘 상위 전략]\n'+topDesc+'\n\n'+
+    '[최근 매매 기록]\n'+tradeData+'\n\n'+
+    '위 데이터 패턴을 분석해서 새로운 진입 조건 조합 2개를 JSON으로 제안해줘.\n'+
+    '각 조합은 기존 상위 전략의 강점을 살리고 약점을 보완해야 한다.\n'+
+    'JSON 형식:\n'+
+    '[{"name":"기법명","maAlign":"triple|short|none","volMin":숫자,"rsiLow":숫자,"rsiHigh":숫자,'+
+    '"bodyRatio":숫자,"candleBull":bool,"lowerWickMin":숫자,"useVwap":bool,"useRisingLows":bool,'+
+    '"usePrevBull":bool,"useDivergence":bool,"stopPct":숫자,"targetMult":숫자,"reason":"이유"}]';
+  try{
+    var data=await callClaude({model:"claude-sonnet-4-5",max_tokens:600,messages:[{role:"user",content:prompt}]},"추가진화 AI");
+    var text=(data.content&&data.content[0]&&data.content[0].text)||'';
+    var jsonMatch=text.match(/\[[\s\S]*?\]/);
+    if(jsonMatch){
+      var suggestions=JSON.parse(jsonMatch[0]);
+      suggestions.forEach(function(s){
+        var gene=_randomGene();
+        ['maAlign','volMin','rsiLow','rsiHigh','bodyRatio','candleBull','lowerWickMin','useVwap','useRisingLows','usePrevBull','useDivergence','stopPct','targetMult'].forEach(function(k){if(s[k]!==undefined)gene[k]=s[k];});
+        gene.name=s.name||'AI기법_G'+_evoPlus.generation;
+        gene.generation=_evoPlus.generation;
+        _evoPlus.pool.push(gene);
+        _evoPlus.log.push({time:Date.now(),type:'ai',msg:'AI 제안: '+gene.name+' — '+(s.reason||_geneToDesc(gene))});
+      });
+      addMsg('ai','🤖 AI가 '+suggestions.length+'개 전략을 제안했습니다. 다음 세대에서 검증합니다.');
+    }
+  }catch(e){console.warn('AI refine error:',e.message);}
+}
+async function runEvoPlusRound(){
+  var btn=document.getElementById('evoPlusBtn');
+  if(btn){btn.innerHTML='🧬+ 진화중...';btn.style.animation='pulse 1.5s infinite';}
+  addMsg('ai','🧬+ 추가진화 '+(_evoPlus.generation+1)+'세대 시작...\n• 풀 사이즈: '+_evoPlus.pool.length+'개\n• 교차/변이/평가 진행');
+  // 풀이 비어있으면 초기화
+  if(_evoPlus.pool.length<8){
+    while(_evoPlus.pool.length<16)_evoPlus.pool.push(_randomGene());
+  }
+  // 세대 진화
+  var best=_evolveGeneration();
+  var bestWr=best&&(best.wins+best.losses)>0?Math.round(best.wins/(best.wins+best.losses)*100):0;
+  _evoPlus.log.push({time:Date.now(),type:'gen',msg:_evoPlus.generation+'세대 완료 — 최고 적합도'+((best&&best.fitness)||0).toFixed(0)+' 승률'+bestWr+'%'});
+  // 3세대마다 AI 정제
+  if(_evoPlus.generation%3===0){
+    addMsg('ai','🤖 AI 분석 중... (상위 전략 + 매매 기록 분석)');
+    await _aiRefineGenes();
+  }
+  // 적합도 40+ 기법 자동 등록
+  if(best&&best.fitness>=40&&bestWr>=45){
+    var eName=registerEvolvedTechnique(best);
+    _evoPlus.log.push({time:Date.now(),type:'register',msg:eName+' 등록 (적합도'+best.fitness.toFixed(0)+' 승률'+bestWr+'%)'});
+  }
+  _saveEvoPlus();
+  renderEvoPlusPanel();
+  if(btn){btn.innerHTML='🧬+ 추가진화';btn.style.animation='';}
+  addMsg('ai','🧬+ '+_evoPlus.generation+'세대 완료\n• 최고 적합도: '+((best&&best.fitness)||0).toFixed(1)+' (승률 '+bestWr+'%)\n• 명예의 전당: '+_evoPlus.hall.length+'개\n• 등록된 진화기법: '+Object.keys(TECHNIQUES).filter(function(k){return TECHNIQUES[k].evolved;}).length+'개');
+}
+var _evoPlusAutoTimer=null;
+function toggleEvoPlus(){
+  if(_evoPlus.running){
+    _evoPlus.running=false;
+    if(_evoPlusAutoTimer){clearTimeout(_evoPlusAutoTimer);_evoPlusAutoTimer=null;}
+    var btn=document.getElementById('evoPlusBtn');
+    if(btn){btn.innerHTML='🧬+ 추가진화';btn.style.animation='';}
+    var panel=document.getElementById('evoPlusPanel');
+    if(panel){panel.style.display='';renderEvoPlusPanel();}
+    addMsg('ai','🧬+ 추가진화 중지. 결과 패널을 확인하세요.');
+  }else{
+    _evoPlus.running=true;
+    var panel=document.getElementById('evoPlusPanel');
+    if(panel)panel.style.display='none';
+    _runEvoPlusLoop();
+  }
+}
+async function _runEvoPlusLoop(){
+  if(!_evoPlus.running)return;
+  await runEvoPlusRound();
+  if(!_evoPlus.running)return;
+  _evoPlusAutoTimer=setTimeout(_runEvoPlusLoop,2000);
+}
+function renderEvoPlusPanel(){
+  var el=document.getElementById('evoPlusPanel');if(!el)return;
+  var pool=_evoPlus.pool.slice().sort(function(a,b){return b.fitness-a.fitness;});
+  // 상태
+  var statusEl=document.getElementById('evoPlusStatus');
+  if(statusEl){
+    var gen=_evoPlus.generation;
+    if(gen<3){statusEl.textContent='탐색 초기 ('+gen+'세대)';statusEl.style.color='var(--tm)';}
+    else if(gen<10){statusEl.textContent='진화 중 ('+gen+'세대)';statusEl.style.color='var(--a)';}
+    else{statusEl.textContent='고도 진화 ('+gen+'세대)';statusEl.style.color='var(--g)';}
+  }
+  // 상위 전략
+  var topEl=document.getElementById('evoPlusTop');
+  if(topEl){
+    var top5=pool.slice(0,5);
+    if(!top5.length){topEl.innerHTML='<div style="color:var(--tm);text-align:center;padding:8px;">추가진화를 시작하세요</div>';}
+    else{
+      var html='';
+      top5.forEach(function(g,i){
+        var wr=g.wins+g.losses>0?Math.round(g.wins/(g.wins+g.losses)*100):0;
+        var fc=g.fitness>=40?'var(--g)':g.fitness>=20?'var(--a)':'var(--tm)';
+        html+='<div style="display:flex;align-items:center;gap:4px;padding:3px 0;border-bottom:1px solid var(--br);font-size:9px;">'+
+          '<span style="font-weight:800;color:var(--p);min-width:14px;">#'+(i+1)+'</span>'+
+          '<span style="flex:1;font-family:var(--mono);font-size:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+_geneToDesc(g)+'</span>'+
+          '<span style="color:'+fc+';font-weight:700;min-width:28px;text-align:right;">'+g.fitness.toFixed(0)+'</span>'+
+          '<span style="min-width:28px;text-align:right;">'+wr+'%</span>'+
+          '<span style="min-width:24px;text-align:right;color:var(--tm);">'+(g.wins+g.losses)+'건</span>';
+        if(g.fitness>=40&&wr>=45){
+          html+='<button onclick="registerEvolvedTechnique(_evoPlus.pool.sort(function(a,b){return b.fitness-a.fitness})['+i+'])" style="font-size:8px;padding:1px 4px;border:1px solid var(--g);color:var(--g);background:none;border-radius:3px;cursor:pointer;">등록</button>';
+        }
+        html+='</div>';
+      });
+      topEl.innerHTML=html;
+    }
+  }
+  // 명예의 전당
+  var hallEl=document.getElementById('evoPlusHall');
+  if(hallEl){
+    var evolved=Object.keys(TECHNIQUES).filter(function(k){return TECHNIQUES[k].evolved;});
+    if(!evolved.length&&!_evoPlus.hall.length){hallEl.innerHTML='<div style="color:var(--tm);font-size:9px;text-align:center;">아직 등록된 진화기법이 없습니다</div>';}
+    else{
+      var html='';
+      evolved.forEach(function(k){
+        var t=TECHNIQUES[k];var wr=t.winRate||0;
+        html+='<div style="font-size:9px;padding:2px 0;border-bottom:1px solid var(--br);display:flex;gap:4px;align-items:center;">'+
+          '<span style="font-weight:700;color:var(--g);">✓</span>'+
+          '<span style="font-weight:600;">'+k+'</span>'+
+          '<span style="flex:1;color:var(--ts);font-size:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+t.cond+'</span>'+
+          '<span style="font-family:var(--mono);">'+wr+'%</span>'+
+        '</div>';
+      });
+      hallEl.innerHTML=html;
+    }
+  }
+  // 진화 로그
+  var logEl=document.getElementById('evoPlusLog');
+  if(logEl){
+    var logs=_evoPlus.log.slice(-8);
+    if(!logs.length){logEl.innerHTML='<div style="text-align:center;padding:4px;">추가진화 버튼을 누르면 새 기법을 발굴합니다</div>';}
+    else{
+      logEl.innerHTML=logs.map(function(l){
+        var icon=l.type==='ai'?'🤖':l.type==='register'?'✅':'🔄';
+        return'<div>'+icon+' '+l.msg+'</div>';
+      }).join('');
+    }
+  }
+}
+function resetEvoPlus(){
+  if(!confirm('추가진화 데이터를 초기화합니다. 명예의 전당과 풀이 리셋됩니다.'))return;
+  _evoPlus={running:false,generation:0,pool:[],hall:[],log:[],bestFitness:0};
+  Object.keys(TECHNIQUES).forEach(function(k){if(TECHNIQUES[k].evolved)delete TECHNIQUES[k];});
+  _saveEvoPlus();renderEvoPlusPanel();
+  addMsg('ai','🔄 추가진화 데이터 초기화 완료');
+}
 var _evolveRunning=false;
 function toggleEvolve(){
   if(_evolveRunning){stopEvolve();}
@@ -6535,6 +6884,20 @@ async function _runScreeningAsync(){
     if(_isFirstBar){score+=2;tags.push('첫봉');}
     if(_isMomentum && !_isBreakout){score+=1;tags.push('이슈테마');}
     if(!_isPullback && !_isBreakout && !_isGap && !_isFirstBar && !_isMomentum){tags.push('기타패턴');}
+    // 11-B. 진화기법 매칭 — 등록된 진화기법 조건 체크
+    try{
+      var _evoTechs=Object.keys(TECHNIQUES).filter(function(k){return TECHNIQUES[k].evolved&&TECHNIQUES[k].gene;});
+      _evoTechs.forEach(function(ek){
+        var eg=TECHNIQUES[ek].gene;if(!eg)return;
+        if(eg.maAlign==='triple'&&!(lma5>lma20&&lma20>lma60))return;
+        if(eg.maAlign==='short'&&!(lma5>lma20))return;
+        if(volR<eg.volMin)return;
+        if(lrsi<eg.rsiLow||lrsi>eg.rsiHigh)return;
+        if(eg.candleBull&&lc.c<=lc.o)return;
+        if(body>0&&(body/(lc.h-lc.l||1))<eg.bodyRatio)return;
+        score+=3;tags.push(ek);
+      });
+    }catch(_evo){}
     // 11. 대장첫숨 — 이슈/재료 동반 필수 + 기관수급 강세섹터 대장주 장대양봉 후 첫 음봉
     var _siPat = (window._sectorInfo||{})[tk];
     var _isLeader = _siPat && _siPat.rank<=3 && (_siPat.role==='대장주'||_siPat.momentum==='강함');
@@ -10424,7 +10787,7 @@ function collectMarketCtx(){
 (function(){
   const meta = document.querySelector('meta[name="build-ts"]');
   const myBuildTs = meta ? meta.getAttribute('content') : '';
-  if(!myBuildTs || myBuildTs === '1779627498429') return; // 로컬 빌드 안 한 경우
+  if(!myBuildTs || myBuildTs === '1779628242586') return; // 로컬 빌드 안 한 경우
   let reloaded = false;
   async function check(){
     if(reloaded) return;

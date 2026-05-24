@@ -321,6 +321,36 @@
           <div id="evolveLog" style="font-size:9px;color:var(--ts);max-height:80px;overflow-y:auto;line-height:1.5;"></div>
         </div>
       </div>
+      <!-- 추가진화 패널 -->
+      <div id="evoPlusPanel" style="display:none;padding:10px 14px;background:linear-gradient(135deg,rgba(5,192,114,0.05),rgba(49,130,246,0.03));border-bottom:1px solid rgba(5,192,114,.15);flex-shrink:0;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="font-size:14px;">🧬+</span>
+            <span style="font-size:12px;font-weight:800;color:var(--g);">추가진화</span>
+            <span id="evoPlusStatus" style="font-size:9px;padding:1px 6px;border-radius:3px;background:var(--bg);color:var(--tm);">대기</span>
+          </div>
+          <div style="display:flex;gap:4px;">
+            <button onclick="resetEvoPlus()" style="font-size:9px;padding:2px 6px;border-radius:4px;border:1px solid var(--br);background:var(--bg);color:var(--r);cursor:pointer;">초기화</button>
+            <button onclick="document.getElementById('evoPlusPanel').style.display='none'" style="background:none;border:none;color:var(--tm);font-size:14px;cursor:pointer;">&times;</button>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <!-- 상위 전략 -->
+          <div style="background:var(--pan);border-radius:8px;padding:8px 10px;border-left:3px solid var(--g);">
+            <div style="font-size:10px;font-weight:700;color:var(--g);margin-bottom:6px;">🏆 상위 전략 (적합도순)</div>
+            <div id="evoPlusTop" style="max-height:120px;overflow-y:auto;"></div>
+          </div>
+          <!-- 등록된 기법 -->
+          <div style="background:var(--pan);border-radius:8px;padding:8px 10px;border-left:3px solid var(--p);">
+            <div style="font-size:10px;font-weight:700;color:var(--p);margin-bottom:6px;">📋 등록된 진화기법</div>
+            <div id="evoPlusHall" style="max-height:120px;overflow-y:auto;"></div>
+          </div>
+        </div>
+        <div style="margin-top:8px;background:var(--pan);border-radius:8px;padding:8px 10px;">
+          <div style="font-size:10px;font-weight:700;color:var(--ts);margin-bottom:4px;">🔄 진화 로그</div>
+          <div id="evoPlusLog" style="font-size:9px;color:var(--ts);max-height:60px;overflow-y:auto;line-height:1.5;"></div>
+        </div>
+      </div>
       <!-- 실시간 거래 스트립 (최근 매매 6건, 자동 갱신) -->
       <div id="liveTradesStrip" style="display:none;padding:4px 10px;background:var(--bg);border-bottom:1px solid var(--br);flex-shrink:0;overflow-x:auto;white-space:nowrap;font-family:var(--mono);font-size:9px;line-height:1.4;-webkit-overflow-scrolling:touch;"></div>
       <div class="cp-head">
@@ -446,6 +476,7 @@
       <button class="play-btn" id="playBtn" onclick="togPlay()" style="font-size:14px;line-height:1;">▶</button>
       <button class="ibtn pur" onclick="openBacktestDialog()" title="여러 영업일 연속 백테스트" style="font-size:10px;padding:3px 8px;">🚀 백테스트</button>
       <button class="ibtn" id="evolveBtn" onclick="toggleEvolve()" title="진화 엔진 — 원클릭 학습 시작/중지" style="font-size:10px;padding:3px 8px;background:linear-gradient(135deg,rgba(139,92,246,.15),rgba(49,130,246,.1));color:var(--p);border:1px solid rgba(139,92,246,.25);font-weight:700;">🧬 진화</button>
+      <button class="ibtn" id="evoPlusBtn" onclick="toggleEvoPlus()" title="추가진화 — 유전알고리즘+AI 신규 기법 발굴" style="font-size:10px;padding:3px 8px;background:linear-gradient(135deg,rgba(5,192,114,.12),rgba(49,130,246,.08));color:var(--g);border:1px solid rgba(5,192,114,.25);font-weight:700;">🧬+ 추가진화</button>
       <div class="spd-wrap">
         <span class="spd-l">배속</span>
         <button class="spd-btn" onclick="setSpd(this,1)">실시간</button>
