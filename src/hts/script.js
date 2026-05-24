@@ -2371,10 +2371,23 @@ function setOSide(s){
   document.getElementById("otSell").classList.toggle("on",s==="sell");
   document.getElementById("subBtn").className="sub-btn "+s;
   document.getElementById("subBtn").textContent=(s==="buy"?"매수":"매도")+" 주문";
-  // 매도 시 빠른 청산 버튼 표시
   const qsb=document.getElementById("quickSellBtns");
   if(qsb)qsb.style.display=s==="sell"?"flex":"none";
   updOSum();
+  _toggleObForOrder(true);
+}
+function _toggleObForOrder(show){
+  if(window.innerWidth>=1024) return;
+  const rp=document.querySelector('.rp');
+  const ov=document.querySelector('.mob-overlay');
+  if(!rp) return;
+  if(show){
+    rp.classList.add('mob-open');
+    if(ov) ov.classList.add('on');
+  } else {
+    rp.classList.remove('mob-open');
+    if(ov) ov.classList.remove('on');
+  }
 }
 function setOType(el,t){
   oType=t;document.querySelectorAll(".ot-b").forEach(b=>b.classList.remove("on"));el.classList.add("on");
@@ -2537,6 +2550,7 @@ function submitOrder(autoExec){
     }).catch(() => {});
   }
 
+  if(!autoExec) _toggleObForOrder(false);
   return true;
 }
 

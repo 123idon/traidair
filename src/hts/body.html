@@ -504,8 +504,9 @@
             <span style="font-size:8px;color:var(--tm);font-family:var(--mono);">F1지정매수 F2시장매수 F4손절 F7전량손절 F8반량</span>
           </div>
           <div class="of-tabs">
-            <button class="of-t buy on" id="otBuy" onclick="setOSide('buy')">매수 (F1/F2)</button>
-            <button class="of-t sell" id="otSell" onclick="setOSide('sell')">매도 (F3/F4)</button>
+            <button class="of-t buy on" id="otBuy" onclick="setOSide('buy')">매수</button>
+            <button class="of-t sell" id="otSell" onclick="setOSide('sell')">매도</button>
+            <button class="of-t" onclick="_toggleObForOrder(!document.querySelector('.rp.mob-open'))" style="flex:0;padding:5px 8px;font-size:10px;color:var(--b);border:1.5px solid var(--b);background:none;border-radius:8px;">호가</button>
           </div>
           <div class="of-r">
             <span class="of-l">유형</span>
