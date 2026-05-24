@@ -6714,6 +6714,8 @@ function goPage(p,el){
       if(typeof renderStatsEnhanced==='function') renderStatsEnhanced();
     } else if(p==='journal'){
       if(typeof renderJPage==='function') renderJPage();
+    } else if(p==='features'){
+      if(typeof loadNotionFeatures==='function') loadNotionFeatures();
     }
   }catch(_e){ console.warn('goPage 렌더:', _e.message); }
   // ── 날짜 동기화 ──
@@ -6756,6 +6758,59 @@ function goPage(p,el){
       }
     }catch(e){}
   }
+}
+async function loadNotionFeatures(){
+  const el=document.getElementById('featList');
+  if(!el) return;
+  el.innerHTML='<div style="text-align:center;padding:30px;color:var(--tm);">노션에서 불러오는 중...</div>';
+  try{
+    const r=await fetch('/api/notion-features');
+    const d=await r.json();
+    if(!d.ok||!d.items||!d.items.length){
+      el.innerHTML='<div style="text-align:center;padding:30px;color:var(--tm);">노션 연동 실패 — 로컬 목록 표시 중 (노션 토큰 확인)</div>'+_localFeatureHTML();
+      return;
+    }
+    var cats={};
+    d.items.forEach(function(it){
+      var c=it.category||'기타';
+      if(!cats[c]) cats[c]=[];
+      cats[c].push(it);
+    });
+    var statusIcon={'✅ 정상':'✅','⚠ 일부오류':'⚠️','❌ 안됨':'❌','🔧 수정중':'🔧','📋 미확인':'📋'};
+    var statusCol={'✅ 정상':'var(--g)','⚠ 일부오류':'var(--a)','❌ 안됨':'var(--r)','🔧 수정중':'var(--b)','📋 미확인':'var(--tm)'};
+    var html='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">';
+    var total=d.items.length;
+    var ok=d.items.filter(function(i){return i.status==='✅ 정상';}).length;
+    var err=d.items.filter(function(i){return i.status==='❌ 안됨'||i.status==='⚠ 일부오류';}).length;
+    var unc=d.items.filter(function(i){return i.status==='📋 미확인';}).length;
+    html+='<span style="font-size:11px;padding:4px 10px;background:var(--bg);border-radius:6px;">전체 <b>'+total+'</b></span>';
+    html+='<span style="font-size:11px;padding:4px 10px;background:rgba(5,192,114,.1);border-radius:6px;color:var(--g);">정상 <b>'+ok+'</b></span>';
+    html+='<span style="font-size:11px;padding:4px 10px;background:rgba(240,62,62,.1);border-radius:6px;color:var(--r);">오류 <b>'+err+'</b></span>';
+    html+='<span style="font-size:11px;padding:4px 10px;background:var(--bg);border-radius:6px;color:var(--tm);">미확인 <b>'+unc+'</b></span>';
+    html+='<a href="https://www.notion.so/b3969a236c064476ac82d296b03184de" target="_blank" style="font-size:11px;padding:4px 10px;background:var(--b);color:#fff;border-radius:6px;text-decoration:none;margin-left:auto;">노션에서 편집</a>';
+    html+='</div>';
+    Object.keys(cats).forEach(function(c){
+      html+='<div class="chart-card"><div class="chart-card-t">'+c+'</div>';
+      html+='<div style="padding:6px;">';
+      cats[c].forEach(function(it){
+        var sc=statusCol[it.status]||'var(--tm)';
+        html+='<div style="display:flex;align-items:center;gap:6px;padding:5px 6px;border-bottom:1px solid var(--br);">';
+        html+='<span style="font-size:12px;">'+(statusIcon[it.status]||'📋')+'</span>';
+        html+='<span style="font-size:10px;font-weight:700;flex:1;">'+it.name+'</span>';
+        html+='<span style="font-size:9px;color:var(--ts);flex:1;">'+it.desc+'</span>';
+        if(it.memo) html+='<span style="font-size:9px;color:var(--a);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📝 '+it.memo+'</span>';
+        html+='<span style="font-size:8px;color:'+sc+';font-weight:600;white-space:nowrap;">'+it.status+'</span>';
+        html+='</div>';
+      });
+      html+='</div></div>';
+    });
+    el.innerHTML=html;
+  }catch(e){
+    el.innerHTML='<div style="text-align:center;padding:20px;color:var(--r);">로드 실패: '+e.message+'</div>'+_localFeatureHTML();
+  }
+}
+function _localFeatureHTML(){
+  return document.getElementById('featList')?.getAttribute('data-local')||'';
 }
 
 

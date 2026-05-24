@@ -608,6 +608,49 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ── 노션 기능목록 DB 조회 (/api/notion-features GET)
+  if (url === '/api/notion-features' && req.method === 'GET') {
+    const notionKey = runtimeConfig.notionToken || process.env.NOTION_TOKEN || '';
+    if (!notionKey) {
+      res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+      res.end(JSON.stringify({ ok: false, error: '노션 토큰 없음' }));
+      return;
+    }
+    const dbId = 'b3969a236c064476ac82d296b03184de';
+    const body = JSON.stringify({ page_size: 100 });
+    const nr = https.request({
+      hostname: 'api.notion.com', path: `/v1/databases/${dbId}/query`, method: 'POST',
+      headers: { 'Authorization': `Bearer ${notionKey}`, 'Notion-Version': '2022-06-28', 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
+    }, nRes => {
+      let d = ''; nRes.on('data', c => d += c);
+      nRes.on('end', () => {
+        try {
+          const j = JSON.parse(d);
+          const items = (j.results || []).map(p => {
+            const pr = p.properties || {};
+            return {
+              id: p.id,
+              name: pr['기능명']?.title?.[0]?.plain_text || '',
+              category: pr['카테고리']?.select?.name || '',
+              status: pr['작동상태']?.select?.name || '📋 미확인',
+              priority: pr['우선순위']?.select?.name || '',
+              desc: pr['설명']?.rich_text?.[0]?.plain_text || '',
+              memo: pr['메모']?.rich_text?.[0]?.plain_text || '',
+            };
+          });
+          res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+          res.end(JSON.stringify({ ok: true, items }));
+        } catch (e) {
+          res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+          res.end(JSON.stringify({ ok: false, error: e.message }));
+        }
+      });
+    });
+    nr.on('error', e => { res.writeHead(500, CORS); res.end(JSON.stringify({ ok: false, error: e.message })); });
+    nr.write(body); nr.end();
+    return;
+  }
+
   // ── 사용자 데이터 저장 (/api/user-data POST)
   if (url === '/api/user-data' && req.method === 'POST') {
     let body = '';
