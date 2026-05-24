@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#ffffff">
-<meta name="build-ts" content="1779626593051">
+<meta name="build-ts" content="1779627498429">
 <title>TraidAIr HTS</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 
@@ -72,6 +72,7 @@ button{cursor:pointer;font-family:var(--sans);}
 .bdot{width:5px;height:5px;border-radius:50%;animation:pu 1.5s infinite;}
 .mock .bdot{background:var(--a);}.live .bdot{background:var(--g);}.auto .bdot{background:var(--p);}
 @keyframes pu{0%,100%{opacity:1;}50%{opacity:.3;}}
+@keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(139,92,246,.4);}50%{opacity:.85;box-shadow:0 0 8px 3px rgba(139,92,246,.3);}}
 .clk{font-family:var(--mono);font-size:11px;color:var(--ts);}
 .ibtn{padding:4px 9px;border-radius:7px;border:1.5px solid var(--br);background:var(--pan);color:var(--ts);font-size:10px;font-weight:500;transition:all .12s;white-space:nowrap;box-shadow:var(--sh0);}
 .ibtn:hover{background:var(--bg);color:var(--tp);border-color:var(--brb);}
@@ -1017,7 +1018,7 @@ canvas{image-rendering:pixelated;}
       <div class="vsep" style="height:18px;"></div>
       <button class="play-btn" id="playBtn" onclick="togPlay()" style="font-size:14px;line-height:1;">▶</button>
       <button class="ibtn pur" onclick="openBacktestDialog()" title="여러 영업일 연속 백테스트" style="font-size:10px;padding:3px 8px;">🚀 백테스트</button>
-      <button class="ibtn" onclick="toggleEvolvePanel()" title="진화 엔진 — 성과 프로파일 + 적응형 파라미터" style="font-size:10px;padding:3px 8px;background:linear-gradient(135deg,rgba(139,92,246,.15),rgba(49,130,246,.1));color:var(--p);border:1px solid rgba(139,92,246,.25);font-weight:700;">🧬 진화</button>
+      <button class="ibtn" id="evolveBtn" onclick="toggleEvolve()" title="진화 엔진 — 원클릭 학습 시작/중지" style="font-size:10px;padding:3px 8px;background:linear-gradient(135deg,rgba(139,92,246,.15),rgba(49,130,246,.1));color:var(--p);border:1px solid rgba(139,92,246,.25);font-weight:700;">🧬 진화</button>
       <div class="spd-wrap">
         <span class="spd-l">배속</span>
         <button class="spd-btn" onclick="setSpd(this,1)">실시간</button>
@@ -2991,6 +2992,34 @@ function buildPerfSummary(){
   return lines.join('\n');
 }
 try{var _sp=localStorage.getItem('htsPerfProfile');if(_sp)_perfProfile=JSON.parse(_sp);computeAdaptiveConfig();}catch(_e){}
+var _evolveRunning=false;
+function toggleEvolve(){
+  if(_evolveRunning){stopEvolve();}
+  else{startEvolve();}
+}
+function startEvolve(){
+  if(_evolveRunning)return;
+  if(window.backtest&&backtest.running){showAlert('진화','이미 백테스트 진행 중입니다. 완료 후 다시 시도하세요.');return;}
+  _evolveRunning=true;
+  var btn=document.getElementById('evolveBtn');
+  if(btn){btn.innerHTML='🧬 진화중...';btn.style.background='linear-gradient(135deg,rgba(139,92,246,.3),rgba(49,130,246,.2))';btn.style.animation='pulse 1.5s infinite';}
+  var panel=document.getElementById('evolvePanel');
+  if(panel)panel.style.display='none';
+  var today=(typeof todayStr==='function')?todayStr():new Date().toISOString().slice(0,10);
+  var sd=new Date(today);sd.setDate(sd.getDate()-45);
+  var startDate=sd.getFullYear()+'-'+String(sd.getMonth()+1).padStart(2,'0')+'-'+String(sd.getDate()).padStart(2,'0');
+  addMsg('ai','🧬 진화 엔진 시작\n• 자동 백테스트: '+startDate+' ~ '+today+'\n• 완료 후 성과 프로파일 자동 갱신\n• 다시 누르면 중지 + 결과 확인');
+  startBacktest(startDate, today);
+}
+async function stopEvolve(){
+  _evolveRunning=false;
+  var btn=document.getElementById('evolveBtn');
+  if(btn){btn.innerHTML='🧬 진화';btn.style.background='linear-gradient(135deg,rgba(139,92,246,.15),rgba(49,130,246,.1))';btn.style.animation='';}
+  if(window.backtest&&backtest.running){await stopBacktest();}
+  computePerformanceProfile();
+  var panel=document.getElementById('evolvePanel');
+  if(panel){panel.style.display='';renderEvolvePanel();}
+}
 function toggleEvolvePanel(){
   var el=document.getElementById('evolvePanel');
   if(!el)return;
@@ -4250,6 +4279,15 @@ function _backtestReport(){
   addDecisionLog('📓 백테스트 일지 완료', `${backtest.dailyResults.length}일 / 매매 ${totalTrades}건 — 📓 버튼으로 확인`, '학습');
   addDecisionLog('🧬 진화 엔진', '성과 프로파일 갱신 — 적응형 파라미터 적용', '학습');
   try{renderEvolvePanel();}catch(_e){}
+  // 진화 모드로 시작된 백테스트 완료 시 자동 결과 표시
+  if(_evolveRunning){
+    _evolveRunning=false;
+    var btn=document.getElementById('evolveBtn');
+    if(btn){btn.innerHTML='🧬 진화';btn.style.background='linear-gradient(135deg,rgba(139,92,246,.15),rgba(49,130,246,.1))';btn.style.animation='';}
+    var panel=document.getElementById('evolvePanel');
+    if(panel){panel.style.display='';renderEvolvePanel();}
+    addMsg('ai','🧬 진화 완료! 결과 패널이 열렸습니다. 적응형 파라미터가 다음 매매에 자동 적용됩니다.');
+  }
 }
 // 실시간 거래 스트립 — 차트 헤더 아래 최근 6건
 function renderLiveTrades(){
@@ -10386,7 +10424,7 @@ function collectMarketCtx(){
 (function(){
   const meta = document.querySelector('meta[name="build-ts"]');
   const myBuildTs = meta ? meta.getAttribute('content') : '';
-  if(!myBuildTs || myBuildTs === '1779626593051') return; // 로컬 빌드 안 한 경우
+  if(!myBuildTs || myBuildTs === '1779627498429') return; // 로컬 빌드 안 한 경우
   let reloaded = false;
   async function check(){
     if(reloaded) return;

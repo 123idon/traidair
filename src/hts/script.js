@@ -869,6 +869,34 @@ function buildPerfSummary(){
   return lines.join('\n');
 }
 try{var _sp=localStorage.getItem('htsPerfProfile');if(_sp)_perfProfile=JSON.parse(_sp);computeAdaptiveConfig();}catch(_e){}
+var _evolveRunning=false;
+function toggleEvolve(){
+  if(_evolveRunning){stopEvolve();}
+  else{startEvolve();}
+}
+function startEvolve(){
+  if(_evolveRunning)return;
+  if(window.backtest&&backtest.running){showAlert('진화','이미 백테스트 진행 중입니다. 완료 후 다시 시도하세요.');return;}
+  _evolveRunning=true;
+  var btn=document.getElementById('evolveBtn');
+  if(btn){btn.innerHTML='🧬 진화중...';btn.style.background='linear-gradient(135deg,rgba(139,92,246,.3),rgba(49,130,246,.2))';btn.style.animation='pulse 1.5s infinite';}
+  var panel=document.getElementById('evolvePanel');
+  if(panel)panel.style.display='none';
+  var today=(typeof todayStr==='function')?todayStr():new Date().toISOString().slice(0,10);
+  var sd=new Date(today);sd.setDate(sd.getDate()-45);
+  var startDate=sd.getFullYear()+'-'+String(sd.getMonth()+1).padStart(2,'0')+'-'+String(sd.getDate()).padStart(2,'0');
+  addMsg('ai','🧬 진화 엔진 시작\n• 자동 백테스트: '+startDate+' ~ '+today+'\n• 완료 후 성과 프로파일 자동 갱신\n• 다시 누르면 중지 + 결과 확인');
+  startBacktest(startDate, today);
+}
+async function stopEvolve(){
+  _evolveRunning=false;
+  var btn=document.getElementById('evolveBtn');
+  if(btn){btn.innerHTML='🧬 진화';btn.style.background='linear-gradient(135deg,rgba(139,92,246,.15),rgba(49,130,246,.1))';btn.style.animation='';}
+  if(window.backtest&&backtest.running){await stopBacktest();}
+  computePerformanceProfile();
+  var panel=document.getElementById('evolvePanel');
+  if(panel){panel.style.display='';renderEvolvePanel();}
+}
 function toggleEvolvePanel(){
   var el=document.getElementById('evolvePanel');
   if(!el)return;
@@ -2128,6 +2156,15 @@ function _backtestReport(){
   addDecisionLog('📓 백테스트 일지 완료', `${backtest.dailyResults.length}일 / 매매 ${totalTrades}건 — 📓 버튼으로 확인`, '학습');
   addDecisionLog('🧬 진화 엔진', '성과 프로파일 갱신 — 적응형 파라미터 적용', '학습');
   try{renderEvolvePanel();}catch(_e){}
+  // 진화 모드로 시작된 백테스트 완료 시 자동 결과 표시
+  if(_evolveRunning){
+    _evolveRunning=false;
+    var btn=document.getElementById('evolveBtn');
+    if(btn){btn.innerHTML='🧬 진화';btn.style.background='linear-gradient(135deg,rgba(139,92,246,.15),rgba(49,130,246,.1))';btn.style.animation='';}
+    var panel=document.getElementById('evolvePanel');
+    if(panel){panel.style.display='';renderEvolvePanel();}
+    addMsg('ai','🧬 진화 완료! 결과 패널이 열렸습니다. 적응형 파라미터가 다음 매매에 자동 적용됩니다.');
+  }
 }
 // 실시간 거래 스트립 — 차트 헤더 아래 최근 6건
 function renderLiveTrades(){

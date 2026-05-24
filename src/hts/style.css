@@ -56,6 +56,7 @@ button{cursor:pointer;font-family:var(--sans);}
 .bdot{width:5px;height:5px;border-radius:50%;animation:pu 1.5s infinite;}
 .mock .bdot{background:var(--a);}.live .bdot{background:var(--g);}.auto .bdot{background:var(--p);}
 @keyframes pu{0%,100%{opacity:1;}50%{opacity:.3;}}
+@keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(139,92,246,.4);}50%{opacity:.85;box-shadow:0 0 8px 3px rgba(139,92,246,.3);}}
 .clk{font-family:var(--mono);font-size:11px;color:var(--ts);}
 .ibtn{padding:4px 9px;border-radius:7px;border:1.5px solid var(--br);background:var(--pan);color:var(--ts);font-size:10px;font-weight:500;transition:all .12s;white-space:nowrap;box-shadow:var(--sh0);}
 .ibtn:hover{background:var(--bg);color:var(--tp);border-color:var(--brb);}

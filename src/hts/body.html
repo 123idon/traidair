@@ -445,7 +445,7 @@
       <div class="vsep" style="height:18px;"></div>
       <button class="play-btn" id="playBtn" onclick="togPlay()" style="font-size:14px;line-height:1;">▶</button>
       <button class="ibtn pur" onclick="openBacktestDialog()" title="여러 영업일 연속 백테스트" style="font-size:10px;padding:3px 8px;">🚀 백테스트</button>
-      <button class="ibtn" onclick="toggleEvolvePanel()" title="진화 엔진 — 성과 프로파일 + 적응형 파라미터" style="font-size:10px;padding:3px 8px;background:linear-gradient(135deg,rgba(139,92,246,.15),rgba(49,130,246,.1));color:var(--p);border:1px solid rgba(139,92,246,.25);font-weight:700;">🧬 진화</button>
+      <button class="ibtn" id="evolveBtn" onclick="toggleEvolve()" title="진화 엔진 — 원클릭 학습 시작/중지" style="font-size:10px;padding:3px 8px;background:linear-gradient(135deg,rgba(139,92,246,.15),rgba(49,130,246,.1));color:var(--p);border:1px solid rgba(139,92,246,.25);font-weight:700;">🧬 진화</button>
       <div class="spd-wrap">
         <span class="spd-l">배속</span>
         <button class="spd-btn" onclick="setSpd(this,1)">실시간</button>
