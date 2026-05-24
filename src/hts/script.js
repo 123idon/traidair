@@ -869,6 +869,89 @@ function buildPerfSummary(){
   return lines.join('\n');
 }
 try{var _sp=localStorage.getItem('htsPerfProfile');if(_sp)_perfProfile=JSON.parse(_sp);computeAdaptiveConfig();}catch(_e){}
+function toggleEvolvePanel(){
+  var el=document.getElementById('evolvePanel');
+  if(!el)return;
+  if(el.style.display==='none'){el.style.display='';renderEvolvePanel();}
+  else{el.style.display='none';}
+}
+function renderEvolvePanel(){
+  var sells=(mock.trades||[]).filter(function(t){return t.side==='sell';});
+  // 상태 배지
+  var statusEl=document.getElementById('evolveStatus');
+  if(statusEl){
+    if(sells.length<5){statusEl.textContent='데이터 수집 중 ('+sells.length+'/5건)';statusEl.style.background='var(--bg)';statusEl.style.color='var(--tm)';}
+    else if(sells.length<20){statusEl.textContent='학습 초기 ('+sells.length+'건)';statusEl.style.background='rgba(245,158,11,.1)';statusEl.style.color='var(--a)';}
+    else if(sells.length<50){statusEl.textContent='학습 중 ('+sells.length+'건)';statusEl.style.background='rgba(49,130,246,.1)';statusEl.style.color='var(--b)';}
+    else{statusEl.textContent='진화 완료 ('+sells.length+'건)';statusEl.style.background='rgba(5,192,114,.1)';statusEl.style.color='var(--g)';}
+  }
+  // 적응형 파라미터
+  var adEl=document.getElementById('evolveAdaptive');
+  if(adEl){
+    var ac=_adaptiveCfg;
+    var wr=_perfProfile.recentWr||'-';
+    adEl.innerHTML=
+      '<div style="display:flex;justify-content:space-between;"><span>최근20건 승률</span><b style="color:'+(wr>=50?'var(--g)':'var(--r)')+';">'+wr+'%</b></div>'+
+      '<div style="display:flex;justify-content:space-between;"><span>손절</span><b>'+ac.stop+'%</b></div>'+
+      '<div style="display:flex;justify-content:space-between;"><span>1차 목표</span><b>+'+ac.t1+'%</b></div>'+
+      '<div style="display:flex;justify-content:space-between;"><span>2차 목표</span><b>+'+ac.t2+'%</b></div>'+
+      '<div style="display:flex;justify-content:space-between;"><span>적응형 비중</span><b style="color:var(--b);">'+ac.pos+'%</b></div>'+
+      '<div style="display:flex;justify-content:space-between;"><span>최소 R/R</span><b>1:'+ac.rr+'</b></div>'+
+      '<div style="display:flex;justify-content:space-between;"><span>최소 진입점수</span><b>'+ac.minScore+'점</b></div>';
+  }
+  // 기법별 등급
+  var tgEl=document.getElementById('evolveTechGrades');
+  if(tgEl){
+    if(!_perfProfile.byTech||!Object.keys(_perfProfile.byTech).length){
+      tgEl.innerHTML='<div style="color:var(--tm);text-align:center;padding:10px;">매매 데이터 부족</div>';
+    }else{
+      var gradeCol={A:'var(--g)',B:'var(--b)',C:'var(--a)',D:'var(--r)'};
+      var html='';
+      var techs=Object.keys(_perfProfile.byTech).sort(function(a,b){
+        return(_perfProfile.byTech[b].totalPnl||0)-(_perfProfile.byTech[a].totalPnl||0);
+      });
+      techs.forEach(function(k){
+        var t=_perfProfile.byTech[k];if(t.count<2)return;
+        var gc=gradeCol[t.grade]||'var(--tm)';
+        var pnlCol=(t.totalPnl||0)>=0?'var(--g)':'var(--r)';
+        var barW=Math.min(100,t.winRate);
+        html+='<div style="display:flex;align-items:center;gap:5px;padding:3px 0;border-bottom:1px solid var(--br);">'+
+          '<span style="font-size:11px;font-weight:800;color:'+gc+';min-width:16px;">'+t.grade+'</span>'+
+          '<span style="font-size:10px;font-weight:600;min-width:50px;">'+k+'</span>'+
+          '<div style="flex:1;height:5px;background:var(--br);border-radius:3px;"><div style="height:5px;border-radius:3px;width:'+barW+'%;background:'+gc+';"></div></div>'+
+          '<span style="font-family:var(--mono);font-size:9px;min-width:28px;text-align:right;">'+t.winRate+'%</span>'+
+          '<span style="font-family:var(--mono);font-size:9px;min-width:22px;text-align:right;">'+t.count+'건</span>'+
+          '<span style="font-family:var(--mono);font-size:9px;font-weight:700;min-width:55px;text-align:right;color:'+pnlCol+';">'+((t.totalPnl||0)>=0?'+':'')+Math.round(t.totalPnl||0).toLocaleString()+'</span>'+
+        '</div>';
+      });
+      tgEl.innerHTML=html||'<div style="color:var(--tm);">데이터 부족</div>';
+    }
+  }
+  // 진화 로그
+  var logEl=document.getElementById('evolveLog');
+  if(logEl){
+    var logs=[];
+    if(_perfProfile.updated){
+      logs.push('마지막 갱신: '+new Date(_perfProfile.updated).toLocaleString('ko-KR'));
+    }
+    if(_perfProfile.totalSells){
+      logs.push('분석 대상: 매도 '+_perfProfile.totalSells+'건');
+    }
+    var bestTech='',worstTech='',bestPnl=-Infinity,worstPnl=Infinity;
+    if(_perfProfile.byTech){
+      Object.keys(_perfProfile.byTech).forEach(function(k){
+        var t=_perfProfile.byTech[k];if(t.count<3)return;
+        if(t.totalPnl>bestPnl){bestPnl=t.totalPnl;bestTech=k;}
+        if(t.totalPnl<worstPnl){worstPnl=t.totalPnl;worstTech=k;}
+      });
+      if(bestTech)logs.push('최고 기법: '+bestTech+' ('+(bestPnl>=0?'+':'')+Math.round(bestPnl).toLocaleString()+'원)');
+      if(worstTech&&worstTech!==bestTech)logs.push('최약 기법: '+worstTech+' ('+Math.round(worstPnl).toLocaleString()+'원) → 비중 자동 축소');
+    }
+    if(_adaptiveCfg.pos!==30)logs.push('비중 적응: 기본 30% → '+_adaptiveCfg.pos+'% (반켈리)');
+    if(_adaptiveCfg.stop!==3)logs.push('손절 적응: 기본 3% → '+_adaptiveCfg.stop+'%');
+    logEl.innerHTML=logs.length?logs.map(function(l){return'<div>· '+l+'</div>';}).join(''):'<div style="text-align:center;padding:6px;">백테스트 또는 매매를 실행하면 진화 데이터가 쌓입니다.</div>';
+  }
+}
 function cancelPending(id){pendingOrders=pendingOrders.filter(o=>o.id!==id);renderPending();}
 let chatHist=[],chatBusy=false;
 function checkPending(){pendingOrders.forEach((o,i)=>{const stk=STOCKS.find(s=>s.tk===o.tk);if(!stk)return;const hit=(o.side==="buy"&&stk.pr<=o.price)||(o.side==="sell"&&stk.pr>=o.price);if(hit){const prev=activeTk,prevSide=oSide,prevType=oType;activeTk=o.tk;oSide=o.side;oType="market";document.getElementById("ofQty").value=o.qty;submitOrder(true);activeTk=prev;oSide=prevSide;oType=prevType;pendingOrders.splice(i,1);addMsg("ai",`✅ 지정가 체결: ${o.nm} ${o.side==="buy"?"매수":"매도"} ${fW(o.price)}원 × ${o.qty}주`);renderPending();}});}
@@ -2044,6 +2127,7 @@ function _backtestReport(){
   try{ renderJPage&&renderJPage(); }catch(_e){}
   addDecisionLog('📓 백테스트 일지 완료', `${backtest.dailyResults.length}일 / 매매 ${totalTrades}건 — 📓 버튼으로 확인`, '학습');
   addDecisionLog('🧬 진화 엔진', '성과 프로파일 갱신 — 적응형 파라미터 적용', '학습');
+  try{renderEvolvePanel();}catch(_e){}
 }
 // 실시간 거래 스트립 — 차트 헤더 아래 최근 6건
 function renderLiveTrades(){
