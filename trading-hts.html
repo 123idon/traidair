@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#ffffff">
-<meta name="build-ts" content="1779634544289">
+<meta name="build-ts" content="1779634851988">
 <title>TraidAIr HTS</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 
@@ -3190,12 +3190,17 @@ async function _aiRefineGenes(){
     var wr=g.wins+g.losses>0?Math.round(g.wins/(g.wins+g.losses)*100):0;
     return(i+1)+'. 적합도'+g.fitness.toFixed(0)+' 승률'+wr+'% 조건: '+_geneToDesc(g);
   }).join('\n');
-  var prompt='단타 전략 진화. 상위 전략 강점 살려 새 조합 2개 JSON 제안.\n'+
-    '[상위]\n'+topDesc+'\n[매매]\n'+tradeData.slice(0,300)+'\n'+
-    'JSON: [{"name":"","maAlign":"triple|short|none","volMin":N,"rsiLow":N,"rsiHigh":N,'+
-    '"bodyRatio":N,"candleBull":bool,"stopPct":N,"targetMult":N,"reason":""}]';
+  var prompt='단타 매매 전략 진화 시스템이다. 아래 데이터를 분석해서 새 전략 조건을 제안해줘.\n\n'+
+    '[유전 알고리즘 상위 전략]\n'+topDesc+'\n\n'+
+    '[최근 매매 기록]\n'+tradeData+'\n\n'+
+    '위 데이터 패턴을 분석해서 새로운 진입 조건 조합 2개를 JSON으로 제안해줘.\n'+
+    '각 조합은 기존 상위 전략의 강점을 살리고 약점을 보완해야 한다.\n'+
+    'JSON 형식:\n'+
+    '[{"name":"기법명","maAlign":"triple|short|none","volMin":숫자,"rsiLow":숫자,"rsiHigh":숫자,'+
+    '"bodyRatio":숫자,"candleBull":bool,"lowerWickMin":숫자,"useVwap":bool,"useRisingLows":bool,'+
+    '"usePrevBull":bool,"useDivergence":bool,"stopPct":숫자,"targetMult":숫자,"reason":"이유"}]';
   try{
-    var data=await callClaude({model:"claude-haiku-4-5-20251001",max_tokens:400,messages:[{role:"user",content:prompt}]},"진화+ AI정제");
+    var data=await callClaude({model:"claude-sonnet-4-5",max_tokens:600,messages:[{role:"user",content:prompt}]},"진화+ AI정제");
     var text=(data.content&&data.content[0]&&data.content[0].text)||'';
     var jsonMatch=text.match(/\[\s*\{[\s\S]*?\}\s*\]/);
     if(jsonMatch){
@@ -3368,8 +3373,8 @@ async function _gaRound(gen){
   }
   _saveEvoPlus();
   if(gen<2){setTimeout(function(){_gaRound(gen+1);},100);return;}
-  // GA 3세대 완료 → AI 정제 (5사이클마다만 — API 비용 절감)
-  if(_evolveCycle%5===0&&_evolveRunning){
+  // GA 3세대 완료 → AI 정제 (3사이클마다)
+  if(_evolveCycle%3===0&&_evolveRunning){
     _evolvePhase='ai';
     _updBtn('🧬 C'+_evolveCycle+' AI정제');
     await _aiRefineGenes();
@@ -10817,7 +10822,7 @@ function collectMarketCtx(){
 (function(){
   const meta = document.querySelector('meta[name="build-ts"]');
   const myBuildTs = meta ? meta.getAttribute('content') : '';
-  if(!myBuildTs || myBuildTs === '1779634544289') return; // 로컬 빌드 안 한 경우
+  if(!myBuildTs || myBuildTs === '1779634851988') return; // 로컬 빌드 안 한 경우
   let reloaded = false;
   async function check(){
     if(reloaded) return;
