@@ -972,7 +972,7 @@ function _testGeneOnCandles(gene,cs){
 }
 function _evalPool(){
   var allTks=STOCKS.map(function(s){return s.tk;}).slice(0,10);
-  var evalDays=_randomTradingDays(5);
+  var evalDays=_randomTradingDays(10);
   _evoPlus.pool.forEach(function(gene){
     if(gene.tested)return;
     var totalW=0,totalL=0,totalPnl=0;
@@ -1143,7 +1143,7 @@ async function _runEvoPlusLoop(){
   if(!_evoPlus.running)return;
   await runEvoPlusRound();
   if(!_evoPlus.running)return;
-  _evoPlusAutoTimer=setTimeout(_runEvoPlusLoop,2000);
+  _evoPlusAutoTimer=setTimeout(_runEvoPlusLoop,300);
 }
 function renderEvoPlusPanel(){
   var el=document.getElementById('evoPlusPanel');if(!el)return;
@@ -1238,8 +1238,9 @@ function resetEvoPlus(){
 var _evolveRunning=false;
 var _evolveSnapshot={score:0,wr:0,pnl:0,trades:0};
 var _evolveRoundIdx=0;
-var _evolveTotalRounds=10;
+var _evolveTotalRounds=30;
 var _evolveDays=[];
+var _evolvePrevSpeed=60;
 function _randomTradingDays(count){
   var start=new Date('2023-01-02');
   var today=new Date((typeof todayStr==='function')?todayStr():new Date().toISOString().slice(0,10));
@@ -1282,19 +1283,23 @@ function startEvolve(){
   if(window.backtest&&backtest.running){showAlert('진화','이미 백테스트 진행 중입니다.');return;}
   _evolveRunning=true;
   _evolveSnapshot=_takeSnapshot();
-  _evolveTotalRounds=10;
+  _evolveTotalRounds=30;
   _evolveRoundIdx=0;
   _evolveDays=_randomTradingDays(_evolveTotalRounds);
+  _evolvePrevSpeed=sim.speed;
+  sim.speed=1500;
+  document.querySelectorAll('.spd-btn').forEach(function(b){b.classList.remove('on');});
   var btn=document.getElementById('evolveBtn');
   if(btn){btn.innerHTML='🧬 진화중(0/'+_evolveTotalRounds+')';btn.style.background='linear-gradient(135deg,rgba(139,92,246,.3),rgba(49,130,246,.2))';btn.style.animation='pulse 1.5s infinite';}
   var panel=document.getElementById('evolvePanel');
   if(panel)panel.style.display='none';
-  addMsg('ai','🧬 진화 시작\n• 2023년~ 랜덤 '+_evolveTotalRounds+'일 백테스트\n• 날짜: '+_evolveDays.slice(0,5).join(', ')+((_evolveDays.length>5)?(' 외 '+(_evolveDays.length-5)+'일'):'')+'\n• 다시 누르면 중지 + 결과');
+  addMsg('ai','🧬 진화 시작 (x1500 고정)\n• 2023년~ 랜덤 '+_evolveTotalRounds+'일\n• 날짜: '+_evolveDays.slice(0,5).join(', ')+' 외 '+(_evolveDays.length-5)+'일\n• 다시 누르면 중지 + 결과');
   _evolveNextDay();
 }
 function _evolveNextDay(){
   if(!_evolveRunning)return;
   if(_evolveRoundIdx>=_evolveDays.length){_evolveFinish();return;}
+  sim.speed=1500;
   var day=_evolveDays[_evolveRoundIdx];
   var btn=document.getElementById('evolveBtn');
   if(btn)btn.innerHTML='🧬 진화중('+(_evolveRoundIdx+1)+'/'+_evolveTotalRounds+')';
@@ -1302,6 +1307,7 @@ function _evolveNextDay(){
 }
 function _evolveFinish(){
   _evolveRunning=false;
+  sim.speed=_evolvePrevSpeed||60;
   var btn=document.getElementById('evolveBtn');
   if(btn){btn.innerHTML='🧬 진화';btn.style.background='linear-gradient(135deg,rgba(139,92,246,.15),rgba(49,130,246,.1))';btn.style.animation='';}
   computePerformanceProfile();
@@ -1317,6 +1323,7 @@ function _evolveFinish(){
 }
 async function stopEvolve(){
   _evolveRunning=false;
+  sim.speed=_evolvePrevSpeed||60;
   var btn=document.getElementById('evolveBtn');
   if(btn){btn.innerHTML='🧬 진화';btn.style.background='linear-gradient(135deg,rgba(139,92,246,.15),rgba(49,130,246,.1))';btn.style.animation='';}
   if(window.backtest&&backtest.running){await stopBacktest();}
