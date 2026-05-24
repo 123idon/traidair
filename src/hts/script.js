@@ -1193,11 +1193,11 @@ function startEvolvePlus(){
   _evolveSnapshot=_takeSnapshot();
   _evolveCycle=0;
   _evolvePrevSpeed=sim.speed;
-  sim.speed=1500;
+  sim.speed=250;
   document.querySelectorAll('.spd-btn').forEach(function(b){b.classList.remove('on');});
   var panel=document.getElementById('evolvePanel');
   if(panel)panel.style.display='none';
-  addMsg('ai','🧬 진화+ 시작 (x1500)\n• 사이클: 학습(10일) → GA(3세대) → AI정제 → 반복\n• 다시 누르면 중지 + 결과');
+  addMsg('ai','🧬 진화+ 시작 (x250 · Claude AI 판단)\n• 사이클: 학습(10일) → GA(3세대) → AI정제 → 반복\n• 실매매와 동일한 판단 로직\n• 다시 누르면 중지 + 결과');
   _startLearnPhase();
 }
 function _startLearnPhase(){
@@ -1214,7 +1214,7 @@ function _startLearnPhase(){
 function _evolveNextDay(){
   if(!_evolveRunning)return;
   if(_evolveRoundIdx>=_evolveDays.length){_onLearnDone();return;}
-  sim.speed=1500;
+  sim.speed=250;
   _updBtn('🧬 C'+_evolveCycle+' 학습('+(_evolveRoundIdx+1)+'/10)');
   startBacktest(_evolveDays[_evolveRoundIdx],_evolveDays[_evolveRoundIdx]);
 }
