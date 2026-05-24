@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#ffffff">
-<meta name="build-ts" content="1779622681547">
+<meta name="build-ts" content="1779625932371">
 <title>TraidAIr HTS</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 
@@ -2876,6 +2876,89 @@ function addBanCurrent(){const stk=STOCKS.find(s=>s.tk===activeTk)||STOCKS[0];if
 function addPending(tk,nm,side,price,qty){const id=Date.now();pendingOrders.push({id,tk,nm,side,price,qty,time:new Date().toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"})});renderPending();return id;}
 let autoState={running:false,level:0,cfg:{rr:1.5,pos:30,stop:3,t1:3,t2:5,trail:"off",brk:false,explain:true}};
 let autoTimer=null;
+
+// ═══════════════════════════════════════════════
+// 진화 엔진: 성과 프로파일 + 적응형 파라미터
+// ═══════════════════════════════════════════════
+var _perfProfile={};
+var _adaptiveCfg={stop:3,t1:3,t2:5,pos:30,rr:1.5,minScore:6};
+function computePerformanceProfile(){
+  var trades=mock.trades||[];
+  var sells=trades.filter(function(t){return t.side==='sell';});
+  if(sells.length<3) return _perfProfile;
+  var byTech={};
+  sells.forEach(function(t){
+    var tech=t.technique||'기법없음';
+    if(!byTech[tech]) byTech[tech]={wins:0,losses:0,totalPnl:0,count:0,avgWin:0,avgLoss:0,pnls:[],streak:0,maxStreak:0};
+    var b=byTech[tech];
+    b.count++;b.totalPnl+=(t.pnl||0);b.pnls.push(t.pnl||0);
+    if((t.pnl||0)>0){b.wins++;b.streak++;if(b.streak>b.maxStreak)b.maxStreak=b.streak;}
+    else{b.losses++;b.streak=0;}
+  });
+  Object.keys(byTech).forEach(function(k){
+    var b=byTech[k];
+    var ws=b.pnls.filter(function(p){return p>0;});
+    var ls=b.pnls.filter(function(p){return p<=0;});
+    b.winRate=b.count?Math.round(b.wins/b.count*100):0;
+    b.avgWin=ws.length?Math.round(ws.reduce(function(a,c){return a+c;},0)/ws.length):0;
+    b.avgLoss=ls.length?Math.round(ls.reduce(function(a,c){return a+Math.abs(c);},0)/ls.length):1;
+    b.rr=b.avgLoss>0?(b.avgWin/b.avgLoss).toFixed(2):'--';
+    b.kelly=b.winRate>0&&b.avgLoss>0?Math.max(0,((b.winRate/100)-(1-b.winRate/100)/(b.avgWin/(b.avgLoss||1)))*100).toFixed(1):'0';
+    b.grade=b.winRate>=55&&parseFloat(b.rr)>=1.5?'A':b.winRate>=45&&parseFloat(b.rr)>=1.2?'B':b.winRate>=35?'C':'D';
+  });
+  var recent20=sells.slice(-20);
+  var recentWr=recent20.length?Math.round(recent20.filter(function(t){return(t.pnl||0)>0;}).length/recent20.length*100):50;
+  var recentAvgWin=0,recentAvgLoss=0;
+  var rw=recent20.filter(function(t){return(t.pnl||0)>0;});
+  var rl=recent20.filter(function(t){return(t.pnl||0)<=0;});
+  if(rw.length)recentAvgWin=Math.round(rw.reduce(function(a,t){return a+(t.pnl||0);},0)/rw.length);
+  if(rl.length)recentAvgLoss=Math.round(rl.reduce(function(a,t){return a+Math.abs(t.pnl||0);},0)/rl.length);
+  _perfProfile={byTech:byTech,totalSells:sells.length,recentWr:recentWr,recentAvgWin:recentAvgWin,recentAvgLoss:recentAvgLoss,updated:Date.now()};
+  try{localStorage.setItem('htsPerfProfile',JSON.stringify(_perfProfile));}catch(_e){}
+  computeAdaptiveConfig();
+  return _perfProfile;
+}
+function computeAdaptiveConfig(){
+  var p=_perfProfile;if(!p.totalSells||p.totalSells<5)return;
+  var wr=p.recentWr||50;
+  var avgL=p.recentAvgLoss||1;
+  var avgW=p.recentAvgWin||1;
+  var rr=avgL>0?avgW/avgL:1.5;
+  // 적응형 손절: 승률 높으면 여유, 낮으면 타이트
+  _adaptiveCfg.stop=wr>=55?3.5:wr>=45?3:2.5;
+  // 적응형 목표가: R/R 기반
+  _adaptiveCfg.t1=Math.max(2,Math.round(_adaptiveCfg.stop*(rr>=1.5?1.5:rr>=1?1.2:1)*10)/10);
+  _adaptiveCfg.t2=Math.round(_adaptiveCfg.t1*1.7*10)/10;
+  // 적응형 비중: 켈리 기준 (보수적 반켈리)
+  var kellyPct=(wr/100)-((1-wr/100)/(rr||1));
+  var halfKelly=Math.max(10,Math.min(50,Math.round(kellyPct*50)));
+  _adaptiveCfg.pos=halfKelly;
+  // 적응형 R/R 최소: 승률 높으면 낮춰도 OK
+  _adaptiveCfg.rr=wr>=55?1.2:wr>=45?1.5:2.0;
+  // 적응형 최소 진입 점수
+  _adaptiveCfg.minScore=wr>=55?5:wr>=45?6:8;
+  console.log('[적응형]','wr:'+wr+'%','stop:'+_adaptiveCfg.stop+'%','pos:'+_adaptiveCfg.pos+'%','rr:'+_adaptiveCfg.rr,'minScore:'+_adaptiveCfg.minScore);
+}
+function getTechGrade(techName){
+  if(!_perfProfile.byTech)return{grade:'?',winRate:50,adjust:1};
+  var t=_perfProfile.byTech[techName];
+  if(!t||t.count<3)return{grade:'?',winRate:50,adjust:1};
+  var adj=t.grade==='A'?1.3:t.grade==='B'?1.0:t.grade==='C'?0.7:0.4;
+  return{grade:t.grade,winRate:t.winRate,rr:t.rr,count:t.count,kelly:t.kelly,adjust:adj};
+}
+function buildPerfSummary(){
+  if(!_perfProfile.byTech)return'성과 데이터 없음';
+  var lines=[];
+  Object.keys(_perfProfile.byTech).forEach(function(k){
+    var t=_perfProfile.byTech[k];
+    if(t.count<2)return;
+    lines.push(k+': '+t.grade+'등급 승률'+t.winRate+'% R/R'+t.rr+' '+t.count+'건 총손익'+(t.totalPnl>=0?'+':'')+Math.round(t.totalPnl).toLocaleString()+'원');
+  });
+  lines.push('최근20건 승률: '+(_perfProfile.recentWr||'-')+'%');
+  lines.push('적응형 손절: '+_adaptiveCfg.stop+'% / 비중: '+_adaptiveCfg.pos+'% / 최소R/R: '+_adaptiveCfg.rr);
+  return lines.join('\n');
+}
+try{var _sp=localStorage.getItem('htsPerfProfile');if(_sp)_perfProfile=JSON.parse(_sp);computeAdaptiveConfig();}catch(_e){}
 function cancelPending(id){pendingOrders=pendingOrders.filter(o=>o.id!==id);renderPending();}
 let chatHist=[],chatBusy=false;
 function checkPending(){pendingOrders.forEach((o,i)=>{const stk=STOCKS.find(s=>s.tk===o.tk);if(!stk)return;const hit=(o.side==="buy"&&stk.pr<=o.price)||(o.side==="sell"&&stk.pr>=o.price);if(hit){const prev=activeTk,prevSide=oSide,prevType=oType;activeTk=o.tk;oSide=o.side;oType="market";document.getElementById("ofQty").value=o.qty;submitOrder(true);activeTk=prev;oSide=prevSide;oType=prevType;pendingOrders.splice(i,1);addMsg("ai",`✅ 지정가 체결: ${o.nm} ${o.side==="buy"?"매수":"매도"} ${fW(o.price)}원 × ${o.qty}주`);renderPending();}});}
@@ -4033,11 +4116,24 @@ function _backtestReport(){
     `• 승률: ${winRate}% (${totalWins}승 ${totalLosses}패)\n` +
     (best ? `• 최고: ${best.date} (+${fW(best.pnl)})\n` : '') +
     (worst ? `• 최악: ${worst.date} (${fW(worst.pnl)})\n` : '');
+  // 진화 엔진: 백테스트 후 성과 프로파일 갱신
+  try{
+    var pp=computePerformanceProfile();
+    if(pp.byTech){
+      var evolveMsg='\n🧬 진화 엔진 업데이트:\n';
+      Object.keys(pp.byTech).forEach(function(k){
+        var t=pp.byTech[k];if(t.count<2)return;
+        evolveMsg+=`  ${k}: ${t.grade}등급 승률${t.winRate}% R/R${t.rr}\n`;
+      });
+      evolveMsg+=`  적응형→ 손절${_adaptiveCfg.stop}% 비중${_adaptiveCfg.pos}% 최소R/R${_adaptiveCfg.rr}`;
+      msg+=evolveMsg;
+    }
+  }catch(_e){console.warn('perfProfile:',_e.message);}
   addMsg('ai', msg);
   showAlert('백테스트 결과', msg);
-  // 매매일지 페이지 즉시 갱신 + 안내
   try{ renderJPage&&renderJPage(); }catch(_e){}
   addDecisionLog('📓 백테스트 일지 완료', `${backtest.dailyResults.length}일 / 매매 ${totalTrades}건 — 📓 버튼으로 확인`, '학습');
+  addDecisionLog('🧬 진화 엔진', '성과 프로파일 갱신 — 적응형 파라미터 적용', '학습');
 }
 // 실시간 거래 스트립 — 차트 헤더 아래 최근 6건
 function renderLiveTrades(){
@@ -4644,6 +4740,7 @@ function submitOrder(autoExec){
     if(cfg.al){const lr=-mock.todayPnl/cfg.capital*100;if(lr>=cfg.dayloss)showAlert("⚠ 일일 손실 한도",`한도 ${cfg.dayloss}% 도달\n매매 중단 권고.`);}
   }
   saveMock(); renderPort(); renderTradeLog(); updCash(); updPnl(); updCredLim();
+  if(oSide==='sell'&&(mock.trades||[]).filter(function(t){return t.side==='sell';}).length%5===0){try{computePerformanceProfile();}catch(_e){}}
   try{ renderLiveTrades&&renderLiveTrades(); }catch(_e){}
 
   // ── KIS 실계좌/모의투자 실제 주문 전송 (백테스트 중에는 생략)
@@ -6299,7 +6396,13 @@ async function _runScreeningAsync(){
       addDecisionLog('['+stk.nm+'] 대장첫숨 조건부 미달','장대양봉+첫음봉 OK, 이슈/재료 미확인 — 진입 보류','PASS');
     }
 
-    scored.push({tk:tk,stk:stk,score:score,tags:tags,lc:lc,lma5:lma5,lrsi:lrsi,volR:volR});
+    // 진화: 기법 성과 기반 점수 보정
+    var _detTech=_isPullback?'눌림목':_isBreakout?'돌파':_isGap?'갭상승':_isFirstBar?'첫봉':_isMomentum?'이슈테마':'기타';
+    var _tgCand=getTechGrade(_detTech);
+    if(_tgCand.grade==='A'){score=Math.round(score*1.15);tags.push('A등급↑');}
+    else if(_tgCand.grade==='D'){score=Math.round(score*0.6);tags.push('D등급↓');}
+    else if(_tgCand.grade==='C'){score=Math.round(score*0.85);tags.push('C등급↓');}
+    scored.push({tk:tk,stk:stk,score:score,tags:tags,lc:lc,lma5:lma5,lrsi:lrsi,volR:volR,detTech:_detTech});
   }
 
   if(!scored.length){
@@ -6343,6 +6446,7 @@ async function _runScreeningAsync(){
         const sv=activeTk,svSide=oSide,svType=oType,svCred=credType;
         activeTk=heldTk;oSide="sell";oType="market";credType="cash";
         document.getElementById("ofQty").value=pos.qty;
+        window._pendingSellReason='갈아타기 — '+best.stk.nm+'('+best.score+'점)으로 교체';
         submitOrder(true);
         activeTk=sv;oSide=svSide;oType=svType;credType=svCred;
         await new Promise(r=>setTimeout(r,200));
@@ -6361,9 +6465,11 @@ async function _runScreeningAsync(){
   // 스캘핑 기법 완전 차단
   const _tech = typeof detectTechnique === "function" ? detectTechnique(scored[0]?.lc||{}) : {};
   if(_tech.technique === "스캘핑"){addDecisionLog("스캘핑 차단","스캘핑 기법 금지 설정","NOGO");return;}
-  if(best.score<2){
+  // 진화: 적응형 최소 점수 (성과 좋으면 진입 기준 낮춤, 나쁘면 높임)
+  var _minEntry=Math.max(2,_adaptiveCfg.minScore||6);
+  if(best.score<_minEntry){
     var _whyPass = best.tags.join(' ')||'조건미달';
-    _whyPass += ' (최고 '+best.score+'점/4점 필요)';
+    _whyPass += ' (최고 '+best.score+'점/'+_minEntry+'점 필요 — 적응형)';
     addDecisionLog('['+best.stk.nm+'] 관망', _whyPass, '관망');
     updAdvBoxes('관망 — '+best.stk.nm+' ('+best.score+'점)', _whyPass);
     window._lastNoTradeReason = best.stk.nm+' '+_whyPass;
@@ -6552,20 +6658,25 @@ async function execAutoBuy(pr, stk, score, techTag){
     if(!window.backtest || !backtest.running) stopAuto();
     return;
   }
-  // 확신도(score)에 따라 비중 차등 — 타점 명확하면 화끈하게
-  // score>=12 강한신호 50% / >=10 강함 40% / >=8 보통 30% / 그 외 기본
+  // 진화: 적응형 비중 + 기법 성과 반영
+  var basePos=_adaptiveCfg.pos||30;
   let posPct;
   if(typeof score==='number'){
-    if(score>=12) posPct=50;
-    else if(score>=10) posPct=40;
-    else if(score>=8) posPct=30;
-    else posPct=20;
+    if(score>=12) posPct=Math.round(basePos*1.5);
+    else if(score>=10) posPct=Math.round(basePos*1.3);
+    else if(score>=8) posPct=basePos;
+    else posPct=Math.round(basePos*0.7);
   }else{
-    posPct = Math.max(5, Math.min(80, autoState.cfg.pos||30));
+    posPct = Math.max(5, Math.min(80, basePos));
   }
+  // 기법 성과 기반 조절
+  var _tg=getTechGrade(techTag||'');
+  if(_tg.grade==='A'){posPct=Math.round(posPct*1.2);addDecisionLog('['+stk.nm+'] 기법 A등급','비중 +20%','진화엔진');}
+  else if(_tg.grade==='D'){posPct=Math.round(posPct*0.5);addDecisionLog('['+stk.nm+'] 기법 D등급','비중 -50%','진화엔진');}
+  else if(_tg.grade==='C'){posPct=Math.round(posPct*0.7);}
   // 대장첫숨: 신중 진입 — 비중 1/3로 제한
   if(techTag==='대장첫숨'){ posPct=Math.min(posPct, 33); }
-  // 사용자 cfg 상한 존중 (cfg.pos를 사용자가 60%로 올려놓았다면 그 이상은 안 감)
+  // 사용자 cfg 상한 존중
   posPct = Math.min(posPct, Math.max(20, autoState.cfg.pos||50));
   // 신용 한도 포함 가용 자금 (잔고 + 신용한도 - 사용중)
   const creditAvail = Math.max(0, Math.round(mock.cash*((cfg.clim||140)/100)) - (mock.creditUsed||0));
@@ -6583,9 +6694,12 @@ async function execAutoBuy(pr, stk, score, techTag){
   const totalCost = qty * pr;
   const useCredit = totalCost > mock.cash && creditAvail > 0;
   document.getElementById("ofPr").value=pr;document.getElementById("ofQty").value=qty;
-  document.getElementById("ofStop").value=Math.round(pr*(1-autoState.cfg.stop/100));
-  document.getElementById("ofT1").value=Math.round(pr*(1+autoState.cfg.t1/100));
-  document.getElementById("ofT2").value=Math.round(pr*(1+autoState.cfg.t2/100));
+  var _adStop=_adaptiveCfg.stop||autoState.cfg.stop;
+  var _adT1=_adaptiveCfg.t1||autoState.cfg.t1;
+  var _adT2=_adaptiveCfg.t2||autoState.cfg.t2;
+  document.getElementById("ofStop").value=Math.round(pr*(1-_adStop/100));
+  document.getElementById("ofT1").value=Math.round(pr*(1+_adT1/100));
+  document.getElementById("ofT2").value=Math.round(pr*(1+_adT2/100));
   // ★ 자동매매는 신용만 사용. 미수(margin)는 절대 사용 안 함
   oSide="buy";oType="market";credType=useCredit?"credit":"cash";trailMode=autoState.cfg.trail;
   // credSel UI도 동기화 (submitOrder가 select에서 읽음)
@@ -6786,12 +6900,54 @@ async function detectTechnique(cs, stk){
     technique="역추세";score=2;
   }
   else{technique="눌림목";score=2;}
+  // ── 진화: 다중 확인 보너스 ──
+  var confirmBonus=0,confirmTags=[];
+  // C1: 5일 평균 거래량 대비 (단순 전봉 비교 → 5일 평균)
+  var avg5v_dt=vls.length>=6?(vls.slice(-6,-1).reduce(function(a,b){return a+b;},0)/5):vls[vls.length-2]||1;
+  var volR5=vls[vls.length-1]/avg5v_dt;
+  if(volR5>=2){confirmBonus+=2;confirmTags.push('거래량5일2배');}
+  else if(volR5>=1.5){confirmBonus+=1;confirmTags.push('거래량5일1.5배');}
+  // C2: MA 정배열 품질 (5>20>60)
+  var ma60=calcMA(cls,60);var lma60_dt=ma60[ma60.length-1]||0;
+  if(lma5>lma20&&lma20>lma60_dt&&lma60_dt>0){confirmBonus+=2;confirmTags.push('3중정배열');}
+  else if(lma5>lma20){confirmBonus+=1;confirmTags.push('단기정배열');}
+  // C3: 캔들 패턴 인식
+  var bodySize=Math.abs(lc.c-lc.o);var totalRange=lc.h-lc.l||1;
+  var upperW=lc.h-Math.max(lc.c,lc.o);var lowerW=Math.min(lc.c,lc.o)-lc.l;
+  if(lc.c>lc.o&&bodySize/totalRange>=0.6&&lowerW<bodySize*0.3){confirmBonus+=1;confirmTags.push('장대양봉');}
+  if(lc.c>lc.o&&lowerW>bodySize*2&&upperW<bodySize*0.5){confirmBonus+=1;confirmTags.push('망치형');}
+  var pbody=Math.abs(pc.c-pc.o);var ptotal=pc.h-pc.l||1;
+  if(pc.c<pc.o&&lc.c>lc.o&&lc.c>pc.o&&lc.o<pc.c){confirmBonus+=2;confirmTags.push('상승장악형');}
+  // C4: RSI 다이버전스 (가격 하락 but RSI 상승)
+  var rsiArr=calcRSI(cls,14);
+  var rsi2=rsiArr[rsiArr.length-2]||rsi;
+  if(cls[cls.length-1]<cls[cls.length-2]&&rsi>rsi2+2){confirmBonus+=1;confirmTags.push('RSI다이버전스');}
+  // C5: VWAP 위치 확인
+  if(cs.length>=10){
+    var vwap=calcVWAP(cs.slice(-20));var lvwap=vwap[vwap.length-1]||0;
+    if(lvwap>0&&lc.c>lvwap&&lc.c<lvwap*1.02){confirmBonus+=1;confirmTags.push('VWAP지지');}
+  }
+  // C6: 직전3봉 추세 (연속 양봉 or 저점 상승)
+  if(cs.length>=4){
+    var c3=cs.slice(-3);
+    var risingLows=c3[0].l<c3[1].l&&c3[1].l<c3[2].l;
+    if(risingLows){confirmBonus+=1;confirmTags.push('저점상승');}
+  }
+  score+=confirmBonus;
+  // ── 진화: 성과 기반 점수 조절 ──
+  var tg=getTechGrade(technique);
+  if(tg.grade!=='?'){
+    if(tg.grade==='D'){score=Math.round(score*0.5);confirmTags.push('D등급↓');}
+    else if(tg.grade==='A'){score=Math.round(score*1.2);confirmTags.push('A등급↑');}
+  }
   const t=TECHNIQUES[technique]||TECHNIQUES["눌림목"];
   const entryPr=lc.c;
-  const stopPr=Math.round(lma20*0.995||entryPr*0.97);
-  const rr=2;
+  var adStop=_adaptiveCfg.stop||3;
+  const stopPr=Math.round(Math.min(lma20*0.995,entryPr*(1-adStop/100))||entryPr*0.97);
+  var adRR=_adaptiveCfg.rr||2;
+  const rr=Math.max(adRR,1.5);
   const targetPr=Math.round(entryPr+(entryPr-stopPr)*rr);
-  return {technique,score,phase:t.phase,cond:t.cond,entry:entryPr,stop:stopPr,target:targetPr,rr,ma5:Math.round(lma5),ma20:Math.round(lma20),rsi:rsi.toFixed(0),volRatio:volRatio.toFixed(1)};
+  return {technique,score,phase:t.phase,cond:t.cond,entry:entryPr,stop:stopPr,target:targetPr,rr,ma5:Math.round(lma5),ma20:Math.round(lma20),rsi:rsi.toFixed(0),volRatio:volR5.toFixed(1),confirmTags:confirmTags,techGrade:tg.grade};
 }
 
 // ═══════════════════════════════
@@ -6877,14 +7033,26 @@ async function runFullAnalysis(){
   const pos=mock.positions[activeTk];
   const so=stopOrders[activeTk];
 
+  var _perfSum=buildPerfSummary();
+  var _techG=tech?getTechGrade(tech.technique):{grade:'?'};
+  var _learnCtx=(window.learningMemory||[]).slice(-5).map(function(l){return'['+l.category+'] '+l.text;}).join('\n');
   const prompt=`단타 트레이딩 멘토. Phase 8 통합 점검 기준으로 분석해줘.
 
 종목: ${stk.nm}(${activeTk}) ${stk.sec||""} ${stk.cap||""}
 현재가: ${fW(lc.c)}원
 5MA: ${lma5} / 20MA: ${lma20} / 60MA: ${lma60}
 RSI: ${rsi} / 거래량비율: ${volR}배
-감지된 기법: ${tech?.technique||"불명확"}
-${pos?`보유: ${pos.qty}주 평단 ${Math.round(pos.avgPrice).toLocaleString()}원${so?` 손절${fW(so.stop)} 목표${fW(so.t1)}`:""}`:""} 
+감지된 기법: ${tech?.technique||"불명확"} ${tech?.confirmTags?'['+tech.confirmTags.join(',')+']':''}
+${_techG.grade!=='?'?`기법 과거성과: ${_techG.grade}등급 승률${_techG.winRate}% R/R${_techG.rr} ${_techG.count}건`:''}
+${pos?`보유: ${pos.qty}주 평단 ${Math.round(pos.avgPrice).toLocaleString()}원${so?` 손절${fW(so.stop)} 목표${fW(so.t1)}`:""}`:""}
+
+[적응형 파라미터] 손절${_adaptiveCfg.stop}% / 비중${_adaptiveCfg.pos}% / 최소R/R ${_adaptiveCfg.rr}
+[전체 성과] ${_perfSum}
+[최근 학습]
+${_learnCtx||'없음'}
+
+위 성과 데이터를 참고해서 GO/NO-GO 판단에 반영해줘.
+기법 D등급이면 진입 자제, A등급이면 비중 확대 가능.
 
 Phase 8 STEP 0~7 간략 점검 결과를 JSON으로 답해:
 {
@@ -6908,6 +7076,7 @@ Phase 8 STEP 0~7 간략 점검 결과를 JSON으로 답해:
   },
   "goNogo": "GO" or "NO-GO",
   "goScore": 0~8,
+  "positionAdj": "비중조절 이유 (성과 기반)",
   "caution": "주의사항"
 }`;
 
@@ -10101,7 +10270,7 @@ function collectMarketCtx(){
 (function(){
   const meta = document.querySelector('meta[name="build-ts"]');
   const myBuildTs = meta ? meta.getAttribute('content') : '';
-  if(!myBuildTs || myBuildTs === '1779622681547') return; // 로컬 빌드 안 한 경우
+  if(!myBuildTs || myBuildTs === '1779625932371') return; // 로컬 빌드 안 한 경우
   let reloaded = false;
   async function check(){
     if(reloaded) return;
