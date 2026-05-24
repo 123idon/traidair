@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#ffffff">
-<meta name="build-ts" content="1779619577609">
+<meta name="build-ts" content="1779619925556">
 <title>TraidAIr HTS</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 
@@ -3531,12 +3531,25 @@ function _addLearningReply(stockNm, pnl, tk){
     if(!matched) return;
     if(item.replies.some(r=>r.date===date&&r.stock===stockNm)) return;
     item.replies.push({date:date,stock:stockNm,pnl:pnl,text:icon+' '+stockNm+' '+pnlStr+'원'});
-    if(item.replies.length>8) item.replies=item.replies.slice(-8);
+    if(item.replies.length>20) item.replies=item.replies.slice(-20);
+    _checkLearningWinRate(item);
   });
   try{
     localStorage.setItem('htsLearningMemory',JSON.stringify(learningMemory));
     saveToServer('htsLearningMemory',JSON.stringify(learningMemory));
   }catch(_e){}
+}
+function _checkLearningWinRate(item){
+  if(!item.replies || item.replies.length < 10) return;
+  var wins=item.replies.filter(function(r){return (r.pnl||0)>0;}).length;
+  var wr=Math.round(wins/item.replies.length*100);
+  if(wr < 50 && item.category !== '실패교훈'){
+    item._prevCategory = item.category;
+    item.category = '실패교훈';
+    item._winRate = wr;
+    item.text = item.text + ' [성공률 '+wr+'% → 재검토 필요]';
+    addDecisionLog('⚠ 실패 교훈 감지', item.text.slice(0,40)+'... ('+wr+'%)', '학습');
+  }
 }
 function _autoTrimLearning(){
   learningMemory = learningMemory.filter(m => {
@@ -3558,6 +3571,10 @@ function getLearningContext(maxItems){
     if(!byCat[c]) return;
     byCat[c].slice(-3).forEach(t=>{ out += `• [${c}] ${t}\n`; });
   });
+  if(byCat['실패교훈'] && byCat['실패교훈'].length){
+    out += '\n⚠ 아래는 10회+ 적용했으나 성공률 50% 미만인 교훈 — 이 기준은 의심하고 반대로 생각해볼 것:\n';
+    byCat['실패교훈'].forEach(t=>{ out += `• [실패교훈] ${t}\n`; });
+  }
   out += '═══ 위 학습 내용을 판단에 반영했다면, 응답에 어떤 항목을 반영했는지 명시할 것 ═══\n\n';
   return out;
 }
@@ -3585,7 +3602,7 @@ function openLearningMemo(){
       <div style="font-size:10px;color:var(--tm);margin-bottom:8px;">매매일지에서 누적된 깨달음입니다. 다음 매매 결정 시 AI 프롬프트에 자동 첨부돼요.</div>
       <div style="max-height:50vh;overflow-y:auto;display:flex;flex-direction:column;gap:6px;">
         ${learningMemory.length ? learningMemory.slice().reverse().map(l=>{
-          const catCol=l.category==='반성'?'var(--r)':l.category==='개선'?'var(--g)':l.category==='멘토'?'var(--b)':'var(--p)';
+          const catCol=l.category==='실패교훈'?'#888':l.category==='반성'?'var(--r)':l.category==='개선'?'var(--g)':l.category==='멘토'?'var(--b)':'var(--p)';
           const replies=(l.replies||[]).map(r=>{
             const rc=(r.pnl||0)>=0?'var(--g)':'var(--r)';
             return '<div style="font-size:9px;padding:3px 6px;margin-top:3px;background:var(--pan);border-radius:4px;border-left:2px solid '+rc+';color:var(--ts);">'+
@@ -5216,7 +5233,7 @@ function renderLearningMgmt(){
   const el=document.getElementById('learningMgmtPanel'); if(!el) return;
   const cnt=document.getElementById('learnCount'); if(cnt) cnt.textContent=(learningMemory||[]).length+'개';
   if(!learningMemory||!learningMemory.length){el.innerHTML='<div style="text-align:center;color:var(--tm);padding:20px;">학습 노트가 없습니다.</div>';return;}
-  const cats={반성:'var(--r)',개선:'var(--b)',멘토:'var(--p)',심리:'var(--a)',복기:'var(--g)'};
+  const cats={반성:'var(--r)',개선:'var(--b)',멘토:'var(--p)',심리:'var(--a)',복기:'var(--g)',실패교훈:'#888'};
   el.innerHTML=learningMemory.map((l,i)=>{
     const col=cats[l.category]||'var(--tm)';
     const reps=(l.replies||[]).map(r=>{
@@ -9782,7 +9799,7 @@ function collectMarketCtx(){
 (function(){
   const meta = document.querySelector('meta[name="build-ts"]');
   const myBuildTs = meta ? meta.getAttribute('content') : '';
-  if(!myBuildTs || myBuildTs === '1779619577609') return; // 로컬 빌드 안 한 경우
+  if(!myBuildTs || myBuildTs === '1779619925556') return; // 로컬 빌드 안 한 경우
   let reloaded = false;
   async function check(){
     if(reloaded) return;
