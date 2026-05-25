@@ -4986,19 +4986,31 @@ async function _runScreeningAsync(){
   }
   // ── Claude AI 심층 분석 (레벨3 이상, 평상시 배속) ──
   if(autoState.level>=3){
+    // 진화+ 중: 점수 7+ 만 Claude 호출 (저점수는 규칙 기반으로 처리 — API 비용 대폭 절감)
+    if(_evolveRunning && best.score<7){
+      if(best.score >= 4 || (best.score >= 3 && (best.tags.indexOf('확정시그널')!==-1||best.tags.indexOf('눌림목')!==-1||best.tags.indexOf('돌파')!==-1))){
+        var lcQ2=best.lc;
+        addDecisionLog('['+best.stk.nm+'] ✅ 진입 ('+best.score+'점·규칙)', best.tags.join(' · '), '규칙기반');
+        var _bestTech2 = best.tags.indexOf('대장첫숨')!==-1?'대장첫숨':'';
+        try{ await execAutoBuy(lcQ2.c, best.stk, best.score, _bestTech2); }catch(_e){}
+      } else {
+        addDecisionLog('['+best.stk.nm+'] 관망 ('+best.score+'점)', best.tags.join(' '), '규칙기반');
+      }
+      return;
+    }
     try{
       var lc2=best.lc;
       var stopPr=Math.round(lc2.c*(1-autoState.cfg.stop/100));
       var t1Pr=Math.round(lc2.c*(1+autoState.cfg.t1/100));
       var rr=((t1Pr-lc2.c)/(lc2.c-stopPr)).toFixed(2);
-      // 시황·강세섹터·공시·과거 학습·강의 원칙 맥락 자동 수집
       var _mkt = typeof collectMarketCtx==='function' ? collectMarketCtx() : '';
       var _si = (window._sectorInfo||{})[best.tk];
       var _sectorLine = _si ? `강세섹터 ${_si.rank}위 ${_si.sector} — ${_si.reason||''}` : '';
       var _shortLine = (_si && (_si.short_ratio || _si.short_trend)) ? `공매도 잔고 ${_si.short_ratio||'-'} / 추세 ${_si.short_trend||'-'}` : '';
       var _newsItems = (typeof window._newsItems!=='undefined' && Array.isArray(_newsItems)) ? _newsItems.slice(0,3).map(n=>'• '+(n.title||n)).join('\n') : '';
       var _learn = typeof getLearningContext==='function' ? getLearningContext(10) : '';
-      var _lec = typeof getLectureContext==='function' ? getLectureContext(2500) : '';
+      // 진화+ 중: 강의 컨텍스트 제외 (시뮬 데이터에 무의미, 토큰 절감)
+      var _lec = _evolveRunning ? '' : (typeof getLectureContext==='function' ? getLectureContext(2500) : '');
       var prompt='단타 트레이딩 멘토. 자동매매 최종 진입 여부.\n\n'+
         '⚠️ 절대 원칙: 아래 강의 매매 원칙은 100% 따라야 한다. 강의에 어긋나는 진입은 \"PASS\". 의심스러우면 PASS.\n'+
         '모든 매매 기법 적극 활용: 눌림목/대장첫숨/돌파/첫봉/갭상승/이슈테마.\n'+
