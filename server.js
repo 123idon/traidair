@@ -81,23 +81,51 @@ console.log('✅ 설정 로드:', {
 // ── KIS 토큰 캐시
 const kisTokenCache = {};
 
+// 네이버 클라우드 KIS 프록시 URL (환경변수로 설정, 없으면 직접 연결 시도)
+const KIS_PROXY_URL = process.env.KIS_PROXY_URL || '';
+
 function kisHost(mode) {
   return mode === 'real'
     ? 'openapi.koreainvestment.com'
     : 'openapivts.koreainvestment.com';
 }
 
-function kisPort(mode) {
-  return mode === 'real' ? 9443 : 29443;
+function kisPort() { return 443; }
+
+// 프록시 경유 KIS 요청 (http)
+function kisRequestViaProxy(proxyBase, modePath, method, headers, body) {
+  return new Promise((resolve, reject) => {
+    const url = new URL(proxyBase + modePath);
+    const bodyBuf = body ? Buffer.from(typeof body === 'string' ? body : JSON.stringify(body)) : null;
+    const reqHeaders = { ...headers };
+    if (bodyBuf) reqHeaders['content-length'] = bodyBuf.length;
+
+    const opts = {
+      hostname: url.hostname,
+      port: url.port || 3100,
+      path: url.pathname + (url.search || ''),
+      method: method || 'POST',
+      headers: reqHeaders,
+    };
+
+    const req = http.request(opts, res => {
+      let d = '';
+      res.on('data', c => d += c);
+      res.on('end', () => {
+        try { resolve({ status: res.statusCode, data: JSON.parse(d) }); }
+        catch(e) { resolve({ status: res.statusCode, data: {} }); }
+      });
+    });
+    req.on('error', reject);
+    req.setTimeout(15000, () => req.destroy(new Error('KIS 프록시 응답 없음 (15초)')));
+    if (bodyBuf) req.write(bodyBuf);
+    req.end();
+  });
 }
 
-function kisRequest(opts, body) {
+// 직접 KIS HTTPS 요청 (프록시 없을 때 폴백)
+function kisRequestDirect(opts, body) {
   return new Promise((resolve, reject) => {
-    // port가 없으면 모드에 따라 자동 설정
-    if (!opts.port) {
-      const mode = opts._mode || 'real';
-      opts.port = kisPort(mode);
-    }
     const req = https.request(opts, res => {
       let d = '';
       res.on('data', c => d += c);
@@ -107,10 +135,21 @@ function kisRequest(opts, body) {
       });
     });
     req.on('error', reject);
-    req.setTimeout(8000, () => { req.destroy(new Error('KIS 서버 응답 없음 (8초 초과)')); });
+    req.setTimeout(8000, () => req.destroy(new Error('KIS 서버 응답 없음 (8초)')));
     if (body) req.write(typeof body === 'string' ? body : JSON.stringify(body));
     req.end();
   });
+}
+
+// 통합 KIS 요청: 프록시 우선, 없으면 직접
+async function kisRequest(opts, body) {
+  if (KIS_PROXY_URL) {
+    const mode = opts._mode || (opts.hostname && opts.hostname.includes('vts') ? 'mock' : 'real');
+    const modePrefix = mode === 'mock' ? '/mock' : '/real';
+    return kisRequestViaProxy(KIS_PROXY_URL, modePrefix + opts.path, opts.method || 'GET', opts.headers || {}, body);
+  }
+  if (!opts.port) opts.port = 443;
+  return kisRequestDirect(opts, body);
 }
 
 async function getKisToken(appKey, appSecret, mode) {
@@ -121,12 +160,16 @@ async function getKisToken(appKey, appSecret, mode) {
   const body = JSON.stringify({ grant_type: 'client_credentials', appkey: appKey, appsecret: appSecret });
   const result = await kisRequest({
     hostname: kisHost(mode),
-    port: kisPort(mode),
+    port: 443,
     path: '/oauth2/tokenP',
     method: 'POST',
+    _mode: mode,
     headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
   }, body);
 
+  if (!result.data.access_token) {
+    console.error('[KIS 토큰 실패]', 'mode:', mode, 'proxy:', KIS_PROXY_URL || '없음(직접)', 'status:', result.status, 'response:', JSON.stringify(result.data).slice(0, 300));
+  }
   const token = result.data.access_token;
   if (token) {
     kisTokenCache[cacheKey] = { token, expires: Date.now() + 29 * 60 * 1000 };
@@ -372,7 +415,7 @@ const server = http.createServer(async (req, res) => {
           // KIS 일별 분봉 차트 — fid_input_date_1로 과거 일자 지정 (미래 데이터 사용 절대 금지)
           const result = await kisRequest({
             hostname: kisHost('real'),
-            port: kisPort('real'),
+            port: 443, _mode: 'real',
             path: `/uapi/domestic-stock/v1/quotations/inquire-time-dailychartprice?fid_etc_cls_code=&fid_cond_mrkt_div_code=J&fid_input_iscd=${code}&fid_input_hour_1=${interval}&fid_input_date_1=${dayStr}&fid_pw_data_inqu_yn=Y`,
             method: 'GET',
             headers: {
@@ -440,7 +483,7 @@ const server = http.createServer(async (req, res) => {
 
         const result = await kisRequest({
           hostname: kisHost('real'),
-          port: kisPort('real'),
+          port: 443, _mode: 'real',
           path: `/uapi/domestic-stock/v1/quotations/inquire-asking-price-exp-ccn?fid_cond_mrkt_div_code=J&fid_input_iscd=${code}`,
           method: 'GET',
           headers: {
@@ -481,7 +524,7 @@ const server = http.createServer(async (req, res) => {
         if (!token) throw new Error('토큰 없음');
         const result = await kisRequest({
           hostname: kisHost(mode || 'mock'),
-          port: kisPort(mode || 'mock'),
+          port: 443, _mode: mode || 'mock',
           path: `/uapi/domestic-stock/v1/quotations/inquire-price?fid_cond_mrkt_div_code=J&fid_input_iscd=${code}`,
           method: 'GET',
           headers: {
@@ -525,7 +568,8 @@ const server = http.createServer(async (req, res) => {
         const bodyStr = JSON.stringify(orderBody);
         const result = await kisRequest({
           hostname: kisHost(mode || 'mock'),
-          port: kisPort(mode || 'mock'), path: '/uapi/domestic-stock/v1/trading/order-cash', method: 'POST',
+          port: 443, _mode: mode || 'mock',
+          path: '/uapi/domestic-stock/v1/trading/order-cash', method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(bodyStr), 'authorization': `Bearer ${token}`, 'appkey': appKey, 'appsecret': appSecret, 'tr_id': trId, 'custtype': 'P', 'hashkey': '' },
         }, bodyStr);
         const d = result.data;
@@ -554,7 +598,7 @@ const server = http.createServer(async (req, res) => {
         const isMock = (mode || 'mock') === 'mock';
         const result = await kisRequest({
           hostname: kisHost(mode || 'mock'),
-          port: kisPort(mode || 'mock'),
+          port: 443, _mode: mode || 'mock',
           path: `/uapi/domestic-stock/v1/trading/inquire-balance?CANO=${acntPfx}&ACNT_PRDT_CD=${acntSfx||'01'}&AFHR_FLPR_YN=N&OFL_YN=&INQR_DVSN=02&UNPR_DVSN=01&FUND_STTL_ICLD_YN=N&FNCG_AMT_AUTO_RDPT_YN=N&PRCS_DVSN=01&CTX_AREA_FK100=&CTX_AREA_NK100=`,
           method: 'GET',
           headers: { 'Content-Type': 'application/json', 'authorization': `Bearer ${token}`, 'appkey': appKey, 'appsecret': appSecret, 'tr_id': isMock ? 'VTTC8434R' : 'TTTC8434R' },
