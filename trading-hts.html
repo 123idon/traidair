@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#ffffff">
-<meta name="build-ts" content="1779706871173">
+<meta name="build-ts" content="1779707642604">
 <title>TraidAIr HTS</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 
@@ -3208,6 +3208,144 @@ function getRegimeAdvice(regime,technique){
   return{adj:1,msg:''};
 }
 
+// ── 6. 자본곡선 드로다운 서킷브레이커 ──
+var _equityCurve={peakCash:0,maxDDPct:0,ddStartTime:null,tierHit:0};
+function updateEquityCurve(){
+  var equity=mock.cash;
+  Object.entries(mock.positions||{}).forEach(function(e){
+    var pos=e[1];if(!pos||pos.qty<=0)return;
+    var stk=STOCKS.find(function(s){return s.tk===e[0];});
+    if(stk)equity+=pos.qty*stk.pr;
+  });
+  if(equity>_equityCurve.peakCash)_equityCurve.peakCash=equity;
+  if(_equityCurve.peakCash<=0)_equityCurve.peakCash=equity;
+  var ddPct=_equityCurve.peakCash>0?((_equityCurve.peakCash-equity)/_equityCurve.peakCash*100):0;
+  if(ddPct>_equityCurve.maxDDPct)_equityCurve.maxDDPct=ddPct;
+  if(ddPct>=3){_equityCurve.tierHit=3;}
+  else if(ddPct>=2){_equityCurve.tierHit=2;}
+  else if(ddPct>=1){_equityCurve.tierHit=1;if(!_equityCurve.ddStartTime)_equityCurve.ddStartTime=Date.now();}
+  else{_equityCurve.tierHit=0;_equityCurve.ddStartTime=null;}
+  if(_equityCurve.tierHit===1&&_equityCurve.ddStartTime&&Date.now()-_equityCurve.ddStartTime>2700000)_equityCurve.tierHit=2;
+  return _equityCurve;
+}
+function resetEquityCurve(){_equityCurve.peakCash=mock.cash;_equityCurve.maxDDPct=0;_equityCurve.ddStartTime=null;_equityCurve.tierHit=0;}
+
+// ── 7. 다중신호 청산 최적화 (모멘텀 소진/꼬리/다이버전스 감지) ──
+function computeExitSignal(tk){
+  var pos=mock.positions[tk];var so=stopOrders[tk];
+  if(!pos||!so)return null;
+  var cs;try{cs=tk===activeTk?sim.candles.slice(0,sim.idx+1):_peekSimCandlesFor(tk,sim.date,sim.idx);}catch(_e){return null;}
+  if(!cs||cs.length<10)return null;
+  var cls=cs.map(function(c){return c.c;});var vls=cs.map(function(c){return c.v;});
+  var lc=cs[cs.length-1];var urgency=0;var reasons=[];
+  // 거래량 이탈 (가격↑ 거래량↓)
+  if(cls.length>=4&&cls[cls.length-1]>cls[cls.length-3]&&vls[cls.length-1]<vls[cls.length-3]*0.7){urgency+=2;reasons.push('거래량이탈');}
+  // 윗꼬리 비대
+  var body=Math.abs(lc.c-lc.o);var upperW=lc.h-Math.max(lc.c,lc.o);
+  if(body>0&&upperW>body*1.5){urgency+=2;reasons.push('윗꼬리비대');}
+  // RSI 베어리쉬 다이버전스
+  var rsiArr=calcRSI(cls,14);
+  if(rsiArr.length>=4&&cls[cls.length-1]>cls[cls.length-4]&&(rsiArr[rsiArr.length-1]||50)<(rsiArr[rsiArr.length-4]||50)-3){urgency+=3;reasons.push('RSI다이버전스');}
+  // 5MA 데드크로스
+  var ma5=calcMA(cls,5);var ma20=calcMA(cls,20);
+  if(ma5.length>=2&&ma20.length>=1&&(ma5[ma5.length-2]||0)>(ma20[ma20.length-1]||0)&&(ma5[ma5.length-1]||0)<=(ma20[ma20.length-1]||0)){urgency+=4;reasons.push('5MA데드크로스');}
+  // 모멘텀 소진 (3봉 연속 축소)
+  if(cs.length>=4){
+    var b1=Math.abs(cs[cs.length-3].c-cs[cs.length-3].o),b2=Math.abs(cs[cs.length-2].c-cs[cs.length-2].o),b3=Math.abs(cs[cs.length-1].c-cs[cs.length-1].o);
+    if(b1>b2&&b2>b3&&b3<b1*0.4){urgency+=2;reasons.push('모멘텀소진');}
+  }
+  if(urgency>=5)return{action:'EXIT_ALL',urgency:urgency,reasons:reasons};
+  if(urgency>=3)return{action:'TIGHTEN_STOP',urgency:urgency,reasons:reasons,newStop:Math.round((so.stop+lc.c)/2)};
+  return{action:'HOLD',urgency:urgency,reasons:reasons};
+}
+
+// ── 8. 순차 패턴 체인 (A 이후 B가 어떻게 되는가 + 시간감쇠) ──
+var _patternChains=[];
+try{var _pc2=localStorage.getItem('htsPatternChains');if(_pc2)_patternChains=JSON.parse(_pc2);}catch(_e){}
+function recordPatternChain(sellTrade){
+  var recent=(mock.trades||[]).filter(function(t){return t.tk===sellTrade.tk&&t.side==='sell'&&t.ts!==sellTrade.ts&&sellTrade.ts-t.ts<7200000&&sellTrade.ts-t.ts>0;});
+  if(!recent.length)return;
+  var prev=recent.sort(function(a,b){return b.ts-a.ts;})[0];
+  _patternChains.push({date:sim.date,tk:sellTrade.tk,prevTech:prev.technique||'?',prevWin:(prev.pnl||0)>0?1:0,curTech:sellTrade.technique||'?',curWin:(sellTrade.pnl||0)>0?1:0,ts:Date.now()});
+  if(_patternChains.length>500)_patternChains=_patternChains.slice(-500);
+  try{localStorage.setItem('htsPatternChains',JSON.stringify(_patternChains));}catch(_e){}
+}
+function queryPatternChain(prevTech,prevWin){
+  if(_patternChains.length<10)return{score:0,msg:''};
+  var now=Date.now();var HL=30*86400000;
+  var m=_patternChains.filter(function(c){return c.prevTech===prevTech&&c.prevWin===prevWin;});
+  if(m.length<3)return{score:0,msg:''};
+  var ww=0,wt=0;
+  m.forEach(function(c){var w=Math.pow(0.5,(now-c.ts)/HL);wt+=w;if(c.curWin)ww+=w;});
+  var wr=wt>0?Math.round(ww/wt*100):50;
+  return{score:wr,count:m.length,msg:prevTech+(prevWin?'승':'패')+'후 '+wr+'%('+m.length+'건)'};
+}
+
+// ── 9. VWAP 밴드 + 거래량 프로파일 진입 구간 ──
+function calcVWAPBands(cs){
+  if(!cs||cs.length<10)return null;
+  var cumVP=0,cumV=0,vwaps=[],typicals=[];
+  for(var i=0;i<cs.length;i++){
+    var tp=(cs[i].h+cs[i].l+cs[i].c)/3;cumVP+=tp*cs[i].v;cumV+=cs[i].v;
+    vwaps.push(cumV>0?cumVP/cumV:tp);typicals.push(tp);
+  }
+  var cumSq=0;for(var j=0;j<cs.length;j++){var d=typicals[j]-vwaps[j];cumSq+=d*d*cs[j].v;}
+  var std=cumV>0?Math.sqrt(cumSq/cumV):0;
+  var lv=vwaps[vwaps.length-1];
+  return{vwap:lv,upper1:lv+std,lower1:lv-std,upper2:lv+std*2,lower2:lv-std*2,std:std};
+}
+function volumeZoneScore(cs){
+  var bands=calcVWAPBands(cs);
+  if(!bands)return{bonus:0,zone:''};
+  var price=cs[cs.length-1].c;
+  if(price<=bands.lower1&&price>=bands.lower2)return{bonus:2,zone:'VWAP하단밴드'};
+  if(Math.abs(price-bands.vwap)/bands.vwap<0.003)return{bonus:1,zone:'VWAP지지'};
+  if(price>=bands.upper2)return{bonus:-2,zone:'VWAP과열'};
+  if(price<=bands.lower2)return{bonus:-1,zone:'VWAP투매'};
+  return{bonus:0,zone:''};
+}
+
+// ── 10. 섹터 상관관계 필터 (같은 섹터 집중 방지 + 모멘텀 감쇠) ──
+var _sectorMomentum={};
+try{var _sm=localStorage.getItem('htsSectorMomentum');if(_sm)_sectorMomentum=JSON.parse(_sm);}catch(_e){}
+function updateSectorMomentum(){
+  var sells=(mock.trades||[]).filter(function(t){return t.side==='sell';});
+  var byDateSec={};
+  sells.forEach(function(t){
+    var stk=STOCKS.find(function(s){return s.tk===t.tk;});if(!stk)return;
+    var sec=stk.sec||'기타';var key=t.date+'_'+sec;
+    if(!byDateSec[key])byDateSec[key]={sec:sec,w:0,l:0,pnl:0};
+    if((t.pnl||0)>0)byDateSec[key].w++;else byDateSec[key].l++;
+    byDateSec[key].pnl+=(t.pnl||0);
+  });
+  var secDays={};
+  Object.values(byDateSec).forEach(function(d){if(!secDays[d.sec])secDays[d.sec]=[];secDays[d.sec].push(d);});
+  Object.keys(secDays).forEach(function(sec){
+    var days=secDays[sec].slice(-5);
+    var tw=days.reduce(function(s,d){return s+d.w;},0);
+    var tt=days.reduce(function(s,d){return s+d.w+d.l;},0);
+    var tp=days.reduce(function(s,d){return s+d.pnl;},0);
+    var last2=days.slice(-2),prev3=days.slice(0,-2);
+    var l2p=last2.reduce(function(s,d){return s+d.pnl;},0);
+    var p3p=prev3.reduce(function(s,d){return s+d.pnl;},0);
+    _sectorMomentum[sec]={wr:tt>0?Math.round(tw/tt*100):50,pnl:Math.round(tp),trades:tt,decaying:p3p>0&&l2p<p3p*0.3};
+  });
+  try{localStorage.setItem('htsSectorMomentum',JSON.stringify(_sectorMomentum));}catch(_e){}
+}
+function getCorrelationPenalty(tk){
+  var stk=STOCKS.find(function(s){return s.tk===tk;});if(!stk)return{penalty:0,reason:''};
+  var mySec=stk.sec||'기타';var penalty=0;var reasons=[];
+  Object.keys(mock.positions||{}).forEach(function(heldTk){
+    var pos=mock.positions[heldTk];if(!pos||pos.qty<=0)return;
+    var hs=STOCKS.find(function(s){return s.tk===heldTk;});
+    if(hs&&(hs.sec||'기타')===mySec){penalty-=2;reasons.push(mySec+'보유중');}
+  });
+  var sm=_sectorMomentum[mySec];
+  if(sm&&sm.decaying){penalty-=1;reasons.push(mySec+'모멘텀감쇠');}
+  if(sm&&sm.wr<35&&sm.trades>=5){penalty-=1;reasons.push(mySec+'승률'+sm.wr+'%');}
+  return{penalty:penalty,reason:reasons.join('+')};
+}
+
 // ═══════════════════════════════════════════════
 // 추가진화: 유전 알고리즘 + AI 하이브리드 기법 발굴
 // ═══════════════════════════════════════════════
@@ -4691,6 +4829,7 @@ async function _backtestLoadDay(dateStr){
   sim.date=dateStr;
   const md=document.getElementById('mockDate'); if(md) md.value=dateStr;
   mock.todayPnl=0; mock.todayTrades=0; mock.lossSeries=0;
+  resetEquityCurve();
   // 신용 이자 일일 차감
   if(mock.creditUsed>0){var _di=Math.round(mock.creditUsed*(cfg.crate||8.5)/365/100);mock.cash-=_di;mock.todayPnl-=_di;addDecisionLog('💰 신용이자',fW(_di)+'원 차감 (잔액 '+fW(mock.creditUsed)+'×'+(cfg.crate||8.5)+'%/365)','비용');}
   if(mock.marginUsed>0){var _mi=Math.round(mock.marginUsed*(cfg.mrate||12)/365/100);mock.cash-=_mi;mock.todayPnl-=_mi;addDecisionLog('💰 미수이자',fW(_mi)+'원 차감','비용');}
@@ -5492,7 +5631,9 @@ function submitOrder(autoExec){
       recordRegimePerf(_regime2,_sellTech,pnl);
       var _rc2=_tradeContext[activeTk];
       if(_rc2&&_rc2._ruleCheck)recordAdherence(_sellTech,_rc2._ruleCheck,pnl);
-      if((mock.trades||[]).filter(function(t){return t.side==='sell';}).length%10===0){evolveFeatureWeights();}
+      if((mock.trades||[]).filter(function(t){return t.side==='sell';}).length%10===0){evolveFeatureWeights();updateSectorMomentum();}
+      var _lastTrade=(mock.trades||[]).slice(-1)[0];
+      if(_lastTrade)recordPatternChain(_lastTrade);
     }catch(_le){}
     if(pnl<0){mock.lossSeries++;mock.winSeries=0;}
     else{
@@ -5552,6 +5693,25 @@ function checkStopOrders(){
       }catch(_e){}
     }
     const pr=stk.pr;
+    // 다중신호 청산 최적화
+    try{
+      var _exit=computeExitSignal(tk);
+      if(_exit&&_exit.action==='EXIT_ALL'&&pos.qty>0){
+        var svTk=activeTk,svSide=oSide,svType=oType,svCred=credType;
+        activeTk=tk;oSide="sell";oType="market";credType="cash";
+        document.getElementById("ofQty").value=pos.qty;
+        window._pendingSellReason='다중청산신호: '+_exit.reasons.join('+');
+        submitOrder(true);
+        activeTk=svTk;oSide=svSide;oType=svType;credType=svCred;
+        delete stopOrders[tk];
+        addMsg("ai",'🔶 다중신호 청산! '+stk.nm+' (긴급도 '+_exit.urgency+')\n'+_exit.reasons.join(' · '));
+        return;
+      }
+      if(_exit&&_exit.action==='TIGHTEN_STOP'&&_exit.newStop>so.stop){
+        so.stop=_exit.newStop;
+        addDecisionLog('['+stk.nm+'] 손절선 상향','다중신호: '+_exit.reasons.join('+')+' → '+fW(_exit.newStop),'리스크');
+      }
+    }catch(_ex){}
     // Trailing update
     if(so.trail==="pct"&&pr>so.trailHigh){so.trailHigh=pr;so.stop=Math.round(pr*(1-autoState.cfg.stop/100));}
     if(so.trail==="ma5"){const cs=sim.candles.slice(0,sim.idx+1);const ma=calcMA(cs.map(c=>c.c),5);const m=ma[ma.length-1];if(m&&m>so.stop)so.stop=Math.round(m);}
@@ -7236,6 +7396,19 @@ async function _runScreeningAsync(){
     var _regime=detectMarketRegime();
     var _regAdv=getRegimeAdvice(_regime,_detTech);
     if(_regAdv.adj!==1){score=Math.round(score*_regAdv.adj);if(_regAdv.msg)tags.push(_regAdv.msg);}
+    // VWAP 밴드 진입 구간
+    var _vz=volumeZoneScore(cs);
+    if(_vz.bonus){score+=_vz.bonus;if(_vz.zone)tags.push(_vz.zone);}
+    // 섹터 상관관계 필터
+    var _cp=getCorrelationPenalty(tk);
+    if(_cp.penalty){score+=_cp.penalty;if(_cp.reason)tags.push(_cp.reason);}
+    // 순차 패턴 체인
+    var _lastSell=(mock.trades||[]).filter(function(t){return t.tk===tk&&t.side==='sell';}).slice(-1)[0];
+    if(_lastSell){var _chain=queryPatternChain(_lastSell.technique||'?',(_lastSell.pnl||0)>0?1:0);if(_chain.score>=65&&_chain.count>=5){score+=1;tags.push('체인승률'+_chain.score+'%');}else if(_chain.score<=25&&_chain.count>=5){score-=1;tags.push('체인경고');}}
+    // 드로다운 서킷브레이커
+    var _ec=updateEquityCurve();
+    if(_ec.tierHit>=3){addDecisionLog('[서킷브레이커]','드로다운 3%+ — 전종목 매매 중지','리스크');scored=[];break;}
+    if(_ec.tierHit>=2){score=Math.round(score*0.5);tags.push('DD경고Lv2');}
     scored.push({tk:tk,stk:stk,score:score,tags:tags,lc:lc,lma5:lma5,lrsi:lrsi,volR:volR,detTech:_detTech,entryCond:_entryCond,ruleCheck:_ruleCheck,regime:_regime});
   }
 
@@ -11127,7 +11300,7 @@ function collectMarketCtx(){
 (function(){
   const meta = document.querySelector('meta[name="build-ts"]');
   const myBuildTs = meta ? meta.getAttribute('content') : '';
-  if(!myBuildTs || myBuildTs === '1779706871173') return; // 로컬 빌드 안 한 경우
+  if(!myBuildTs || myBuildTs === '1779707642604') return; // 로컬 빌드 안 한 경우
   let reloaded = false;
   async function check(){
     if(reloaded) return;
