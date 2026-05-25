@@ -52,8 +52,8 @@ try { _localCfg = JSON.parse(require('fs').readFileSync('./cfg.json','utf8')); }
 
 let runtimeConfig = {
   claudeKey:    process.env.ANTHROPIC_API_KEY || _localCfg.ck || '',
-  kisAppKey:    process.env.KIS_APP_KEY       || _localCfg.ak || '',
-  kisAppSecret: process.env.KIS_APP_SECRET    || _localCfg.as || '',
+  kisAppKey:    process.env.KIS_APP_KEY       || _localCfg.ak || 'PSrI4OkbeIl4zTuwKEO1ORdKbPklB2NeeAp4',
+  kisAppSecret: process.env.KIS_APP_SECRET    || _localCfg.as || 't8js7Q3Mh2HVkKdjWq4WK2QJAZtmi2oabSgLg1Y8ofaLde7ManMljS/D9hFjbw9csXRVncC2RRGBm8OUN+BabR+5u8hpsJx4s6wCh7X68hH6ETFyNn+Fzx/gt5zUDgNbS+ukh4KFKBntqVKt5MCCiD/vJ9IKv4ytAzrml3WyAp7uz5kZYjA=',
   kisAccount:   process.env.KIS_ACCOUNT       || _localCfg.ac || '',
   kisMode:      process.env.KIS_MODE          || _localCfg.md || 'real',
   dartKey:      process.env.DART_API_KEY      || _localCfg.dk || '',
