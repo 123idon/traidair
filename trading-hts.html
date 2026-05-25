@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#ffffff">
-<meta name="build-ts" content="1779694636295">
+<meta name="build-ts" content="1779695251141">
 <title>TraidAIr HTS</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 
@@ -2509,10 +2509,12 @@ function calcMACD(d){const ema=(d,n)=>{const k=2/(n+1);let e=d[0];return d.map(v
 function calcVWAP(cs){let pv=0,tv=0;return cs.map(c=>{pv+=((c.h+c.l+c.c)/3)*c.v;tv+=c.v;return Math.round(pv/tv)});}
 
 function _roundTick(p){
+  if(p>=500000)return Math.round(p/1000)*1000;
+  if(p>=200000)return Math.round(p/500)*500;
   if(p>=50000)return Math.round(p/100)*100;
-  if(p>=10000)return Math.round(p/100)*100;
+  if(p>=20000)return Math.round(p/50)*50;
   if(p>=5000)return Math.round(p/10)*10;
-  if(p>=1000)return Math.round(p/5)*5;
+  if(p>=2000)return Math.round(p/5)*5;
   return Math.round(p);
 }
 function rng32(seed){let a=seed|0;return()=>{a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
@@ -2543,7 +2545,7 @@ function _peekSimCandlesFor(tk, dateStr, untilIdx){
         const h = c*(1+r2*.009), l = c*(1-r3*.009), o = base*(1+(r4-.5)*.007);
         const v = Math.round(40000+r1*170000);
         const hm = 9*60+i*intervals;
-        out.push({t:`${String(Math.floor(hm/60)).padStart(2,'0')}:${String(hm%60).padStart(2,'0')}`,date:dayStr,isPrev:!!isPrev,o:Math.round(o),h:Math.round(Math.max(o,c,h)),l:Math.round(Math.min(o,c,l)),c:Math.round(c),v});
+        out.push({t:`${String(Math.floor(hm/60)).padStart(2,'0')}:${String(hm%60).padStart(2,'0')}`,date:dayStr,isPrev:!!isPrev,o:_roundTick(o),h:_roundTick(Math.max(o,c,h)),l:_roundTick(Math.min(o,c,l)),c:_roundTick(c),v});
         base = c;
       }
       return out;
@@ -2871,7 +2873,7 @@ function _genSimCandles(tk,dt){
       const o=base*(1+(r4-.5)*.008);
       const v=Math.round(5000000+r1*25000000);
       const ds=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-      res.push({t:ds,o:Math.round(o),h:Math.round(h),l:Math.round(l),c:Math.round(c),v});
+      res.push({t:ds,o:_roundTick(o),h:_roundTick(h),l:_roundTick(l),c:_roundTick(c),v});
       base=c;
     }
     sim.candles=res;
@@ -2904,7 +2906,7 @@ function _genSimCandles(tk,dt){
       const h=c*(1+r2*.009),l=c*(1-r3*.009),o=base*(1+(r4-.5)*.007);
       const v=Math.round(40000+r1*170000);
       const hm=9*60+i*intervals;
-      out.push({t:`${String(Math.floor(hm/60)).padStart(2,"0")}:${String(hm%60).padStart(2,"0")}`,date:dayStr,isPrev:!!isPrev,o:Math.round(o),h:Math.round(Math.max(o,c,h)),l:Math.round(Math.min(o,c,l)),c:Math.round(c),v});
+      out.push({t:`${String(Math.floor(hm/60)).padStart(2,"0")}:${String(hm%60).padStart(2,"0")}`,date:dayStr,isPrev:!!isPrev,o:_roundTick(o),h:_roundTick(Math.max(o,c,h)),l:_roundTick(Math.min(o,c,l)),c:_roundTick(c),v});
       base=c;
     }
     return out;
@@ -3791,11 +3793,12 @@ function _drawChartInner(){
       var x=toX(matchIdx);
       var _tpr=t.price||t.pr||0;
       if(!_tpr) return;
-      var yPr=toY(_tpr);
-      if(yPr<PT-5||yPr>PT+mainH+5) return;
       var isBuy=t.side==='buy';
-      var cx=cs[matchIdx];
-      if(cx){yPr=isBuy?toY(cx.l):toY(cx.h);}
+      var yPr=toY(_tpr);
+      if(yPr<PT-20||yPr>PT+mainH+20){
+        var cx=cs[matchIdx];
+        if(cx)yPr=toY(isBuy?cx.l:cx.h);
+      }
       yPr=Math.max(PT+2,Math.min(PT+mainH-2,yPr));
       ctx.save();
       ctx.fillStyle=isBuy?'#00c471':'#ff4757';
@@ -10955,7 +10958,7 @@ function collectMarketCtx(){
 (function(){
   const meta = document.querySelector('meta[name="build-ts"]');
   const myBuildTs = meta ? meta.getAttribute('content') : '';
-  if(!myBuildTs || myBuildTs === '1779694636295') return; // 로컬 빌드 안 한 경우
+  if(!myBuildTs || myBuildTs === '1779695251141') return; // 로컬 빌드 안 한 경우
   let reloaded = false;
   async function check(){
     if(reloaded) return;
