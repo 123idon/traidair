@@ -1245,7 +1245,7 @@ async function _gaRound(gen){
   var best=_evolveGeneration();
   var bestWr=best&&(best.wins+best.losses)>0?Math.round(best.wins/(best.wins+best.losses)*100):0;
   _evoPlus.log.push({time:Date.now(),type:'gen',msg:'C'+_evolveCycle+' '+_evoPlus.generation+'세대 — 적합도'+((best&&best.fitness)||0).toFixed(0)+' 승률'+bestWr+'%'});
-  if(best&&best.fitness>=25){
+  if(best&&best.fitness>=40){
     registerEvolvedTechnique(best);
     _evoPlus.log.push({time:Date.now(),type:'register',msg:'기법 등록 (적합도'+best.fitness.toFixed(0)+' 승률'+bestWr+'%)'});
   }
