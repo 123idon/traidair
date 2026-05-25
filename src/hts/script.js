@@ -1213,8 +1213,9 @@ function getCorrelationPenalty(tk){
 var _evoPlus={running:false,generation:0,pool:[],hall:[],log:[],bestFitness:0};
 try{var _ep=localStorage.getItem('htsEvoPlus');if(_ep){var _epd=JSON.parse(_ep);_evoPlus.pool=_epd.pool||[];_evoPlus.hall=_epd.hall||[];_evoPlus.generation=_epd.generation||0;_evoPlus.bestFitness=_epd.bestFitness||0;}}catch(_e){}
 function _saveEvoPlus(){try{localStorage.setItem('htsEvoPlus',JSON.stringify({pool:_evoPlus.pool,hall:_evoPlus.hall,generation:_evoPlus.generation,bestFitness:_evoPlus.bestFitness}));}catch(_e){}}
-function _randomGene(){
-  return{
+function _randomGene(retries){
+  retries=retries||0;
+  var g={
     id:'evo_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
     name:'',generation:_evoPlus.generation+1,
     maAlign:Math.random()<0.7?'short':Math.random()<0.5?'triple':'none',
@@ -1232,6 +1233,8 @@ function _randomGene(){
     targetMult:1.5+Math.random()*1.5,
     fitness:0,wins:0,losses:0,totalPnl:0,tested:0
   };
+  if(_isBlacklisted(g)&&retries<5)return _randomGene(retries+1);
+  return g;
 }
 function _crossover(a,b){
   var child={};var keys=['maAlign','volMin','rsiLow','rsiHigh','bodyRatio','candleBull','lowerWickMin','useVwap','useRisingLows','usePrevBull','useDivergence','stopPct','targetMult'];
@@ -1356,8 +1359,40 @@ function _geneToDesc(g){
   if(g.useDivergence)parts.push('RSI다이버전스');
   return parts.join('+');
 }
+// 발굴기법 블랙리스트 (테스트 10회+ 승률 70% 미만 → 재테스트 금지)
+var _geneBlacklist=[];
+try{var _gb=localStorage.getItem('htsGeneBlacklist');if(_gb)_geneBlacklist=JSON.parse(_gb);}catch(_e){}
+function _geneSignature(gene){
+  return[gene.maAlign,Math.round(gene.volMin*10),gene.rsiLow,gene.rsiHigh,Math.round(gene.bodyRatio*10),gene.candleBull?1:0,gene.useVwap?1:0,gene.useRisingLows?1:0].join('_');
+}
+function _isBlacklisted(gene){
+  var sig=_geneSignature(gene);
+  return _geneBlacklist.some(function(b){return b.sig===sig;});
+}
+function _addToBlacklist(gene,wr){
+  var sig=_geneSignature(gene);
+  if(!_geneBlacklist.some(function(b){return b.sig===sig;})){
+    _geneBlacklist.push({sig:sig,desc:_geneToDesc(gene),wr:wr,ts:Date.now()});
+    if(_geneBlacklist.length>200)_geneBlacklist=_geneBlacklist.slice(-200);
+    try{localStorage.setItem('htsGeneBlacklist',JSON.stringify(_geneBlacklist));}catch(_e){}
+  }
+}
 function registerEvolvedTechnique(gene){
-  var wr=gene.wins+gene.losses>0?Math.round(gene.wins/(gene.wins+gene.losses)*100):0;
+  var total=gene.wins+gene.losses;
+  var wr=total>0?Math.round(gene.wins/total*100):0;
+  // 테스트 10회 미만 → 아직 판단 불가, 등록 보류
+  if(total<10){return null;}
+  // 승률 70% 미만 → 블랙리스트 추가, 등록 거부
+  if(wr<70){
+    _addToBlacklist(gene,wr);
+    addDecisionLog('🧬 기법 탈락',_geneToDesc(gene)+' — '+total+'회 테스트 승률'+wr+'% (70% 미달)','진화');
+    return null;
+  }
+  // 블랙리스트 확인 (동일 조건 재등록 방지)
+  if(_isBlacklisted(gene)){
+    addDecisionLog('🧬 블랙리스트',_geneToDesc(gene)+' — 이전 탈락 기법','진화');
+    return null;
+  }
   var baseName=gene.name||('진화기법_G'+gene.generation);
   var name=baseName;
   var suffix=2;
@@ -1365,9 +1400,23 @@ function registerEvolvedTechnique(gene){
   var desc=_geneToDesc(gene);
   var sc=_calcScore(wr,gene.wins&&gene.losses?(gene.wins/gene.losses):0,0);
   TECHNIQUES[name]={phase:'EVO-'+gene.generation,cond:desc,stop:'진입가 -'+gene.stopPct.toFixed(1)+'%',target:'R/R 1:'+gene.targetMult.toFixed(1),evolved:true,gene:gene,winRate:wr,score:sc};
-  addMsg('ai','🧬 신규 기법 등록: '+name+'\n• 조건: '+desc+'\n• 점수: '+sc+'/100 (승률 '+wr+'%)\n• R/R: 1:'+gene.targetMult.toFixed(1)+'\n• 세대: '+gene.generation);
-  addDecisionLog('🧬 신규기법 등록',name+' — '+desc+' ('+sc+'점)','진화');
+  addMsg('ai','🧬 신규 기법 등록: '+name+'\n• 조건: '+desc+'\n• 테스트: '+total+'회 승률 '+wr+'%\n• R/R: 1:'+gene.targetMult.toFixed(1));
+  addDecisionLog('🧬 신규기법 등록',name+' — '+total+'회 '+wr+'% ('+sc+'점)','진화');
   return name;
+}
+// 등록된 기법 정기 검증 — 승률 70% 미달 시 삭제
+function auditEvolvedTechniques(){
+  Object.keys(TECHNIQUES).forEach(function(k){
+    var t=TECHNIQUES[k];if(!t||!t.evolved||!t.gene)return;
+    var g=t.gene;var total=g.wins+g.losses;
+    if(total<10)return;
+    var wr=Math.round(g.wins/total*100);
+    if(wr<70){
+      _addToBlacklist(g,wr);
+      delete TECHNIQUES[k];
+      addDecisionLog('🧬 기법 삭제',k+' — '+total+'회 승률'+wr+'% (70% 미달)','진화');
+    }
+  });
 }
 async function _aiRefineGenes(){
   var top=_evoPlus.pool.slice().sort(function(a,b){return b.fitness-a.fitness;}).slice(0,3);
@@ -1562,6 +1611,7 @@ function _finishLoopRound(){
   computePerformanceProfile();
   evolveFeatureWeights();
   updateSectorMomentum();
+  auditEvolvedTechniques();
   // 루프 결과 기록
   var snap=_takeSnapshot();
   var loopResult={
@@ -1607,9 +1657,9 @@ async function _gaRound(gen){
   var best=_evolveGeneration();
   var bestWr=best&&(best.wins+best.losses)>0?Math.round(best.wins/(best.wins+best.losses)*100):0;
   _evoPlus.log.push({time:Date.now(),type:'gen',msg:'C'+_evolveCycle+' G'+_evoPlus.generation+' 적합도'+((best&&best.fitness)||0).toFixed(0)});
-  if(best&&best.fitness>=40){
-    registerEvolvedTechnique(best);
-    _evoPlus.log.push({time:Date.now(),type:'register',msg:'기법 등록 (적합도'+best.fitness.toFixed(0)+')'});
+  if(best&&best.fitness>=40&&!_isBlacklisted(best)){
+    var regName=registerEvolvedTechnique(best);
+    if(regName)_evoPlus.log.push({time:Date.now(),type:'register',msg:regName+' 등록 ('+bestWr+'%)'});
   }
   // 가중치 진화도 GA와 연동
   if(gen===2)try{evolveFeatureWeights();}catch(_e){}
