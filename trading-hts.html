@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#ffffff">
-<meta name="build-ts" content="1779684287151">
+<meta name="build-ts" content="1779686127480">
 <title>TraidAIr HTS</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 
@@ -3242,8 +3242,8 @@ function renderEvoPlusPanel(){
           '<span style="flex:1;font-family:var(--mono);font-size:7px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+_geneToDesc(g)+'</span>'+
           '<span style="color:'+fc+';font-weight:700;">'+g.fitness.toFixed(0)+'</span>'+
           '<span>'+wr+'%</span>';
-        if(g.fitness>=40&&wr>=45){
-          html+='<button data-gid="'+g.id.replace(/"/g,'&quot;')+'" onclick="var f=_evoPlus.pool.find(function(x){return x.id===this.dataset.gid}.bind(this));if(f)registerEvolvedTechnique(f);" style="font-size:7px;padding:0 3px;border:1px solid var(--g);color:var(--g);background:none;border-radius:2px;cursor:pointer;">등록</button>';
+        if(g.fitness>=20){
+          html+='<button data-gid="'+g.id.replace(/"/g,'&quot;')+'" onclick="var el=this;var f=_evoPlus.pool.find(function(x){return x.id===el.getAttribute(\'data-gid\');});if(f){registerEvolvedTechnique(f);el.textContent=\'✓\';el.disabled=true;}" style="font-size:7px;padding:0 3px;border:1px solid var(--g);color:var(--g);background:none;border-radius:2px;cursor:pointer;">등록</button>';
         }
         html+='</div>';
       });
@@ -3380,9 +3380,9 @@ async function _gaRound(gen){
   var best=_evolveGeneration();
   var bestWr=best&&(best.wins+best.losses)>0?Math.round(best.wins/(best.wins+best.losses)*100):0;
   _evoPlus.log.push({time:Date.now(),type:'gen',msg:'C'+_evolveCycle+' '+_evoPlus.generation+'세대 — 적합도'+((best&&best.fitness)||0).toFixed(0)+' 승률'+bestWr+'%'});
-  if(best&&best.fitness>=40&&bestWr>=45){
+  if(best&&best.fitness>=25){
     registerEvolvedTechnique(best);
-    _evoPlus.log.push({time:Date.now(),type:'register',msg:'기법 등록 (적합도'+best.fitness.toFixed(0)+')'});
+    _evoPlus.log.push({time:Date.now(),type:'register',msg:'기법 등록 (적합도'+best.fitness.toFixed(0)+' 승률'+bestWr+'%)'});
   }
   _saveEvoPlus();
   if(gen<2){setTimeout(function(){_gaRound(gen+1);},100);return;}
@@ -10876,7 +10876,7 @@ function collectMarketCtx(){
 (function(){
   const meta = document.querySelector('meta[name="build-ts"]');
   const myBuildTs = meta ? meta.getAttribute('content') : '';
-  if(!myBuildTs || myBuildTs === '1779684287151') return; // 로컬 빌드 안 한 경우
+  if(!myBuildTs || myBuildTs === '1779686127480') return; // 로컬 빌드 안 한 경우
   let reloaded = false;
   async function check(){
     if(reloaded) return;

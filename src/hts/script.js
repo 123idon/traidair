@@ -1107,8 +1107,8 @@ function renderEvoPlusPanel(){
           '<span style="flex:1;font-family:var(--mono);font-size:7px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+_geneToDesc(g)+'</span>'+
           '<span style="color:'+fc+';font-weight:700;">'+g.fitness.toFixed(0)+'</span>'+
           '<span>'+wr+'%</span>';
-        if(g.fitness>=40&&wr>=45){
-          html+='<button data-gid="'+g.id.replace(/"/g,'&quot;')+'" onclick="var f=_evoPlus.pool.find(function(x){return x.id===this.dataset.gid}.bind(this));if(f)registerEvolvedTechnique(f);" style="font-size:7px;padding:0 3px;border:1px solid var(--g);color:var(--g);background:none;border-radius:2px;cursor:pointer;">등록</button>';
+        if(g.fitness>=20){
+          html+='<button data-gid="'+g.id.replace(/"/g,'&quot;')+'" onclick="var el=this;var f=_evoPlus.pool.find(function(x){return x.id===el.getAttribute(\'data-gid\');});if(f){registerEvolvedTechnique(f);el.textContent=\'✓\';el.disabled=true;}" style="font-size:7px;padding:0 3px;border:1px solid var(--g);color:var(--g);background:none;border-radius:2px;cursor:pointer;">등록</button>';
         }
         html+='</div>';
       });
@@ -1245,9 +1245,9 @@ async function _gaRound(gen){
   var best=_evolveGeneration();
   var bestWr=best&&(best.wins+best.losses)>0?Math.round(best.wins/(best.wins+best.losses)*100):0;
   _evoPlus.log.push({time:Date.now(),type:'gen',msg:'C'+_evolveCycle+' '+_evoPlus.generation+'세대 — 적합도'+((best&&best.fitness)||0).toFixed(0)+' 승률'+bestWr+'%'});
-  if(best&&best.fitness>=40&&bestWr>=45){
+  if(best&&best.fitness>=25){
     registerEvolvedTechnique(best);
-    _evoPlus.log.push({time:Date.now(),type:'register',msg:'기법 등록 (적합도'+best.fitness.toFixed(0)+')'});
+    _evoPlus.log.push({time:Date.now(),type:'register',msg:'기법 등록 (적합도'+best.fitness.toFixed(0)+' 승률'+bestWr+'%)'});
   }
   _saveEvoPlus();
   if(gen<2){setTimeout(function(){_gaRound(gen+1);},100);return;}
