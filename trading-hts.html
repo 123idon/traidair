@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#ffffff">
-<meta name="build-ts" content="1779686202326">
+<meta name="build-ts" content="1779688866243">
 <title>TraidAIr HTS</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 
@@ -4493,8 +4493,8 @@ async function stopBacktest(){
   if(backtest._pendingStart){ clearTimeout(backtest._pendingStart); backtest._pendingStart=null; }
   _syncPlayBtn();
   renderBacktestPanel();
-  // 백그라운드 일지 작성 모두 완료까지 대기 (학습 메모리 보장)
-  if(backtest.pendingJournals && backtest.pendingJournals.length){
+  // 백그라운드 일지 작성 완료 대기 — 진화+ 중에는 스킵 (일지 안 만듦)
+  if(!_evolveRunning && backtest.pendingJournals && backtest.pendingJournals.length){
     addMsg('ai',`⏳ 진행 중인 매매일지 ${backtest.pendingJournals.length}건 작성 완료까지 대기...`);
     try{ await Promise.allSettled(backtest.pendingJournals); }catch(e){}
     backtest.pendingJournals = [];
@@ -4529,8 +4529,8 @@ async function _backtestLoadDay(dateStr){
       setTimeout(()=>{try{_df.contentWindow._skipHtsSync=false;}catch(e){}},100);
     }
   }catch(_e){}
-  // ★ 매일 강세섹터 새로 가져오기 (사용자 요청: 딜레이 있어도 정확하게)
-  if(typeof refreshHotSectors==='function'){
+  // ★ 매일 강세섹터 새로 가져오기 — 진화+ 중에는 초기 분석 데이터 재사용 (비용 절감)
+  if(typeof refreshHotSectors==='function' && !_evolveRunning){
     addDecisionLog('📊 '+dateStr+' 강세섹터 분석', '새 날짜 데이터 가져오는 중...', '백테스트');
     try{ await refreshHotSectors(true); }catch(_e){ console.warn('섹터 fetch:', _e.message); }
   }
@@ -4628,8 +4628,8 @@ async function _backtestEndOfDayInner(dt){
       };
       saveJEntry(dt, _baseJ, dayPnl, wins, _sells.length, _baseJ.trades);
       addDecisionLog(`📓 ${dt} 일지 저장`, todayTrades.length+'건 기록', '학습');
-      // AI 평가도 시도 (실패해도 위 기본 일지가 남음)
-      if(typeof autoSaveJournalOnTrade === 'function'){
+      // AI 평가도 시도 (실패해도 위 기본 일지가 남음) — 진화+ 중에는 스킵 (비용 절감)
+      if(typeof autoSaveJournalOnTrade === 'function' && !_evolveRunning){
         const _p = autoSaveJournalOnTrade(dt).catch(e=>console.warn('AI일지:', e.message));
         backtest.pendingJournals.push(_p);
       }
@@ -7192,9 +7192,8 @@ async function _runScreeningAsync(){
 
 function runAutoStep(cs){
   if(!autoState.running)return;
-  // 백테스트 중 봉 단위 강세섹터 갱신 (시뮬 시간 기준 60봉마다 = 약 1시간)
-  // 백테스트: 봉 단위로 강세섹터 갱신 (1분봉 기준 120봉=2시간 마다 → 비용 ↓)
-  if(window.backtest&&backtest.running && (sim.idx % 120 === 0) && sim.idx > 0){
+  // 백테스트 중 봉 단위 강세섹터 갱신 — 진화+ 중에는 스킵 (비용 절감, 초기 분석 데이터 사용)
+  if(window.backtest&&backtest.running && !_evolveRunning && (sim.idx % 120 === 0) && sim.idx > 0){
     if(typeof refreshHotSectors==='function' && !window._sectorRefreshing){
       window._sectorRefreshing = true;
       refreshHotSectors(false).finally(()=>{ window._sectorRefreshing = false; });
@@ -10876,7 +10875,7 @@ function collectMarketCtx(){
 (function(){
   const meta = document.querySelector('meta[name="build-ts"]');
   const myBuildTs = meta ? meta.getAttribute('content') : '';
-  if(!myBuildTs || myBuildTs === '1779686202326') return; // 로컬 빌드 안 한 경우
+  if(!myBuildTs || myBuildTs === '1779688866243') return; // 로컬 빌드 안 한 경우
   let reloaded = false;
   async function check(){
     if(reloaded) return;
