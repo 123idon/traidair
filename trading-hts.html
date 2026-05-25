@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#ffffff">
-<meta name="build-ts" content="1779708174505">
+<meta name="build-ts" content="1779708529420">
 <title>TraidAIr HTS</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 
@@ -7524,21 +7524,8 @@ async function _runScreeningAsync(){
   }
   // ── Claude AI 심층 분석 (레벨3 이상, 평상시 배속) ──
   if(autoState.level>=3){
-    // 학습 데이터 기반 사전 필터 — Claude 호출 전 불필요한 호출 차단
-    var _preFilter=false;
-    var _pfReason='';
-    // (a) 패턴 DB 승률 25% 미만 → Claude 없이 PASS
-    if(best.entryCond){var _pq2=queryPatternDB(best.entryCond,best.detTech);if(_pq2.count>=8&&_pq2.score<=25){_preFilter=true;_pfReason='패턴DB승률'+_pq2.score+'%('+_pq2.count+'건)';}}
-    // (b) 원칙 위반 3개+ → Claude 없이 PASS
-    if(best.ruleCheck&&best.ruleCheck.failed>=3){_preFilter=true;_pfReason+=((_pfReason?' + ':'')+('원칙위반'+best.ruleCheck.failed+'개'));}
-    // (c) 드로다운 tier2+ → Claude 없이 규칙 기반
-    if(_equityCurve.tierHit>=2){_preFilter=true;_pfReason+=((_pfReason?' + ':'')+'드로다운Lv'+_equityCurve.tierHit);}
-    if(_preFilter){
-      addDecisionLog('['+best.stk.nm+'] 학습필터 PASS',_pfReason,'학습차단');
-      return;
-    }
-    // 진화+ 중 OR 점수 6 미만: 규칙 기반 판단 (Claude 스킵 — 10개 학습 시스템이 대신 판단)
-    if(_evolveRunning || best.score<6){
+    // 진화+ 중에만 규칙 기반 (실매매에서는 항상 Claude 사용)
+    if(_evolveRunning){
       var _hasConf2=best.tags.indexOf('확정시그널')!==-1;
       var _hasPat2=best.tags.indexOf('눌림목')!==-1||best.tags.indexOf('돌파')!==-1||best.tags.indexOf('갭상승')!==-1||best.tags.indexOf('첫봉')!==-1;
       if(best.score>=5||best.score>=4&&(_hasConf2||_hasPat2)){
@@ -7557,7 +7544,7 @@ async function _runScreeningAsync(){
     if(!window._aiDecisionCache)window._aiDecisionCache={};
     var _cacheKey=best.tk+'_'+Math.floor(best.score/2);
     var _cached=window._aiDecisionCache[_cacheKey];
-    if(_cached&&Date.now()-_cached.ts<300000){
+    if(_cached&&Date.now()-_cached.ts<120000){
       if(_cached.decision==='BUY'&&_cached.confidence>=65){
         addDecisionLog('['+best.stk.nm+'] ✅ AI캐시매수','캐시 재사용 (신뢰도'+_cached.confidence+'%)','캐시');
         var _bestTech3=best.tags.indexOf('대장첫숨')!==-1?'대장첫숨':'';
@@ -7579,8 +7566,11 @@ async function _runScreeningAsync(){
       var _learn = typeof getLearningContext==='function' ? getLearningContext(10) : '';
       // 진화+ 중: 강의 컨텍스트 제외 (시뮬 데이터에 무의미, 토큰 절감)
       var _lec = _evolveRunning ? '' : (typeof getLectureContext==='function' ? getLectureContext(2500) : '');
-      var prompt='단타 자동매매 최종 진입 판단.\n'+
-        '의심스러우면 PASS. 학습 데이터가 경고하면 PASS.\n\n'+
+      var prompt='단타 트레이딩 멘토. 자동매매 최종 진입 여부.\n\n'+
+        '⚠️ 절대 원칙: 아래 강의 매매 원칙은 100% 따라야 한다. 강의에 어긋나는 진입은 \"PASS\". 의심스러우면 PASS.\n'+
+        '눌림목: 상승추세(20MA↑)+5MA/20MA지지+거래량감소후회복.\n'+
+        '돌파: 20봉 신고가+거래량 150%↑. 갭상승: 갭업 후 양봉 확정. 첫봉: 시초 6봉 내 양봉+거래량.\n'+
+        '대장첫숨: 이슈/재료 동반 필수 + 대장주 장대양봉 후 첫 음봉 → 비중 1/3.\n\n'+
         _lec +
         _learn +
         '【종목】 '+best.stk.nm+'('+best.tk+') '+best.stk.sec+'\n'+
@@ -11327,7 +11317,7 @@ function collectMarketCtx(){
 (function(){
   const meta = document.querySelector('meta[name="build-ts"]');
   const myBuildTs = meta ? meta.getAttribute('content') : '';
-  if(!myBuildTs || myBuildTs === '1779708174505') return; // 로컬 빌드 안 한 경우
+  if(!myBuildTs || myBuildTs === '1779708529420') return; // 로컬 빌드 안 한 경우
   let reloaded = false;
   async function check(){
     if(reloaded) return;
