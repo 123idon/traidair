@@ -1576,7 +1576,7 @@ async function startEvolvePlus(){
   _evolveLoopCycleIdx=0;
   _evolveLoopHistory=[];
   _evolvePrevSpeed=sim.speed;
-  sim.speed=1500;
+  sim.speed=3000;
   document.querySelectorAll('.spd-btn').forEach(function(b){b.classList.remove('on');});
   var panel=document.getElementById('evolvePanel');
   if(panel)panel.style.display='none';
@@ -1584,7 +1584,7 @@ async function startEvolvePlus(){
   addMsg('ai','🧬 진화+ 시작\n• 종목 풀 분석 + 강세섹터 동기화 중...');
   try{if(typeof refreshHotSectors==='function') await refreshHotSectors(true);}catch(_e){}
   var poolSize=(WGS[0]||[]).length+(WGS[1]||[]).length+Object.keys(window._sectorInfo||{}).length;
-  addMsg('ai','🧬 진화+ (종목풀 '+poolSize+'개)\n• x1500 규칙 기반 학습 (API 비용 0)\n• 루프: 20사이클 → 정리 → 반복\n• 학습 데이터는 실매매 Claude에 자동 반영\n• 다시 누르면 중지 + 결과');
+  addMsg('ai','🧬 진화+ (종목풀 '+poolSize+'개)\n• x3000 최대속도 학습 (API 비용 0)\n• 루프: 20사이클 → 정리 → 반복\n• 다시 누르면 중지 + 결과');
   _startLearnPhase();
 }
 function _startLearnPhase(){
@@ -1640,7 +1640,7 @@ function _finishLoopRound(){
 function _evolveNextDay(){
   if(!_evolveRunning)return;
   if(_evolveRoundIdx>=_evolveDays.length){_onLearnDone();return;}
-  sim.speed=1500;
+  sim.speed=3000;
   _updBtn('🧬 L'+_evolveLoop+' '+_evolveLoopCycleIdx+'/'+_evolveCyclesPerLoop);
   startBacktest(_evolveDays[_evolveRoundIdx],_evolveDays[_evolveRoundIdx]);
 }
