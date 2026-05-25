@@ -1542,6 +1542,10 @@ function _randomTradingDays(count){
   return picked.sort();
 }
 function _takeSnapshot(){
+  // 이미 계산된 성과 프로파일이 있으면 우선 사용
+  if(_perfProfile.recentScore!==undefined&&_perfProfile.totalSells>=3){
+    return{score:_perfProfile.recentScore,wr:_perfProfile.recentWr||0,pnl:Math.round((mock.trades||[]).filter(function(t){return t.side==='sell';}).reduce(function(s,t){return s+(t.pnl||0);},0)),trades:_perfProfile.totalSells};
+  }
   var sells=(mock.trades||[]).filter(function(t){return t.side==='sell';});
   var wins=sells.filter(function(t){return(t.pnl||0)>0;});
   var losses=sells.filter(function(t){return(t.pnl||0)<=0;});

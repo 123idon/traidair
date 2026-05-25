@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#ffffff">
-<meta name="build-ts" content="1779721061806">
+<meta name="build-ts" content="1779722076523">
 <title>TraidAIr HTS</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 
@@ -3681,6 +3681,10 @@ function _randomTradingDays(count){
   return picked.sort();
 }
 function _takeSnapshot(){
+  // 이미 계산된 성과 프로파일이 있으면 우선 사용
+  if(_perfProfile.recentScore!==undefined&&_perfProfile.totalSells>=3){
+    return{score:_perfProfile.recentScore,wr:_perfProfile.recentWr||0,pnl:Math.round((mock.trades||[]).filter(function(t){return t.side==='sell';}).reduce(function(s,t){return s+(t.pnl||0);},0)),trades:_perfProfile.totalSells};
+  }
   var sells=(mock.trades||[]).filter(function(t){return t.side==='sell';});
   var wins=sells.filter(function(t){return(t.pnl||0)>0;});
   var losses=sells.filter(function(t){return(t.pnl||0)<=0;});
@@ -11438,7 +11442,7 @@ function collectMarketCtx(){
 (function(){
   const meta = document.querySelector('meta[name="build-ts"]');
   const myBuildTs = meta ? meta.getAttribute('content') : '';
-  if(!myBuildTs || myBuildTs === '1779721061806') return; // 로컬 빌드 안 한 경우
+  if(!myBuildTs || myBuildTs === '1779722076523') return; // 로컬 빌드 안 한 경우
   let reloaded = false;
   async function check(){
     if(reloaded) return;
