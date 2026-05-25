@@ -6633,13 +6633,26 @@ function loadKisCfgFromStorage(){
     const raw = localStorage.getItem(KIS_CFG_KEY) || localStorage.getItem('kisConfig');
     if(raw) {
       const parsed = JSON.parse(raw);
-      // 저장된 값이 있으면 우선, 없는 필드는 기본값으로
-      return { ..._DEFAULT_CFG, ...parsed };
+      if(parsed.appKey) return { ..._DEFAULT_CFG, ...parsed };
     }
   } catch(e) {}
   return { ..._DEFAULT_CFG };
 }
 let kisConfig = loadKisCfgFromStorage();
+// 서버에서 설정 복원 (localStorage 비어있을 때)
+if(!kisConfig.appKey){
+  fetch('/api/get-config').then(function(r){return r.json();}).then(function(d){
+    if(d&&d.kisAppKey){
+      kisConfig.appKey=d.kisAppKey;kisConfig.appSecret=d.kisAppSecret||'';
+      kisConfig.account=d.kisAccount||kisConfig.account;kisConfig.mode=d.kisMode||'real';
+      localStorage.setItem(KIS_CFG_KEY,JSON.stringify(kisConfig));
+      localStorage.setItem('kisConfig',JSON.stringify(kisConfig));
+      console.log('[KIS] 서버에서 설정 복원 완료');
+      var ki=document.getElementById('kis-appkey');if(ki)ki.value=kisConfig.appKey;
+      var ks=document.getElementById('kis-appsecret');if(ks)ks.value=kisConfig.appSecret;
+    }
+  }).catch(function(){});
+}
 
 async function saveKisConfig(){
   const ak = document.getElementById('kis-appkey')?.value?.trim() || '';
