@@ -1530,7 +1530,7 @@ async function startEvolvePlus(){
     if(typeof refreshHotSectors==='function') await refreshHotSectors(true);
   }catch(_e){}
   var poolSize=(WGS[0]||[]).length+(WGS[1]||[]).length+Object.keys(window._sectorInfo||{}).length;
-  addMsg('ai','🧬 분석 완료 (종목풀 '+poolSize+'개)\n• x250 · Claude AI 판단\n• 사이클: 학습(10일) → GA(3세대) → AI정제 → 반복\n• 다시 누르면 중지 + 결과');
+  addMsg('ai','🧬 진화+ 시작 (종목풀 '+poolSize+'개)\n• 중지할 때까지 무한 진화\n• 사이클: 학습(랜덤일) → GA(5세대) → AI정제(3사이클마다) → 반복\n• 다시 누르면 중지 + 결과');
   _startLearnPhase();
 }
 function _startLearnPhase(){
@@ -1538,8 +1538,8 @@ function _startLearnPhase(){
   _evolveCycle++;
   _evolvePhase='learn';
   _evolveRoundIdx=0;
-  _evolveDays=_randomTradingDays(10);
-  _updBtn('🧬 C'+_evolveCycle+' 학습(0/10)');
+  _evolveDays=[_randomTradingDays(1)[0]];
+  _updBtn('🧬 C'+_evolveCycle+' 학습');
   var cyEl=document.getElementById('evolveCycle');
   if(cyEl)cyEl.textContent='사이클 '+_evolveCycle;
   _evolveNextDay();
@@ -1548,7 +1548,7 @@ function _evolveNextDay(){
   if(!_evolveRunning)return;
   if(_evolveRoundIdx>=_evolveDays.length){_onLearnDone();return;}
   sim.speed=250;
-  _updBtn('🧬 C'+_evolveCycle+' 학습('+(_evolveRoundIdx+1)+'/10)');
+  _updBtn('🧬 C'+_evolveCycle+' '+_evolveDays[_evolveRoundIdx]);
   startBacktest(_evolveDays[_evolveRoundIdx],_evolveDays[_evolveRoundIdx]);
 }
 function _onLearnDone(){
@@ -1561,18 +1561,20 @@ function _onLearnDone(){
 }
 async function _gaRound(gen){
   if(!_evolveRunning)return;
-  _updBtn('🧬 C'+_evolveCycle+' GA('+(gen+1)+'/3)');
+  _updBtn('🧬 C'+_evolveCycle+' GA('+(gen+1)+'/5)');
   var best=_evolveGeneration();
   var bestWr=best&&(best.wins+best.losses)>0?Math.round(best.wins/(best.wins+best.losses)*100):0;
-  _evoPlus.log.push({time:Date.now(),type:'gen',msg:'C'+_evolveCycle+' '+_evoPlus.generation+'세대 — 적합도'+((best&&best.fitness)||0).toFixed(0)+' 승률'+bestWr+'%'});
+  _evoPlus.log.push({time:Date.now(),type:'gen',msg:'C'+_evolveCycle+' G'+_evoPlus.generation+' 적합도'+((best&&best.fitness)||0).toFixed(0)});
   if(best&&best.fitness>=40){
     registerEvolvedTechnique(best);
-    _evoPlus.log.push({time:Date.now(),type:'register',msg:'기법 등록 (적합도'+best.fitness.toFixed(0)+' 승률'+bestWr+'%)'});
+    _evoPlus.log.push({time:Date.now(),type:'register',msg:'기법 등록 (적합도'+best.fitness.toFixed(0)+')'});
   }
+  // 가중치 진화도 GA와 연동
+  if(gen===2)try{evolveFeatureWeights();}catch(_e){}
   _saveEvoPlus();
-  if(gen<2){setTimeout(function(){_gaRound(gen+1);},100);return;}
-  // GA 3세대 완료 → AI 정제 (3사이클마다)
-  if(_evolveCycle%3===0&&_evolveRunning){
+  if(gen<4){setTimeout(function(){_gaRound(gen+1);},50);return;}
+  // GA 5세대 완료 → AI 정제 (5사이클마다 — 토큰 절감)
+  if(_evolveCycle%5===0&&_evolveRunning){
     _evolvePhase='ai';
     _updBtn('🧬 C'+_evolveCycle+' AI정제');
     await _aiRefineGenes();
