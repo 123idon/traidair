@@ -7764,6 +7764,9 @@ function mobTab(name,btn){
     openMobPanel('brp');
     const aiTab=document.querySelector('.brpt[onclick*="ai"]');
     if(aiTab){brTab(aiTab,'brpb-ai');}
+  } else if(name==='learn'){
+    openMobPanel('lp');
+    try{openLearningMemo();}catch(_e){}
   }
 }
 

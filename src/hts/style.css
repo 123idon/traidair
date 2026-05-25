@@ -333,11 +333,11 @@ button{cursor:pointer;font-family:var(--sans);}
 .live-note{font-size:9px;color:var(--tm);text-align:center;margin-top:6px;font-family:var(--mono);}
 /* ── 태블릿 (860px 이하) ── */
 /* ── 모바일 공통 컴포넌트 (기본값 = 숨김) ── */
-.mob-overlay{display:none;position:fixed;inset:0;z-index:599;background:rgba(0,0,0,.4);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);}
+.mob-overlay{display:none;position:fixed;inset:0;z-index:599;background:rgba(0,0,0,.25);}
 .mob-tabbar{display:none;position:fixed;bottom:0;left:0;right:0;height:calc(var(--mob-nav) + var(--sab));padding-bottom:var(--sab);background:var(--pan);border-top:1px solid var(--br);box-shadow:0 -2px 12px rgba(0,0,0,.08);z-index:600;align-items:stretch;justify-content:space-around;}
-.mob-tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;background:none;border:none;cursor:pointer;color:var(--tm);font-size:9px;font-family:var(--sans);padding:6px 2px;min-width:0;transition:color .12s;-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
+.mob-tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;background:none;border:none;cursor:pointer;color:var(--tm);font-size:8px;font-family:var(--sans);padding:4px 1px;min-width:0;transition:color .12s;-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
 .mob-tab.active{color:var(--b);}
-.mob-tab .mob-icon{font-size:20px;line-height:1;}
+.mob-tab .mob-icon{font-size:17px;line-height:1;}
 .mob-tab .mob-label{font-size:9px;font-weight:500;white-space:nowrap;}
 .thought-step{padding:3px 6px;border-radius:5px;font-size:9px;line-height:1.5;border-left:2px solid var(--br);margin-bottom:2px;}
 .thought-step.ok{border-color:#22c55e;background:rgba(34,197,94,.06);}
@@ -390,7 +390,7 @@ input,select,textarea{-webkit-appearance:none;appearance:none;}
     transform:translateX(100%);transition:transform .2s ease;overflow-y:auto;overflow-x:hidden;}
   .rp.mob-open{transform:translateX(0);}
   .brp{grid-column:3/5;grid-row:1/4;position:static;transform:none;width:auto;box-shadow:none;z-index:auto;overflow-y:auto;overflow-x:hidden;}
-  .mob-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:305;}
+  .mob-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.15);z-index:305;}
   .mob-overlay.on{display:block;}
   .tab-quick-lp,.tab-quick-rp{display:none !important;}
   .mob-tabbar{display:none !important;}
