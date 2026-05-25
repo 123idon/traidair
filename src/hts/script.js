@@ -6836,7 +6836,7 @@ async function kisCall(endpoint, payload) {
         kisConfig._tokenExp = Date.now() + 29 * 60 * 1000;
         return { ok: true, token: d.access_token.slice(0, 10) + '...' };
       }
-      return { ok: false, error: d.message || '토큰 발급 실패' };
+      return { ok: false, error: (d.message||'')+(d.msg1||'')+(d.msg_cd?' ['+d.msg_cd+']':'')||'토큰 발급 실패 (응답: '+JSON.stringify(d).slice(0,100)+')' };
     } catch(e) {
       clearTimeout(timer);
       if (e.name === 'AbortError') {
@@ -6889,7 +6889,7 @@ async function kisConnect() {
     }
   } catch(e) {
     if (ks) { ks.textContent = '❌ KIS — 연결 실패'; ks.style.color = 'var(--r)'; }
-    showAlert('KIS 연결 실패', e.message + '\n\nApp Key/Secret과 모의투자 신청 여부를 확인하세요.');
+    showAlert('KIS 연결 실패', e.message + '\n\n확인사항:\n1. App Key/Secret 정확한지\n2. 모의투자: openapivts.koreainvestment.com:29443\n3. 실거래: openapi.koreainvestment.com:9443\n4. 한국투자증권 API 신청 완료했는지\n5. 현재 모드: '+(kisConfig.mode||'?'));
   }
 }
 

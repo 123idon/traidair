@@ -127,6 +127,9 @@ async function getKisToken(appKey, appSecret, mode) {
     headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
   }, body);
 
+  if (!result.data.access_token) {
+    console.error('[KIS 토큰 실패]', 'mode:', mode, 'host:', kisHost(mode), 'port:', kisPort(mode), 'status:', result.status, 'response:', JSON.stringify(result.data).slice(0, 300));
+  }
   const token = result.data.access_token;
   if (token) {
     kisTokenCache[cacheKey] = { token, expires: Date.now() + 29 * 60 * 1000 };
