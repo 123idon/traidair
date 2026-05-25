@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#ffffff">
-<meta name="build-ts" content="1779696365495">
+<meta name="build-ts" content="1779706871173">
 <title>TraidAIr HTS</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 
@@ -3029,6 +3029,186 @@ function buildPerfSummary(){
 try{var _sp=localStorage.getItem('htsPerfProfile');if(_sp)_perfProfile=JSON.parse(_sp);computeAdaptiveConfig();}catch(_e){}
 
 // ═══════════════════════════════════════════════
+// AI 학습 엔진 v2: 패턴 DB + 원칙 규칙 + 준수 추적 + 가중치 진화 + 시장 적응
+// ═══════════════════════════════════════════════
+
+// ── 1. 승/패 조건 DB (매 거래의 진입 시점 조건 기록 + 결과 매핑) ──
+var _patternDB=[];
+try{var _pd=localStorage.getItem('htsPatternDB');if(_pd)_patternDB=JSON.parse(_pd);}catch(_e){}
+function captureEntryConditions(){
+  var cs=sim.candles;if(!cs||sim.idx<10)return null;
+  var cls=cs.slice(0,sim.idx+1).map(function(c){return c.c;});
+  var vls=cs.slice(0,sim.idx+1).map(function(c){return c.v;});
+  var lc=cs[sim.idx],pc=cs[sim.idx-1]||lc;
+  var ma5=calcMA(cls,5),ma20=calcMA(cls,20);
+  var lma5=ma5[ma5.length-1]||0,lma20=ma20[ma20.length-1]||0;
+  var rsi=parseFloat((calcRSI(cls,14).slice(-1)[0]||50).toFixed(0));
+  var avg5v=vls.length>=6?(vls.slice(-6,-1).reduce(function(a,b){return a+b;},0)/5):vls[vls.length-2]||1;
+  var volR=parseFloat((vls[vls.length-1]/avg5v).toFixed(1));
+  var body=Math.abs(lc.c-lc.o),range=lc.h-lc.l||1;
+  var _hm=String(lc.t||'').split(':'),hour=parseInt(_hm[0])||9;
+  return{
+    maAlign:lma5>lma20?1:0,
+    priceVsMa5:lma5>0?parseFloat(((lc.c-lma5)/lma5*100).toFixed(1)):0,
+    rsi:rsi,volR:volR,
+    bodyRatio:parseFloat((body/range).toFixed(2)),
+    isBull:lc.c>lc.o?1:0,
+    prevBull:pc.c>pc.o?1:0,
+    hour:hour,
+    spread:parseFloat(((lc.h-lc.l)/lc.c*100).toFixed(2))
+  };
+}
+function recordPattern(side,technique,conditions,pnl){
+  if(!conditions)return;
+  var entry={date:sim.date,side:side,tech:technique,cond:conditions,pnl:Math.round(pnl||0),win:pnl>0?1:0,ts:Date.now()};
+  _patternDB.push(entry);
+  if(_patternDB.length>1000)_patternDB=_patternDB.slice(-1000);
+  try{localStorage.setItem('htsPatternDB',JSON.stringify(_patternDB));}catch(_e){}
+}
+function queryPatternDB(conditions,technique){
+  if(_patternDB.length<10)return{score:0,count:0,msg:'데이터부족'};
+  var similar=_patternDB.filter(function(p){
+    if(technique&&p.tech!==technique)return false;
+    var c=p.cond;if(!c)return false;
+    var match=0,total=0;
+    if(c.maAlign===conditions.maAlign){match++;}total++;
+    if(Math.abs(c.rsi-conditions.rsi)<=10){match++;}total++;
+    if(Math.abs(c.volR-conditions.volR)<=0.5){match++;}total++;
+    if(c.isBull===conditions.isBull){match++;}total++;
+    if(c.hour===conditions.hour){match++;}total++;
+    return match>=3;
+  });
+  if(similar.length<3)return{score:0,count:similar.length,msg:'유사패턴부족'};
+  var wins=similar.filter(function(p){return p.win;}).length;
+  var wr=Math.round(wins/similar.length*100);
+  var avgPnl=Math.round(similar.reduce(function(a,p){return a+p.pnl;},0)/similar.length);
+  return{score:wr,count:similar.length,avgPnl:avgPnl,msg:wr+'%승률('+similar.length+'건) 평균'+avgPnl+'원'};
+}
+
+// ── 2. 강의 원칙 → 하드 규칙 (텍스트가 아닌 코드 게이트) ──
+var LECTURE_RULES=[
+  {name:'눌림목_MA지지',tech:'눌림목',check:function(c,lma5,lma20){return c.c>=lma20&&Math.abs(c.c-lma5)/lma5<=0.02;},msg:'20MA 위 + 5MA 근접'},
+  {name:'돌파_거래량',tech:'돌파',check:function(c,lma5,lma20,volR){return volR>=1.5;},msg:'거래량 150%+ 필수'},
+  {name:'돌파_신고가',tech:'돌파',check:function(c,lma5,lma20,volR,prev20High){return c.c>prev20High*0.998;},msg:'20봉 신고가 근접'},
+  {name:'갭상승_양봉확정',tech:'갭상승',check:function(c){return c.c>c.o;},msg:'갭 후 양봉 필수'},
+  {name:'첫봉_시초6봉',tech:'첫봉',check:function(c,lma5,lma20,volR,p20h,idx,prevCount){return(idx-prevCount)<=6;},msg:'시초 6봉 이내'},
+  {name:'공통_RSI과매수금지',tech:'*',check:function(c,lma5,lma20,volR,p20h,idx,prevCount,rsi){return rsi<72;},msg:'RSI 72 미만'},
+  {name:'공통_추격금지',tech:'*',check:function(c,lma5,lma20,volR,p20h,idx,prevCount,rsi,pc){return!pc||c.c<=pc.c*1.03;},msg:'전봉대비 +3% 이내'},
+  {name:'공통_3연음봉금지',tech:'*',check:function(c,lma5,lma20,volR,p20h,idx,prevCount,rsi,pc,pc2){return!(c.c<c.o&&pc&&pc.c<pc.o&&pc2&&pc2.c<pc2.o);},msg:'3연속 음봉 아님'}
+];
+function checkLectureRules(tech,c,lma5,lma20,volR,prev20High,idx,prevCount,rsi,pc,pc2){
+  var passed=0,failed=0,failMsgs=[];
+  LECTURE_RULES.forEach(function(rule){
+    if(rule.tech!=='*'&&rule.tech!==tech)return;
+    try{
+      if(rule.check(c,lma5,lma20,volR,prev20High,idx,prevCount,rsi,pc,pc2)){passed++;}
+      else{failed++;failMsgs.push(rule.name+': '+rule.msg);}
+    }catch(_e){passed++;}
+  });
+  return{passed:passed,failed:failed,total:passed+failed,rate:passed+failed>0?Math.round(passed/(passed+failed)*100):100,failMsgs:failMsgs};
+}
+
+// ── 3. 원칙 준수 추적 (거래마다 기록, 준수율↔수익률 상관관계) ──
+var _adherenceLog=[];
+try{var _al=localStorage.getItem('htsAdherenceLog');if(_al)_adherenceLog=JSON.parse(_al);}catch(_e){}
+function recordAdherence(tech,ruleResult,pnl){
+  _adherenceLog.push({date:sim.date,tech:tech,rate:ruleResult.rate,passed:ruleResult.passed,total:ruleResult.total,pnl:Math.round(pnl||0),win:pnl>0?1:0,ts:Date.now()});
+  if(_adherenceLog.length>500)_adherenceLog=_adherenceLog.slice(-500);
+  try{localStorage.setItem('htsAdherenceLog',JSON.stringify(_adherenceLog));}catch(_e){}
+}
+function getAdherenceInsight(){
+  if(_adherenceLog.length<10)return{highAdherenceWr:0,lowAdherenceWr:0,msg:'데이터부족'};
+  var high=_adherenceLog.filter(function(a){return a.rate>=80;});
+  var low=_adherenceLog.filter(function(a){return a.rate<60;});
+  var highWr=high.length>=3?Math.round(high.filter(function(a){return a.win;}).length/high.length*100):0;
+  var lowWr=low.length>=3?Math.round(low.filter(function(a){return a.win;}).length/low.length*100):0;
+  return{highAdherenceWr:highWr,lowAdherenceWr:lowWr,highCount:high.length,lowCount:low.length,
+    msg:'원칙준수(80%+) 승률'+highWr+'%('+high.length+'건) vs 미준수(<60%) 승률'+lowWr+'%('+low.length+'건)'};
+}
+
+// ── 4. 조건 가중치 자동 진화 (어떤 지표가 수익에 가장 기여하는지) ──
+var _featureWeights={maAlign:1,rsi:1,volR:1,isBull:1,prevBull:1,bodyRatio:1,hour:1};
+try{var _fw=localStorage.getItem('htsFeatureWeights');if(_fw)_featureWeights=JSON.parse(_fw);}catch(_e){}
+function evolveFeatureWeights(){
+  if(_patternDB.length<20)return;
+  var wins=_patternDB.filter(function(p){return p.win;});
+  var losses=_patternDB.filter(function(p){return!p.win;});
+  if(wins.length<5||losses.length<5)return;
+  var features=['maAlign','rsi','volR','isBull','prevBull','bodyRatio'];
+  features.forEach(function(f){
+    var wAvg=wins.reduce(function(a,p){return a+(p.cond[f]||0);},0)/wins.length;
+    var lAvg=losses.reduce(function(a,p){return a+(p.cond[f]||0);},0)/losses.length;
+    var diff=wAvg-lAvg;
+    if(f==='rsi'){_featureWeights[f]=diff>3?1.2:diff<-3?0.8:1;}
+    else if(f==='volR'){_featureWeights[f]=diff>0.3?1.3:diff<-0.3?0.7:1;}
+    else{_featureWeights[f]=diff>0.1?1.2:diff<-0.1?0.8:1;}
+  });
+  // 시간대별 승률
+  var hourWr={};
+  _patternDB.forEach(function(p){
+    var h=p.cond.hour||9;
+    if(!hourWr[h])hourWr[h]={w:0,t:0};
+    hourWr[h].t++;if(p.win)hourWr[h].w++;
+  });
+  var bestHour=9,bestHourWr=0;
+  Object.keys(hourWr).forEach(function(h){
+    var wr=hourWr[h].t>=5?hourWr[h].w/hourWr[h].t:0;
+    if(wr>bestHourWr){bestHourWr=wr;bestHour=parseInt(h);}
+  });
+  _featureWeights.bestHour=bestHour;
+  _featureWeights.hourWr=hourWr;
+  try{localStorage.setItem('htsFeatureWeights',JSON.stringify(_featureWeights));}catch(_e){}
+}
+function applyFeatureWeights(score,conditions){
+  if(!conditions)return score;
+  var bonus=0;
+  if(conditions.maAlign&&_featureWeights.maAlign>1)bonus+=1;
+  if(conditions.volR>=1.5&&_featureWeights.volR>1)bonus+=1;
+  if(conditions.isBull&&_featureWeights.isBull>1)bonus+=1;
+  if(conditions.hour===_featureWeights.bestHour)bonus+=1;
+  if(_featureWeights.hourWr){
+    var hw=_featureWeights.hourWr[conditions.hour];
+    if(hw&&hw.t>=5&&hw.w/hw.t<0.3)bonus-=1;
+  }
+  return score+bonus;
+}
+
+// ── 5. 시장 상태 적응 (상승/하락/박스권 감지 + 기법별 상태 성과) ──
+function detectMarketRegime(){
+  var cs=sim.candles;if(!cs||cs.length<40)return'unknown';
+  var cls=cs.slice(0,Math.min(sim.idx+1,cs.length)).map(function(c){return c.c;});
+  if(cls.length<20)return'unknown';
+  var ma20=calcMA(cls,20);
+  var recent=ma20.slice(-10).filter(function(v){return v!==null;});
+  if(recent.length<5)return'unknown';
+  var rising=0,falling=0;
+  for(var i=1;i<recent.length;i++){
+    if(recent[i]>recent[i-1])rising++;else falling++;
+  }
+  if(rising>=7)return'uptrend';
+  if(falling>=7)return'downtrend';
+  return'sideways';
+}
+var _regimePerf={};
+try{var _rp=localStorage.getItem('htsRegimePerf');if(_rp)_regimePerf=JSON.parse(_rp);}catch(_e){}
+function recordRegimePerf(regime,technique,pnl){
+  var key=regime+'_'+technique;
+  if(!_regimePerf[key])_regimePerf[key]={w:0,l:0,pnl:0};
+  _regimePerf[key].pnl+=pnl;
+  if(pnl>0)_regimePerf[key].w++;else _regimePerf[key].l++;
+  try{localStorage.setItem('htsRegimePerf',JSON.stringify(_regimePerf));}catch(_e){}
+}
+function getRegimeAdvice(regime,technique){
+  var key=regime+'_'+technique;
+  var r=_regimePerf[key];
+  if(!r||r.w+r.l<3)return{adj:1,msg:''};
+  var wr=Math.round(r.w/(r.w+r.l)*100);
+  if(wr>=60)return{adj:1.1,msg:regime+'+'+technique+' 승률'+wr+'%↑'};
+  if(wr<=30)return{adj:0.8,msg:regime+'+'+technique+' 승률'+wr+'%↓'};
+  return{adj:1,msg:''};
+}
+
+// ═══════════════════════════════════════════════
 // 추가진화: 유전 알고리즘 + AI 하이브리드 기법 발굴
 // ═══════════════════════════════════════════════
 var _evoPlus={running:false,generation:0,pool:[],hall:[],log:[],bestFitness:0};
@@ -5303,6 +5483,17 @@ function submitOrder(autoExec){
     pos.qty -= qty;
     if(pos.qty<=0){delete mock.positions[activeTk];}
     mock.todayPnl+=pnl;mock.todayTrades++;
+    // ── 학습 엔진 v2: 매도 시 패턴/원칙/시장상태 기록 ──
+    try{
+      var _sellTech=(_buyTrade||{}).technique||'';
+      var _sellCond=captureEntryConditions();
+      recordPattern('sell',_sellTech,_sellCond,pnl);
+      var _regime2=detectMarketRegime();
+      recordRegimePerf(_regime2,_sellTech,pnl);
+      var _rc2=_tradeContext[activeTk];
+      if(_rc2&&_rc2._ruleCheck)recordAdherence(_sellTech,_rc2._ruleCheck,pnl);
+      if((mock.trades||[]).filter(function(t){return t.side==='sell';}).length%10===0){evolveFeatureWeights();}
+    }catch(_le){}
     if(pnl<0){mock.lossSeries++;mock.winSeries=0;}
     else{
       mock.lossSeries=0;
@@ -7026,7 +7217,26 @@ async function _runScreeningAsync(){
       if(_lmGood.length>=1){score+=1;tags.push('학습성공');}
     }catch(_lme){}
     if((_perfProfile.recentScore||50)>=70){score+=1;tags.push('성과우수');}
-    scored.push({tk:tk,stk:stk,score:score,tags:tags,lc:lc,lma5:lma5,lrsi:lrsi,volR:volR,detTech:_detTech});
+    // ── 학습 엔진 v2 적용 ──
+    // 패턴 DB 조회: 유사 조건의 과거 승률
+    var _entryCond=captureEntryConditions();
+    var _patQ=queryPatternDB(_entryCond,_detTech);
+    if(_patQ.count>=5){
+      if(_patQ.score>=65){score+=2;tags.push('패턴승률'+_patQ.score+'%');}
+      else if(_patQ.score<=30){score-=1;tags.push('패턴경고'+_patQ.score+'%');}
+    }
+    // 강의 원칙 체크
+    var _prevCount2=(_kisChartMeta&&_kisChartMeta.prevCount)||0;
+    var _prev20H=Math.max.apply(null,cs.slice(-21,-1).map(function(c){return c.h;}));
+    var _ruleCheck=checkLectureRules(_detTech,lc,lma5,lma20,volR,_prev20H,sim.idx,_prevCount2,lrsi,pc,pc2);
+    if(_ruleCheck.failed>=2){score-=1;tags.push('원칙위반'+_ruleCheck.failed);}
+    // 가중치 진화 적용
+    score=applyFeatureWeights(score,_entryCond);
+    // 시장 상태 적응
+    var _regime=detectMarketRegime();
+    var _regAdv=getRegimeAdvice(_regime,_detTech);
+    if(_regAdv.adj!==1){score=Math.round(score*_regAdv.adj);if(_regAdv.msg)tags.push(_regAdv.msg);}
+    scored.push({tk:tk,stk:stk,score:score,tags:tags,lc:lc,lma5:lma5,lrsi:lrsi,volR:volR,detTech:_detTech,entryCond:_entryCond,ruleCheck:_ruleCheck,regime:_regime});
   }
 
   if(!scored.length){
@@ -7125,6 +7335,8 @@ async function _runScreeningAsync(){
       var lcQ=best.lc;
       addDecisionLog('['+best.stk.nm+'] ✅ 진입 ('+best.score+'점)', best.tags.join(' · '), best.score>=5?'강한신호':'확정시그널');
       var _bestTech = best.tags.indexOf('대장첫숨')!==-1?'대장첫숨':'';
+      if(best.entryCond)recordPattern('buy',best.detTech,best.entryCond,0);
+      if(best.ruleCheck){if(!_tradeContext[best.tk])_tradeContext[best.tk]={};_tradeContext[best.tk]._ruleCheck=best.ruleCheck;}
       try{ await execAutoBuy(lcQ.c, best.stk, best.score, _bestTech); }catch(_e){}
     } else if(best.score >= 2){
       var _whyWait = best.tags.join(' · ')+' — 점수 부족('+best.score+'/5)';
@@ -7682,6 +7894,9 @@ ${pos?`보유: ${pos.qty}주 평단 ${Math.round(pos.avgPrice).toLocaleString()}
 
 [적응형 파라미터] 손절${_adaptiveCfg.stop}% / 비중${_adaptiveCfg.pos}% / 최소R/R ${_adaptiveCfg.rr}
 [전체 성과] ${_perfSum}
+[패턴 DB] ${(function(){var c=captureEntryConditions();var q=queryPatternDB(c,tech?.technique);return q.msg;})()}
+[원칙 준수 통계] ${getAdherenceInsight().msg}
+[시장 상태] ${detectMarketRegime()} ${(function(){var r=detectMarketRegime();var a=getRegimeAdvice(r,tech?.technique||'');return a.msg;})()}
 [최근 학습]
 ${_learnCtx||'없음'}
 
@@ -10912,7 +11127,7 @@ function collectMarketCtx(){
 (function(){
   const meta = document.querySelector('meta[name="build-ts"]');
   const myBuildTs = meta ? meta.getAttribute('content') : '';
-  if(!myBuildTs || myBuildTs === '1779696365495') return; // 로컬 빌드 안 한 경우
+  if(!myBuildTs || myBuildTs === '1779706871173') return; // 로컬 빌드 안 한 경우
   let reloaded = false;
   async function check(){
     if(reloaded) return;
