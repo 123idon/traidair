@@ -6819,28 +6819,16 @@ async function kisCall(endpoint, payload) {
     : 'https://openapivts.koreainvestment.com:29443';
 
   if (endpoint === 'token') {
-    // 토큰 발급
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 12000);
+    // 토큰 발급 — 항상 서버 프록시 경유 (브라우저 직접 호출은 CORS 차단)
     try {
-      const res = await fetch(`${host}/oauth2/tokenP`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ grant_type: 'client_credentials', appkey: kisConfig.appKey, appsecret: kisConfig.appSecret }),
-        signal: controller.signal,
-      });
-      clearTimeout(timer);
-      const d = await res.json();
-      if (d.access_token) {
-        kisConfig._token = d.access_token;
+      var tokenResult = await _kisCallProxy('token', {});
+      if(tokenResult.ok && tokenResult.token){
+        kisConfig._token = tokenResult.token;
         kisConfig._tokenExp = Date.now() + 29 * 60 * 1000;
-        return { ok: true, token: d.access_token.slice(0, 10) + '...' };
       }
-      return { ok: false, error: (d.message||'')+(d.msg1||'')+(d.msg_cd?' ['+d.msg_cd+']':'')||'토큰 발급 실패 (응답: '+JSON.stringify(d).slice(0,100)+')' };
+      return tokenResult;
     } catch(e) {
-      clearTimeout(timer);
-      if (e.name === 'AbortError') {
-        // 직접 호출 실패 → 서버 프록시 폴백
+      if(false){
         return _kisCallProxy(endpoint, payload);
       }
       return _kisCallProxy(endpoint, payload);
@@ -6872,8 +6860,19 @@ async function _kisCallProxy(endpoint, payload) {
 // KIS 연결 테스트 (토큰 발급 확인)
 async function kisConnect() {
   const ks = document.getElementById('kis-status');
+  // 서버에서 설정 복원 시도
+  if(!kisConfig.appKey){
+    try{
+      var cfg=await fetch('/api/get-config').then(function(r){return r.json();});
+      if(cfg&&cfg.kisAppKey){
+        kisConfig.appKey=cfg.kisAppKey;kisConfig.appSecret=cfg.kisAppSecret||'';
+        kisConfig.account=cfg.kisAccount||kisConfig.account;kisConfig.mode=cfg.kisMode||'real';
+        localStorage.setItem(KIS_CFG_KEY,JSON.stringify(kisConfig));
+      }
+    }catch(_e){}
+  }
   if (!kisConfig.appKey || !kisConfig.appSecret) {
-    showAlert('KIS 연결 실패', 'App Key와 App Secret을 먼저 저장하세요.');
+    showAlert('KIS 연결 실패', 'App Key와 App Secret이 없습니다.\n설정에서 저장하거나 서버 설정을 확인하세요.');
     return;
   }
   if (ks) { ks.textContent = '⏳ KIS — 연결 중...'; ks.style.color = 'var(--a)'; }

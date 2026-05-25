@@ -332,8 +332,12 @@ const server = http.createServer(async (req, res) => {
     req.on('end', async () => {
       try {
         const { appKey, appSecret, mode } = JSON.parse(body);
-        if (!appKey || !appSecret) throw new Error('appKey/appSecret 필요');
-        const token = await getKisToken(appKey, appSecret, mode || 'mock');
+        const ak = appKey || runtimeConfig.kisAppKey;
+        const as = appSecret || runtimeConfig.kisAppSecret;
+        const md = mode || runtimeConfig.kisMode || 'real';
+        if (!ak || !as) throw new Error('appKey/appSecret 필요');
+        console.log('[KIS 토큰 요청]', 'mode:', md, 'host:', kisHost(md), 'keyLen:', ak.length);
+        const token = await getKisToken(ak, as, md);
         if (!token) throw new Error('토큰 발급 실패');
         res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
         res.end(JSON.stringify({ ok: true, token: token.slice(0, 10) + '...' }));
