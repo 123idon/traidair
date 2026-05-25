@@ -5,3 +5,4 @@ config.js
 cfg.json
 config.js
 buildinfo.json
+.claude/
