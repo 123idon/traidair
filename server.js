@@ -88,7 +88,7 @@ function kisHost(mode) {
 }
 
 function kisPort(mode) {
-  return mode === 'real' ? 9443 : 29443;
+  return 443; // Railway에서 9443/29443 차단 → 443으로 통일
 }
 
 function kisRequest(opts, body) {
