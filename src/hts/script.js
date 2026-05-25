@@ -369,6 +369,13 @@ function calcMACD(d){const ema=(d,n)=>{const k=2/(n+1);let e=d[0];return d.map(v
 
 function calcVWAP(cs){let pv=0,tv=0;return cs.map(c=>{pv+=((c.h+c.l+c.c)/3)*c.v;tv+=c.v;return Math.round(pv/tv)});}
 
+function _roundTick(p){
+  if(p>=50000)return Math.round(p/100)*100;
+  if(p>=10000)return Math.round(p/100)*100;
+  if(p>=5000)return Math.round(p/10)*10;
+  if(p>=1000)return Math.round(p/5)*5;
+  return Math.round(p);
+}
 function rng32(seed){let a=seed|0;return()=>{a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
 // 종목별 시뮬 캔들 — 현재 봉 인덱스까지만 (미래 데이터 노출 금지)
 // _genSimCandles와 동일한 시드 로직 사용 — 일관된 데이터
@@ -2365,6 +2372,9 @@ async function _backtestLoadDay(dateStr){
   sim.date=dateStr;
   const md=document.getElementById('mockDate'); if(md) md.value=dateStr;
   mock.todayPnl=0; mock.todayTrades=0; mock.lossSeries=0;
+  // 신용 이자 일일 차감
+  if(mock.creditUsed>0){var _di=Math.round(mock.creditUsed*(cfg.crate||8.5)/365/100);mock.cash-=_di;mock.todayPnl-=_di;addDecisionLog('💰 신용이자',fW(_di)+'원 차감 (잔액 '+fW(mock.creditUsed)+'×'+(cfg.crate||8.5)+'%/365)','비용');}
+  if(mock.marginUsed>0){var _mi=Math.round(mock.marginUsed*(cfg.mrate||12)/365/100);mock.cash-=_mi;mock.todayPnl-=_mi;addDecisionLog('💰 미수이자',fW(_mi)+'원 차감','비용');}
   // ★ 백테스트 중 자동매매가 꺼졌으면(연속 손절 brk) 매일 다시 켜기
   if(backtest.running && !autoState.running){
     autoState.running=true; autoState.level=autoLevel||4;
@@ -3085,9 +3095,21 @@ function submitOrder(autoExec){
     if(!confirm(`⚠ ${stk.nm}은(는) 매매금지 종목입니다.
 그래도 매수하시겠습니까?`))return false;
   }
-  const pr=oType==="market"?stk.pr:parseFloat(document.getElementById("ofPr").value)||stk.pr;
-  const qty=parseInt(document.getElementById("ofQty").value)||0;
+  let pr=oType==="market"?stk.pr:parseFloat(document.getElementById("ofPr").value)||stk.pr;
+  // 실매매 시뮬: 슬리피지 + 스프레드 (백테스트/시뮬에서만)
+  if(autoExec&&(window.backtest&&backtest.running||sim.playing)){
+    var slip=pr*0.001;
+    pr=oSide==='buy'?Math.round(pr+slip):Math.round(pr-slip);
+  }
+  pr=_roundTick(pr);
+  let qty=parseInt(document.getElementById("ofQty").value)||0;
   if(qty<=0){if(!autoExec)showAlert("주문 오류","수량을 입력하세요.");return false;}
+  // 실매매 시뮬: 거래량 제한 — 캔들 거래량의 10% 초과 매수 불가
+  if(oSide==='buy'&&autoExec&&sim.candles&&sim.candles[sim.idx]){
+    var _cv=sim.candles[sim.idx].v||0;
+    var _maxQty=Math.max(1,Math.floor(_cv*0.1));
+    if(qty>_maxQty&&_cv>0){qty=_maxQty;document.getElementById("ofQty").value=qty;addDecisionLog('거래량 제한','캔들 거래량 '+_cv+'주의 10% = '+_maxQty+'주로 축소','리스크');}
+  }
   // ★ 수수료는 매수/매도 각각 따로 — 이중 차감 방지
   const _br = (cfg.bf||0.015)/100, _sr = (cfg.sf||0.015)/100;
   const fee = oSide==='sell' ? (pr*qty)*_sr : (pr*qty)*_br;
@@ -3203,23 +3225,36 @@ function checkStopOrders(){
     // Trailing update
     if(so.trail==="pct"&&pr>so.trailHigh){so.trailHigh=pr;so.stop=Math.round(pr*(1-autoState.cfg.stop/100));}
     if(so.trail==="ma5"){const cs=sim.candles.slice(0,sim.idx+1);const ma=calcMA(cs.map(c=>c.c),5);const m=ma[ma.length-1];if(m&&m>so.stop)so.stop=Math.round(m);}
-    // Stop hit
+    // Stop hit — 갭 실행: 실제 체결가는 캔들 저가 or 현재가 중 낮은 값
     if(pr<=so.stop&&pos.qty>0){
+      var fillPr=pr;
+      try{
+        var _scs=tk===activeTk?sim.candles:_peekSimCandlesFor(tk,sim.date,sim.idx);
+        var _sc=_scs&&_scs[Math.min(sim.idx,_scs.length-1)];
+        if(_sc&&_sc.l<fillPr)fillPr=_sc.l;
+      }catch(_e){}
+      fillPr=_roundTick(Math.max(1,fillPr));
       const saveTk=activeTk,saveSide=oSide,saveType=oType,saveCred=credType;
-      activeTk=tk;oSide="sell";oType="market";credType="cash";document.getElementById("ofQty").value=pos.qty;
-      window._pendingSellReason='손절 실행 — 손절가 '+fW(so.stop)+'원 도달 (Phase 9-4)';
+      activeTk=tk;oSide="sell";oType="limit";credType="cash";
+      document.getElementById("ofPr").value=fillPr;
+      document.getElementById("ofQty").value=pos.qty;
+      window._pendingSellReason='손절 실행 — 손절가 '+fW(so.stop)+'원 (체결 '+fW(fillPr)+'원)';
       submitOrder(true);
       activeTk=saveTk;oSide=saveSide;oType=saveType;credType=saveCred;
       delete stopOrders[tk];
-      addMsg("ai",`🔴 손절 실행! ${stk.nm} ${fW(pr)}원\n손절가 ${fW(so.stop)}원 도달 → 전량 청산\n[Phase 9-4: 손절은 시장가 즉시]`);
+      var gapMsg=fillPr<so.stop?' ⚠갭 -'+((1-fillPr/so.stop)*100).toFixed(1)+'%':'';
+      addMsg("ai",`🔴 손절 실행! ${stk.nm} ${fW(fillPr)}원${gapMsg}\n손절가 ${fW(so.stop)}원 도달 → 전량 청산\n[Phase 9-4: 손절은 시장가 즉시]`);
       return;
     }
-    // T1 (50%)
+    // T1 (50%) — 실제 체결가: 캔들 고가 or 목표가 중 높은 값
     if(!so.t1done&&pr>=so.t1&&pos.qty>0){
+      var t1Fill=so.t1;
+      try{var _tc1=tk===activeTk?sim.candles[sim.idx]:null;if(_tc1&&_tc1.h>t1Fill)t1Fill=_tc1.h;}catch(_e){}
+      t1Fill=Math.min(t1Fill,pr);t1Fill=_roundTick(t1Fill);
       const q50=Math.max(1,Math.floor(so.origQty*0.5));
       const qty=Math.min(q50,pos.qty);
       const saveTk=activeTk,saveSide=oSide,saveType=oType,saveCred2=credType;
-      activeTk=tk;oSide="sell";oType="market";credType="cash";document.getElementById("ofQty").value=qty;
+      activeTk=tk;oSide="sell";oType="limit";credType="cash";document.getElementById("ofPr").value=t1Fill;document.getElementById("ofQty").value=qty;
       window._pendingSellReason='1차 목표가 '+fW(so.t1)+'원 도달 — 50% 분할 익절 (Phase 9-2)';
       submitOrder(true);
       activeTk=saveTk;oSide=saveSide;oType=saveType;credType=saveCred2;
