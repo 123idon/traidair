@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#ffffff">
-<meta name="build-ts" content="1779695251141">
+<meta name="build-ts" content="1779696365495">
 <title>TraidAIr HTS</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 
@@ -3791,14 +3791,9 @@ function _drawChartInner(){
       }
       if(matchIdx<0) return;
       var x=toX(matchIdx);
-      var _tpr=t.price||t.pr||0;
-      if(!_tpr) return;
       var isBuy=t.side==='buy';
-      var yPr=toY(_tpr);
-      if(yPr<PT-20||yPr>PT+mainH+20){
-        var cx=cs[matchIdx];
-        if(cx)yPr=toY(isBuy?cx.l:cx.h);
-      }
+      var cx=cs[matchIdx];if(!cx)return;
+      var yPr=toY(isBuy?cx.l:cx.h);
       yPr=Math.max(PT+2,Math.min(PT+mainH-2,yPr));
       ctx.save();
       ctx.fillStyle=isBuy?'#00c471':'#ff4757';
@@ -3806,9 +3801,11 @@ function _drawChartInner(){
       ctx.lineWidth=1.5;
       ctx.beginPath();
       if(isBuy){
-        ctx.moveTo(x,yPr+14);ctx.lineTo(x-5,yPr+4);ctx.lineTo(x+5,yPr+4);
+        var y0=yPr+4;
+        ctx.moveTo(x,y0+12);ctx.lineTo(x-6,y0);ctx.lineTo(x+6,y0);
       }else{
-        ctx.moveTo(x,yPr-14);ctx.lineTo(x-5,yPr-4);ctx.lineTo(x+5,yPr-4);
+        var y0=yPr-4;
+        ctx.moveTo(x,y0-12);ctx.lineTo(x-6,y0);ctx.lineTo(x+6,y0);
       }
       ctx.closePath();ctx.fill();ctx.stroke();
       ctx.restore();
@@ -7009,48 +7006,26 @@ async function _runScreeningAsync(){
       addDecisionLog('['+stk.nm+'] 대장첫숨 조건부 미달','장대양봉+첫음봉 OK, 이슈/재료 미확인 — 진입 보류','PASS');
     }
 
-    // 진화: 기법 성과 기반 점수 보정 — 학습 데이터 적극 활용
+    // 진화: 기법 성과 기반 점수 보정
     var _detTech=_isPullback?'눌림목':_isBreakout?'돌파':_isGap?'갭상승':_isFirstBar?'첫봉':_isMomentum?'이슈테마':'기타';
     var _tgCand=getTechGrade(_detTech);
     if(_tgCand.grade!=='?'){
-      // 등급별 점수 배율
       if(_tgCand.grade==='A'){score=Math.round(score*1.2);tags.push('A등급↑');}
-      else if(_tgCand.grade==='D'){score=Math.round(score*0.5);tags.push('D등급↓');}
-      else if(_tgCand.grade==='C'){score=Math.round(score*0.8);tags.push('C등급↓');}
-      // R/R 기반 보정: 기법의 실제 R/R이 높으면 가산
+      else if(_tgCand.grade==='D'){score=Math.round(score*0.85);tags.push('D등급↓');}
       var _techRR=parseFloat(_tgCand.rr)||0;
-      if(_techRR>=2){score+=2;tags.push('R/R'+_techRR);}
-      else if(_techRR<0.8&&_tgCand.count>=5){score-=2;tags.push('R/R낮음');}
-      // 수익팩터 기반: PF>1.5면 수익기법
+      if(_techRR>=2){score+=1;tags.push('R/R'+_techRR);}
       var _techPF=parseFloat(_tgCand.pf)||0;
       if(_techPF>=1.5){score+=1;tags.push('PF'+_techPF);}
-      else if(_techPF<0.7&&_tgCand.count>=5){score-=1;tags.push('PF부족');}
-      // 연속 손실 기법 차단: D등급 + 최근 5건 이상이면 진입 거부
-      if(_tgCand.grade==='D'&&_tgCand.count>=5){
-        addDecisionLog('['+stk.nm+'] '+_detTech+' D등급 차단','승률 낮은 기법 진입 거부 ('+_tgCand.count+'건 '+_tgCand.score+'점)','학습차단');
-        continue;
-      }
     }
-    // 학습 메모리 기반 필터: 최근 학습에서 같은 기법/종목 경고가 있으면 감점
+    // 학습 메모리: 성공 경험만 가산 (감점은 AI 프롬프트에서 처리)
     try{
-      var _lmRecent=(window.learningMemory||[]).slice(-20);
-      var _lmWarn=_lmRecent.filter(function(l){
-        var txt=l.text||'';
-        return(txt.indexOf(_detTech)!==-1||txt.indexOf(stk.nm)!==-1)&&(l.category==='실수'||l.category==='손실'||l.category==='경고');
-      });
-      if(_lmWarn.length>=2){score-=3;tags.push('학습경고×'+_lmWarn.length);}
-      else if(_lmWarn.length===1){score-=1;tags.push('학습주의');}
-      // 성공 학습이 있으면 가산
-      var _lmGood=_lmRecent.filter(function(l){
+      var _lmGood=(window.learningMemory||[]).slice(-15).filter(function(l){
         var txt=l.text||'';
         return(txt.indexOf(_detTech)!==-1||txt.indexOf(stk.nm)!==-1)&&(l.category==='성공'||l.category==='수익');
       });
-      if(_lmGood.length>=2){score+=2;tags.push('학습성공×'+_lmGood.length);}
+      if(_lmGood.length>=1){score+=1;tags.push('학습성공');}
     }catch(_lme){}
-    // 전체 성과 점수 기반: 최근 성과가 나쁘면 전체적으로 보수적
-    var _recentSc=_perfProfile.recentScore||50;
-    if(_recentSc<30){score=Math.round(score*0.8);tags.push('성과부진');}
-    else if(_recentSc>=70){score+=1;tags.push('성과우수');}
+    if((_perfProfile.recentScore||50)>=70){score+=1;tags.push('성과우수');}
     scored.push({tk:tk,stk:stk,score:score,tags:tags,lc:lc,lma5:lma5,lrsi:lrsi,volR:volR,detTech:_detTech});
   }
 
@@ -7329,31 +7304,10 @@ async function execAutoBuy(pr, stk, score, techTag){
   }else{
     posPct = Math.max(5, Math.min(80, basePos));
   }
-  // 기법 성과 기반 조절 — 학습 데이터 적극 반영
+  // 기법 성과 기반 조절
   var _tg=getTechGrade(techTag||'');
-  if(_tg.grade==='A'){
-    posPct=Math.round(posPct*1.2);
-    addDecisionLog('['+stk.nm+'] 기법 A등급','비중 +20% (승률'+_tg.winRate+'% R/R'+_tg.rr+')','진화엔진');
-  }else if(_tg.grade==='D'){
-    posPct=Math.round(posPct*0.5);
-    addDecisionLog('['+stk.nm+'] 기법 D등급','비중 -50% (승률'+_tg.winRate+'% R/R'+_tg.rr+')','진화엔진');
-  }else if(_tg.grade==='C'){posPct=Math.round(posPct*0.7);}
-  // 수익팩터 기반 비중 미세 조정
-  if(_tg.grade!=='?'){
-    var _tpf=parseFloat(_tg.pf)||1;
-    if(_tpf>=2){posPct=Math.min(60,Math.round(posPct*1.1));}
-    else if(_tpf<0.5&&_tg.count>=3){posPct=Math.round(posPct*0.6);}
-  }
-  // 전체 성과 반영: 최근 성과 점수가 낮으면 전체 비중 축소
-  var _overallSc=_perfProfile.recentScore||50;
-  if(_overallSc<25){posPct=Math.round(posPct*0.7);addDecisionLog('['+stk.nm+'] 전체성과 부진','비중 -30% (점수'+_overallSc+'/100)','학습반영');}
-  else if(_overallSc>=75){posPct=Math.min(55,Math.round(posPct*1.1));}
-  // 학습 메모리 기반: 최근 같은 종목에서 손실 학습이 있으면 비중 축소
-  try{
-    var _lmThis=(window.learningMemory||[]).slice(-15).filter(function(l){return(l.text||'').indexOf(stk.nm)!==-1&&(l.category==='실수'||l.category==='손실');});
-    if(_lmThis.length>=2){posPct=Math.round(posPct*0.5);addDecisionLog('['+stk.nm+'] 학습 경고 반영','같은 종목 손실 학습 '+_lmThis.length+'건 → 비중 -50%','학습반영');}
-    else if(_lmThis.length===1){posPct=Math.round(posPct*0.8);}
-  }catch(_e){}
+  if(_tg.grade==='A'){posPct=Math.round(posPct*1.15);addDecisionLog('['+stk.nm+'] A등급','비중 +15%','진화엔진');}
+  else if(_tg.grade==='D'){posPct=Math.round(posPct*0.8);}
   // 대장첫숨: 신중 진입 — 비중 1/3로 제한
   if(techTag==='대장첫숨'){ posPct=Math.min(posPct, 33); }
   // 사용자 cfg 상한 존중
@@ -10958,7 +10912,7 @@ function collectMarketCtx(){
 (function(){
   const meta = document.querySelector('meta[name="build-ts"]');
   const myBuildTs = meta ? meta.getAttribute('content') : '';
-  if(!myBuildTs || myBuildTs === '1779695251141') return; // 로컬 빌드 안 한 경우
+  if(!myBuildTs || myBuildTs === '1779696365495') return; // 로컬 빌드 안 한 경우
   let reloaded = false;
   async function check(){
     if(reloaded) return;
