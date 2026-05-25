@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#ffffff">
-<meta name="build-ts" content="1779714768803">
+<meta name="build-ts" content="1779720530748">
 <title>TraidAIr HTS</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 
@@ -3713,8 +3713,9 @@ async function startEvolvePlus(){
   _evolveCycle=0;
   _evolveLoop=1;
   _evolveLoopCycleIdx=0;
+  _evolveLoopHistory=[];
   _evolvePrevSpeed=sim.speed;
-  sim.speed=250;
+  sim.speed=1500;
   document.querySelectorAll('.spd-btn').forEach(function(b){b.classList.remove('on');});
   var panel=document.getElementById('evolvePanel');
   if(panel)panel.style.display='none';
@@ -3722,7 +3723,7 @@ async function startEvolvePlus(){
   addMsg('ai','🧬 진화+ 시작\n• 종목 풀 분석 + 강세섹터 동기화 중...');
   try{if(typeof refreshHotSectors==='function') await refreshHotSectors(true);}catch(_e){}
   var poolSize=(WGS[0]||[]).length+(WGS[1]||[]).length+Object.keys(window._sectorInfo||{}).length;
-  addMsg('ai','🧬 진화+ (종목풀 '+poolSize+'개)\n• 루프: 20사이클 학습 → 정리 → 반복\n• 다시 누르면 중지 + 결과');
+  addMsg('ai','🧬 진화+ (종목풀 '+poolSize+'개)\n• x1500 규칙 기반 학습 (API 비용 0)\n• 루프: 20사이클 → 정리 → 반복\n• 학습 데이터는 실매매 Claude에 자동 반영\n• 다시 누르면 중지 + 결과');
   _startLearnPhase();
 }
 function _startLearnPhase(){
@@ -3778,7 +3779,7 @@ function _finishLoopRound(){
 function _evolveNextDay(){
   if(!_evolveRunning)return;
   if(_evolveRoundIdx>=_evolveDays.length){_onLearnDone();return;}
-  sim.speed=250;
+  sim.speed=1500;
   _updBtn('🧬 L'+_evolveLoop+' '+_evolveLoopCycleIdx+'/'+_evolveCyclesPerLoop);
   startBacktest(_evolveDays[_evolveRoundIdx],_evolveDays[_evolveRoundIdx]);
 }
@@ -3820,6 +3821,7 @@ async function stopEvolvePlus(){
   _updBtn('reset');
   if(window.backtest&&backtest.running){await stopBacktest();}
   computePerformanceProfile();
+  evolveFeatureWeights();
   _saveEvoPlus();
   var after=_takeSnapshot();
   _evolveSnapshot.afterScore=after.score;_evolveSnapshot.afterPnl=after.pnl;_evolveSnapshot.afterTrades=after.trades;
@@ -3827,11 +3829,35 @@ async function stopEvolvePlus(){
   _evolveSnapshot.deltaPnl=after.pnl-_evolveSnapshot.pnl;
   _evolveSnapshot.deltaTrades=after.trades-_evolveSnapshot.trades;
   var evolved=Object.keys(TECHNIQUES).filter(function(k){return TECHNIQUES[k].evolved;}).length;
+  var blacklisted=_geneBlacklist.length;
   var panel=document.getElementById('evolvePanel');
   if(panel){panel.style.display='';renderUnifiedPanel();}
   var ds=_evolveSnapshot.deltaScore;
-  var loopSummary=_evolveLoopHistory.length?'\n• 루프 이력: '+_evolveLoopHistory.map(function(h){return'L'+h.loop+'('+h.score+'점'+(h.deltaScore!==undefined?(h.deltaScore>=0?'+':'')+h.deltaScore:'')+')'}).join(' → '):'';
-  addMsg('ai','🧬 진화+ 중지 (루프'+_evolveLoop+' / '+_evolveCycle+'사이클)\n• 종합점수: '+_evolveSnapshot.score+' → '+after.score+' ('+(ds>=0?'+':'')+ds+')\n• 손익: '+(_evolveSnapshot.deltaPnl>=0?'+':'')+_evolveSnapshot.deltaPnl.toLocaleString()+'원\n• 신규 매매: '+_evolveSnapshot.deltaTrades+'건\n• GA: '+_evoPlus.generation+'세대 / 등록기법: '+evolved+'개\n• 패턴DB: '+_patternDB.length+'건'+loopSummary);
+  var loopSummary=_evolveLoopHistory.length?_evolveLoopHistory.map(function(h){return'L'+h.loop+'('+h.score+'점'+(h.deltaScore!==undefined?(h.deltaScore>=0?'+':'')+h.deltaScore:'')+')'}).join(' → '):'';
+  // 진화 전용 결과 메시지
+  var resultMsg='🧬 진화+ 결과\n═══════════════\n';
+  resultMsg+='📊 '+_evolveLoop+'루프 '+_evolveCycle+'사이클 완료\n\n';
+  resultMsg+='【학습 성과】\n';
+  resultMsg+='• 종합점수: '+_evolveSnapshot.score+' → '+after.score+' ('+(ds>=0?'+':'')+ds+')\n';
+  resultMsg+='• 매매: '+_evolveSnapshot.deltaTrades+'건 / 손익: '+(_evolveSnapshot.deltaPnl>=0?'+':'')+_evolveSnapshot.deltaPnl.toLocaleString()+'원\n\n';
+  resultMsg+='【진화 데이터】\n';
+  resultMsg+='• GA: '+_evoPlus.generation+'세대\n';
+  resultMsg+='• 등록기법: '+evolved+'개 / 블랙리스트: '+blacklisted+'개\n';
+  resultMsg+='• 패턴DB: '+_patternDB.length+'건\n';
+  resultMsg+='• 원칙준수: '+getAdherenceInsight().msg+'\n\n';
+  resultMsg+='【적응형 파라미터】\n';
+  resultMsg+='• 손절: '+_adaptiveCfg.stop+'% / 비중: '+_adaptiveCfg.pos+'% / R/R: '+_adaptiveCfg.rr+'\n';
+  resultMsg+='• 최소진입: '+_adaptiveCfg.minScore+'점\n\n';
+  if(_perfProfile.byTech){
+    resultMsg+='【기법별 성과】\n';
+    Object.keys(_perfProfile.byTech).sort(function(a,b){return(_perfProfile.byTech[b].score||0)-(_perfProfile.byTech[a].score||0);}).forEach(function(k){
+      var t=_perfProfile.byTech[k];if(t.count<2)return;
+      resultMsg+='• '+t.grade+' '+k+': '+t.score+'점 ('+t.count+'건 승률'+t.winRate+'%)\n';
+    });
+  }
+  if(loopSummary)resultMsg+='\n【루프 이력】\n'+loopSummary;
+  addMsg('ai',resultMsg);
+  showAlert('🧬 진화+ 결과',resultMsg);
 }
 function renderUnifiedPanel(){
   var sells=(mock.trades||[]).filter(function(t){return t.side==='sell';});
@@ -5113,7 +5139,7 @@ function _backtestReport(){
   if(_evolveRunning&&_evolvePhase==='learn'){
     _evolveRoundIdx++;
     if(_evolveRoundIdx<_evolveDays.length){
-      setTimeout(_evolveNextDay,300);
+      setTimeout(_evolveNextDay,100);
     }else{
       _onLearnDone();
     }
@@ -11412,7 +11438,7 @@ function collectMarketCtx(){
 (function(){
   const meta = document.querySelector('meta[name="build-ts"]');
   const myBuildTs = meta ? meta.getAttribute('content') : '';
-  if(!myBuildTs || myBuildTs === '1779714768803') return; // 로컬 빌드 안 한 경우
+  if(!myBuildTs || myBuildTs === '1779720530748') return; // 로컬 빌드 안 한 경우
   let reloaded = false;
   async function check(){
     if(reloaded) return;
