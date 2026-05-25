@@ -1186,7 +1186,7 @@ function toggleEvolvePlus(){
   if(_evolveRunning){stopEvolvePlus();}
   else{startEvolvePlus();}
 }
-function startEvolvePlus(){
+async function startEvolvePlus(){
   if(_evolveRunning)return;
   if(window.backtest&&backtest.running){showAlert('진화+','백테스트 진행 중입니다.');return;}
   _evolveRunning=true;
@@ -1197,7 +1197,13 @@ function startEvolvePlus(){
   document.querySelectorAll('.spd-btn').forEach(function(b){b.classList.remove('on');});
   var panel=document.getElementById('evolvePanel');
   if(panel)panel.style.display='none';
-  addMsg('ai','🧬 진화+ 시작 (x250 · Claude AI 판단)\n• 사이클: 학습(10일) → GA(3세대) → AI정제 → 반복\n• 실매매와 동일한 판단 로직\n• 다시 누르면 중지 + 결과');
+  _updBtn('🧬 분석 중...');
+  addMsg('ai','🧬 진화+ 시작\n• 종목 풀 분석 + 강세섹터 동기화 중...');
+  try{
+    if(typeof refreshHotSectors==='function') await refreshHotSectors(true);
+  }catch(_e){}
+  var poolSize=(WGS[0]||[]).length+(WGS[1]||[]).length+Object.keys(window._sectorInfo||{}).length;
+  addMsg('ai','🧬 분석 완료 (종목풀 '+poolSize+'개)\n• x250 · Claude AI 판단\n• 사이클: 학습(10일) → GA(3세대) → AI정제 → 반복\n• 다시 누르면 중지 + 결과');
   _startLearnPhase();
 }
 function _startLearnPhase(){
@@ -1640,7 +1646,11 @@ function _drawChartInner(){
       var _tpr=t.price||t.pr||0;
       if(!_tpr) return;
       var yPr=toY(_tpr);
+      if(yPr<PT-5||yPr>PT+mainH+5) return;
       var isBuy=t.side==='buy';
+      var cx=cs[matchIdx];
+      if(cx){yPr=isBuy?toY(cx.l):toY(cx.h);}
+      yPr=Math.max(PT+2,Math.min(PT+mainH-2,yPr));
       ctx.save();
       ctx.fillStyle=isBuy?'#00c471':'#ff4757';
       ctx.strokeStyle=isBuy?'#008855':'#cc1133';
@@ -2395,10 +2405,13 @@ async function _backtestLoadDay(dateStr){
   const _wait = sim.speed>=300 ? 150 : sim.speed>=60 ? 300 : 600;
   // setTimeout 핸들 backtest에 저장 — stopBacktest에서 clear 가능
   if(backtest._pendingStart){ clearTimeout(backtest._pendingStart); backtest._pendingStart=null; }
-  backtest._pendingStart = setTimeout(()=>{
+  function _onCandlesReady(){
     backtest._pendingStart = null;
-    // ★ setTimeout 안에서도 backtest.running 체크 (정지 후 재시작 차단)
     if(!window.backtest || !backtest.running) return;
+    if(!sim.candles||sim.candles.length<5){
+      backtest._pendingStart=setTimeout(_onCandlesReady,200);
+      return;
+    }
     chartViewCount=Math.min(120, sim.candles.length||60);
     chartViewStart=Math.max(0,(sim.candles.length||60)-chartViewCount);
     const prevCount=(_kisChartMeta&&_kisChartMeta.prevCount)||0;
@@ -2409,7 +2422,8 @@ async function _backtestLoadDay(dateStr){
     _syncPlayBtn();
     runStep();
     renderBacktestPanel();
-  }, _wait);
+  }
+  backtest._pendingStart = setTimeout(_onCandlesReady, _wait);
 }
 async function _backtestEndOfDay(){
   if(!window.backtest || !backtest.running) return;
@@ -3111,6 +3125,7 @@ function submitOrder(autoExec){
   } else {
     const pos=mock.positions[activeTk];
     if(!pos||pos.qty<qty){if(!autoExec)showAlert("보유 부족",`보유 ${pos?.qty||0}주 주문 ${qty}주`);return false;}
+    if(!pos.avgPrice||pos.avgPrice<=0){pos.avgPrice=pr;}
     const pnl=(pr-pos.avgPrice)*qty-fee-tax;
     // ★ 신용/미수 사용분 먼저 갚고 나머지를 cash로 (잔고 뻥튀기 버그 수정)
     let _proceeds = tot - fee - tax; // 매도 받은 순금액
