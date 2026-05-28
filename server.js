@@ -578,6 +578,7 @@ const server = http.createServer(async (req, res) => {
             code: p.pdno, name: p.prdt_name, qty: parseInt(p.hldg_qty || 0),
             avgPrice: parseInt(p.pchs_avg_pric || 0), currentPrice: parseInt(p.prpr || 0),
             evalAmt: parseInt(p.evlu_amt || 0), pnl: parseInt(p.evlu_pfls_amt || 0), pnlPct: p.evlu_pfls_rt || '0.00',
+            loanDt: p.loan_dt || '', crdtType: p.crdt_type || '',
           })),
         }));
       } catch(e) {
