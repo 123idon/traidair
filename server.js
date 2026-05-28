@@ -588,6 +588,333 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ── KIS 신용주문 (/api/kis/order-credit) — 실전 전용
+  // body: { appKey, appSecret, mode, account, side:"buy|sell", code, qty, price, orderType:"limit|market", crdtType?, loanDate? }
+  // 신용유형(CRDT_TYPE) 기본값: buy="21"(자기융자신규), sell="25"(자기융자상환). 매도 시 loanDate(YYYYMMDD) 필수.
+  if (url === '/api/kis/order-credit' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        const { appKey, appSecret, mode, account, side, code, qty, price, orderType, crdtType, loanDate } = JSON.parse(body);
+        if (!appKey || !appSecret || !account) throw new Error('필수 정보 누락');
+        if ((mode || 'real') !== 'real') throw new Error('신용주문은 실전(real) 모드 전용');
+        if (side === 'sell' && !loanDate) throw new Error('신용 매도 시 loanDate(YYYYMMDD) 필수');
+        const token = await getKisToken(appKey, appSecret, 'real');
+        if (!token) throw new Error('토큰 없음');
+        const trId = side === 'buy' ? 'TTTC0852U' : 'TTTC0851U';
+        const ordDvsn = orderType === 'market' ? '01' : '00';
+        const [acntPfx, acntSfx] = account.includes('-') ? account.split('-') : [account.slice(0,8), account.slice(8)];
+        const orderBody = {
+          CANO: acntPfx,
+          ACNT_PRDT_CD: acntSfx || '01',
+          PDNO: code,
+          CRDT_TYPE: crdtType || (side === 'buy' ? '21' : '25'),
+          LOAN_DT: loanDate || '',
+          ORD_DVSN: ordDvsn,
+          ORD_QTY: String(qty),
+          ORD_UNPR: ordDvsn === '01' ? '0' : String(price),
+        };
+        const bodyStr = JSON.stringify(orderBody);
+        const result = await kisRequest({
+          hostname: kisHost('real'),
+          port: kisPort('real'),
+          path: '/uapi/domestic-stock/v1/trading/order-credit',
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(bodyStr),
+            'authorization': `Bearer ${token}`,
+            'appkey': appKey, 'appsecret': appSecret,
+            'tr_id': trId, 'custtype': 'P', 'hashkey': '',
+          },
+        }, bodyStr);
+        const d = result.data;
+        if (d.rt_cd === '0') {
+          res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+          res.end(JSON.stringify({
+            ok: true,
+            ordNo: d.output?.ODNO || d.output?.odno,
+            krxFwdgOrgno: d.output?.KRX_FWDG_ORD_ORGNO || d.output?.krx_fwdg_ord_orgno,
+            ordTime: d.output?.ORD_TMD || d.output?.ord_tmd,
+            msg: d.msg1 || '신용주문 완료',
+          }));
+        } else throw new Error(d.msg1 || `신용주문 실패 (rt_cd: ${d.rt_cd})`);
+      } catch(e) {
+        res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+        res.end(JSON.stringify({ ok: false, error: e.message }));
+      }
+    });
+    return;
+  }
+
+  // ── KIS 주문 정정/취소 (/api/kis/order-cancel)
+  // body: { appKey, appSecret, mode, account, orgOrdNo, krxFwdgOrgno, code?, action:"cancel|modify", qty, price, orderType, qtyAllOrd?:"Y|N" }
+  // action='cancel' → RVSE_CNCL_DVSN_CD='02', 'modify' → '01'
+  if (url === '/api/kis/order-cancel' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        const { appKey, appSecret, mode, account, orgOrdNo, krxFwdgOrgno, action, qty, price, orderType, qtyAllOrd } = JSON.parse(body);
+        if (!appKey || !appSecret || !account || !orgOrdNo) throw new Error('필수 정보 누락 (orgOrdNo 포함)');
+        const token = await getKisToken(appKey, appSecret, mode || 'mock');
+        if (!token) throw new Error('토큰 없음');
+        const isMock = (mode || 'mock') === 'mock';
+        const trId = isMock ? 'VTTC0803U' : 'TTTC0803U';
+        const ordDvsn = orderType === 'market' ? '01' : '00';
+        const rvseCnclCd = action === 'cancel' ? '02' : '01';
+        const [acntPfx, acntSfx] = account.includes('-') ? account.split('-') : [account.slice(0,8), account.slice(8)];
+        const orderBody = {
+          CANO: acntPfx,
+          ACNT_PRDT_CD: acntSfx || '01',
+          KRX_FWDG_ORD_ORGNO: krxFwdgOrgno || '',
+          ORGN_ODNO: String(orgOrdNo),
+          ORD_DVSN: ordDvsn,
+          RVSE_CNCL_DVSN_CD: rvseCnclCd,
+          ORD_QTY: String(qty || 0),
+          ORD_UNPR: action === 'cancel' ? '0' : String(price || 0),
+          QTY_ALL_ORD_YN: qtyAllOrd || 'Y',
+        };
+        const bodyStr = JSON.stringify(orderBody);
+        const result = await kisRequest({
+          hostname: kisHost(mode || 'mock'),
+          port: kisPort(mode || 'mock'),
+          path: '/uapi/domestic-stock/v1/trading/order-rvsecncl',
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(bodyStr),
+            'authorization': `Bearer ${token}`,
+            'appkey': appKey, 'appsecret': appSecret,
+            'tr_id': trId, 'custtype': 'P', 'hashkey': '',
+          },
+        }, bodyStr);
+        const d = result.data;
+        if (d.rt_cd === '0') {
+          res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+          res.end(JSON.stringify({
+            ok: true,
+            ordNo: d.output?.ODNO || d.output?.odno,
+            krxFwdgOrgno: d.output?.KRX_FWDG_ORD_ORGNO || d.output?.krx_fwdg_ord_orgno,
+            ordTime: d.output?.ORD_TMD || d.output?.ord_tmd,
+            action,
+            msg: d.msg1 || (action === 'cancel' ? '취소 완료' : '정정 완료'),
+          }));
+        } else throw new Error(d.msg1 || `${action} 실패 (rt_cd: ${d.rt_cd})`);
+      } catch(e) {
+        res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+        res.end(JSON.stringify({ ok: false, error: e.message }));
+      }
+    });
+    return;
+  }
+
+  // ── KIS 미체결 조회 (/api/kis/unfilled)
+  // body: { appKey, appSecret, mode, account }
+  // 정정/취소 가능한 미체결 주문 목록. 결과의 ordNo/krxFwdgOrgno는 /api/kis/order-cancel 입력으로 사용.
+  if (url === '/api/kis/unfilled' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        const { appKey, appSecret, mode, account } = JSON.parse(body);
+        if (!appKey || !appSecret || !account) throw new Error('필수 정보 누락');
+        const token = await getKisToken(appKey, appSecret, mode || 'mock');
+        if (!token) throw new Error('토큰 없음');
+        const isMock = (mode || 'mock') === 'mock';
+        const [acntPfx, acntSfx] = account.includes('-') ? account.split('-') : [account.slice(0,8), account.slice(8)];
+        const result = await kisRequest({
+          hostname: kisHost(mode || 'mock'),
+          port: kisPort(mode || 'mock'),
+          path: `/uapi/domestic-stock/v1/trading/inquire-psbl-rvsecncl?CANO=${acntPfx}&ACNT_PRDT_CD=${acntSfx||'01'}&CTX_AREA_FK100=&CTX_AREA_NK100=&INQR_DVSN_1=0&INQR_DVSN_2=0`,
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'authorization': `Bearer ${token}`,
+            'appkey': appKey, 'appsecret': appSecret,
+            'tr_id': isMock ? 'VTTC8036R' : 'TTTC8036R',
+          },
+        });
+        const d = result.data;
+        const orders = (d.output || []).map(o => ({
+          ordNo: o.odno,
+          orgOrdNo: o.orgn_odno || '',
+          krxFwdgOrgno: o.ord_gno_brno || '',
+          code: o.pdno,
+          name: o.prdt_name,
+          side: o.sll_buy_dvsn_cd === '02' ? 'buy' : 'sell',
+          ordQty: parseInt(o.ord_qty || 0),
+          filledQty: parseInt(o.tot_ccld_qty || 0),
+          unfilledQty: parseInt(o.rmn_qty || (parseInt(o.ord_qty||0) - parseInt(o.tot_ccld_qty||0))),
+          ordPrice: parseInt(o.ord_unpr || 0),
+          avgFilledPrice: parseInt(o.avg_prvs || 0),
+          ordTime: o.ord_tmd,
+          ordDvsn: o.ord_dvsn_cd,
+          ordDvsnName: o.ord_dvsn_name,
+          rvseCnclName: o.rvse_cncl_dvsn_name,
+        }));
+        res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+        res.end(JSON.stringify({ ok: true, count: orders.length, orders }));
+      } catch(e) {
+        res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+        res.end(JSON.stringify({ ok: false, error: e.message }));
+      }
+    });
+    return;
+  }
+
+  // ── KIS 매수가능금액·신용 가용액 (/api/kis/inquire-psbl-order)
+  // body: { appKey, appSecret, mode, account, code?, price?, orderType?:"limit|market" }
+  // 종목/단가 없이도 조회 가능 (계좌 전체 가용액).
+  if (url === '/api/kis/inquire-psbl-order' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        const { appKey, appSecret, mode, account, code, price, orderType } = JSON.parse(body);
+        if (!appKey || !appSecret || !account) throw new Error('필수 정보 누락');
+        const token = await getKisToken(appKey, appSecret, mode || 'mock');
+        if (!token) throw new Error('토큰 없음');
+        const isMock = (mode || 'mock') === 'mock';
+        const [acntPfx, acntSfx] = account.includes('-') ? account.split('-') : [account.slice(0,8), account.slice(8)];
+        const ordDvsn = orderType === 'market' ? '01' : '00';
+        const path = `/uapi/domestic-stock/v1/trading/inquire-psbl-order?CANO=${acntPfx}&ACNT_PRDT_CD=${acntSfx||'01'}&PDNO=${code||''}&ORD_UNPR=${price||0}&ORD_DVSN=${ordDvsn}&CMA_EVLU_AMT_ICLD_YN=N&OVRS_ICLD_YN=N`;
+        const result = await kisRequest({
+          hostname: kisHost(mode || 'mock'),
+          port: kisPort(mode || 'mock'),
+          path,
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'authorization': `Bearer ${token}`,
+            'appkey': appKey, 'appsecret': appSecret,
+            'tr_id': isMock ? 'VTTC8908R' : 'TTTC8908R',
+          },
+        });
+        const o = result.data.output || {};
+        res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+        res.end(JSON.stringify({
+          ok: true,
+          orderCashable: parseInt(o.ord_psbl_cash || 0),         // 주문가능현금
+          orderSubst: parseInt(o.ord_psbl_sbst || 0),            // 주문가능대용금
+          reusableAmt: parseInt(o.ruse_psbl_amt || 0),           // 재사용가능금액
+          fundRcvableAmt: parseInt(o.fund_rcvable_amt || 0),     // 펀드환매대금
+          maxBuyAmt: parseInt(o.max_buy_amt || 0),               // 최대매수금액(현금+신용)
+          maxBuyQty: parseInt(o.max_buy_qty || 0),               // 최대매수수량
+          cmaEvluAmt: parseInt(o.cma_evlu_amt || 0),             // CMA 평가금액
+          ovrsRusePsblAmt: parseInt(o.ovrs_re_use_amt_wcrc || 0),
+          raw: o,
+        }));
+      } catch(e) {
+        res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+        res.end(JSON.stringify({ ok: false, error: e.message }));
+      }
+    });
+    return;
+  }
+
+  // ── KIS 거래대금/거래량 상위 (/api/kis/volume-rank)
+  // body: { appKey, appSecret, mode, market?:"0000|0001|1001", rankBy?:"0|1|2|3|4", minPrice?, maxPrice?, topN? }
+  //   market: 0000=전체, 0001=코스피, 1001=코스닥
+  //   rankBy: 0=평균거래량, 1=거래증가율, 2=평균거래회전율, 3=거래금액순(기본), 4=평균거래금액회전율
+  if (url === '/api/kis/volume-rank' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        const { appKey, appSecret, market, rankBy, minPrice, maxPrice, topN } = JSON.parse(body);
+        if (!appKey || !appSecret) throw new Error('appKey/appSecret 필요');
+        const token = await getKisToken(appKey, appSecret, 'real');
+        if (!token) throw new Error('토큰 없음');
+        const mk = market || '0000';
+        const blng = String(rankBy != null ? rankBy : '3');
+        const path = `/uapi/domestic-stock/v1/quotations/volume-rank?FID_COND_MRKT_DIV_CODE=J&FID_COND_SCR_DIV_CODE=20171&FID_INPUT_ISCD=${mk}&FID_DIV_CLS_CODE=0&FID_BLNG_CLS_CODE=${blng}&FID_TRGT_CLS_CODE=111111111&FID_TRGT_EXLS_CLS_CODE=000000&FID_INPUT_PRICE_1=${minPrice||0}&FID_INPUT_PRICE_2=${maxPrice||0}&FID_VOL_CNT=0&FID_INPUT_DATE_1=`;
+        const result = await kisRequest({
+          hostname: kisHost('real'),
+          port: kisPort('real'),
+          path,
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'authorization': `Bearer ${token}`,
+            'appkey': appKey, 'appsecret': appSecret,
+            'tr_id': 'FHPST01710000', 'custtype': 'P',
+          },
+        });
+        const out = result.data.output || [];
+        const limit = topN || 30;
+        const items = out.slice(0, limit).map(r => ({
+          rank: parseInt(r.data_rank || 0),
+          code: r.mksc_shrn_iscd,
+          name: r.hts_kor_isnm,
+          price: parseInt(r.stck_prpr || 0),
+          change: parseInt(r.prdy_vrss || 0),
+          changePct: parseFloat(r.prdy_ctrt || 0),
+          volume: parseInt(r.acml_vol || 0),
+          turnover: parseInt(r.acml_tr_pbmn || 0),    // 거래대금(원)
+          volSurgePct: parseFloat(r.vol_inrt || 0),   // 거래량 증가율
+          volTurnoverPct: parseFloat(r.vol_tnrt || 0),// 거래회전율
+          listedShares: parseInt(r.lstn_stcn || 0),
+          avgTurnoverPct: parseFloat(r.avrg_tr_pbmn || 0),
+        }));
+        res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+        res.end(JSON.stringify({ ok: true, market: mk, rankBy: blng, count: items.length, items }));
+      } catch(e) {
+        res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+        res.end(JSON.stringify({ ok: false, error: e.message }));
+      }
+    });
+    return;
+  }
+
+  // ── KIS 종목별 투자자 수급 (/api/kis/investor)
+  // body: { appKey, appSecret, mode, code }
+  // 최근 30영업일 외인/기관/개인 순매수 (수량 + 금액 천원).
+  if (url === '/api/kis/investor' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        const { appKey, appSecret, code } = JSON.parse(body);
+        if (!appKey || !appSecret || !code) throw new Error('필수 정보 누락 (code 포함)');
+        const token = await getKisToken(appKey, appSecret, 'real');
+        if (!token) throw new Error('토큰 없음');
+        const result = await kisRequest({
+          hostname: kisHost('real'),
+          port: kisPort('real'),
+          path: `/uapi/domestic-stock/v1/quotations/inquire-investor?FID_COND_MRKT_DIV_CODE=J&FID_INPUT_ISCD=${code}`,
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'authorization': `Bearer ${token}`,
+            'appkey': appKey, 'appsecret': appSecret,
+            'tr_id': 'FHKST01010900', 'custtype': 'P',
+          },
+        });
+        const out = result.data.output || [];
+        const series = out.map(r => ({
+          date: r.stck_bsop_date,
+          close: parseInt(r.stck_clpr || 0),
+          change: parseInt(r.prdy_vrss || 0),
+          changeSign: r.prdy_vrss_sign,
+          foreignerQty: parseInt(r.frgn_ntby_qty || 0),
+          institutionQty: parseInt(r.orgn_ntby_qty || 0),
+          individualQty: parseInt(r.prsn_ntby_qty || 0),
+          foreignerAmt: parseInt(r.frgn_ntby_tr_pbmn || 0),       // 천원 단위
+          institutionAmt: parseInt(r.orgn_ntby_tr_pbmn || 0),
+          individualAmt: parseInt(r.prsn_ntby_tr_pbmn || 0),
+        }));
+        res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+        res.end(JSON.stringify({ ok: true, code, count: series.length, series }));
+      } catch(e) {
+        res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+        res.end(JSON.stringify({ ok: false, error: e.message }));
+      }
+    });
+    return;
+  }
+
   // ── DART 공시 (/api/dart/list)
   if (url === '/api/dart/list') {
     const dartKey = runtimeConfig.dartKey;
