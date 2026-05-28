@@ -88,7 +88,10 @@ function kisHost(mode) {
 }
 
 function kisPort(mode) {
-  return 443; // Railway에서 9443/29443 차단 → 443으로 통일
+  // Railway 등 일부 cloud 환경은 9443/29443 outbound가 차단됨 → 443으로 강제 가능.
+  // 로컬에서는 KIS 공식 포트(real=9443, mock=29443)를 사용해야 정상 응답.
+  if (process.env.KIS_FORCE_PORT_443 === 'true') return 443;
+  return mode === 'real' ? 9443 : 29443;
 }
 
 function kisRequest(opts, body) {
