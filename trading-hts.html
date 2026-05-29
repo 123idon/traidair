@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#ffffff">
-<meta name="build-ts" content="1779725610202">
+<meta name="build-ts" content="1780061399407">
 <title>TraidAIr HTS</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 
@@ -582,6 +582,9 @@ canvas{image-rendering:pixelated;}
     <button class="tab" id="tab-stats" onclick="goPage('stats',this)">📉 통계</button>
     <button class="tab" id="tab-journal" onclick="goPage('journal',this)">📓 일지</button>
     <button class="tab" id="tab-features" onclick="goPage('features',this)">📋 기능</button>
+    <button class="tab" id="tab-backtest" onclick="goPage('backtest',this)">🎬 백테스트</button>
+    <button class="tab" id="tab-agentmon" onclick="goPage('agentmon',this)">🧠 에이전트</button>
+    <a class="tab" id="tab-agent" href="/agent" target="_blank" rel="noopener" style="text-decoration:none;">🤖 ai-agent</a>
   </div>
   <div class="srch-wrap">
     <div class="srch-box">
@@ -1671,6 +1674,28 @@ canvas{image-rendering:pixelated;}
   </div>
 </div>
 
+<!-- ── 백테스트 실시간 페이지 (§17) ── -->
+<div class="page" id="page-backtest" style="overflow:hidden;">
+  <iframe
+    id="btFrame"
+    src="backtest-live.html"
+    style="flex:1;border:none;width:100%;height:100%;display:block;"
+    loading="lazy"
+    title="백테스트 실시간 현황">
+  </iframe>
+</div>
+
+<!-- ── 에이전트 실시간 모니터 페이지 (§2) ── -->
+<div class="page" id="page-agentmon" style="overflow:hidden;">
+  <iframe
+    id="agentMonFrame"
+    src="agent-monitor.html"
+    style="flex:1;border:none;width:100%;height:100%;display:block;"
+    loading="lazy"
+    title="에이전트 실시간 모니터">
+  </iframe>
+</div>
+
 <!-- ── 기능 목록 페이지 ── -->
 <div class="page" id="page-features">
   <div class="stats-page" style="max-width:960px;">
@@ -2137,6 +2162,166 @@ canvas{image-rendering:pixelated;}
     <div class="modal-ftr"><button class="mbtn" onclick="closeModal('alert')">확인</button></div>
   </div>
 </div>
+
+<!-- ── 🤖 에이전트 실시간 체결 위젯 (§20) — 수동 주문창과 별개로 떠 있는 라이브 피드 ── -->
+<div id="agentFillsWidget" style="position:fixed;right:14px;bottom:14px;width:280px;z-index:9000;
+     background:#fff;border:1px solid #e5e8eb;border-radius:16px;box-shadow:0 6px 24px rgba(0,0,0,.12);
+     font-family:'Noto Sans KR',sans-serif;overflow:hidden;display:none;">
+  <div style="display:flex;align-items:center;gap:6px;padding:10px 12px;background:#f9fafb;border-bottom:1px solid #eef1f4;cursor:pointer;"
+       onclick="(function(b){b.style.display=b.style.display==='none'?'':'none';})(document.getElementById('agentFillsBody'))">
+    <span style="font-size:13px;font-weight:800;">🤖 에이전트 체결</span>
+    <span id="agentFillsRun" style="font-size:10px;font-weight:700;color:#8b95a1;">대기</span>
+    <span style="flex:1;"></span>
+    <span style="font-size:11px;color:#b0b8c1;">접기/펼치기</span>
+  </div>
+  <div id="agentFillsBody" style="max-height:240px;overflow:auto;padding:6px 10px;font-size:12px;">
+    <div style="color:#8b95a1;text-align:center;padding:10px;">아직 에이전트 매매가 없어요</div>
+  </div>
+</div>
+<script>
+// 에이전트(멀티에이전트 백테스트) 주문/체결을 HTS 위에 실시간 표시. 기존 수동 주문창과 공존.
+(function(){
+  var won=function(n){return (n==null?'-':Number(n).toLocaleString());};
+  function render(d){
+    var w=document.getElementById('agentFillsWidget'); if(!w) return;
+    var trades=(d&&d.ok&&d.todayTrades)||[];
+    var running=d&&d.running;
+    if(!d||!d.ok){ w.style.display='none'; return; }
+    if(!running && !trades.length){ w.style.display='none'; return; }
+    w.style.display='';
+    var rb=document.getElementById('agentFillsRun');
+    if(rb){ rb.textContent=running?'● 실행중':'정지'; rb.style.color=running?'#00c473':'#8b95a1'; }
+    var body=document.getElementById('agentFillsBody'); if(!body) return;
+    if(!trades.length){ body.innerHTML='<div style="color:#8b95a1;text-align:center;padding:10px;">진입 대기 중…</div>'; return; }
+    body.innerHTML=trades.slice(0,12).map(function(t){
+      var ex=t.kind==='exit';
+      var color=ex?(t.pnlPct>0?'#f04452':(t.pnlPct<0?'#3182f6':'#8b95a1')):'#191f28';
+      var label=ex?('청산 '+(t.exitKind||'')):'진입';
+      var pnl=ex?('<b style="color:'+color+'">'+(t.pnlPct>0?'+':'')+Number(t.pnlPct).toFixed(2)+'%</b>'):'';
+      return '<div style="display:flex;justify-content:space-between;gap:6px;padding:5px 0;border-top:1px solid #f1f3f5;">'+
+        '<span>'+(t.time||'')+' <b>'+(ex?'🔻':'🔵')+'</b> '+(t.name||t.code||'')+'</span>'+
+        '<span style="font-family:monospace;">'+won(t.price)+' '+pnl+'</span></div>';
+    }).join('');
+  }
+  function tick(){
+    if(document.hidden) return;
+    fetch('/api/backtest/state',{cache:'no-store'}).then(function(r){return r.json();}).then(render).catch(function(){});
+  }
+  setInterval(tick, 2000); tick();
+})();
+</script>
+
+<!-- ── 🤖 에이전트 팀 현황 (토스 스타일 상태창) — 메인화면 상시 표시 (CLAUDE.md §17.6) ── -->
+<!-- /api/backtest/state 를 3초마다 폴링해 8개 부서 에이전트가 "지금 무슨 일을 하는지" 쉬운 말로 보여준다. -->
+<div id="agentTeamPanel" style="position:fixed;left:14px;bottom:14px;width:312px;z-index:9000;
+     background:#fff;border:1px solid #e5e8eb;border-radius:18px;box-shadow:0 8px 28px rgba(0,0,0,.14);
+     font-family:'Noto Sans KR',sans-serif;overflow:hidden;">
+  <div style="display:flex;align-items:center;gap:7px;padding:11px 14px;background:linear-gradient(90deg,#eef4ff,#f9fafb);border-bottom:1px solid #eef1f4;cursor:pointer;"
+       onclick="(function(b){b.style.display=b.style.display==='none'?'':'none';})(document.getElementById('agentTeamBody'))">
+    <span style="font-size:14px;font-weight:800;color:#191f28;">🤖 에이전트 팀</span>
+    <span id="agentTeamRun" style="font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;background:#f1f3f5;color:#8b95a1;">대기</span>
+    <span style="flex:1;"></span>
+    <span id="agentTeamClock" style="font-size:12px;font-weight:700;font-family:monospace;color:#3182f6;">--:--</span>
+    <span style="font-size:11px;color:#b0b8c1;">▾</span>
+  </div>
+  <div id="agentTeamBody" style="max-height:60vh;overflow:auto;padding:8px 10px;">
+    <div id="agentTeamDate" style="font-size:11px;color:#8b95a1;text-align:center;padding:2px 0 8px;">백테스트를 시작하면 팀이 일을 시작해요</div>
+    <div id="agentTeamRows"></div>
+    <div style="display:flex;gap:6px;margin-top:8px;">
+      <a href="/agent-monitor.html" target="_blank" style="flex:1;text-align:center;text-decoration:none;font-size:11px;font-weight:700;color:#3182f6;background:#eef4ff;border-radius:10px;padding:7px 0;">🧠 상세 모니터</a>
+    </div>
+  </div>
+</div>
+<script>
+// 토스 스타일 8부서 에이전트 현황. agent-monitor.html 과 같은 데이터/말투를 메인화면에 압축 표시.
+(function(){
+  var won=function(n){return (n==null?'—':Number(n).toLocaleString()+'원');};
+  var pct=function(v){return (v==null?'—':(v>0?'+':'')+Number(v).toFixed(2)+'%');};
+  function signalText(s){return {STRONG_ENTRY:'✅ 지금 사기 좋아요',CONDITIONAL_ENTRY:'🤔 조건 맞으면 살 만해요',NO_ENTRY:'⏸️ 아직 살 때 아니에요'}[s]||'분석 중…';}
+  function marketText(g){return {GREEN:'🟢 시장 평온해요',YELLOW:'🟡 조금 조심스러워요',RED:'🔴 위험 (신규진입 금지)',BLACK:'⚫ 비상정지 상태'}[g]||'확인 중…';}
+  function riskRejectText(rule,reason){
+    var m={'HL-01':'🈵 이미 3종목 꽉 찼어요','HL-02':'😮‍💨 연속 손해라 1시간 쉬는 중','HL-03':'🕝 2시반 지나 신규진입 금지','HL-04':'🌅 장 초반이라 아직 못 사요',
+      'HL-05':'↔️ 호가 차이가 너무 커요','HL-06':'💳 신용 한도가 모자라요','MARKET_RED':'🔴 시장이 안 좋아 멈춤','MARKET_BLACK':'⚫ 비상정지로 멈춤',
+      'MARKET_YELLOW_CONDITIONAL':'🟡 애매한 시장이라 조건부 진입 차단','SIZING':'💸 살 돈이 부족해요'};
+    return m[rule]||('🛑 '+(reason||'규칙에 걸려 막았어요'));
+  }
+  function row(emoji,label,status,tone){
+    var col=tone==='ok'?'#00c473':(tone==='no'?'#f04452':(tone==='warn'?'#f5a623':'#191f28'));
+    return '<div style="display:flex;align-items:center;gap:9px;padding:8px 6px;border-top:1px solid #f1f3f5;">'+
+      '<span style="font-size:17px;width:22px;text-align:center;flex-shrink:0;">'+emoji+'</span>'+
+      '<div style="min-width:0;flex:1;">'+
+        '<div style="font-size:10px;color:#8b95a1;font-weight:700;">'+label+'</div>'+
+        '<div style="font-size:13px;font-weight:700;color:'+col+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+status+'</div>'+
+      '</div></div>';
+  }
+  function idle(){
+    return [row('🧑‍💼','대표(CEO)','대기 중',''),row('🔍','종목 찾기','대기 중',''),row('🌤️','시장 분위기','대기 중',''),
+      row('📊','신호 분석','대기 중',''),row('🛡️','안전 점검','대기 중',''),row('🧾','주문 실행','대기 중',''),
+      row('📚','학습부','대기 중',''),row('🧠','메타 총괄','대기 중','')].join('');
+  }
+  function render(d){
+    var runEl=document.getElementById('agentTeamRun');
+    var clockEl=document.getElementById('agentTeamClock');
+    var dateEl=document.getElementById('agentTeamDate');
+    var rowsEl=document.getElementById('agentTeamRows');
+    if(!rowsEl) return;
+    if(!d||!d.ok){
+      runEl.textContent='대기'; runEl.style.background='#f1f3f5'; runEl.style.color='#8b95a1';
+      clockEl.textContent='--:--';
+      dateEl.textContent='백테스트를 시작하면 팀이 일을 시작해요';
+      rowsEl.innerHTML=idle();
+      return;
+    }
+    var run=d.running;
+    runEl.textContent=run?'● 실행중':'정지/완료';
+    runEl.style.background=run?'#e7f6ee':'#f1f3f5';
+    runEl.style.color=run?'#00c473':'#8b95a1';
+    var t=(d.sim&&d.sim.time)?d.sim.time.slice(0,5):'--:--';
+    clockEl.textContent=t;
+    var dd=(d.sim&&d.sim.date)||'';
+    dateEl.textContent=dd?('📅 백테스트 날짜 '+dd.slice(0,4)+'.'+dd.slice(4,6)+'.'+dd.slice(6,8)):'—';
+    var a=d.agents||{};
+    var out=[];
+    // CEO
+    var c=a.ceo||{};
+    out.push(row('🧑‍💼','대표(CEO)',(c.mode==='live'?'🔴 실전 모드':'🧪 모의 모드')+' · '+(c.days||0)+'일차',''));
+    // 스크리닝
+    var s=a.screening||{}; var topN=(s.top&&s.top[0]);
+    out.push(row('🔍','종목 찾기','📋 '+(s.count||0)+'개 발견'+(topN?(' · '+(topN.name||topN.code)+' '+Math.round(topN.score)+'점'):''),s.count?'ok':''));
+    // 시장
+    var m=a.market;
+    out.push(row('🌤️','시장 분위기',m?marketText(m.grade):'확인 중…',m?(m.grade==='GREEN'?'ok':(m.grade==='YELLOW'?'warn':'no')):''));
+    // 신호
+    var sg=a.signal;
+    out.push(row('📊','신호 분석',sg?((sg.symbol?sg.symbol+' ':'')+signalText(sg.signal)+' ('+(sg.scoreCount||0)+'/5)'):'분석 대기 중…',sg?(sg.signal==='STRONG_ENTRY'?'ok':(sg.signal==='NO_ENTRY'?'':'warn')):''));
+    // 리스크
+    var r=a.risk;
+    if(!r) out.push(row('🛡️','안전 점검','대기 중…',''));
+    else if(r.decision==='APPROVE') out.push(row('🛡️','안전 점검','👍 주문 통과 · '+(r.symbol||'')+' '+(r.qty||'')+'주','ok'));
+    else out.push(row('🛡️','안전 점검','✋ '+riskRejectText(r.rule,r.reason),'no'));
+    // 주문
+    var o=a.order;
+    if(!o) out.push(row('🧾','주문 실행','주문 없음',''));
+    else { var ok=o.status==='filled'; var side=o.side==='buy'?'매수':(o.side==='sell'?'매도':'');
+      out.push(row('🧾','주문 실행',ok?('✅ '+side+' 체결 · '+(o.name||o.code||'')+' '+(o.qty||'')+'주'):'❌ 주문 실패',ok?'ok':'no')); }
+    // 학습부
+    var l=a.learning||{}; var ps=(l.proposals||[]);
+    out.push(row('📚','학습부','💡 개선 제안 '+ps.length+'건'+((l.bestPattern)?(' · 잘된패턴 '+l.bestPattern):''),ps.length?'ok':''));
+    // 메타
+    var mt=a.meta||{}; var pf=(mt.profitFactor==null?'∞':Number(mt.profitFactor).toFixed(2));
+    out.push(row('🧠','메타 총괄','종합 '+(mt.perfScore!=null?mt.perfScore:'–')+'점 · 승률 '+(mt.winRate!=null?mt.winRate+'%':'—')+' · 손익비 '+pf,''));
+    rowsEl.innerHTML=out.join('');
+  }
+  function tick(){
+    if(document.hidden) return;
+    fetch('/api/backtest/state',{cache:'no-store'}).then(function(r){return r.json();}).then(render).catch(function(){
+      var rowsEl=document.getElementById('agentTeamRows'); if(rowsEl&&!rowsEl.innerHTML) rowsEl.innerHTML=idle();
+    });
+  }
+  document.getElementById('agentTeamRows').innerHTML=idle();
+  setInterval(tick, 3000); tick();
+})();
+</script>
 <script>// ═══════════════════════════════
 // 멘토 페르소나 — 모든 Claude 호출 system 프롬프트로 사용
 // ═══════════════════════════════
@@ -4959,7 +5144,8 @@ async function _backtestLoadDay(dateStr){
   if(mock.creditUsed>0){var _di=Math.round(mock.creditUsed*(cfg.crate||8.5)/365/100);mock.cash-=_di;mock.todayPnl-=_di;addDecisionLog('💰 신용이자',fW(_di)+'원 차감 (잔액 '+fW(mock.creditUsed)+'×'+(cfg.crate||8.5)+'%/365)','비용');}
   if(mock.marginUsed>0){var _mi=Math.round(mock.marginUsed*(cfg.mrate||12)/365/100);mock.cash-=_mi;mock.todayPnl-=_mi;addDecisionLog('💰 미수이자',fW(_mi)+'원 차감','비용');}
   // ★ 백테스트 중 자동매매가 꺼졌으면(연속 손절 brk) 매일 다시 켜기
-  if(backtest.running && !autoState.running){
+  // [이관] 단일 AI 자율매매 비활성화(§20) — ai-agent 멀티에이전트로 대체.
+  if(!AI_HANDOFF_TO_AGENTS && backtest.running && !autoState.running){
     autoState.running=true; autoState.level=autoLevel||4;
     if(!autoTimer) scheduleScreening();
     addDecisionLog('🔄 자동매매 재시작','새 날짜 — 연속손절 리셋','백테스트');
@@ -7125,7 +7311,18 @@ function setTrailMA5(){
   so.trail="ma5";updateTrailPanel();
   addDecisionLog("트레일링 스탑 5MA 설정","5MA 이탈 시 자동 손절","Phase 9-3");
 }
+// ═══════════════════════════════════════════════════════════════════
+// [이관] 단일 Claude 자동매매는 ai-agent 멀티에이전트(스크리닝/신호/리스크/주문/학습)로
+// 이관되었다(CLAUDE.md §20, agents/AI_HANDOFF.md). 자율매매 진입점을 비활성화한다.
+// 코드는 보존하되 아래 플래그로 가드한다(삭제 금지). 수동 주문·차트·호가·체결·멘토챗은 유지.
+// 멀티에이전트 백테스트는 상단 🎬 백테스트 / 🧠 에이전트 탭에서 실행한다.
+// ═══════════════════════════════════════════════════════════════════
+const AI_HANDOFF_TO_AGENTS = true;
 function startAuto(){
+  if (AI_HANDOFF_TO_AGENTS) {
+    try { addMsg('ai','🤖 단일 AI 자동매매는 ai-agent 멀티에이전트로 이관되었습니다.\n상단 [🎬 백테스트] 탭에서 시작/중지/리셋하세요. ([🧠 에이전트] 탭에서 각 에이전트 판단을 실시간으로 볼 수 있어요.)\n\n· 시장 분석 → 시장상황 에이전트\n· 종목 선정 → 스크리닝 에이전트\n· 매매 신호 → 신호분석 에이전트\n· 리스크 관리 → 리스크 에이전트\n· 주문 실행 → 주문실행 에이전트\n· 매매일지 → 학습부 에이전트'); } catch(e) {}
+    return;   // 자율매매 비활성화 (수동 기능에는 영향 없음)
+  }
   autoState.running=true;autoState.level=autoLevel;
   autoState.cfg={rr:parseFloat((document.getElementById("auto-rr")||{value:"1.5"}).value)||1.5,pos:parseFloat((document.getElementById("auto-pos")||{value:"50"}).value)||50,stop:parseFloat((document.getElementById("auto-stop")||{value:"3"}).value)||3,t1:parseFloat((document.getElementById("auto-t1")||{value:"3"}).value)||3,t2:parseFloat((document.getElementById("auto-t2")||{value:"5"}).value)||5,trail:(document.getElementById("auto-trail")||{value:"none"}).value,brk:(document.getElementById("auto-brk")||{checked:false}).checked,explain:(document.getElementById("auto-explain")||{checked:true}).checked};
   document.getElementById("modeBadge").className="badge auto";
@@ -8134,7 +8331,7 @@ async function runFullAnalysis(){
   showProgress('AI 종합 분석 중...', 5);
   const stk=STOCKS.find(s=>s.tk===activeTk)||STOCKS[0];
   const cs=getCandles(20);
-  if(cs.length<5){analysisRunning=false;return;}
+  if(cs.length<5){analysisRunning=false;finishProgress('데이터 모으는 중');return;}
   document.getElementById("analysisTk").textContent=`${stk.nm} (${sim.tf}분)`;
   document.getElementById("techniqueTag").textContent="분석 중...";
   document.getElementById("entryPoint").textContent="계산 중...";
@@ -8172,6 +8369,7 @@ async function runFullAnalysis(){
         `<span style="font-size:7px;color:var(--tm);">* 봉 데이터 축적 중</span>`;
     }
     analysisRunning=false;
+    finishProgress('로컬 분석 완료');
     return;
   }
 
@@ -8344,6 +8542,8 @@ Phase 8 STEP 0~7 간략 점검 결과를 JSON으로 답해:
     document.getElementById("entryPoint").textContent="API 오류";
     document.getElementById("phase8Check").textContent="API 오류";
     failProgress('분석 실패: '+e.message);
+    analysisRunning=false;
+    return;
   }
   analysisRunning=false;
   finishProgress('AI 분석 완료');
@@ -11454,7 +11654,7 @@ function collectMarketCtx(){
 (function(){
   const meta = document.querySelector('meta[name="build-ts"]');
   const myBuildTs = meta ? meta.getAttribute('content') : '';
-  if(!myBuildTs || myBuildTs === '1779725610202') return; // 로컬 빌드 안 한 경우
+  if(!myBuildTs || myBuildTs === '1780061399407') return; // 로컬 빌드 안 한 경우
   let reloaded = false;
   async function check(){
     if(reloaded) return;
