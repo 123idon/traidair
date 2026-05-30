@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#ffffff">
-<meta name="build-ts" content="1780061399407">
+<meta name="build-ts" content="1780132578227">
 <title>TraidAIr HTS</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 
@@ -569,6 +569,90 @@ input,select,textarea{-webkit-appearance:none;appearance:none;}
 canvas{image-rendering:pixelated;}
 /* 하단 탭바 자동매매 버튼 강조 */
 #mbt-auto{flex-shrink:0;min-width:52px;}
+
+/* ════════ 에이전트 상담 페이지 (💬 상담) ════════ */
+#page-consult.on{display:flex;flex-direction:row;}
+.cons-wrap{display:flex;flex:1;gap:12px;padding:12px;min-height:0;overflow:hidden;width:100%;}
+/* 왼쪽 사이드 */
+.cons-side{width:236px;flex-shrink:0;display:flex;flex-direction:column;gap:10px;background:var(--pan);border-radius:16px;padding:14px;box-shadow:var(--sh0);overflow-y:auto;}
+.cons-side-h{padding:2px 2px 6px;}
+.cons-side-t{font-size:15px;font-weight:800;color:var(--tp);}
+.cons-side-d{font-size:10px;color:var(--ts);margin-top:2px;}
+.cons-agents{display:flex;flex-direction:column;gap:7px;}
+.cons-card{display:flex;align-items:center;gap:10px;padding:10px 11px;border-radius:13px;background:var(--card);border:1.5px solid transparent;cursor:pointer;transition:all .13s;text-align:left;}
+.cons-card:hover{background:var(--bg);transform:translateY(-1px);box-shadow:var(--sh0);}
+.cons-card.on{border-color:var(--b);background:#eef4ff;}
+.cons-card-ava{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0;}
+.cons-card-tx{flex:1;min-width:0;}
+.cons-card-nm{font-size:12.5px;font-weight:700;color:var(--tp);}
+.cons-card-rl{font-size:9.5px;color:var(--ts);margin-top:1px;line-height:1.3;}
+.cons-meeting-btn{margin-top:4px;padding:12px;border-radius:13px;border:none;background:linear-gradient(135deg,#3182f6,#7c3aed);color:#fff;font-size:12.5px;font-weight:800;cursor:pointer;transition:opacity .13s,transform .1s;box-shadow:var(--sh1);}
+.cons-meeting-btn:hover{opacity:.92;transform:translateY(-1px);}
+.cons-meeting-btn:active{transform:translateY(0);}
+.cons-mode-badge{margin-top:auto;text-align:center;font-size:10px;font-weight:600;color:var(--ts);background:var(--bg);border-radius:9px;padding:6px;}
+/* 오른쪽 메인 */
+.cons-main{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--pan);border-radius:16px;box-shadow:var(--sh0);overflow:hidden;}
+.cons-chat-h{display:flex;align-items:center;gap:11px;padding:13px 16px;border-bottom:1px solid var(--br);flex-shrink:0;}
+.cons-chat-ava{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:21px;flex-shrink:0;background:var(--card);}
+.cons-chat-name{font-size:15px;font-weight:800;color:var(--tp);}
+.cons-chat-role{font-size:10.5px;color:var(--ts);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.cons-clear-btn{border:none;background:var(--bg);width:32px;height:32px;border-radius:9px;cursor:pointer;font-size:14px;color:var(--ts);transition:all .12s;flex-shrink:0;}
+.cons-clear-btn:hover{background:var(--card);color:var(--r);}
+.cons-chat-body{flex:1;overflow-y:auto;padding:18px 16px;display:flex;flex-direction:column;gap:12px;min-height:0;}
+.cons-chat-body::-webkit-scrollbar{width:5px;}
+.cons-chat-body::-webkit-scrollbar-thumb{background:var(--br);border-radius:3px;}
+/* 빈 상태 */
+.cons-empty{margin:auto;text-align:center;color:var(--ts);}
+.cons-empty-emo{font-size:46px;margin-bottom:10px;}
+.cons-empty-t{font-size:16px;font-weight:800;color:var(--tp);margin-bottom:6px;}
+.cons-empty-d{font-size:11.5px;line-height:1.7;}
+/* 말풍선 */
+/* flex-shrink:0 — 세로 flex 컨테이너(cons-chat-body)에서 메시지가 쌓이면 기본
+   flex-shrink:1 때문에 각 행이 세로로 찌부러져 내용이 중간에 잘리는 버그가 있다.
+   행이 항상 자기 내용 높이를 유지하고, 넘치면 컨테이너가 스크롤되도록 한다. */
+.cons-row{display:flex;gap:9px;max-width:88%;flex-shrink:0;}
+.cons-row.me{align-self:flex-end;flex-direction:row-reverse;}
+.cons-row-ava{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;background:var(--card);}
+/* min-width:0 + overflow-wrap — 긴 텍스트/URL 도 잘리지 않고 줄바꿈되어 전체 표시 */
+.cons-bub{padding:10px 13px;border-radius:14px;font-size:12.5px;line-height:1.65;white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere;min-width:0;height:auto;}
+.cons-row.ai .cons-bub{background:var(--card);color:var(--tp);border-top-left-radius:4px;}
+.cons-row.me .cons-bub{background:var(--b);color:#fff;border-top-right-radius:4px;}
+.cons-row.sys .cons-bub{background:#fff6e5;color:#8a5a00;font-size:11px;border-radius:11px;}
+.cons-name-tag{font-size:10px;font-weight:700;color:var(--ts);margin-bottom:3px;}
+.cons-bub b{font-weight:700;}
+/* 파라미터 적용 카드 */
+.cons-param{margin-top:9px;background:var(--pan);border:1.5px solid var(--b);border-radius:12px;padding:11px 12px;box-shadow:var(--sh0);}
+.cons-param-t{font-size:11px;font-weight:800;color:var(--tp);margin-bottom:3px;}
+.cons-param-d{font-size:10.5px;color:var(--ts);line-height:1.5;margin-bottom:8px;}
+.cons-param-val{font-family:var(--mono);font-size:11px;color:var(--tp);background:var(--bg);border-radius:7px;padding:3px 7px;display:inline-block;margin-bottom:8px;}
+.cons-param-btn{width:100%;padding:9px;border-radius:9px;border:none;background:var(--g);color:#fff;font-size:11.5px;font-weight:800;cursor:pointer;transition:opacity .12s;}
+.cons-param-btn:hover{opacity:.9;}
+.cons-param-btn:disabled{background:var(--tm);cursor:default;opacity:1;}
+.cons-param.done{border-color:var(--g);}
+.cons-param.fail{border-color:var(--r);}
+/* 입력 */
+.cons-chat-foot{display:flex;gap:8px;align-items:flex-end;padding:11px 13px;border-top:1px solid var(--br);flex-shrink:0;}
+.cons-input{flex:1;resize:none;border:1.5px solid var(--br);border-radius:13px;padding:10px 13px;font-size:12.5px;font-family:var(--sans);color:var(--tp);background:var(--bg);outline:none;max-height:120px;line-height:1.5;transition:border-color .12s;}
+.cons-input:focus{border-color:var(--b);background:var(--pan);}
+.cons-send{padding:0 18px;height:42px;border-radius:13px;border:none;background:var(--b);color:#fff;font-size:13px;font-weight:800;cursor:pointer;flex-shrink:0;transition:opacity .12s;}
+.cons-send:disabled{background:var(--tm);cursor:default;}
+.cons-typing{display:flex;gap:4px;padding:12px 14px;}
+.cons-typing span{width:7px;height:7px;border-radius:50%;background:var(--tm);animation:consBlink 1.2s infinite;}
+.cons-typing span:nth-child(2){animation-delay:.2s;}
+.cons-typing span:nth-child(3){animation-delay:.4s;}
+@keyframes consBlink{0%,60%,100%{opacity:.3;}30%{opacity:1;}}
+/* 스트리밍 커서(요구 1) — 텍스트가 다 받아질 때까지 깜빡이다 done()에서 제거된다 */
+.cons-cursor{display:inline-block;width:7px;height:13px;background:var(--b);margin-left:2px;border-radius:1px;animation:consBlink 1s infinite;vertical-align:text-bottom;}
+.cons-stream-body{white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere;}
+/* 협력 안내(요구 3) — 부서 간 의견 요청 시 가운데 안내줄 */
+.cons-row.sys .cons-bub{max-width:100%;}
+/* 모바일 */
+@media(max-width:760px){
+  .cons-wrap{flex-direction:column;padding:8px;gap:8px;}
+  .cons-side{width:100%;flex-direction:column;max-height:38vh;}
+  .cons-agents{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+  .cons-card-rl{display:none;}
+}
 </style>
 </head>
 <body>
@@ -584,6 +668,7 @@ canvas{image-rendering:pixelated;}
     <button class="tab" id="tab-features" onclick="goPage('features',this)">📋 기능</button>
     <button class="tab" id="tab-backtest" onclick="goPage('backtest',this)">🎬 백테스트</button>
     <button class="tab" id="tab-agentmon" onclick="goPage('agentmon',this)">🧠 에이전트</button>
+    <button class="tab" id="tab-consult" onclick="goPage('consult',this)">💬 상담</button>
     <a class="tab" id="tab-agent" href="/agent" target="_blank" rel="noopener" style="text-decoration:none;">🤖 ai-agent</a>
   </div>
   <div class="srch-wrap">
@@ -1037,19 +1122,8 @@ canvas{image-rendering:pixelated;}
       <div class="vsep" style="height:18px;"></div>
       <button class="play-btn" id="playBtn" onclick="togPlay()" style="font-size:14px;line-height:1;">▶</button>
       <button class="ibtn pur" onclick="openBacktestDialog()" title="여러 영업일 연속 백테스트" style="font-size:10px;padding:3px 8px;">🚀 백테스트</button>
-      <button class="ibtn" id="evolveBtn" onclick="toggleEvolvePlus()" title="진화+ — 학습 + 기법 발굴 + AI 정제 통합" style="font-size:10px;padding:3px 8px;background:linear-gradient(135deg,rgba(139,92,246,.18),rgba(5,192,114,.12));color:var(--p);border:1px solid rgba(139,92,246,.3);font-weight:700;">🧬 진화+</button>
-      <div class="spd-wrap">
-        <span class="spd-l">배속</span>
-        <button class="spd-btn" onclick="setSpd(this,1)">실시간</button>
-        <button class="spd-btn" onclick="setSpd(this,10)">x10</button>
-        <button class="spd-btn" onclick="setSpd(this,30)">x30</button>
-        <button class="spd-btn on" onclick="setSpd(this,60)">x60</button>
-        <button class="spd-btn" onclick="setSpd(this,120)">x120</button>
-        <button class="spd-btn" onclick="setSpd(this,250)">x250</button>
-        <button class="spd-btn" onclick="setSpd(this,300)">x300</button>
-        <button class="spd-btn" onclick="setSpd(this,600)">x600</button>
-        <button class="spd-btn" onclick="setSpd(this,1500)">x1500</button>
-      </div>
+      <button class="ibtn" id="evolveBtn" onclick="runAgentEvolve()" title="진화+ — 메타 에이전트 최적화 제안 실행 (저널 관찰 → 전략 파라미터 진화)" style="font-size:10px;padding:3px 8px;background:linear-gradient(135deg,rgba(139,92,246,.18),rgba(5,192,114,.12));color:var(--p);border:1px solid rgba(139,92,246,.3);font-weight:700;">🧬 진화+</button>
+      <!-- 배속 버튼 제거: 백테스트는 AutoSpeedGovernor(시스템 부하 기반)로 항상 자동 최고속 -->
       <div class="prog" style="flex:1;position:relative;cursor:pointer;" onclick="seekToPos(event,this)" title="클릭으로 이동">
         <div class="prog-f" id="progF" style="width:0%;pointer-events:none;"></div>
         <input type="range" id="simSlider" min="0" max="100" value="0"
@@ -1124,6 +1198,8 @@ canvas{image-rendering:pixelated;}
 
       <!-- 주문 패널 -->
       <div class="brpb on" id="brpb-order" style="overflow-y:auto;">
+        <!-- 🤖 에이전트 주문 내역 (백테스트 실시간) — 수동 주문폼과 공존 -->
+        <div id="agentOrderFeed"></div>
         <div class="of">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
             <span style="font-size:8px;color:var(--tm);font-family:var(--mono);">F1지정매수 F2시장매수 F4손절 F7전량손절 F8반량</span>
@@ -1276,6 +1352,8 @@ canvas{image-rendering:pixelated;}
           <div class="ai-adv-t"><div class="ai-dot"></div>AI 실시간 조언</div>
           <div class="ai-mb" id="aiModeBadge">대기중</div>
         </div>
+        <!-- 🤖 8부서 에이전트 실시간 판단 (토스 스타일) — 백테스트 연동 -->
+        <div id="agentAICards" style="flex-shrink:0;border-bottom:1px solid var(--br);max-height:42%;overflow-y:auto;"></div>
         <div id="aiThoughtPanel" style="flex-shrink:0;padding:6px 8px;border-bottom:1px solid var(--br);">
           <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
             <div id="aiThoughtDot" style="width:8px;height:8px;border-radius:50%;background:#94a3b8;flex-shrink:0;"></div>
@@ -1694,6 +1772,56 @@ canvas{image-rendering:pixelated;}
     loading="lazy"
     title="에이전트 실시간 모니터">
   </iframe>
+</div>
+
+<!-- ── 에이전트 상담 페이지 (CLAUDE.md 부서별 역할 챗) ── -->
+<div class="page" id="page-consult">
+  <div class="cons-wrap">
+
+    <!-- 왼쪽: 에이전트 카드 목록 -->
+    <aside class="cons-side">
+      <div class="cons-side-h">
+        <div class="cons-side-t">🏢 우리 팀</div>
+        <div class="cons-side-d">상담할 에이전트를 골라보세요</div>
+      </div>
+      <div id="consAgentList" class="cons-agents"><!-- JS로 채움 --></div>
+      <button class="cons-meeting-btn" onclick="consTeamMeeting()">🤝 전체 팀 회의 열기</button>
+      <div class="cons-mode-badge" id="consModeBadge">모드 확인 중…</div>
+
+      <!-- 📚 노션 학습 현황 (학습부가 노션 페이지를 읽어 전 부서에 반영) -->
+      <div id="notionPanel" style="margin-top:12px;padding:10px;border-radius:10px;background:var(--card,#16181d);border:1px solid var(--bd,#2a2d35);">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:6px;">
+          <div style="font-size:12px;font-weight:800;">📚 노션 학습 현황</div>
+          <button id="notionSyncBtn" onclick="notionSync()" style="font-size:10px;padding:4px 8px;border-radius:8px;border:none;background:var(--b,#3b82f6);color:#fff;cursor:pointer;white-space:nowrap;">🔄 지금 업데이트</button>
+        </div>
+        <div id="notionStatus" style="font-size:10px;color:var(--ts,#9aa);line-height:1.5;">불러오는 중…</div>
+      </div>
+    </aside>
+
+    <!-- 오른쪽: 채팅창 -->
+    <section class="cons-main">
+      <div class="cons-chat-h" id="consChatHead">
+        <div class="cons-chat-ava" id="consHeadAva">💬</div>
+        <div style="flex:1;min-width:0;">
+          <div class="cons-chat-name" id="consHeadName">에이전트 상담</div>
+          <div class="cons-chat-role" id="consHeadRole">왼쪽에서 에이전트를 선택하면 상담이 시작돼요</div>
+        </div>
+        <button class="cons-clear-btn" onclick="consClearChat()" title="대화 비우기">🗑</button>
+      </div>
+      <div class="cons-chat-body" id="consChatBody">
+        <div class="cons-empty">
+          <div class="cons-empty-emo">💬</div>
+          <div class="cons-empty-t">에이전트 상담</div>
+          <div class="cons-empty-d">왼쪽 카드에서 부서를 선택하세요.<br>선택하면 그 부서가 <b>자기반성 보고</b>부터 시작합니다.</div>
+        </div>
+      </div>
+      <div class="cons-chat-foot">
+        <textarea id="consInput" class="cons-input" rows="1" placeholder="메시지를 입력하세요… (예: 손절이 너무 잦은데 왜 그래?)" oninput="consAutoGrow(this)" onkeydown="consInputKey(event)"></textarea>
+        <button class="cons-send" id="consSend" onclick="consSend()" disabled>전송</button>
+      </div>
+    </section>
+
+  </div>
 </div>
 
 <!-- ── 기능 목록 페이지 ── -->
@@ -2637,19 +2765,21 @@ function renderWLGroup(){
   }
 }
 function renderWL(){renderWLGroup();}
-// CANDS: 진입후보 — 점수(score) 포함, 대시보드에서 업데이트됨
-let CANDS=[
-  {tk:"373220",why:"기관 3일 연속 순매수",score:82},
-  {tk:"207940",why:"바이오 테마 강세",score:74}
-];
-// 대시보드에서 후보 업데이트 시 호출
+// CANDS: 진입후보 — 스크리닝 에이전트 결과로 채워진다(점수·이유·테마·상태).
+let CANDS=[];
+// 에이전트(백테스트) 스크리닝이 종목을 공급 중이면 true → 레거시 종목선정이 좌측 리스트를 덮어쓰지 않음.
+function _agentScreeningActive(){ return !!(window._agentState && window._agentState.screening && window._agentState.screening.length); }
+// 스크리닝 에이전트 결과(/api/backtest/state 의 screening[])로 좌측 관심종목을 통일.
+// code/name/score/breakdown/themes 전부 보존 → 점수·이유·상태가 에이전트 판단 기준으로 표시됨.
 function updateCandsFromDash(candidates){
-  if(!candidates||!candidates.length) return;
-  CANDS = candidates.map(c=>({
+  CANDS = (candidates||[]).map(c=>({
     tk: c.code||c.tk||'',
-    why: c.reason||c.why||'',
-    score: c.score || 0
-  })).filter(c=>c.tk).sort((a,b)=>b.score-a.score).slice(0,3);
+    nm: c.name||c.nm||'',
+    score: c.score || 0,
+    breakdown: c.breakdown || {},
+    themes: c.themes || [],
+    why: c.reason||c.why||''
+  })).filter(c=>c.tk).sort((a,b)=>(b.score||0)-(a.score||0));
   renderCands();
 }
 
@@ -2794,6 +2924,7 @@ function loadState(){
   const c=localStorage.getItem("htsCfg");if(c)cfg={...cfg,...JSON.parse(c)};
   const m=localStorage.getItem("htsMock");if(m){const p=JSON.parse(m);mock={...mock,...p};}
   mock.cash=mock.cash||cfg.capital;
+  if(window.backtestState) window.backtestState.cash=mock.cash;   // 단일 상태 동기화 (요구 2)
   if(!mock.positions)mock.positions={};
   if(!mock.trades)mock.trades=[];
   const so=localStorage.getItem("htsStopOrders");
@@ -2803,7 +2934,7 @@ function loadState(){
     if(ok) {
       // 서버 데이터로 덮어쓰기
       const m2=localStorage.getItem("htsMock");
-      if(m2){const p=JSON.parse(m2);mock={...mock,...p};mock.cash=mock.cash||cfg.capital;if(!mock.positions)mock.positions={};if(!mock.trades)mock.trades=[];}
+      if(m2){const p=JSON.parse(m2);mock={...mock,...p};mock.cash=mock.cash||cfg.capital;if(window.backtestState) window.backtestState.cash=mock.cash;if(!mock.positions)mock.positions={};if(!mock.trades)mock.trades=[];}
       const so2=localStorage.getItem("htsStopOrders");
       if(so2){try{stopOrders={...JSON.parse(so2)};}catch(e){}}
       // 시뮬 상태(날짜/TF/현재종목) 복원
@@ -2889,7 +3020,7 @@ function saveMock(){
 
 function renderAll(){renderWLGroup();renderCands();renderFilters();renderNews();renderPort();renderTradeLog();updCash();updCredLim();renderBanList();updateTrailPanel();checkPsychWarnings();detectSlump();renderGrowthRoadmap();}
 
-function renderPending(){const el=document.getElementById("pendingList");if(!el)return;if(!pendingOrders.length){el.innerHTML="<div style='font-size:9px;color:var(--tm);padding:8px;'>미체결 없음</div>";return;}el.innerHTML=pendingOrders.map(o=>`<div style="padding:4px 8px;border-bottom:1px solid var(--br);display:flex;align-items:center;gap:4px;"><span style="font-size:9px;font-weight:700;color:${o.side==="buy"?"var(--g)":"var(--r)"};">${o.side==="buy"?"매수":"매도"}</span><span style="font-size:9px;flex:1;">${o.nm} ${fW(o.price)}×${o.qty}</span><span style="font-size:8px;color:var(--tm);">${o.time}</span><button onclick="cancelPending(${o.id})" style="background:var(--r);color:#fff;border:none;border-radius:3px;font-size:8px;padding:1px 4px;cursor:pointer;">취소</button></div>`).join("");}
+function renderPending(){if(window._agentActive)return;const el=document.getElementById("pendingList");if(!el)return;if(!pendingOrders.length){el.innerHTML="<div style='font-size:9px;color:var(--tm);padding:8px;'>미체결 없음</div>";return;}el.innerHTML=pendingOrders.map(o=>`<div style="padding:4px 8px;border-bottom:1px solid var(--br);display:flex;align-items:center;gap:4px;"><span style="font-size:9px;font-weight:700;color:${o.side==="buy"?"var(--g)":"var(--r)"};">${o.side==="buy"?"매수":"매도"}</span><span style="font-size:9px;flex:1;">${o.nm} ${fW(o.price)}×${o.qty}</span><span style="font-size:8px;color:var(--tm);">${o.time}</span><button onclick="cancelPending(${o.id})" style="background:var(--r);color:#fff;border:none;border-radius:3px;font-size:8px;padding:1px 4px;cursor:pointer;">취소</button></div>`).join("");}
 
 function renderBanList(){const el=document.getElementById("banList");if(!el)return;if(!BAN_LIST.length){el.textContent="없음";return;}el.innerHTML=BAN_LIST.map(tk=>{const s=STOCKS.find(s=>s.tk===tk)||{nm:tk};return`<div style="display:flex;align-items:center;justify-content:space-between;padding:2px 0;border-bottom:1px solid var(--br);"><span style="color:var(--r);font-size:9px;">${s.nm}</span><button onclick="removeBan('${tk}')" style="background:none;border:none;color:var(--tm);font-size:10px;cursor:pointer;">×</button></div>`;}).join("");}
 
@@ -4149,6 +4280,29 @@ let cfg={capital:10000000,dayloss:3,maxpos:50,clim:200,mlim:0,crate:8.5,mrate:12
 let mock={cash:10000000,positions:{},trades:[],todayPnl:0,todayTrades:0,lossSeries:0,creditUsed:0,marginUsed:0};
 let sim={playing:false,speed:60,idx:0,candles:[],timer:null,date:todayStr(),tf:"1"};
 
+// ════════════════════════════════════════════════════════════════
+// 요구 2: 잔고 단일 진실 공급원(SSOT)
+//  - 잔고 상태는 window.backtestState.cash 하나로만 통일한다.
+//  - 잔고 변경은 반드시 updateCash(amount) 단일 함수로만 처리한다.
+//  - updateCash 호출 시 상단 헤더(hdrCash)와 보유탭(cashVal)을 동시에 갱신한다.
+//  - 백테스트 매수/매도/리셋, 수동 매매, KIS 동기화 모두 이 함수를 통해서만 잔고를 바꾼다.
+// ════════════════════════════════════════════════════════════════
+window.backtestState = window.backtestState || { cash: (mock.cash||0) };
+function updateCash(amount){
+  amount = Number(amount);
+  if(!isFinite(amount)) amount = 0;
+  // 단일 상태 갱신
+  window.backtestState.cash = amount;
+  // 레거시 호환: mock.cash도 같은 값으로 동기화(다른 계산식들이 mock.cash를 참조)
+  if(typeof mock==='object' && mock) mock.cash = amount;
+  // 상단 헤더 잔고
+  const he = document.getElementById('hdrCash');
+  if(he){ try{ he.textContent = fW(amount)+'원'; }catch(_e){ he.textContent = Math.round(amount).toLocaleString()+'원'; } }
+  // 보유탭 잔고
+  const cv = document.getElementById('cashVal');
+  if(cv) cv.textContent = Math.round(amount).toLocaleString()+'원';
+}
+
 function openSettings(){openModal('settings');}
 // ═══════════════════════════════════════════════════════
 // ★★★ 절대 원칙: 미래 데이터 참조 완전 차단 ★★★
@@ -4318,6 +4472,9 @@ function _drawChartInner(){
     ctx.moveTo(x,top+ht);ctx.lineTo(x,yL);ctx.stroke();
     ctx.fillStyle=col;ctx.fillRect(x-bw/2,top,bw,ht);
   });
+
+  // ── ai-agent 매수/매도 마커 (백테스트 연동, §17.6) ──
+  try{ _drawAgentMarkers(ctx,cs,toX,toY,bw,PT,mainH); }catch(_e){}
 
   // X축 레이블
   ctx.fillStyle='#8c9db5';ctx.font='8px "JetBrains Mono",monospace';ctx.textAlign='center';
@@ -5141,8 +5298,8 @@ async function _backtestLoadDay(dateStr){
   mock.todayPnl=0; mock.todayTrades=0; mock.lossSeries=0;
   resetEquityCurve();
   // 신용 이자 일일 차감
-  if(mock.creditUsed>0){var _di=Math.round(mock.creditUsed*(cfg.crate||8.5)/365/100);mock.cash-=_di;mock.todayPnl-=_di;addDecisionLog('💰 신용이자',fW(_di)+'원 차감 (잔액 '+fW(mock.creditUsed)+'×'+(cfg.crate||8.5)+'%/365)','비용');}
-  if(mock.marginUsed>0){var _mi=Math.round(mock.marginUsed*(cfg.mrate||12)/365/100);mock.cash-=_mi;mock.todayPnl-=_mi;addDecisionLog('💰 미수이자',fW(_mi)+'원 차감','비용');}
+  if(mock.creditUsed>0){var _di=Math.round(mock.creditUsed*(cfg.crate||8.5)/365/100);updateCash(mock.cash-_di);mock.todayPnl-=_di;addDecisionLog('💰 신용이자',fW(_di)+'원 차감 (잔액 '+fW(mock.creditUsed)+'×'+(cfg.crate||8.5)+'%/365)','비용');}
+  if(mock.marginUsed>0){var _mi=Math.round(mock.marginUsed*(cfg.mrate||12)/365/100);updateCash(mock.cash-_mi);mock.todayPnl-=_mi;addDecisionLog('💰 미수이자',fW(_mi)+'원 차감','비용');}
   // ★ 백테스트 중 자동매매가 꺼졌으면(연속 손절 brk) 매일 다시 켜기
   // [이관] 단일 AI 자율매매 비활성화(§20) — ai-agent 멀티에이전트로 대체.
   if(!AI_HANDOFF_TO_AGENTS && backtest.running && !autoState.running){
@@ -5492,39 +5649,36 @@ function backtestDiagnose(){
   d.push(issues.join('\n'));
   showAlert('🔍 백테스트 검진', d.join('\n'));
 }
+// ▶ 백테스트 버튼 → ai-agent(run_backtest.py) 멀티에이전트 모의투자 실행 다이얼로그.
+// (기존 HTS 내장 JS 백테스트 엔진은 그대로 보존하되, 이 버튼은 ai-agent로 연동됨)
 function openBacktestDialog(){
-  const today = todayStr();
-  const d=new Date(today); d.setMonth(d.getMonth()-1);
-  const monthAgo=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const running = !!(window.agentBT && agentBT.running);
   const html = `
-    <div style="padding:12px;">
-      <div style="font-size:13px;font-weight:800;margin-bottom:10px;">🚀 백테스트 시작</div>
+    <div style="padding:14px;">
+      <div style="font-size:13px;font-weight:800;margin-bottom:4px;">🤖 ai-agent 백테스트</div>
+      <div style="font-size:9px;color:var(--tm);margin-bottom:10px;line-height:1.5;">멀티에이전트(스크리닝·신호·리스크·실행·학습)가 <b>로컬 분봉이 있는 랜덤 거래일</b>을 골라 실제처럼 재생합니다.<br>배속은 시스템 부하를 보며 <b>항상 자동 최고속</b>(성능 저하 없는 선)으로 동작해요.</div>
       <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;">
-        <label style="font-size:10px;color:var(--ts);">시작일
-          <input type="date" id="btStart" value="${monthAgo}" style="margin-left:6px;padding:4px 6px;border:1px solid var(--br);border-radius:6px;font-family:var(--mono);">
+        <label style="font-size:10px;color:var(--ts);display:flex;align-items:center;gap:6px;">며칠분 돌릴까요?
+          <input type="number" id="btDays" value="5" placeholder="비우면 무제한" min="1" style="flex:1;padding:4px 6px;border:1px solid var(--br);border-radius:6px;font-family:var(--mono);text-align:right;"> 거래일
         </label>
-        <label style="font-size:10px;color:var(--ts);">종료일
-          <input type="date" id="btEnd" value="${today}" style="margin-left:6px;padding:4px 6px;border:1px solid var(--br);border-radius:6px;font-family:var(--mono);">
-        </label>
-        <div style="font-size:9px;color:var(--tm);line-height:1.5;background:var(--bg);padding:6px 8px;border-radius:6px;">
-          • 자동매매가 꺼져있으면 자동 시작됩니다.<br>
-          • 현재 배속(x${sim.speed})으로 진행. 더 빠르게 하려면 배속을 올리세요.<br>
-          • 분봉(${sim.tf}분) 기준. 1분봉+x600 ≈ 39초/일.
+      </div>
+      <div style="font-size:9px;color:var(--tm);line-height:1.5;background:var(--bg);padding:6px 8px;border-radius:6px;margin-bottom:10px;">
+        • 날짜는 묻지 않아요 — 로컬에 수집된 분봉(<code>scripts/collect_candles.py</code>) 중에서 자동으로 랜덤 추첨됩니다.<br>
+        • 진행 상황·매수/매도 마커가 이 차트와 하단에 실시간 표시돼요.
+      </div>
+      <div style="display:flex;gap:8px;justify-content:space-between;align-items:center;">
+        <button class="ibtn" onclick="agentBTReset()" title="가상잔고/진행 초기화" style="font-size:11px;">↺ 리셋</button>
+        <div style="display:flex;gap:8px;">
+          <button class="ibtn" onclick="document.getElementById('btDialog').remove()" style="font-size:11px;">닫기</button>
+          <button class="ibtn ${running?'':'pur'}" id="btToggleBtn" onclick="agentBTToggle()" style="font-size:11px;${running?'background:var(--r);color:#fff;border:none;':''}">${running?'■ 정지':'▶ 시작'}</button>
         </div>
-      </div>
-      <div style="background:rgba(245,158,11,0.08);border:1px solid var(--a);border-radius:8px;padding:8px 10px;margin-bottom:10px;">
-        <button onclick="backtestDiagnose()" style="width:100%;padding:8px;border-radius:6px;border:none;background:var(--a);color:#fff;font-size:12px;font-weight:700;cursor:pointer;">🩺 백테스트 오류 테스트</button>
-        <div style="font-size:9px;color:var(--tm);text-align:center;margin-top:4px;">매매 안 됨 / 일지 안 됨 등 원인 분석</div>
-      </div>
-      <div style="display:flex;gap:8px;justify-content:flex-end;">
-        <button class="ibtn" onclick="document.getElementById('btDialog').remove()" style="font-size:11px;">취소</button>
-        <button class="ibtn pur" onclick="(function(){const s=document.getElementById('btStart').value;const e=document.getElementById('btEnd').value;if(!s||!e||s>e){alert('날짜 확인');return;}document.getElementById('btDialog').remove();startBacktest(s,e);})()" style="font-size:11px;">▶ 시작</button>
       </div>
     </div>
   `;
+  const old=document.getElementById('btDialog'); if(old)old.remove();
   const d2 = document.createElement('div');
   d2.id='btDialog';
-  d2.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9999;background:var(--pan);border-radius:14px;box-shadow:0 8px 40px rgba(0,0,0,.2);width:320px;max-width:92vw;';
+  d2.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9999;background:var(--pan);border-radius:14px;box-shadow:0 8px 40px rgba(0,0,0,.2);width:340px;max-width:92vw;';
   d2.innerHTML=html;
   document.body.appendChild(d2);
 }
@@ -5634,6 +5788,8 @@ function updPrice(c){
   updOSum(); updPnl();
 }
 function updPnl(){
+  // ai-agent 백테스트가 돌면 하단 손익은 에이전트 실제 성과로 표시(아래 폴러가 갱신).
+  if(window.agentBT && agentBT.running) return;
   let tot=0;Object.entries(mock.positions).forEach(([tk,pos])=>{const s=STOCKS.find(s=>s.tk===tk);if(s)tot+=(s.pr-pos.avgPrice)*pos.qty;});
   const up=tot>=0;
   const _pnlEl=document.getElementById("msPnl");if(_pnlEl){_pnlEl.textContent=(up?"+":"")+Math.round(tot).toLocaleString()+"원";_pnlEl.className="ms-v "+(up?"cu":"cd");}
@@ -5652,6 +5808,7 @@ function updPnl(){
 // ORDERBOOK
 // ═══════════════════════════════
 function renderOB(){
+  if(window._agentActive) return;   // 백테스트 연동 중엔 합성 호가창(_agentSynthOrderbook)이 표시됨
   // KIS 연결 시 실제 호가창 사용
   if(kisConfig.appKey && kisConfig.appSecret){
     _refreshKisOrderbook();
@@ -5752,7 +5909,7 @@ function renderTH(){
 // ═══════════════════════════════
 // CREDIT / MARGIN
 // ═══════════════════════════════
-function updCredLim(){const cl=Math.round(mock.cash*(cfg.clim/100)),ml=Math.round(mock.cash*(cfg.mlim/100));const _cl=document.getElementById("credLim");if(_cl)_cl.textContent=`신용 ${cl.toLocaleString()}원 / 미수 ${ml.toLocaleString()}원`;}
+function updCredLim(){if(window._agentActive)return;const cl=Math.round(mock.cash*(cfg.clim/100)),ml=Math.round(mock.cash*(cfg.mlim/100));const _cl=document.getElementById("credLim");if(_cl)_cl.textContent=`신용 ${cl.toLocaleString()}원 / 미수 ${ml.toLocaleString()}원`;}
 function getCredAvail(){if(credType==="credit")return Math.max(0,Math.round(mock.cash*(cfg.clim/100))-mock.creditUsed);if(credType==="margin")return Math.max(0,Math.round(mock.cash*(cfg.mlim/100))-mock.marginUsed);return mock.cash;}
 function onCredChange(){
   credType=document.getElementById("credSel").value;
@@ -5890,7 +6047,7 @@ function submitOrder(autoExec){
     if(credN>getCredAvail()){if(!autoExec)showAlert("한도 초과",`${credType==="credit"?"신용":"미수"} 한도 초과\n가능: ${fW(getCredAvail())}원`);return false;}
     if(cashN>mock.cash){if(!autoExec)showAlert("잔고 부족",`현금 부족\n필요: ${Math.round(cashN).toLocaleString()}원 보유: ${fW(mock.cash)}원`);return false;}
     if(!autoExec&&credType==="cash"&&ratio>cfg.maxpos){if(!confirm(`⚠ 비중 ${ratio.toFixed(1)}% (한도 ${cfg.maxpos}%)\n진행?`))return false;}
-    mock.cash-=cashN;
+    updateCash(mock.cash-cashN);   // 매수 — 잔고 단일 함수 경유 (요구 2)
     if(credType==="credit")mock.creditUsed+=credN;
     else if(credType==="margin")mock.marginUsed+=credN;
     if(!mock.positions[activeTk])mock.positions[activeTk]={qty:0,avgPrice:0,creditType:"cash",creditAmt:0};
@@ -5929,7 +6086,7 @@ function submitOrder(autoExec){
       else mock.marginUsed = Math.max(0, mock.marginUsed - _repay);
       pos.creditAmt = Math.max(0, pos.creditAmt - ret);
     }
-    mock.cash += (_proceeds - _repay); // 부채 갚고 남은 만큼만 cash로
+    updateCash(mock.cash + (_proceeds - _repay)); // 매도 — 부채 갚고 남은 만큼만 cash로 (요구 2, 단일 함수 경유)
     pos.qty -= qty;
     if(pos.qty<=0){delete mock.positions[activeTk];}
     mock.todayPnl+=pnl;mock.todayTrades++;
@@ -7753,7 +7910,7 @@ async function _runScreeningAsync(){
   var newCands=scored.slice(0,3).map(function(c){
     return {tk:c.tk,why:c.tags.join(' '),score:Math.min(99,Math.max(10,50+c.score*5))};
   });
-  if(newCands.length){CANDS=newCands;renderCands();}
+  if(newCands.length && !_agentScreeningActive()){CANDS=newCands;renderCands();}
 
   addDecisionLog('[중앙AI] 스크리닝',topList,'종목선정');
 
@@ -8950,6 +9107,71 @@ async function callClaude(payload, feature){
   trackApiCall(feature, inTok, outTok);
   return data;
 }
+// ── Claude 스트리밍 호출(요구 1: 말풍선 잘림 해결) ──
+//  /api/claude/stream(SSE) 을 읽어 텍스트 델타를 누적하고, onText(누적텍스트)로 점진 렌더.
+//  반환: {text, stop_reason}. stop_reason==='max_tokens'면 호출측에서 이어쓰기 한다.
+async function callClaudeStream(payload, feature, onText){
+  feature = feature || 'AI 기타';
+  let full='', stopReason=null, errored=null;
+  const usage={ input_tokens:0, output_tokens:0 };
+  let res;
+  try{
+    res = await fetch('/api/claude/stream',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
+  }catch(e){ throw new Error('스트리밍 연결 실패: '+e.message); }
+  if(!res.body){ // 스트림 미지원 폴백 — 일반 호출
+    const d = await callClaude(payload, feature);
+    const t=(d.content&&d.content[0]&&d.content[0].text)||(d.error?('⚠ '+(d.error.message||'')):'');
+    if(onText) onText(t);
+    return { text:t, stop_reason:(d.stop_reason||null) };
+  }
+  const reader=res.body.getReader(); const dec=new TextDecoder(); let buf='';
+  while(true){
+    const { done, value } = await reader.read();
+    if(done) break;
+    buf += dec.decode(value,{stream:true});
+    let idx;
+    while((idx=buf.indexOf('\n\n'))>=0){
+      const chunk=buf.slice(0,idx); buf=buf.slice(idx+2);
+      let ev=null, dataStr='';
+      chunk.split('\n').forEach(line=>{
+        if(line.indexOf('event:')===0) ev=line.slice(6).trim();
+        else if(line.indexOf('data:')===0) dataStr += line.slice(5).trim();
+      });
+      if(!dataStr) continue;
+      let d; try{ d=JSON.parse(dataStr); }catch(e){ continue; }
+      const t=d.type||ev;
+      if(t==='content_block_delta' && d.delta && d.delta.type==='text_delta' && d.delta.text){
+        full += d.delta.text; if(onText) onText(full);
+      }else if(t==='message_start' && d.message && d.message.usage){
+        usage.input_tokens=d.message.usage.input_tokens||0;
+      }else if(t==='message_delta'){
+        if(d.usage && d.usage.output_tokens!=null) usage.output_tokens=d.usage.output_tokens;
+        if(d.delta && d.delta.stop_reason) stopReason=d.delta.stop_reason;
+      }else if(t==='error'){
+        errored=(d.error && (d.error.message||d.error))||'스트리밍 오류';
+      }
+    }
+  }
+  if(errored && !full) throw new Error(errored);
+  trackApiCall(feature, usage.input_tokens||estimateTokens(JSON.stringify(payload)), usage.output_tokens||estimateTokens(full));
+  return { text:full, stop_reason:stopReason };
+}
+// 잘림 없이 끝까지 — max_tokens로 끊기면 자동 이어쓰기(최대 2회). onText는 누적 전체를 받는다.
+async function consComplete(payload, feature, onText){
+  let acc='';
+  const p=JSON.parse(JSON.stringify(payload));
+  for(let i=0;i<3;i++){
+    const r=await callClaudeStream(p, feature, cur=>{ if(onText) onText(acc+cur); });
+    acc += r.text;
+    if(onText) onText(acc);
+    if(r.stop_reason!=='max_tokens') break;
+    p.messages = (p.messages||[]).concat([
+      { role:'assistant', content:r.text },
+      { role:'user', content:'끊긴 부분에서 이어서 계속 써줘. 앞 내용을 반복하지 말고 이어서만.' }
+    ]);
+  }
+  return acc;
+}
 function estimateTokens(text){
   // 토큰 수 추정 (응답에 usage 없을 때): 영문 4자/토큰, 한글 2자/토큰
   const korean = (text.match(/[가-힣]/g)||[]).length;
@@ -9256,9 +9478,9 @@ async function syncKisBalance() {
   try {
     const result = await kisCall('balance', {});
     if (!result.ok) return;
-    // 예수금 동기화
+    // 예수금 동기화 (단일 함수 경유, 요구 2)
     if (result.cash > 0) {
-      mock.cash = result.cash;
+      updateCash(result.cash);
     }
     // 보유 종목 동기화 (실제 계좌 기준으로 덮어씌움)
     if (result.positions && result.positions.length > 0) {
@@ -9520,6 +9742,7 @@ function autoResize(el){el.style.height="auto";el.style.height=Math.min(el.scrol
 // PORTFOLIO
 // ═══════════════════════════════
 function updCash(){
+  if(window._agentActive) return;   // 백테스트 연동 중엔 에이전트 잔고가 표시됨
   // 오늘 손익 표시
   const tpEl = document.getElementById('todayPnlDisp');
   if(tpEl){
@@ -9527,9 +9750,8 @@ function updCash(){
     tpEl.textContent = (tp>=0?'+':'')+Math.round(tp).toLocaleString()+'원';
     tpEl.style.color = tp>0?'var(--g)':tp<0?'var(--r)':'var(--tm)';
   }
-  // cashVal도 갱신
-  const cv = document.getElementById('cashVal');
-  if(cv && mock.cash !== undefined) cv.textContent = Math.round(mock.cash).toLocaleString()+'원';
+  // cashVal·상단 헤더 동시 갱신 (단일 함수 경유, 요구 2)
+  if(mock.cash !== undefined) updateCash(mock.cash);
 }
 function switchToSell(){
   // 보유 종목 클릭 시 주문탭 + 매도 자동 선택
@@ -9560,6 +9782,7 @@ function renderAlerts(){
   }).join("");
 }
 function renderPort(){
+  if(window._agentActive) return;   // 백테스트 연동 중엔 에이전트 보유가 표시됨
   const c=document.getElementById("portItems"),keys=Object.keys(mock.positions);
   if(!keys.length){c.innerHTML="<div style='font-size:9px;color:var(--tm);text-align:center;padding:12px 0;'>보유 종목 없음</div>";return;}
   c.innerHTML=keys.map(tk=>{
@@ -9571,6 +9794,7 @@ function renderPort(){
   }).join("");
 }
 function renderTradeLog(){
+  if(window._agentActive) return;   // 백테스트 연동 중엔 에이전트 체결이 표시됨
   const c=document.getElementById("tradeLog"),rec=[...mock.trades].reverse().slice(0,40);
   if(!rec.length){c.innerHTML="<div style='font-size:9px;color:var(--tm);text-align:center;padding:12px;'>거래 없음</div>";return;}
   c.innerHTML=rec.map(t=>{
@@ -9691,7 +9915,8 @@ function updChartHeader(){
       eval += pr * p.qty;
     });
     const totalPnl = (mock.todayPnl||0);
-    const he = document.getElementById('hdrCash'); if(he) he.textContent = fW(mock.cash)+'원';
+    // 잔고는 단일 상태(window.backtestState.cash)에서만 읽는다 (요구 2)
+    const he = document.getElementById('hdrCash'); if(he) he.textContent = fW((window.backtestState&&window.backtestState.cash!=null)?window.backtestState.cash:mock.cash)+'원';
     const ev = document.getElementById('hdrEval'); if(ev) ev.textContent = Math.round(eval).toLocaleString()+'원';
     const pn = document.getElementById('hdrPnl');
     if(pn){
@@ -10451,6 +10676,9 @@ function goPage(p,el){
       if(typeof renderJPage==='function') renderJPage();
     } else if(p==='features'){
       if(typeof loadNotionFeatures==='function') loadNotionFeatures();
+    } else if(p==='consult'){
+      if(typeof consInit==='function') consInit();
+      if(typeof notionStatusLoad==='function') notionStatusLoad();
     }
   }catch(_e){ console.warn('goPage 렌더:', _e.message); }
   // ── 날짜 동기화 ──
@@ -11523,32 +11751,65 @@ function loadSectorStocks(name, stocksStr, reason){
 }
 
 // ── 진입후보 점수 + 클릭 상세 ──
+// ── 좌측 관심종목 = 스크리닝 에이전트 결과 (점수·이유·상태 전부 에이전트 기준) ──
+// breakdown 키 → 사람말 라벨
+const _SCR_LABELS={turnover_rank:'거래대금',opening_gap:'시가갭',ma_alignment:'정배열',sector_theme:'테마',volatility_atr:'변동성',dart_penalty:'공시'};
+// 후보 한 건의 "이유" 문장 (점수 기여 상위 항목 + 테마)
+function _scrReason(c){
+  if(!c) return '스크리닝 통과';
+  if(c.why) return c.why;
+  const bd=c.breakdown||{};
+  const top=Object.keys(bd).filter(k=>(bd[k]||0)>0).sort((a,b)=>(bd[b]||0)-(bd[a]||0)).slice(0,2)
+    .map(k=>(_SCR_LABELS[k]||k)+' '+Math.round(bd[k]));
+  const parts=[];
+  if(top.length) parts.push(top.join('·'));
+  if(c.themes&&c.themes.length) parts.push('🔥'+c.themes.slice(0,2).join(','));
+  return parts.join(' / ')||'스크리닝 통과';
+}
+// 현재 백테스트 상태(window._agentState)에서 종목별 "상태" 산출
+function _scrStatus(code){
+  const s=window._agentState||{};
+  const pos=(s.positions||[]).find(p=>p.code===code);
+  if(pos) return {t:'보유 '+((pos.pnlPct>=0?'+':'')+(pos.pnlPct||0))+'%',c:'var(--b)'};
+  const risk=s.agents&&s.agents.risk;
+  if(risk&&risk.symbol===code) return risk.decision==='APPROVE'?{t:'승인',c:'var(--g)'}:{t:'거절'+(risk.rule?' '+risk.rule:''),c:'var(--r)'};
+  const sig=s.agents&&s.agents.signal;
+  if(sig&&sig.symbol===code) return {t:'분석 '+(sig.scoreCount||0)+'/5',c:'var(--a)'};
+  return {t:'후보',c:'var(--tm)'};
+}
 function renderCands(){
   const cc=document.getElementById('candCount');
   const sorted=[...CANDS].sort((a,b)=>(b.score||0)-(a.score||0));
-  if(cc){cc.textContent=sorted.length+'/3';cc.style.color=sorted.length>=3?'var(--r)':'var(--ts)';}
+  if(cc){cc.textContent=sorted.length+'개';cc.style.color=sorted.length?'var(--g)':'var(--ts)';}
+  const wgC=document.getElementById('wgCount'); if(wgC) wgC.textContent=sorted.length+'개';
   const el=document.getElementById('candList');
   if(!el) return;
+  if(!sorted.length){
+    el.innerHTML='<div style="font-size:9px;color:var(--tm);padding:8px 4px;line-height:1.6;">스크리닝 대기 중…<br>🚀 백테스트를 시작하면 에이전트가 뽑은 종목이 실시간으로 표시됩니다.</div>';
+    return;
+  }
   el.innerHTML=sorted.map((c,i)=>{
-    const s=STOCKS.find(s=>s.tk===c.tk)||{nm:c.tk,pr:0,base:1};
-    const sc=c.score||70;
-    const col=sc>=80?'var(--g)':sc>=65?'var(--a)':'var(--r)';
-    const chg=((s.pr-s.base)/s.base*100).toFixed(2);
-    const up=parseFloat(chg)>=0;
+    const nm=c.nm||c.name||c.tk;
+    const sc=Math.round(c.score||0);
+    const col=sc>=80?'var(--g)':sc>=70?'var(--a)':'var(--r)';
+    const why=_scrReason(c);
+    const st=_scrStatus(c.tk);
     return `<div onclick="showCandDetail('${c.tk}')" style="padding:7px 6px;border-radius:8px;cursor:pointer;border-bottom:1px solid var(--br);" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='none'">
       <div style="display:flex;align-items:center;gap:5px;">
         <span style="font-size:11px;font-weight:800;color:var(--b);min-width:16px;">${i+1}</span>
         <div style="flex:1;min-width:0;">
-          <div style="font-size:11px;font-weight:700;">${s.nm}</div>
-          <div style="font-size:8px;color:var(--ts);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.why||''}</div>
+          <div style="font-size:11px;font-weight:700;display:flex;align-items:center;gap:4px;">
+            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${nm}</span>
+            <span style="font-size:8px;font-weight:700;color:#fff;background:${st.c};border-radius:3px;padding:0 4px;flex-shrink:0;">${st.t}</span>
+          </div>
+          <div style="font-size:8px;color:var(--ts);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${why}</div>
         </div>
-        <div style="text-align:right;">
+        <div style="text-align:right;flex-shrink:0;">
           <div style="font-size:12px;font-weight:900;color:${col};">${sc}점</div>
-          <div style="font-size:9px;" class="${up?'cu':'cd'}">${up?'+':''}${chg}%</div>
         </div>
       </div>
       <div style="height:2px;background:var(--bg);border-radius:1px;margin-top:4px;overflow:hidden;">
-        <div style="height:100%;width:${sc}%;background:${col};border-radius:1px;"></div>
+        <div style="height:100%;width:${Math.min(100,sc)}%;background:${col};border-radius:1px;"></div>
       </div>
     </div>`;
   }).join('');
@@ -11556,41 +11817,42 @@ function renderCands(){
 
 function showCandDetail(tk){
   const c=CANDS.find(c=>c.tk===tk)||{tk,why:'',score:70};
-  const s=STOCKS.find(s=>s.tk===tk)||{nm:tk,pr:0,base:1};
+  const s=STOCKS.find(s=>s.tk===tk)||{nm:c.nm||tk,pr:0,base:1};
   const sc=c.score||70;
   const col=sc>=80?'var(--g)':sc>=65?'var(--a)':'var(--r)';
   let popup=document.getElementById('_candPopup');
   if(!popup){ popup=document.createElement('div'); popup.id='_candPopup';
     popup.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9999;background:var(--pan);border-radius:14px;box-shadow:0 8px 40px rgba(0,0,0,.2);padding:18px;width:300px;max-width:92vw;';
     document.body.appendChild(popup); }
+  // 스크리닝 에이전트의 점수 분해(breakdown) + 테마 + 현재 상태 = 진입 후보 사유.
+  const bd=c.breakdown||{};
+  const rows=Object.keys(bd).filter(k=>bd[k]!==undefined)
+    .sort((a,b)=>(bd[b]||0)-(bd[a]||0))
+    .map(k=>{
+      const v=Math.round(bd[k]); const neg=v<0;
+      return `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--br);">
+        <span style="color:var(--ts);">${_SCR_LABELS[k]||k}</span>
+        <span style="font-family:var(--mono);font-weight:700;color:${neg?'var(--r)':'var(--g)'};">${neg?'':'+'}${v}</span>
+      </div>`;
+    }).join('');
+  const themesTxt=(c.themes&&c.themes.length)?('🔥 '+c.themes.join(', ')):'';
+  const st=_scrStatus(tk);
   popup.innerHTML=`
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-      <div><div style="font-size:14px;font-weight:800;">${s.nm}</div><div style="font-size:10px;color:var(--tm);">${tk}</div></div>
+      <div><div style="font-size:14px;font-weight:800;">${s.nm}</div><div style="font-size:10px;color:var(--tm);">${tk} · <span style="color:${st.c};font-weight:700;">${st.t}</span></div></div>
       <div style="text-align:right;"><div style="font-size:22px;font-weight:900;color:${col};">${sc}점</div>
       <button onclick="document.getElementById('_candPopup').style.display='none'" style="border:none;background:none;font-size:14px;cursor:pointer;color:var(--tm);">✕</button></div>
     </div>
-    <div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:12px;font-size:11px;line-height:1.8;color:var(--ts);" id="_candReason">
-      <span style="color:var(--tm);">🤖 AI가 분석 중이에요...</span>
+    <div style="font-size:9px;color:var(--tm);margin-bottom:4px;">🤖 스크리닝 에이전트 점수 분해</div>
+    <div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:8px;font-size:11px;line-height:1.5;color:var(--ts);">
+      ${rows||'<span style="color:var(--tm);">분해 정보 없음</span>'}
     </div>
+    ${themesTxt?`<div style="font-size:10px;color:var(--r);margin-bottom:12px;">${themesTxt}</div>`:''}
     <div style="display:flex;gap:8px;">
       <button onclick="selectStk('${tk}');document.getElementById('_candPopup').style.display='none';" style="flex:1;padding:9px;border-radius:8px;border:none;background:var(--b);color:#fff;font-size:12px;font-weight:700;cursor:pointer;">📊 차트 보기</button>
       <button onclick="document.getElementById('_candPopup').style.display='none'" style="padding:9px 14px;border-radius:8px;border:1.5px solid var(--br);background:none;font-size:12px;cursor:pointer;">닫기</button>
     </div>`;
   popup.style.display='block';
-  const cs=getRecentCandles(5); const cls=cs.map(x=>x.c);
-  const rsi=(calcRSI(cls,9).slice(-1)[0]||50).toFixed(0);
-  const lc=getCurrentCandle()||{c:s.pr};
-  callClaude({model:'claude-sonnet-4-5',max_tokens:200,
-    messages:[{role:'user',content:`단타 트레이더야. ${s.nm}(${tk})이 오늘 진입 후보인 이유를 토스처럼 쉽게 알려줘.
-추천이유: ${c.why||'조건검색 통과'} | 현재가: ${fW(lc.c)}원 | RSI: ${rsi}
-수급/차트/재료/리스크 각 한줄씩, 이모지 사용해서 쉽게.`}]},'후보상세').then(d=>{
-    const t=d.content?.[0]?.text||'분석 실패';
-    const el=document.getElementById('_candReason');
-    if(el) el.innerHTML=t.replace(/\n/g,'<br>');
-  }).catch(()=>{
-    const el=document.getElementById('_candReason');
-    if(el) el.textContent=c.why||'Claude API 키를 설정창에서 입력해 주세요.';
-  });
 }
 
 // ── 전체 새로고침 버튼 ──
@@ -12060,14 +12322,16 @@ async function syncCandidatesToWatchlist(){
     });
     addMsg('ai', msg);
 
-    // CANDS 업데이트
-    CANDS = newTks.slice(0,3).map(function(tk,i){
-      const info = sectorInfo[tk]||{};
-      const _sec = info.sector||''; const _rnk = info.rank; const _rsn = info.reason||'';
-      const _why = _sec ? _sec+(_rnk ? '('+_rnk+'위)' : '')+(_rsn ? ' '+_rsn : '') : _rsn || '강세섹터 편입';
-      return {tk:tk, why:_why, score:95-i*5};
-    });
-    renderCands();
+    // CANDS 업데이트 (에이전트 스크리닝이 활성이면 좌측 리스트는 그대로 둠)
+    if(!_agentScreeningActive()){
+      CANDS = newTks.slice(0,3).map(function(tk,i){
+        const info = sectorInfo[tk]||{};
+        const _sec = info.sector||''; const _rnk = info.rank; const _rsn = info.reason||'';
+        const _why = _sec ? _sec+(_rnk ? '('+_rnk+'위)' : '')+(_rsn ? ' '+_rsn : '') : _rsn || '강세섹터 편입';
+        return {tk:tk, why:_why, score:95-i*5};
+      });
+      renderCands();
+    }
 
   }catch(e){
     console.warn('강세섹터 분석 실패:', e.message);
@@ -12271,25 +12535,1303 @@ function _showThought_idle(n){updAIThought({type:'waiting',title:'모니터링 -
 
 
 function resetBalance(){
-  const cur=(cfg.capital||10000000).toString().replace(/,/g,"");
-  const newCap=prompt("초기 자본금 입력 (원)",cur);
-  if(newCap===null)return;
-  const amt=parseInt(String(newCap).replace(/,/g,""));
-  if(isNaN(amt)||amt<100000){showAlert("입력 오류","100,000원 이상 입력하세요.");return;}
-  if(!confirm(fW(amt)+"원으로 리셋하시겠습니까?"))return;
-  cfg.capital=amt;mock.cash=amt;mock.positions={};mock.trades=[];
+  // 요구 3: 가상잔고 100만원 고정 초기화 + 보유종목 전부 청산 (확인 묻지 않음).
+  const amt=1000000;
+  cfg.capital=amt;updateCash(amt);mock.positions={};mock.trades=[];
   mock.todayPnl=0;mock.totalPnl=0;mock.lossSeries=0;mock.wins=0;mock.losses=0;
   mock.creditUsed=0;mock.marginUsed=0;
-  saveMock();
-  // saveCfg가 정의돼 있으면 호출 (없을 수도)
+  try{ saveMock(); }catch(_e){}
   if(typeof saveCfg === 'function') saveCfg();
-  updCash();updPnl();renderPort();renderTradeLog();
-  addMsg("ai","잔고 "+fW(amt)+"원으로 리셋 완료");
-  showAlert("리셋 완료",fW(amt)+"원으로 리셋되었습니다.");
+  // ai-agent 백테스트 가상잔고도 함께 100만원 초기화 + 보유 청산 (프로세스 중지·state 삭제·패널 리셋)
+  if(typeof agentBTReset==='function'){ try{ agentBTReset(); return; }catch(_e){} }
+  // 폴백(백테스트 컨트롤러 미로딩 시): 레거시 패널만 갱신
+  window._agentActive=false;
+  try{ updCash();renderPort();renderTradeLog();updCredLim(); }catch(_e){}
+  if(typeof showAlert==='function') showAlert("리셋 완료","가상잔고 100만원으로 초기화 · 보유종목 전부 청산");
 }
 
 /* DEPLOY-v437431 */
 function toggleAutoTrade(){if(autoState.running){stopAuto();}else{startAuto();}}
+
+window.agentBT = window.agentBT || { running:false, timer:null, curKey:null, state:null, _reported:false, epoch:0 };
+if(agentBT.epoch===undefined) agentBT.epoch=0;
+
+function _agentToast(msg){
+  try{ if(typeof addMsg==='function'){ addMsg('ai', msg); return; } }catch(_e){}
+  console.log('[agentBT]', msg);
+}
+
+// ── 시작/정지/리셋 ──────────────────────────────────────────
+function agentBTStart(opt){
+  opt = opt || {};
+  agentBT._reported = false;
+  const body = {};
+  if(opt.start) body.start = opt.start;
+  if(opt.end) body.end = opt.end;
+  if(opt.cash && Number(opt.cash)>0) body.cash = Math.floor(Number(opt.cash));
+  if(opt.days && Number(opt.days)>0) body.days = Math.floor(Number(opt.days));
+  fetch('/api/backtest/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+    .then(r=>r.json()).then(r=>{
+      if(!r.ok){ agentBT.running=false; _syncBtToggleBtn(); alert('백테스트 시작 실패: '+(r.error||'알 수 없음')); return; }
+      agentBT.running=true; agentBT.curKey=null; agentBT._reported=false; window._agentMarkers=null;
+      _agentToast('🤖 ai-agent 백테스트 시작 (가상잔고 '+(body.cash||1000000).toLocaleString()+'원, 자동 최고속)');
+      _syncBtToggleBtn();
+      agentBTStartPoll();
+    }).catch(e=>{ agentBT.running=false; _syncBtToggleBtn(); alert('백테스트 시작 실패: '+e.message); });
+}
+function agentBTStop(){
+  // epoch을 올려 이후 도착하는 stale 폴링 응답이 running을 되살리지 못하게 한다.
+  agentBT.epoch=(agentBT.epoch||0)+1;
+  agentBTStopPoll();                 // 폴링 즉시 중단 (계속 진행되는 것처럼 보이던 버그 차단)
+  agentBT.running=false; _syncBtToggleBtn();
+  fetch('/api/backtest/stop',{method:'POST'}).then(r=>r.json()).then(()=>{
+    _agentToast('■ 백테스트 정지');
+  }).catch(()=>{});
+  // 잠시 후 최종 상태 1회만 반영(완료/정지 표시) — 폴링은 재개하지 않음.
+  setTimeout(()=>{
+    fetch('/api/backtest/state',{cache:'no-store'}).then(r=>r.json()).then(s=>{
+      if(s && s.ok){ s.running=false; try{ agentBTApply(s); }catch(_e){} }
+      agentBT.running=false; _syncBtToggleBtn();
+    }).catch(()=>{});
+  }, 1300);
+}
+// 요구 2: 팝업의 단일 토글 버튼 (▶ 시작 ↔ ■ 정지). 팝업은 닫지 않고 제자리 토글.
+function agentBTToggle(){
+  if(window.agentBT && agentBT.running){
+    agentBTStop();
+  } else {
+    const dEl=document.getElementById('btDays');
+    agentBTStart({days: dEl?dEl.value:''});
+    agentBT.running=true;   // 낙관적 — 폴링이 곧 실제 상태로 정정
+  }
+  _syncBtToggleBtn();
+}
+function _syncBtToggleBtn(){
+  const btn=document.getElementById('btToggleBtn'); if(!btn) return;
+  const run=!!(window.agentBT && agentBT.running);
+  btn.textContent = run ? '■ 정지' : '▶ 시작';
+  if(run){ btn.classList.remove('pur'); btn.style.background='var(--r)'; btn.style.color='#fff'; btn.style.border='none'; }
+  else { btn.classList.add('pur'); btn.style.background=''; btn.style.color=''; btn.style.border=''; }
+}
+// 우측 탭을 비운 초기 상태(가상잔고 100만·무보유)로 되돌림 (요구 3 리셋)
+function _agentResetRightPanels(){
+  window._agentActive=false;   // 레거시 렌더러 재가동 허용
+  // 레거시 mock 잔고도 정확히 100만으로 맞춰, 이후 타이머 렌더러가 다른 값으로 덮어쓰지 않게 한다.
+  try{
+    if(typeof mock==='object' && mock){
+      mock.positions={}; mock.trades=[];
+      mock.todayPnl=0; mock.totalPnl=0; mock.lossSeries=0; mock.wins=0; mock.losses=0;
+      mock.creditUsed=0; mock.marginUsed=0; mock.todayTrades=0;
+    }
+    updateCash(1000000);   // 잔고 100만 초기화 — 상단/보유탭 동시 (요구 2)
+    if(typeof cfg==='object' && cfg) cfg.capital=1000000;
+    if(typeof pendingOrders!=='undefined') pendingOrders=[];
+    if(typeof stopOrders!=='undefined') stopOrders={};
+    if(typeof saveMock==='function') saveMock();
+  }catch(_e){}
+  const tp=document.getElementById('todayPnlDisp'); if(tp){ tp.textContent='+0원'; tp.style.color='var(--tm)'; }
+  const cl=document.getElementById('credLim'); if(cl) cl.textContent='현금 1,000,000원 · 매수가능 1,000,000원';
+  const pi=document.getElementById('portItems'); if(pi) pi.innerHTML="<div style='font-size:9px;color:var(--tm);text-align:center;padding:12px 0;'>보유 종목 없음 (청산됨)</div>";
+  const tl=document.getElementById('tradeLog'); if(tl) tl.innerHTML="<div style='font-size:9px;color:var(--tm);text-align:center;padding:12px;'>거래 없음</div>";
+  const pl=document.getElementById('pendingList'); if(pl) pl.innerHTML='<div style="font-size:9px;color:var(--tm);padding:8px;">미체결 없음</div>';
+  const of=document.getElementById('agentOrderFeed'); if(of) of.innerHTML='';
+  const ac=document.getElementById('agentAICards'); if(ac) ac.innerHTML='';
+  try{ CANDS=[]; renderCands(); }catch(_e){}
+}
+function agentBTReset(){
+  // epoch을 즉시 올려서, 리셋 전 출발한 in-flight 폴링 응답이 화면을 되돌리지 못하게 한다.
+  agentBT.epoch=(agentBT.epoch||0)+1;
+  agentBTStopPoll();
+  agentBT.running=false; agentBT.curKey=null; agentBT.state=null; agentBT._reported=true;
+  window._agentState=null; window._agentMarkers=null;
+  // 화면 즉시 초기화 (네트워크 응답을 기다리지 않음)
+  _agentResetFooter();
+  _agentResetRightPanels();    // 가상잔고 100만 · 보유/거래/오늘손익/매매횟수 0
+  _syncBtToggleBtn();
+  const panel=document.getElementById('backtestPanel'); if(panel)panel.style.display='none';
+  try{ drawChart(); }catch(_e){}
+  fetch('/api/backtest/reset',{method:'POST'}).then(r=>r.json()).then(()=>{
+    // 서버 state 삭제 후 한 번 더 초기화 보장(혹시 그 사이 갱신됐을 경우)
+    _agentResetRightPanels(); _agentResetFooter();
+    _agentToast('↺ 백테스트 리셋 (가상잔고 1,000,000원 초기화 · 보유 전부 청산)');
+  }).catch(e=>{ _agentToast('리셋 경고: '+e.message+' (화면은 초기화됨)'); });
+}
+
+// ── 폴링 ─────────────────────────────────────────────────────
+function agentBTStartPoll(){ if(agentBT.timer) return; agentBTPollOnce(); agentBT.timer=setInterval(agentBTPollOnce, 500); }
+function agentBTStopPoll(){ if(agentBT.timer){ clearInterval(agentBT.timer); agentBT.timer=null; } }
+function agentBTPollOnce(){
+  const ep = agentBT.epoch||0;
+  fetch('/api/backtest/state',{cache:'no-store'}).then(r=>r.json()).then(s=>{
+    if((agentBT.epoch||0)!==ep) return;   // 리셋/정지 후 도착한 stale 응답 무시
+    agentBTApply(s);
+  }).catch(()=>{});
+}
+
+// ── 상태 반영 ────────────────────────────────────────────────
+function _agentFocus(s){
+  if(s.positions && s.positions.length) return s.positions[0].code;
+  if(s.todayTrades && s.todayTrades.length) return s.todayTrades[0].code; // 최신 거래 우선(reversed)
+  return null;
+}
+function _setMsSigned(id, val, unit, isPct){
+  const el=document.getElementById(id); if(!el) return;
+  val = Number(val)||0;
+  const up = val>=0;
+  const num = isPct ? val.toFixed(2) : Math.round(val).toLocaleString();
+  el.textContent = (up?'+':'') + num + unit;   // 음수는 num에 '-' 포함
+  el.className = 'ms-v ' + (up?'cu':'cd');
+}
+function _agentResetFooter(){
+  ['msPnl','msTodayPnl'].forEach(id=>{const e=document.getElementById(id);if(e){e.textContent='+0원';e.className='ms-v cu';}});
+  const p=document.getElementById('msPct'); if(p){p.textContent='0.00%';p.className='ms-v cu';}
+  const t=document.getElementById('msTrades'); if(t)t.textContent='0회';
+}
+// ── 우측 탭 전체를 백테스트(ai-agent) 상태로 실시간 동기화 ──────────────
+function _agentSyncRightPanels(s){
+  if(!s || !s.ok) return;
+  window._agentActive = true;   // 레거시(mock) 렌더러가 덮어쓰지 않도록 플래그
+  try{ _agentRenderBalance(s); }catch(_e){}
+  try{ _agentRenderPortItems(s); }catch(_e){}
+  try{ _agentRenderTradeLog(s); }catch(_e){}
+  try{ _agentRenderPending(s); }catch(_e){}
+  try{ _agentRenderOrderFeed(s); }catch(_e){}
+  try{ _agentRenderAITab(s); }catch(_e){}
+}
+// 보유 탭 — 가상잔고/오늘손익/한도 (요구 3: 완전 연동)
+function _agentRenderBalance(s){
+  const b=s.balance||{};
+  // 백테스트 잔고도 단일 함수로만 갱신 → 상단/보유탭 항상 일치 (요구 2)
+  updateCash(b.cash!=null ? b.cash : (b.startCash||0));
+  const tp=document.getElementById('todayPnlDisp');
+  if(tp){ const v=b.todayPnl||0; tp.textContent=(v>=0?'+':'')+Math.round(v).toLocaleString()+'원'; tp.style.color=v>0?'var(--g)':v<0?'var(--r)':'var(--tm)'; }
+  const cl=document.getElementById('credLim');
+  if(cl) cl.textContent='현금 '+Math.round(b.cash||0).toLocaleString()+'원 · 매수가능 '+Math.round(b.creditLimit||b.cash||0).toLocaleString()+'원';
+}
+// 보유 탭 — 보유 종목(진입가·현재가·수익률)
+function _agentRenderPortItems(s){
+  const c=document.getElementById('portItems'); if(!c) return;
+  const ps=s.positions||[];
+  if(!ps.length){ c.innerHTML="<div style='font-size:9px;color:var(--tm);text-align:center;padding:12px 0;'>보유 종목 없음 (무보유)</div>"; return; }
+  c.innerHTML=ps.map(p=>{
+    const up=(p.pnl||0)>=0; const nm=p.name||p.code;
+    const ymd=(s.sim&&s.sim.date)||'';
+    return `<div class="pi" onclick="agentBTLoadChart('${p.code}','${ymd}')" style="cursor:pointer;">
+      <div class="pi-h"><span class="pi-tk">${nm} <span style="font-size:8px;background:var(--p);color:#fff;border-radius:3px;padding:0 3px;">AI</span></span>
+      <span class="pi-pnl ${up?'cu':'cd'}">${up?'+':''}${Math.round(p.pnl||0).toLocaleString()}원</span></div>
+      <div class="pi-s"><span>${(p.qty||0).toLocaleString()}주 · 평단 ${Math.round(p.entry||0).toLocaleString()}</span>
+      <span class="${up?'cu':'cd'}">${up?'+':''}${p.pnlPct||0}%</span></div>
+      <div class="pi-s"><span style="color:var(--tm);">현재가 ${Math.round(p.current||0).toLocaleString()}원</span></div>
+    </div>`;
+  }).join('');
+}
+// 거래 탭 — 오늘 체결 전체(진입/청산)
+function _agentRenderTradeLog(s){
+  const c=document.getElementById('tradeLog'); if(!c) return;
+  const tr=s.todayTrades||[];   // dashboard에서 최신순(reversed)
+  if(!tr.length){ c.innerHTML="<div style='font-size:9px;color:var(--tm);text-align:center;padding:12px;'>오늘 체결 없음</div>"; return; }
+  c.innerHTML=tr.map(t=>{
+    const ex=t.kind==='exit'; const side=ex?'매도':'매수'; const nm=t.name||t.code;
+    const pnlTxt = ex?`<div class="tl-pnl ${t.pnlPct>=0?'cu':'cd'}">${t.pnlPct>=0?'+':''}${t.pnlPct}%</div>`:'';
+    const reason = ex&&t.exitKind?`<div style="font-size:7px;color:var(--ts);margin-top:1px;">↳ ${t.exitKind}${t.reason?(' · '+t.reason):''}</div>`:'';
+    return `<div class="tl-i"><div class="tl-side ${ex?'sell':'buy'}">${side}</div>
+      <div class="tl-info">${nm}<span style='color:var(--p);font-size:8px;'>[AI]</span> <span style="color:var(--tm);font-size:8px;">${t.time||''}</span><br>${Math.round(t.price||0).toLocaleString()}×${t.qty||0}${reason}</div>${pnlTxt}</div>`;
+  }).join('');
+}
+// 미체결 탭 — 백테스트는 즉시 체결(미체결 없음) → 최근 체결 안내
+function _agentRenderPending(s){
+  const el=document.getElementById('pendingList'); if(!el) return;
+  const o=s.agents&&s.agents.order;
+  if(o&&o.status==='filled'){
+    el.innerHTML=`<div style="font-size:9px;color:var(--tm);padding:8px;line-height:1.6;">백테스트는 <b>즉시 체결</b> 방식이라 미체결이 없어요.<br>최근 체결: <b>${o.side==='buy'?'매수':'매도'}</b> ${o.name||o.code||''} ${o.qty||0}주 @${Math.round(o.price||0).toLocaleString()} <span style="color:var(--ts);">${o.time||''}</span></div>`;
+  } else {
+    el.innerHTML='<div style="font-size:9px;color:var(--tm);padding:8px;">미체결 없음 (백테스트 즉시 체결)</div>';
+  }
+}
+// 주문 탭 상단 — 에이전트가 실행한 매수/매도 주문 내역
+function _agentRenderOrderFeed(s){
+  const el=document.getElementById('agentOrderFeed'); if(!el) return;
+  const tr=(s.todayTrades||[]).slice(0,12);
+  const hdr='<div style="font-size:10px;font-weight:800;color:var(--p);padding:6px 8px 3px;">🤖 에이전트 주문 내역 <span style="font-size:8px;color:var(--tm);font-weight:600;">실시간</span></div>';
+  if(!tr.length){ el.innerHTML=hdr+'<div style="font-size:9px;color:var(--tm);padding:2px 8px 8px;border-bottom:1px solid var(--br);margin-bottom:6px;">아직 에이전트 주문이 없어요. 🚀 백테스트를 시작하면 표시됩니다.</div>'; return; }
+  el.innerHTML=hdr+'<div style="max-height:150px;overflow:auto;border-bottom:1px solid var(--br);margin-bottom:6px;">'+tr.map(t=>{
+    const ex=t.kind==='exit'; const side=ex?'매도':'매수';
+    const col=ex?(t.pnlPct>0?'var(--r)':t.pnlPct<0?'var(--b)':'var(--tm)'):'var(--g)';
+    const pnl=ex?` <b style="color:${col};">${t.pnlPct>0?'+':''}${t.pnlPct}%</b>`:'';
+    return `<div style="display:flex;justify-content:space-between;gap:6px;padding:4px 8px;border-top:1px solid var(--br);font-size:9px;">
+      <span><b style="color:${ex?'var(--r)':'var(--g)'};">${ex?'🔻':'🔵'}${side}</b> ${t.name||t.code||''}</span>
+      <span style="font-family:var(--mono);">${(t.qty||0)}주 @${Math.round(t.price||0).toLocaleString()}${pnl} <span style="color:var(--tm);">${t.time||''}</span></span></div>`;
+  }).join('')+'</div>';
+}
+// AI 탭 상단 — 8부서 에이전트 실시간 판단(토스 스타일)
+function _agRow(emoji,label,status,tone){
+  const col=tone==='ok'?'var(--g)':tone==='no'?'var(--r)':tone==='warn'?'var(--a)':'var(--tp)';
+  return `<div style="display:flex;align-items:center;gap:9px;padding:7px 6px;border-top:1px solid var(--br);">
+    <span style="font-size:16px;width:20px;text-align:center;flex-shrink:0;">${emoji}</span>
+    <div style="min-width:0;flex:1;"><div style="font-size:9px;color:var(--tm);font-weight:700;">${label}</div>
+    <div style="font-size:12px;font-weight:700;color:${col};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${status}</div></div></div>`;
+}
+function _agentRenderAITab(s){
+  const el=document.getElementById('agentAICards'); if(!el) return;
+  const a=s.agents||{};
+  const sigT={STRONG_ENTRY:'✅ 지금 사기 좋아요',CONDITIONAL_ENTRY:'🤔 조건 맞으면 살 만',NO_ENTRY:'⏸️ 아직 살 때 아니에요'};
+  const mktT={GREEN:'🟢 시장 평온',YELLOW:'🟡 조금 조심',RED:'🔴 위험(신규금지)',BLACK:'⚫ 비상정지'};
+  const rej={'HL-01':'🈵 3종목 꽉 참','HL-02':'😮‍💨 연속손해 휴식','HL-03':'🕝 2시반후 금지','HL-04':'🌅 장초반 금지','HL-05':'↔️ 호가차 큼','HL-06':'💳 신용한도 부족','MARKET_RED':'🔴 시장 나쁨','MARKET_BLACK':'⚫ 비상정지','MARKET_YELLOW_CONDITIONAL':'🟡 조건부 차단','SIZING':'💸 자금 부족'};
+  const tm=(s.sim&&s.sim.time)||'';
+  const out=[];
+  const c=a.ceo||{};
+  out.push(_agRow('🧑‍💼','대표(CEO)',(c.mode==='live'?'🔴 실전':'🧪 모의')+' · '+(c.days||0)+'일차'+(tm?(' · '+tm):''),''));
+  const sc=a.screening||{}; const t0=sc.top&&sc.top[0];
+  out.push(_agRow('🔍','종목 찾기','📋 '+(sc.count||0)+'개'+(t0?(' · '+(t0.name||t0.code)+' '+Math.round(t0.score)+'점'):''),sc.count?'ok':''));
+  const m=a.market;
+  out.push(_agRow('🌤️','시장 분위기',m?(mktT[m.grade]||'확인 중'):'확인 중…',m?(m.grade==='GREEN'?'ok':m.grade==='YELLOW'?'warn':'no'):''));
+  const sg=a.signal;
+  out.push(_agRow('📊','신호 분석',sg?((sg.symbol?sg.symbol+' ':'')+(sigT[sg.signal]||'분석 중')+' ('+(sg.scoreCount||0)+'/5)'):'분석 대기…',sg?(sg.signal==='STRONG_ENTRY'?'ok':sg.signal==='NO_ENTRY'?'':'warn'):''));
+  const r=a.risk;
+  if(!r) out.push(_agRow('🛡️','안전 점검','대기 중…',''));
+  else if(r.decision==='APPROVE') out.push(_agRow('🛡️','안전 점검','👍 통과 · '+(r.symbol||'')+' '+(r.qty||'')+'주','ok'));
+  else out.push(_agRow('🛡️','안전 점검','✋ '+(rej[r.rule]||r.reason||'규칙 차단'),'no'));
+  const o=a.order;
+  if(!o) out.push(_agRow('🧾','주문 실행','주문 없음',''));
+  else { const ok=o.status==='filled'; const sd=o.side==='buy'?'매수':o.side==='sell'?'매도':''; out.push(_agRow('🧾','주문 실행',ok?('✅ '+sd+' 체결 · '+(o.name||o.code||'')+' '+(o.qty||'')+'주'):'❌ 실패',ok?'ok':'no')); }
+  const l=a.learning||{}; const ps=l.proposals||[];
+  out.push(_agRow('📚','학습부','💡 제안 '+ps.length+'건'+(l.bestPattern?(' · 잘된패턴 '+l.bestPattern):''),ps.length?'ok':''));
+  const mt=a.meta||{}; const pf=mt.profitFactor==null?'∞':Number(mt.profitFactor).toFixed(2);
+  out.push(_agRow('🧠','메타 총괄','종합 '+(mt.perfScore!=null?mt.perfScore:'–')+'점 · 승률 '+(mt.winRate!=null?mt.winRate+'%':'—')+' · 손익비 '+pf,''));
+  el.innerHTML='<div style="font-size:10px;font-weight:800;color:var(--p);padding:6px 8px 2px;">🤖 에이전트 실시간 판단</div>'+out.join('');
+}
+
+// ── 차트 실시간 재생: 서버가 보낸 (가상 시각까지 잘린) 분봉을 차트에 주입 ──
+function _agTick(p){
+  if(p>=500000)return 1000; if(p>=200000)return 500; if(p>=50000)return 100;
+  if(p>=20000)return 50; if(p>=5000)return 10; if(p>=2000)return 5; return 1;
+}
+function _agentRenderChart(s){
+  const ch=s.chart; if(!ch || !ch.candles || !ch.candles.length) return;
+  const code=ch.code;
+  const ymd=(s.sim&&s.sim.date)||ch.date||'';
+  activeTk=code;
+  if(ymd){ const dstr=ymd.slice(0,4)+'-'+ymd.slice(4,6)+'-'+ymd.slice(6,8); sim.date=dstr; const md=document.getElementById('mockDate'); if(md) md.value=dstr; }
+  const nm=ch.name || (typeof STOCKS!=='undefined'&&((STOCKS.find(x=>x.tk===code)||{}).nm)) || code;
+  const hNm=document.getElementById('chartHdrNm'); if(hNm) hNm.textContent=nm;
+  const hTk=document.getElementById('chartHdrTk'); if(hTk) hTk.textContent=code;
+  // 오늘 봉 주입 (prevClose는 등락 기준). 서버가 이미 미래봉을 잘랐으므로 전부 '현재까지'.
+  sim.candles=ch.candles.map(c=>({t:c.t,o:c.o,h:c.h,l:c.l,c:c.c,v:c.v}));
+  _kisChartMeta=_kisChartMeta||{}; _kisChartMeta.prevCount=0; _kisChartMeta._prevCount=0;
+  _kisChartMeta.todayCount=sim.candles.length; _kisChartMeta.prevDate='';
+  sim.idx=sim.candles.length-1;
+  window._agentDayBase = ch.prevClose || (sim.candles[0]&&sim.candles[0].o) || 0;
+  // 최신 봉 따라가기 (사용자가 드래그 중이 아니면)
+  const total=sim.candles.length;
+  chartViewCount=Math.max(10, Math.min(chartViewCount||80, total));
+  if(window._followLatest!==false && !window._chartUserDragging){
+    chartViewStart=Math.max(0, total-chartViewCount);
+  }
+  _agentUpdTopInfo(s);          // 현재가·등락률 (상단/호가 현재가)
+  _agentSynthOrderbook(s);      // 호가창 합성
+  try{ drawChart(); }catch(_e){}   // MA/RSI/MACD/볼린저/VWAP는 drawChart가 getCandles로 재계산
+}
+// 상단 현재가·등락률 (백테스트 시점 기준)
+function _agentUpdTopInfo(s){
+  const cc=(typeof getCurrentCandle==='function')?getCurrentCandle():null;
+  const cur=cc?cc.c:0;
+  const base=window._agentDayBase||cur||1;
+  const ca=cur-base, cp=base?(ca/base*100):0, up=ca>=0, cls=up?'cu':'cd';
+  const fmt=(typeof fW==='function')?fW:(n=>Math.round(n).toLocaleString());
+  const set=(id,txt,clss)=>{const e=document.getElementById(id);if(e){e.textContent=txt;if(clss!=null)e.className=clss;}};
+  set('chartHdrPr',fmt(cur));
+  const chCh=document.getElementById('chartHdrCh'); if(chCh){chCh.textContent=(up?'+':'')+cp.toFixed(2)+'%';chCh.style.color=up?'var(--r)':'var(--b)';}
+  set('siPr',fmt(cur),'si-pr '+cls);
+  const siCh=document.getElementById('siCh'); if(siCh){siCh.textContent=(up?'+':'')+ca.toLocaleString()+' ('+(up?'+':'')+cp.toFixed(2)+'%)';siCh.className='si-ch '+cls;}
+  set('obPr',fmt(cur),'ob-cur-p '+cls);
+  const obInfo=document.getElementById('obInfo'); if(obInfo)obInfo.textContent=(up?'+':'')+ca.toLocaleString()+' ('+cp.toFixed(2)+'%)';
+}
+// 호가창 합성 (OHLCV만 있으므로 현재가 기준 10단계 사다리 — 백테스트 시점)
+function _agentSynthOrderbook(s){
+  const cc=(typeof getCurrentCandle==='function')?getCurrentCandle():null; if(!cc) return;
+  const obS=document.getElementById('obSell'), obB=document.getElementById('obBuy'); if(!obS||!obB) return;
+  const mid=Math.round(cc.c), tick=_agTick(mid);
+  const volBase=Math.max(10, Math.round((cc.v||1000)/20));
+  let sell='', buy='', tSell=0, tBuy=0;
+  const sellRows=[];
+  for(let i=10;i>=1;i--){
+    const pr=mid+tick*i; const q=Math.max(1, Math.round(volBase*(1.1-i*0.07)*(0.7+((pr%7)/10))));
+    tSell+=q; const w=Math.min(100,q/(volBase*1.2)*100).toFixed(0);
+    sellRows.push(`<div class="ob-r" onclick="document.getElementById('ofPr').value=${pr};updOSum&&updOSum()"><div class="ob-bg s" style="width:${w}%"></div><div class="ob-p" style="color:#2563eb;">${pr.toLocaleString()}</div><div class="ob-q">${q.toLocaleString()}</div></div>`);
+  }
+  const buyRows=[];
+  for(let i=1;i<=10;i++){
+    const pr=Math.max(tick,mid-tick*i); const q=Math.max(1, Math.round(volBase*(1.1-i*0.07)*(0.7+((pr%7)/10))));
+    tBuy+=q; const w=Math.min(100,q/(volBase*1.2)*100).toFixed(0);
+    buyRows.push(`<div class="ob-r" onclick="document.getElementById('ofPr').value=${pr};updOSum&&updOSum()"><div class="ob-bg b" style="width:${w}%"></div><div class="ob-p" style="color:#dc2626;">${pr.toLocaleString()}</div><div class="ob-q">${q.toLocaleString()}</div></div>`);
+  }
+  sell=`<div style="display:flex;justify-content:space-between;padding:3px 8px;background:rgba(37,99,235,.05);border-bottom:1px solid var(--br);font-family:var(--mono);font-size:9px;color:#2563eb;"><span>매도 총잔량</span><span>${tSell.toLocaleString()}</span></div>`+sellRows.join('');
+  buy=buyRows.join('')+`<div style="display:flex;justify-content:space-between;padding:3px 8px;background:rgba(220,38,38,.05);border-top:1px solid var(--br);font-family:var(--mono);font-size:9px;color:#dc2626;"><span>매수 총잔량</span><span>${tBuy.toLocaleString()}</span></div>`;
+  obS.innerHTML=sell; obB.innerHTML=buy;
+  const obName=document.getElementById('obTkName'); if(obName) obName.textContent=(s.chart&&s.chart.name)||activeTk;
+  const btEl=document.getElementById('obBuyTotal'); if(btEl) btEl.textContent=tBuy.toLocaleString();
+}
+
+function agentBTApply(s){
+  if(!s || !s.ok){ return; }
+  agentBT.state = s;
+  window._agentState = s;
+  agentBT.running = !!s.running;
+  // 좌측 관심종목 = 스크리닝 에이전트 결과로 실시간 동기화 (점수·이유·상태)
+  try{ updateCandsFromDash(s.screening||[]); }catch(_e){}
+  // 우측 탭(주문/보유/거래/미체결/AI) 전부 백테스트 상태로 실시간 동기화
+  try{ _agentSyncRightPanels(s); }catch(_e){}
+  // 백테스트 팝업이 열려 있으면 시작/정지 토글 버튼 라벨 동기화
+  try{ _syncBtToggleBtn(); }catch(_e){}
+  const cum = s.cumulative || {};
+  const bal = s.balance || {};
+
+  // 하단 손익/수익률/매매횟수 (기존 푸터 UI 그대로 사용)
+  _setMsSigned('msPnl', cum.totalPnl||0, '원', false);
+  _setMsSigned('msPct', cum.totalReturnPct||0, '%', true);
+  const todayPnl = (bal.todayPnl!==undefined) ? bal.todayPnl
+    : ((s.positions||[]).reduce((a,p)=>a+(p.pnl||0),0));
+  _setMsSigned('msTodayPnl', todayPnl, '원', false);
+  const trEl=document.getElementById('msTrades'); if(trEl) trEl.textContent=(cum.trades||0)+'회';
+  if(s.sim && s.sim.time){ const tEl=document.getElementById('msTime'); if(tEl) tEl.textContent=s.sim.time; }
+
+  // 진행 패널
+  _agentBTPanel(s);
+
+  // 차트 실시간 재생 — 에이전트가 보는 종목의 분봉을 백테스트 시각까지 주입.
+  const ymd = s.sim && s.sim.date;
+  const chCode = (s.chart && s.chart.code) || _agentFocus(s);
+  if(chCode && ymd){
+    // 현재 포커스 종목의 매수(▲)/매도(▼) 마커 수집
+    const list=[];
+    (s.todayTrades||[]).forEach(t=>{
+      if(t.code!==chCode || !t.time) return;
+      const tm = t.time.slice(0,5);
+      if(t.kind==='entry') list.push({time:tm, side:'buy', price:t.price});
+      else if(t.kind==='exit') list.push({time:tm, side:'sell', price:t.price, pnlPct:t.pnlPct});
+    });
+    window._agentMarkers = { code:chCode, ymd:ymd, list:list };
+  }
+  if(s.chart && s.chart.candles && s.chart.candles.length){
+    // 서버가 가상 시각까지 잘라준 분봉 → 매 폴링마다 캔들이 하나씩 늘어 '살아있는' 차트
+    try{ _agentRenderChart(s); }catch(_e){ try{ drawChart(); }catch(__e){} }
+  } else {
+    // 폴백: 분봉 미제공 시 기존 traidair 차트 로드
+    if(chCode && ymd){ const key=chCode+'@'+ymd; if(key!==agentBT.curKey){ agentBT.curKey=key; agentBTLoadChart(chCode, ymd); } }
+    try{ drawChart(); }catch(_e){}
+  }
+
+  // 완료 → 리포트 1회 표시 후 폴링 종료
+  if(!s.running && (cum.days||0)>0 && !agentBT._reported){
+    agentBT._reported = true;
+    agentBTStopPoll();
+    agentBT.running = false;
+    agentBTShowReport(s);
+  }
+}
+
+function _agentBTPanel(s){
+  const panel=document.getElementById('backtestPanel'); if(!panel) return;
+  panel.style.display='block';
+  const cum=s.cumulative||{};
+  const sim=s.sim||{};
+  const dstr = sim.date ? (sim.date.slice(0,4)+'.'+sim.date.slice(4,6)+'.'+sim.date.slice(6,8)) : '—';
+  const grade = (s.agents && s.agents.market && s.agents.market.grade) || '—';
+  const gColor = grade==='RED'||grade==='BLACK' ? 'var(--r)' : grade==='YELLOW' ? 'var(--a)' : 'var(--g)';
+  const posTxt = (s.positions&&s.positions.length)
+    ? s.positions.map(p=>`${p.name||p.code} ${(p.pnlPct>=0?'+':'')+p.pnlPct}%`).join(', ')
+    : '무보유';
+  const retUp = (cum.totalReturnPct||0)>=0;
+  panel.innerHTML = `
+    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;font-size:11px;">
+      <span style="font-weight:800;color:var(--p);">🤖 ai-agent ${s.running?'<span style="color:var(--g);">진행 중</span>':'<span style="color:var(--tm);">정지</span>'}</span>
+      <span>📅 ${dstr} <b>${sim.time||''}</b></span>
+      <span>일수 <b>${cum.days||0}</b></span>
+      <span>누적 <b style="color:${retUp?'var(--r)':'var(--b,#2563eb)'};">${(retUp?'+':'')+(cum.totalReturnPct||0)}%</b></span>
+      <span>매매 <b>${cum.trades||0}</b>회 · 승률 <b>${cum.tradeWinRate||0}%</b></span>
+      <span>시장 <b style="color:${gColor};">${grade}</b></span>
+      <span style="color:var(--ts);">보유: ${posTxt}</span>
+    </div>`;
+}
+
+// 에이전트가 보는 종목/날짜를 차트에 로드 (분봉) — 마커 정렬용
+function agentBTLoadChart(code, ymd){
+  try{
+    const dstr = ymd.slice(0,4)+'-'+ymd.slice(4,6)+'-'+ymd.slice(6,8);
+    activeTk = code;
+    sim.date = dstr;
+    const md=document.getElementById('mockDate'); if(md) md.value=dstr;
+    const nm=(typeof STOCKS!=='undefined'&&STOCKS.find(x=>x.tk===code));
+    const hdrNm=document.getElementById('chartHdrNm'); if(hdrNm) hdrNm.textContent=(nm&&nm.nm)||code;
+    const hdrTk=document.getElementById('chartHdrTk'); if(hdrTk) hdrTk.textContent=code;
+    if(typeof _fetchKisCandles==='function' && !(sim.tf==='D'||(''+sim.tf).startsWith('D'))){
+      _fetchKisCandles(code, dstr, sim.tf).then(ic=>{
+        if(ic && ic.length>=2){
+          sim.candles = ic;
+          const pc=(_kisChartMeta&&_kisChartMeta.prevCount)||0;
+          sim.idx = ic.length-1;
+          const todayLen = Math.max(1, ic.length-pc);
+          chartViewCount = Math.min(ic.length, Math.max(todayLen+8, 80));
+          chartViewStart = Math.max(0, ic.length-chartViewCount);
+          if(_kisChartMeta) _kisChartMeta._prevCount = pc;
+          drawChart();
+        } else { genCandles(code, dstr); drawChart(); }
+      }).catch(()=>{ try{ genCandles(code, dstr); drawChart(); }catch(_e){} });
+    } else {
+      genCandles(code, dstr); drawChart();
+    }
+  }catch(_e){}
+}
+
+// 캔들차트 위 매수(▲)/매도(▼) 마커 — drawChart 내부에서 호출됨
+function _drawAgentMarkers(ctx, cs, toX, toY, bw, PT, mainH){
+  const M = window._agentMarkers;
+  if(!M || !M.list || !M.list.length) return;
+  if(M.code !== activeTk) return;              // 현재 차트가 그 종목일 때만
+  const prevCount = (_kisChartMeta && (_kisChartMeta._prevCount||_kisChartMeta.prevCount)) || 0;
+  // 보이는 봉 중 "오늘" 봉만: "HH:MM" → 시각 인덱스
+  const byTime = {};
+  for(let i=0;i<cs.length;i++){
+    const abs = chartViewStart + i;
+    if(prevCount>0 && abs < prevCount) continue;
+    byTime[cs[i].t] = i;
+  }
+  ctx.save();
+  ctx.font='bold 9px sans-serif'; ctx.textAlign='center'; ctx.lineWidth=1;
+  M.list.forEach(mk=>{
+    const i = byTime[mk.time];
+    if(i==null) return;
+    const c = cs[i], x = toX(i);
+    if(mk.side==='buy'){
+      const y = toY(c.l) + 11;
+      ctx.fillStyle = '#3182f6';                // 매수 = 파랑 ▲ (요청)
+      ctx.beginPath(); ctx.moveTo(x,y-8); ctx.lineTo(x-5,y); ctx.lineTo(x+5,y); ctx.closePath(); ctx.fill();
+      ctx.fillText('매수', x, y+11);
+    } else {
+      const y = toY(c.h) - 11;
+      ctx.fillStyle = '#fa5252';                // 매도 = 빨강 ▼
+      ctx.beginPath(); ctx.moveTo(x,y+8); ctx.lineTo(x-5,y); ctx.lineTo(x+5,y); ctx.closePath(); ctx.fill();
+      let lbl = '매도';
+      if(mk.pnlPct!=null) lbl = (mk.pnlPct>=0?'+':'') + Number(mk.pnlPct).toFixed(1) + '%';
+      ctx.fillStyle = (mk.pnlPct!=null && mk.pnlPct<0) ? '#2563eb' : '#dc2626';
+      ctx.fillText(lbl, x, y-5);
+    }
+  });
+  ctx.restore();
+}
+
+// ── 완료 리포트 모달 ─────────────────────────────────────────
+function agentBTShowReport(s){
+  const cum=s.cumulative||{}; const rep=s.report||{};
+  const old=document.getElementById('agentBTReport'); if(old)old.remove();
+  const fmtPf = cum.profitFactor==null ? '∞' : cum.profitFactor;
+  const best = rep.bestPattern ? (rep.bestPattern.pattern||rep.bestPattern.key||JSON.stringify(rep.bestPattern)) : '—';
+  const worst = rep.worstPattern ? (rep.worstPattern.pattern||rep.worstPattern.key||JSON.stringify(rep.worstPattern)) : '—';
+  const sugg = (rep.suggestions||[]).map(p=>`<li style="margin:2px 0;">[${p.kind}] ${p.rationale}</li>`).join('') || '<li style="color:var(--tm);">제안 없음</li>';
+  const retUp=(cum.totalReturnPct||0)>=0;
+  const html = `
+    <div style="padding:16px;max-height:80vh;overflow:auto;">
+      <div style="font-size:14px;font-weight:800;margin-bottom:12px;">🤖 ai-agent 백테스트 결과</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
+        <div style="background:var(--bg);border-radius:8px;padding:8px 10px;"><div style="font-size:9px;color:var(--tm);">총 수익률</div><div style="font-size:16px;font-weight:800;color:${retUp?'#dc2626':'#2563eb'};">${(retUp?'+':'')+(cum.totalReturnPct||0)}%</div></div>
+        <div style="background:var(--bg);border-radius:8px;padding:8px 10px;"><div style="font-size:9px;color:var(--tm);">총 손익</div><div style="font-size:16px;font-weight:800;color:${(cum.totalPnl||0)>=0?'#dc2626':'#2563eb'};">${((cum.totalPnl||0)>=0?'+':'')+(cum.totalPnl||0).toLocaleString()}원</div></div>
+        <div style="background:var(--bg);border-radius:8px;padding:8px 10px;"><div style="font-size:9px;color:var(--tm);">거래 승률</div><div style="font-size:14px;font-weight:700;">${cum.tradeWinRate||0}% <span style="font-size:10px;color:var(--tm);">(${cum.trades||0}건)</span></div></div>
+        <div style="background:var(--bg);border-radius:8px;padding:8px 10px;"><div style="font-size:9px;color:var(--tm);">손익비 / MDD</div><div style="font-size:14px;font-weight:700;">${fmtPf} <span style="font-size:10px;color:var(--r);">/ -${cum.mddPct||0}%</span></div></div>
+      </div>
+      <div style="font-size:11px;margin-bottom:6px;"><b>일수</b> ${cum.days||0}일 · <b>승일률</b> ${cum.dayWinRate||0}%</div>
+      <div style="font-size:11px;margin-bottom:4px;"><b>📈 가장 잘 된 패턴:</b> <span style="color:var(--g);">${best}</span></div>
+      <div style="font-size:11px;margin-bottom:10px;"><b>📉 가장 안 된 패턴:</b> <span style="color:var(--r);">${worst}</span></div>
+      <div style="font-size:11px;font-weight:700;margin-bottom:4px;">🧬 메타 개선 제안</div>
+      <ul style="font-size:10px;color:var(--ts);margin:0 0 12px 16px;padding:0;">${sugg}</ul>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button class="ibtn" onclick="document.getElementById('agentBTReport').remove();runAgentEvolve();" style="font-size:11px;background:linear-gradient(135deg,rgba(139,92,246,.18),rgba(5,192,114,.12));color:var(--p);border:1px solid rgba(139,92,246,.3);">🧬 제안 적용(진화+)</button>
+        <button class="ibtn pur" onclick="document.getElementById('agentBTReport').remove()" style="font-size:11px;">확인</button>
+      </div>
+    </div>`;
+  const m=document.createElement('div');
+  m.id='agentBTReport';
+  m.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:10000;background:var(--pan);border-radius:14px;box-shadow:0 8px 40px rgba(0,0,0,.25);width:420px;max-width:94vw;';
+  m.innerHTML=html;
+  document.body.appendChild(m);
+}
+
+// ── 진화+ : 메타 에이전트 최적화 제안 실행 ───────────────────
+var _evolvePollTimer=null;
+function runAgentEvolve(){
+  if(window.agentBT && agentBT.running){ alert('백테스트 진행 중에는 진화를 실행할 수 없어요. 먼저 정지하세요.'); return; }
+  if(_evolvePollTimer){ alert('진화가 이미 실행 중이에요.'); return; }
+  const btn=document.getElementById('evolveBtn');
+  fetch('/api/backtest/evolve',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})
+    .then(r=>r.json()).then(r=>{
+      if(!r.ok){ alert('진화 시작 실패: '+(r.error||'알 수 없음')); return; }
+      if(btn){ btn._orig=btn.textContent; btn.textContent='🧬 진화 중...'; btn.disabled=true; }
+      _agentToast('🧬 메타 에이전트가 저널을 관찰하고 전략을 진화시키는 중...');
+      _evolvePollTimer=setInterval(_evolvePoll, 1000);
+    }).catch(e=>alert('진화 실패: '+e.message));
+}
+function _evolvePoll(){
+  fetch('/api/backtest/evolve-result',{cache:'no-store'}).then(r=>r.json()).then(res=>{
+    if(res && res.running) return;     // 진행 중
+    if(!res || !res.ok) return;        // 아직 결과 파일 없음 → 계속 대기
+    clearInterval(_evolvePollTimer); _evolvePollTimer=null;
+    const btn=document.getElementById('evolveBtn');
+    if(btn){ btn.textContent=btn._orig||'🧬 진화+'; btn.disabled=false; }
+    agentEvolveShowResult(res);
+  }).catch(()=>{});
+}
+function agentEvolveShowResult(res){
+  const old=document.getElementById('agentEvolveModal'); if(old)old.remove();
+  const applied=(res.applied||[]).map(c=>`<li style="margin:2px 0;"><b>${c.key}</b>: ${c.from} → <span style="color:var(--g);">${c.to}</span> <span style="color:var(--tm);">(${c.reason})</span></li>`).join('') || '<li style="color:var(--tm);">적용된 파라미터 변경 없음</li>';
+  const recs=(res.recommendations||[]).slice(0,8).map(r=>`<li style="margin:2px 0;">${r}</li>`).join('') || '<li style="color:var(--tm);">권고 없음</li>';
+  const obs=(res.observed||[]).slice(-5).map(o=>`<span style="display:inline-block;margin:1px 4px 1px 0;padding:1px 5px;background:var(--bg);border-radius:4px;font-size:9px;">${o.date.slice(4,6)}/${o.date.slice(6,8)} ${o.trades}건·${o.winRate}%</span>`).join('') || '<span style="color:var(--tm);">없음</span>';
+  const html=`
+    <div style="padding:16px;max-height:80vh;overflow:auto;">
+      <div style="font-size:14px;font-weight:800;margin-bottom:6px;">🧬 진화+ (메타 최적화) 결과</div>
+      <div style="font-size:11px;color:var(--ts);margin-bottom:10px;">${res.message||''} <span style="color:var(--tm);">[${res.mode||'?'}]</span></div>
+      <div style="font-size:10px;color:var(--tm);margin-bottom:4px;">관찰한 거래일(${res.daysObserved||0}일)</div>
+      <div style="margin-bottom:12px;">${obs}</div>
+      <div style="font-size:11px;font-weight:700;margin-bottom:4px;">✅ 적용된 전략 파라미터</div>
+      <ul style="font-size:10px;margin:0 0 12px 16px;padding:0;">${applied}</ul>
+      <div style="font-size:11px;font-weight:700;margin-bottom:4px;">💡 토큰/효율 권고</div>
+      <ul style="font-size:10px;color:var(--ts);margin:0 0 12px 16px;padding:0;">${recs}</ul>
+      <div style="display:flex;justify-content:flex-end;">
+        <button class="ibtn pur" onclick="document.getElementById('agentEvolveModal').remove()" style="font-size:11px;">확인</button>
+      </div>
+    </div>`;
+  const m=document.createElement('div');
+  m.id='agentEvolveModal';
+  m.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:10000;background:var(--pan);border-radius:14px;box-shadow:0 8px 40px rgba(0,0,0,.25);width:440px;max-width:94vw;';
+  m.innerHTML=html;
+  document.body.appendChild(m);
+}
+
+// 요구 3: 페이지 로드 시 백테스트 상태를 항상 '정지'로 완전 초기화한다.
+//  - 이전 세션의 서버 state가 running:true로 남아 있어도 자동 재연결/재생하지 않는다.
+//  - isRunning=false 고정 + 버튼을 '▶ 시작'(정지 상태)으로 동기화한다.
+//  - 사용자가 ▶ 시작을 누르면 그때 실제 실행 + 폴링이 시작되고, 정지를 누르면 중단된다.
+window.addEventListener('load', function(){
+  try{
+    agentBT.epoch = (agentBT.epoch||0) + 1;   // 직전 세션의 in-flight 폴링 응답 무효화
+    agentBTStopPoll();                         // 혹시 살아있는 폴링 타이머 중단
+    agentBT.running = false;                    // 초기 상태 = 정지로 고정
+    agentBT.curKey = null;
+    agentBT.state = null;
+    agentBT._reported = false;
+    _syncBtToggleBtn();                         // 버튼 라벨/색을 정지(▶ 시작) 상태로 동기화
+  }catch(_e){}
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  💬 에이전트 상담 (CLAUDE.md 부서별 역할 챗)
+//  - 왼쪽 카드에서 부서 선택 → 그 부서가 자기반성 보고부터 시작
+//  - 대화 중 파라미터 수정 제안 → ✅ 적용(스cript yaml 수정 + git 커밋, paper 전용)
+//  - 🤝 전체 팀 회의: 전 부서 라운드테이블 + CEO 종합
+// ═══════════════════════════════════════════════════════════════
+
+// 수정 가능한 전략 파라미터 화이트리스트 (ai-team optimizer TUNABLE_KEYS와 동일)
+const CONS_TUNABLE = {
+  'screening.threshold':       { label:'스크리닝 통과 점수', hint:'높을수록 후보가 까다로워져 거래 수가 줄어요', range:'0~100' },
+  'signal.volume_surge_multiplier': { label:'거래량 급증 배수', hint:'직전 20분 평균 대비 몇 배여야 신호로 볼지 (기본 2.0)', range:'1.2~4.0' },
+  'time_stop.evaluation_minutes':   { label:'타임스톱 평가 시간(분)', hint:'진입 후 방향 안 나올 때 재평가까지 기다리는 시간', range:'10~60' },
+  'time_stop.flat_box_pct':         { label:'타임스톱 무방향 박스(%)', hint:'±이 범위 안이면 방향 미발생으로 봐요 (0.005=±0.5%)', range:'0.001~0.02' },
+};
+
+// ── 각 에이전트 정의 — 관할(jurisdiction)을 완전히 분리 ──
+//  charter.talk     : 이 에이전트가 "말하는 것"
+//  charter.never    : "절대 말하지 않는 것"(다른 부서 관할)
+//  charter.reflect  : 자기반성에서 다룰 범위(자기 관할 실수만)
+//  scope            : 이 에이전트가 참조할 컨텍스트 데이터 키 (자기 관할만)
+//  topicPrefix      : 저널에서 자기 관할로 인정할 토픽 접두사
+//  tunables         : 이 에이전트가 직접 제안 가능한 파라미터 키(자기 관할만)
+const CONS_AGENTS = [
+  { id:'ceo', emoji:'🧠', color:'#3182f6', name:'CEO (총괄)', role:'팀 성과 총평 · 모드 전환 · 전략 방향',
+    identity:'너는 자동매매 시스템의 CEO다. 전 부서를 총괄하지만, 세부 실무는 각 담당에게 맡긴다.',
+    charter:{
+      talk:'오늘 팀 전체가 어땠는지 한 문장 총평, 잘한 부서/아쉬운 부서, 모드(paper/live) 유지·전환 판단, 앞으로의 큰 전략 방향.',
+      never:'개별 지표(RSI·MACD 등) 수치, 주문 체결·슬리피지 상세, 종목별 스크리닝 점수 계산 과정. 이런 건 절대 직접 말하지 않는다.',
+      reflect:'총괄로서의 판단 실수(모드 전환 타이밍, 부서 조율 부족, 전략 방향 오판)만 돌아본다.' },
+    scope:['mode','perfOverall','teamActivity'], topicPrefix:[], tunables:[] },
+
+  { id:'screening', emoji:'📡', color:'#0ea5e9', name:'스크리닝 담당', role:'장 전 종목 선정 · 스크리닝 점수',
+    identity:'너는 정보부 스크리닝 담당이다. 장 시작 전에 그날 매매할 후보 종목을 골라내는 일만 한다.',
+    charter:{
+      talk:'오늘 몇 종목을 검토했는지, 왜 이 종목들을 후보로 골랐는지(거래대금·갭·정배열·테마·ATR 점수), 어떤 종목을 왜 탈락시켰는지.',
+      never:'매매 타점·진입 신호, 손절/익절 기준, 주문 체결 과정. 후보를 넘긴 뒤의 일은 내 관할이 아니다.',
+      reflect:'종목 선정 실수(놓친 강세 종목, 잘못 올린 후보, 점수 가중치 문제)만 돌아본다.' },
+    scope:['screening','threshold'], topicPrefix:['screening','market'], tunables:['screening.threshold'] },
+
+  { id:'signal', emoji:'📊', color:'#7c3aed', name:'신호분석 담당', role:'RSI·MACD·MA·거래량·캔들 5지표',
+    identity:'너는 분석부 신호분석 담당이다. 스크리닝이 넘긴 종목의 5지표만 보고 진입 강도를 판정한다.',
+    charter:{
+      talk:'오늘 신호가 몇 번 발생했는지, STRONG_ENTRY/CONDITIONAL_ENTRY/NO_ENTRY를 왜 그렇게 판정했는지(5지표 중 몇 개 충족), 놓친 신호.',
+      never:'어떤 종목을 후보로 뽑을지(스크리닝 관할), 주문을 어떻게 낼지(주문실행 관할), 리스크 한도·사이징(리스크 관할).',
+      reflect:'지표 판정 실수(거짓 신호, 늦은 포착, 임계값 문제)만 돌아본다.' },
+    scope:['signalParam'], topicPrefix:['signal'], tunables:['signal.volume_surge_multiplier'] },
+
+  { id:'risk', emoji:'🛡', color:'#f03e3e', name:'리스크 담당', role:'하드리밋 · 손절/익절 · 쿨다운',
+    identity:'너는 리스크부 담당이다. 하드리밋(HL-01~06)을 감시하고 손절·익절·연속손절 쿨다운을 집행한다.',
+    charter:{
+      talk:'오늘 하드리밋이 발동했는지(동시보유 3종목·연속손절 쿨다운·시간대 금지·슬리피지 5틱·담보비율), 위험했던 순간, 손절 집행 내역과 익절 기준. 하드리밋은 절대 변경 불가임을 분명히 한다.',
+      never:'어떤 종목을 고를지(스크리닝 관할), 지표 분석 수치(신호분석 관할), 주문을 실제로 어떻게 넣었는지의 체결 과정(주문실행 관할).',
+      reflect:'리스크 관리 실수(늦은 손절, 과도한 사이징, 쿨다운 누락)만 돌아본다.' },
+    scope:['riskParam','hardLimits'], topicPrefix:['risk'], tunables:['time_stop.evaluation_minutes','time_stop.flat_box_pct'] },
+
+  { id:'order', emoji:'⚡', color:'#ff9900', name:'주문실행 담당', role:'KIS 주문 · 체결 · 슬리피지',
+    identity:'너는 실행부 주문실행 담당이다. 리스크부 승인(APPROVE)을 받은 주문만 KIS로 보내고 체결을 관리한다.',
+    charter:{
+      talk:'오늘 주문을 몇 건 냈는지, 체결이 얼마나 잘 됐는지(체결률), 슬리피지가 얼마였는지, 현금/신용 분기, 미체결·실패 내역.',
+      never:'어떤 종목을 고를지(스크리닝 관할), 지표 분석(신호분석 관할), 리스크 한도·승인 여부 판단(리스크 관할). 나는 승인된 주문을 "실행"만 한다.',
+      reflect:'주문 실행 실수(슬리피지 과다, 체결 실패, 분할 오류)만 돌아본다.' },
+    scope:[], topicPrefix:['order'], tunables:[] },
+
+  { id:'learning', emoji:'📚', color:'#05c072', name:'학습부', role:'패턴 분석 · 복기 · 백테스트',
+    identity:'너는 학습부다. 끝난 거래를 복기하고 패턴을 분석하며 백테스트 결과를 해석한다(실시간 매매에는 관여하지 않는다).',
+    charter:{
+      talk:'오늘(또는 최근 백테스트에서) 발견한 패턴, 잘 된 조건과 못 된 조건, 다음에 적용하면 좋을 교훈.',
+      never:'실시간 주문 실행(주문실행 관할), 리스크 한도(리스크 관할), 종목 선정(스크리닝 관할). 나는 "지난 일을 복기"할 뿐 실시간에 끼어들지 않는다.',
+      reflect:'복기·패턴 분석의 실수(표본 부족, 잘못된 인과 추론, 놓친 교훈)만 돌아본다.' },
+    scope:['patterns','perfOverall'], topicPrefix:['learning'], tunables:[] },
+
+  { id:'meta', emoji:'🔬', color:'#e8590c', name:'메타 옵티마이저', role:'에이전트 성과 점수 · 토큰 · 파라미터',
+    identity:'너는 메타 옵티마이저다. 각 에이전트의 성과와 토큰 사용을 관찰하고 파라미터 최적화를 제안한다(직접 매매는 안 한다).',
+    charter:{
+      talk:'어떤 에이전트가 잘했고 어떤 에이전트가 부진했는지, 토큰 낭비·중복 호출 분석, 근거 기반 파라미터 최적화 제안(paper에서만 적용, 승인 후 반영).',
+      never:'특정 종목을 사라/팔아 같은 직접 매매 지시, 실시간 체결 개입. 나는 "시스템을 관찰·개선"할 뿐이다.',
+      reflect:'관찰·제안의 실수(잘못된 성과 귀속, 근거 약한 제안)만 돌아본다.' },
+    scope:['mode','perfOverall','teamActivity','allParams'], topicPrefix:['meta','*'], tunables:['screening.threshold','signal.volume_surge_multiplier','time_stop.evaluation_minutes','time_stop.flat_box_pct'] },
+];
+
+// 부서 id → 한글 담당명 (관할 밖 질문을 떠넘길 때 사용)
+const CONS_OWNER = { ceo:'CEO(총괄)', screening:'스크리닝 담당', signal:'신호분석 담당', risk:'리스크 담당', order:'주문실행 담당', learning:'학습부', meta:'메타 옵티마이저' };
+
+let consState = {
+  agent: null,        // 현재 선택된 에이전트 객체 (null이면 팀회의 모드)
+  history: {},        // {agentId: [{role,content}...]} Claude messages
+  busy: false,
+  ctx: null,          // 최근 컨텍스트 캐시 (params/mode/perf/journal)
+  ctxAt: 0,
+  initDone: false,
+  meeting: false,     // 전체 팀 회의 모드 여부 (true면 입력이 팀 전체로 전달됨)
+  meetingLog: [],     // 회의 라운드 기록 [{q, a}]
+};
+
+// ── 진입 시 1회 초기화: 카드 렌더 + 모드/파라미터 로드 ──
+function consInit(){
+  consRenderCards();
+  consLoadContext(true).then(()=>consUpdateModeBadge());
+  consState.initDone = true;
+}
+
+// ── 📚 노션 학습 현황 (학습부 노션 동기화 → 전 부서 반영) ──
+function _notionEsc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function _notionTime(s){ if(!s) return '-'; try{ return String(s).replace('T',' ').slice(0,16); }catch(e){ return s; } }
+async function notionStatusLoad(){
+  const el=document.getElementById('notionStatus');
+  if(!el) return;
+  try{
+    const r=await fetch('/api/agent/notion/status',{cache:'no-store'});
+    notionRenderStatus(await r.json());
+  }catch(e){ el.textContent='현황 조회 실패: '+e.message; }
+}
+function notionRenderStatus(d){
+  const el=document.getElementById('notionStatus');
+  if(!el) return;
+  if(!d||!d.ok){ el.textContent='현황을 불러오지 못했어요.'; return; }
+  if(!d.synced){ el.innerHTML='<div style="color:var(--tm,#888);">'+_notionEsc(d.message||'아직 동기화 안 됨')+'</div>'; return; }
+  const names={screening:'🔎 스크리닝',signal:'📈 신호분석',risk:'🛡 리스크',market_watch:'🌐 시장상황',ceo:'👔 CEO'};
+  let h='<div style="margin-bottom:4px;">📄 <b>'+_notionEsc(d.title||'')+'</b></div>';
+  h+='<div style="color:var(--tm,#888);">마지막 반영: '+_notionTime(d.last_update)+'<br>확인: '+_notionTime(d.last_checked)+' · 총 <b>'+(d.total_rules||0)+'</b>건</div>';
+  h+='<div style="margin-top:6px;border-top:1px solid var(--bd,#2a2d35);padding-top:6px;">';
+  for(const [k,a] of Object.entries(d.agents||{})){
+    const samples=(a.sample_rules||[]).slice(0,2).map(_notionEsc).join(' / ');
+    h+='<div style="margin:3px 0;" title="'+_notionEsc(samples)+'"><b>'+(names[k]||k)+'</b> · '+(a.count||0)+'건</div>';
+  }
+  h+='</div>';
+  if(d.updates&&d.updates.length){
+    h+='<details style="margin-top:6px;"><summary style="cursor:pointer;color:var(--b,#3b82f6);">변경 내역</summary>'+
+       '<div style="font-size:9px;color:var(--tm,#888);white-space:pre-wrap;margin-top:4px;">'+d.updates.slice(-8).map(_notionEsc).join('\n')+'</div></details>';
+  }
+  el.innerHTML=h;
+}
+async function notionSync(){
+  const btn=document.getElementById('notionSyncBtn'), el=document.getElementById('notionStatus');
+  if(btn){ btn.disabled=true; btn.textContent='⏳ 동기화 중…'; }
+  try{
+    const r=await fetch('/api/agent/notion/sync',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({force:true})});
+    const d=await r.json();
+    if(!d.ok){ if(el) el.innerHTML='<div style="color:#ef4444;">❌ '+_notionEsc(d.reason||d.error||'동기화 실패')+'</div>'; }
+    else { await notionStatusLoad(); }
+  }catch(e){ if(el) el.innerHTML='<div style="color:#ef4444;">❌ '+_notionEsc(e.message)+'</div>'; }
+  finally{ if(btn){ btn.disabled=false; btn.textContent='🔄 지금 업데이트'; } }
+}
+
+function consRenderCards(){
+  const wrap = document.getElementById('consAgentList');
+  if(!wrap) return;
+  wrap.innerHTML = CONS_AGENTS.map(a=>(
+    '<button class="cons-card" id="consCard-'+a.id+'" onclick="consSelect(\''+a.id+'\')">'+
+      '<div class="cons-card-ava" style="background:'+a.color+'1a;">'+a.emoji+'</div>'+
+      '<div class="cons-card-tx"><div class="cons-card-nm">'+a.name+'</div>'+
+      '<div class="cons-card-rl">'+a.role+'</div></div>'+
+    '</button>'
+  )).join('');
+}
+
+// ── 컨텍스트 수집: 모드 + 현재 파라미터 + 최근 백테스트 성과 + 저널 요약 ──
+async function consLoadContext(force){
+  if(!force && consState.ctx && (Date.now()-consState.ctxAt) < 60000) return consState.ctx;
+  const ctx = { mode:'paper', params:{}, perf:null, journal:null, screening:null };
+  // 모드 + 현재 파라미터 + 저널 요약 (동일 출처 UI 라우트, 인증 불필요)
+  try{
+    const r = await fetch('/api/agent/consult/context',{cache:'no-store'});
+    const d = await r.json();
+    if(d && d.ok){ ctx.mode = d.mode||'paper'; ctx.params = d.tunable||{}; ctx.journal = d.journal||null; }
+  }catch(e){}
+  // 백테스트 상태 (성과/스크리닝/매매)
+  try{
+    const s = await (await fetch('/api/backtest/state',{cache:'no-store'})).json();
+    if(s && s.ok){
+      ctx.perf = s.report || { cumPnlPct:s.cumPnlPct, trades:s.todayTrades?s.todayTrades.length:undefined };
+      ctx.screening = (s.screening||[]).slice(0,8).map(x=>({code:x.code,name:x.name,score:x.score}));
+      ctx.running = !!s.running;
+      ctx.position = s.position||null;
+    }
+  }catch(e){}
+  // 지난 팀 회의 기록(요구 2: 다음 상담 시작 시 참고)
+  try{
+    const mr = await (await fetch('/api/agent/consult/meeting/log?limit=3',{cache:'no-store'})).json();
+    if(mr && mr.ok) ctx.meetings = mr.meetings||[];
+  }catch(e){}
+  consState.ctx = ctx; consState.ctxAt = Date.now();
+  return ctx;
+}
+
+function consUpdateModeBadge(){
+  const el = document.getElementById('consModeBadge');
+  if(!el) return;
+  const m = (consState.ctx && consState.ctx.mode) || 'paper';
+  if(m==='live'){ el.innerHTML='🔒 실전(live) — 파라미터 잠금'; el.style.color='var(--r)'; }
+  else { el.innerHTML='🧪 모의(paper) — 파라미터 수정 가능'; el.style.color='var(--g)'; }
+}
+
+// ── 저널 토픽을 에이전트 관할 접두사로 필터 ──
+function consTopicSlice(ctx, prefixes){
+  if(!ctx.journal || !ctx.journal.byTopic) return null;
+  if(prefixes.indexOf('*')>=0){
+    const all = Object.keys(ctx.journal.byTopic).map(k=>k+':'+ctx.journal.byTopic[k]);
+    return all.length? { total:ctx.journal.total, text:all.join(', ') } : null;
+  }
+  const hit = Object.keys(ctx.journal.byTopic).filter(k=>prefixes.some(p=>k.indexOf(p)===0));
+  if(!hit.length) return null;
+  let n=0; const parts=hit.map(k=>{ n+=ctx.journal.byTopic[k]; return k+':'+ctx.journal.byTopic[k]; });
+  return { total:n, text:parts.join(', ') };
+}
+
+// ── 에이전트 관할 데이터만 추려서 프롬프트용 현황으로 ──
+//  scope 키에 따라 자기 영역 데이터만 포함한다(다른 부서 데이터는 절대 넣지 않음).
+function consScopedCtx(agent, ctx){
+  const L = [];
+  const has = k=>agent.scope.indexOf(k)>=0;
+  const r = ctx.perf||{};
+  L.push('현재 모드: '+(ctx.mode==='live'?'실전(live, 전략 파라미터 잠금)':'모의(paper, 파라미터 수정 가능)'));
+
+  if(has('mode') && agent.id==='ceo'){ /* mode는 위에서 이미 포함 */ }
+
+  // 전체 성과(총평/복기/메타만)
+  if(has('perfOverall')){
+    const bits = [];
+    if(r.totalReturnPct!=null) bits.push('누적수익률 '+(+r.totalReturnPct).toFixed(2)+'%');
+    else if(r.cumPnlPct!=null) bits.push('누적손익 '+(+r.cumPnlPct).toFixed(2)+'%');
+    if(r.winRate!=null) bits.push('승률 '+(+r.winRate).toFixed(0)+'%');
+    if(r.trades!=null) bits.push('매매 '+r.trades+'회');
+    if(r.profitFactor!=null) bits.push('손익비 '+(+r.profitFactor).toFixed(2));
+    if(r.mdd!=null) bits.push('MDD '+(+r.mdd).toFixed(2)+'%');
+    L.push(bits.length? '팀 전체 성과: '+bits.join(' · ') : '팀 전체 성과: (아직 집계 데이터 부족)');
+  }
+  // 패턴(학습부 전용)
+  if(has('patterns')){
+    if(r.bestPattern&&r.bestPattern.label) L.push('가장 잘 된 패턴: '+r.bestPattern.label+(r.bestPattern.winRate!=null?(' (승률 '+(+r.bestPattern.winRate).toFixed(0)+'%)'):''));
+    if(r.worstPattern&&r.worstPattern.label) L.push('가장 안 된 패턴: '+r.worstPattern.label+(r.worstPattern.winRate!=null?(' (승률 '+(+r.worstPattern.winRate).toFixed(0)+'%)'):''));
+    if(!r.bestPattern && !r.worstPattern) L.push('패턴 통계: (아직 충분한 거래 표본이 없어요)');
+  }
+  // 스크리닝 후보(스크리닝 전용)
+  if(has('screening')){
+    if(ctx.screening&&ctx.screening.length) L.push('오늘 후보 종목('+ctx.screening.length+'개): '+ctx.screening.map(x=>(x.name||x.code)+'('+(x.score!=null?Math.round(x.score):'?')+'점)').join(', '));
+    else L.push('오늘 후보 종목: (아직 스크리닝 결과 없음 — 백테스트/장전 미가동)');
+  }
+  // 파라미터 — 자기 관할 키만
+  const p = ctx.params||{};
+  if(has('threshold') && p['screening.threshold']!=null) L.push('현재 스크리닝 통과 점수(threshold): '+p['screening.threshold']);
+  if(has('signalParam') && p['signal.volume_surge_multiplier']!=null) L.push('현재 거래량 급증 배수: '+p['signal.volume_surge_multiplier']);
+  if(has('riskParam')){
+    if(p['time_stop.evaluation_minutes']!=null) L.push('현재 타임스톱 평가시간: '+p['time_stop.evaluation_minutes']+'분');
+    if(p['time_stop.flat_box_pct']!=null) L.push('현재 타임스톱 무방향 박스: ±'+(p['time_stop.flat_box_pct']*100).toFixed(2)+'%');
+  }
+  if(has('hardLimits')) L.push('하드리밋(변경불가): 동시보유 3종목 / 연속손절 3회→1시간 쿨다운 / 09:00~09:30·14:30이후 진입금지 / 슬리피지 5틱 / 신용 담보비율 버퍼.');
+  if(has('allParams')){
+    const pv = Object.keys(p).map(k=>k+'='+p[k]).join(', ');
+    if(pv) L.push('전체 수정가능 파라미터: '+pv);
+  }
+  // 저널(자기 관할 토픽만)
+  const js = consTopicSlice(ctx, agent.topicPrefix);
+  if(js) L.push('오늘 내 관할 저널 이벤트 '+js.total+'건 ('+js.text+')');
+  else if(agent.topicPrefix.length) L.push('오늘 내 관할 저널 이벤트: 아직 없음');
+  // 팀 활동(총괄/메타만, 토픽별 카운트 high-level)
+  if(has('teamActivity') && ctx.journal && ctx.journal.total){
+    L.push('오늘 팀 전체 활동량: 저널 '+ctx.journal.total+'건');
+  }
+  return L.join('\n');
+}
+
+// ── 토스 스타일 말투 규칙(공통, 관할 정보는 없음) ──
+function consStyleRules(){
+  return [
+    '말투: 토스(toss) 앱처럼 친근하고 쉬운 한국어로, 짧고 명확하게. 어려운 용어는 풀어 설명하고 이모지를 적절히 쓴다.',
+    '답변은 핵심부터, 보통 3~5문장. 장황한 나열 금지.',
+    '확실하지 않으면 솔직히 모른다고 한다. 특정 종목을 사라/팔아 같은 매매 지시는 하지 않는다.',
+  ].join('\n');
+}
+
+// ── 에이전트별 시스템 프롬프트(관할 완전 분리) ──
+function consAgentSystem(agent, ctx){
+  const c = agent.charter;
+  const tun = (agent.tunables||[]).map(k=>k+'('+(CONS_TUNABLE[k]?CONS_TUNABLE[k].label:k)+')');
+  const parts = [];
+  parts.push(agent.identity);
+  parts.push('【내 관할 — 이것만 말한다】\n'+c.talk);
+  parts.push('【절대 말하지 않는 것 — 다른 부서 관할】\n'+c.never);
+  parts.push('【관할 밖 질문을 받으면】\n"그건 제 관할이 아니에요, [담당]에게 물어보세요"처럼 해당 담당 부서를 명확히 알려주고 넘긴다. 추측으로 다른 부서 일을 대신 답하지 않는다. (부서: '+Object.keys(CONS_OWNER).map(k=>CONS_OWNER[k]).join(' / ')+')');
+  if(tun.length){
+    parts.push('【내가 제안 가능한 파라미터】\n'+tun.join(', ')+' — 이 키만. 변경이 정말 도움된다고 판단하면 답변 맨 끝에 정확히 이 형식으로 한 줄: [[PARAM:키=값|한줄이유]]. 실전(live) 모드면 "지금은 잠겨서 모의에서만 적용돼요"라고 덧붙인다. 내 관할 밖 파라미터는 제안하지 않는다(메타나 해당 담당에게 넘긴다).');
+  } else {
+    parts.push('【파라미터】\n내 관할에는 직접 바꿀 전략 파라미터가 없다. 파라미터 변경 얘기가 나오면 메타 옵티마이저(또는 해당 담당)에게 넘긴다. [[PARAM:...]] 형식을 쓰지 않는다.');
+  }
+  parts.push(consStyleRules());
+  // 부서 협력(요구 3): 다른 부서 의견이 꼭 필요하면 ASK 토큰으로 호출
+  parts.push('【부서 협력】\n다른 부서의 의견이 꼭 필요할 때만, 답변 맨 끝에 한 줄로 [[ASK:부서id|구체적인 질문]] 을 쓸 수 있다(부서id: '+Object.keys(CONS_OWNER).join(' / ')+'). 그러면 그 담당이 와서 자기 관점으로 의견을 준다. 정말 필요할 때만, 최대 1개. 평소엔 쓰지 않는다.');
+  // 지난 팀 회의 참고(요구 2)
+  if(ctx.meetings && ctx.meetings.length){
+    const lines=ctx.meetings.slice(-2).map(m=>{
+      const imp=(m.improvements||[]).map(x=>x.key+'='+x.val).join(', ');
+      const when=String(m.ts||'').slice(0,16).replace('T',' ');
+      const concl=String(m.ceo||'').replace(/\s+/g,' ').slice(0,180);
+      return '· ['+when+'] 안건: '+(m.q||'정기회의')+' → 결론: '+concl+(imp?(' / 합의 개선안: '+imp):'');
+    });
+    parts.push('【지난 팀 회의 결론 — 이어서 일관되게 답하라】\n'+lines.join('\n'));
+  }
+  parts.push('【내 관할 실시간 현황 — 이 데이터만 참조한다】\n'+consScopedCtx(agent, ctx));
+  return parts.join('\n\n');
+}
+
+// ── 카드 선택 → 상담 시작 (자기반성 자동 보고) ──
+async function consSelect(id){
+  const a = CONS_AGENTS.find(x=>x.id===id);
+  if(!a) return;
+  consState.agent = a;
+  consState.meeting = false;   // 개별 상담 선택 시 팀 회의 모드 해제
+  const _inp = document.getElementById('consInput'); if(_inp) _inp.placeholder='메시지를 입력하세요… (예: 손절이 너무 잦은데 왜 그래?)';
+  document.querySelectorAll('.cons-card').forEach(c=>c.classList.remove('on'));
+  const card = document.getElementById('consCard-'+id); if(card) card.classList.add('on');
+  // 헤드 갱신
+  const ava=document.getElementById('consHeadAva'), nm=document.getElementById('consHeadName'), rl=document.getElementById('consHeadRole');
+  if(ava){ ava.textContent=a.emoji; ava.style.background=a.color+'1a'; }
+  if(nm) nm.textContent=a.name;
+  if(rl) rl.textContent=a.role;
+  document.getElementById('consSend').disabled = false;
+  consClearBody();
+  // 이미 대화 이력이 있으면 복원, 없으면 자기반성 보고 시작
+  if(consState.history[id] && consState.history[id].length){
+    consState.history[id].forEach(m=>{
+      if(m.role==='user' && m._self) return; // 내부 자기반성 트리거는 화면에 안 보임
+      consRenderMsg(m.role==='user'?'me':'ai', m.content, a);
+    });
+    consScrollEnd();
+    return;
+  }
+  consState.history[id] = [];
+  consSysMsg(a.emoji+' '+a.name+'와 상담을 시작합니다. 먼저 자기 관할에 대한 자기반성 보고부터 들어볼게요.');
+  await consAsk(a, '너의 관할 영역에 한정해서 "자기반성 보고"를 해줘. '+a.charter.reflect+' 형식은 ①내 관할에서 잘하고 있는 점 ②내 관할에서 부족하거나 걱정되는 점 ③내 관할에서 개선하고 싶은 것 한 가지. 다른 부서 일(예: '+(a.id!=='screening'?'종목 선정':'지표 분석')+' 등)은 절대 언급하지 말고, 오직 네 관할만 돌아봐. 내 관할 파라미터로 바꾸면 좋을 게 있으면 제안해줘.', true);
+}
+
+// ── Claude에 질문 (단일 에이전트) — 스트리밍(요구 1) + 협력(요구 3) ──
+async function consAsk(agent, userText, isSelf){
+  if(consState.busy) return;
+  consState.busy = true;
+  const ctx = await consLoadContext(false);
+  consUpdateModeBadge();
+  const sys = consAgentSystem(agent, ctx);
+  const hist = consState.history[agent.id] || (consState.history[agent.id]=[]);
+  const um = { role:'user', content:userText }; if(isSelf) um._self=true;
+  hist.push(um);
+  const stream = consRenderStreaming(agent);
+  try{
+    const msgs = hist.filter(m=>!m._hidden).map(m=>({role:m.role,content:m.content}));
+    const text = await consComplete({ model:'claude-sonnet-4-5', max_tokens:1500, system:sys, messages:msgs.slice(-12) }, '상담:'+agent.id, cur=>stream.set(cur));
+    hist.push({ role:'assistant', content:text });
+    const parsed = stream.done(text);
+    consScrollEnd();
+    // 요구 3: 협력 — 모델이 [[ASK]]를 썼으면 그 부서를 호출, 아니면 사용자 문장에서 부서 요청 감지
+    if(!isSelf){
+      const asks = (parsed.asks||[]).filter(a=>a.dept!==agent.id);
+      if(asks.length){
+        for(const a of asks){ await consCollaborate(agent, a.dept, a.q); }
+      }else{
+        const reqDept = consDetectDeptRequest(userText, agent.id);
+        if(reqDept) await consCollaborate(agent, reqDept, userText);
+      }
+    }
+  }catch(e){
+    if(stream) stream.fail('⚠ 상담 중 오류가 났어요: '+e.message+'\n(설정창에서 Claude API 키를 확인해 주세요)');
+  }finally{
+    consState.busy = false;
+  }
+}
+// ── 사용자 문장에서 "다른 부서 의견 들어봐" 류 요청 감지(요구 3) ──
+function consDetectDeptRequest(text, currentId){
+  if(!text) return null;
+  const low=text.toLowerCase();
+  if(!/(의견|물어|들어봐|불러|에게|한테|담당|생각|어떻게 보)/.test(text)) return null;
+  const kw={
+    risk:['리스크','위험','손절','익절','하드리밋','쿨다운','담보'],
+    signal:['신호','지표','rsi','macd','이동평균','거래량','캔들','진입강도'],
+    screening:['스크리닝','종목 선정','종목선정','후보','선별'],
+    order:['주문','체결','슬리피지','실행','분할매수'],
+    learning:['학습','복기','패턴','백테','교훈'],
+    meta:['메타','최적화','토큰','옵티마'],
+    ceo:['총괄','모드 전환','전략 방향','대표']
+  };
+  for(const id of Object.keys(kw)){
+    if(id===currentId) continue;
+    if(kw[id].some(k=>low.indexOf(k.toLowerCase())>=0)) return id;
+  }
+  return null;
+}
+// ── 부서 간 협력(요구 3): toAgent가 의견 → fromAgent가 짧게 응답(자연스럽게 이어짐) ──
+async function consCollaborate(fromAgent, toAgentId, question){
+  const to = CONS_AGENTS.find(x=>x.id===toAgentId);
+  if(!to || to.id===fromAgent.id) return;
+  const ctx = await consLoadContext(false);
+  consSysMsg('🤝 '+fromAgent.name+'가 '+to.name+'의 의견을 요청했어요.');
+  const fromHist = consState.history[fromAgent.id]||(consState.history[fromAgent.id]=[]);
+  const recent = fromHist.filter(m=>!m._self&&!m._hidden).slice(-4)
+    .map(m=>(m.role==='user'?'사용자':fromAgent.name)+': '+consStripTokens(m.content)).join('\n');
+  // 1) 동료 부서가 자기 관점으로 의견(동의/반박)
+  const toSys = consAgentSystem(to, ctx)+'\n\n【지금은 부서 간 협력 — 동료의 의견 요청】 다른 부서('+fromAgent.name+')와 사용자가 나눈 대화를 보고, 네 관할 관점에서 의견을 줘. 동의하면 동의 근거를, 이견이 있으면 정중히 반박 근거를 대라(2~4문장). 관할 밖이면 누가 담당인지만 한 줄. [[ASK]]·[[PARAM]]은 쓰지 마라.';
+  const toAsk='지금까지 대화:\n'+(recent||'(맥락 없음)')+'\n\n['+fromAgent.name+']가 너에게 물은 것: '+question+'\n\n네 관할 관점에서 의견을 줘.';
+  const s1=consRenderStreaming(to);
+  let toText='';
+  try{
+    toText=await consComplete({model:'claude-sonnet-4-5',max_tokens:800,system:toSys,messages:[{role:'user',content:toAsk}]},'협력:'+to.id,cur=>s1.set(cur));
+    s1.done(toText);
+  }catch(e){ if(s1) s1.fail('⚠ 협력 중 오류: '+e.message); return; }
+  // 동료 의견을 원 부서 맥락에 주입(대화가 끊기지 않게)
+  fromHist.push({ role:'user', content:'['+to.name+' 의견] '+toText });
+  // 2) 원 부서가 동료 의견에 짧게 응답(수용/보완/정중한 재반박)
+  const fromSys=consAgentSystem(fromAgent, ctx)+'\n\n【방금 '+to.name+'가 네 사안에 의견을 줬다】 그 의견을 받아 네 관할 관점에서 짧게 응답해라(수용/보완/정중한 재반박, 2~3문장). [[ASK]]는 다시 쓰지 마라.';
+  const s2=consRenderStreaming(fromAgent);
+  try{
+    const fmsgs=fromHist.filter(m=>!m._self&&!m._hidden).map(m=>({role:m.role,content:m.content})).slice(-10);
+    const ftext=await consComplete({model:'claude-sonnet-4-5',max_tokens:700,system:fromSys,messages:fmsgs},'협력응답:'+fromAgent.id,cur=>s2.set(cur));
+    fromHist.push({ role:'assistant', content:ftext });
+    s2.done(ftext);
+  }catch(e){ if(s2) s2.fail('⚠ 응답 중 오류: '+e.message); }
+}
+
+// ── 사용자 입력 전송 ──
+function consSend(){
+  const inp = document.getElementById('consInput');
+  const txt = (inp.value||'').trim();
+  if(!txt || consState.busy) return;
+  // 전체 팀 회의 모드: 입력을 팀 전체에게 보내고 CEO가 종합 (요구 1)
+  if(consState.meeting && !consState.agent){
+    inp.value=''; consAutoGrow(inp);
+    consRenderMsg('me', txt, null);
+    consScrollEnd();
+    consRunMeeting(txt);
+    return;
+  }
+  if(!consState.agent) return;
+  inp.value=''; consAutoGrow(inp);
+  consRenderMsg('me', txt, consState.agent);
+  consScrollEnd();
+  consAsk(consState.agent, txt, false);
+}
+function consInputKey(e){
+  if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); consSend(); }
+}
+function consAutoGrow(el){ el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,120)+'px'; }
+
+// ── 🤝 전체 팀 회의 ──
+async function consTeamMeeting(){
+  if(consState.busy) return;
+  consState.agent = null;
+  consState.meeting = true;          // 회의 모드 진입 — 이후 입력은 팀 전체로 전달
+  consState.meetingLog = [];
+  document.querySelectorAll('.cons-card').forEach(c=>c.classList.remove('on'));
+  const ava=document.getElementById('consHeadAva'), nm=document.getElementById('consHeadName'), rl=document.getElementById('consHeadRole');
+  if(ava){ ava.textContent='🤝'; ava.style.background='var(--card)'; }
+  if(nm) nm.textContent='전체 팀 회의';
+  if(rl) rl.textContent='전 부서 라운드테이블 + CEO 종합';
+  // 요구 1: 회의 중에도 사용자 입력창 + 전송 버튼이 작동하도록 활성화한다.
+  const sendBtn=document.getElementById('consSend'); if(sendBtn) sendBtn.disabled=false;
+  const inp=document.getElementById('consInput'); if(inp) inp.placeholder='팀 전체에게 질문해보세요 — 각 부서가 답하고 CEO가 종합해요 (Enter 전송)';
+  consClearBody();
+  consSysMsg('🤝 전체 팀 회의를 시작합니다. 각 부서가 자기 관할만 발언한 뒤 CEO가 종합해요. 아래 입력창으로 팀 전체에게 질문하면 각 부서가 답하고 CEO가 종합해 드려요.');
+  await consRunMeeting(null);
+}
+
+// ── 회의 1라운드 실행 (요구 2·3: 토론·반박 + 결과 저장/적용) ──
+//  흐름: ①각 부서 발언 → ②CEO 중간 제안 → ③각 부서 동의/반박 토론 → ④CEO 최종 종합(+개선안)
+//        → ⑤기록 저장 + 깃 커밋. 개선안은 ✅ 적용 카드로 strategy_params.yaml 반영.
+async function consRunMeeting(userText){
+  if(consState.busy) return;
+  consState.busy = true;
+  const sendBtn=document.getElementById('consSend'); if(sendBtn) sendBtn.disabled=true;
+  const ctx = await consLoadContext(userText?false:true);
+  consUpdateModeBadge();
+  const record = { q:userText||'(정기 회의)', mode:(ctx.mode||'paper'), statements:[], interim:'', debate:[], ceo:'', improvements:[] };
+  try{
+    const depts = CONS_AGENTS.filter(a=>a.id!=='ceo');
+    const ceo = CONS_AGENTS.find(a=>a.id==='ceo');
+
+    // ① 각 부서 발언/답변 (병렬, 전체 수신 후 표시)
+    const deptAsk = (a)=>{
+      const base = consAgentSystem(a, ctx);
+      let sys, ask;
+      if(userText){
+        sys = base+'\n\n【전체 팀 회의 — 사용자 질문 답변 차례】 사용자 질문에 네 관할에서만 2~4문장으로 답해라. 관할 밖이면 누구 담당인지만. [[PARAM]]·[[ASK]]는 쓰지 마라.';
+        ask = '사용자 질문: '+userText+'\n\n네 관할에서 답해줘.';
+      }else{
+        sys = base+'\n\n【전체 팀 회의 — 현황 발언 차례】 네 관할에서 오늘 어땠는지 2~4문장. 다른 부서 일은 언급 마라. [[PARAM]]·[[ASK]]는 쓰지 마라.';
+        ask = '회의 발언을 해줘. 네 관할에서 잘한 점/걱정되는 점만 짧게.';
+      }
+      return callClaude({ model:'claude-haiku-4-5', max_tokens:500, system:sys, messages:[{role:'user',content:ask}] }, '회의:'+a.id)
+        .then(d=>({ agent:a, text:consStripTokens((d.content&&d.content[0]&&d.content[0].text)||(d.error?('⚠ '+(d.error.message||'')):'(발언 없음)')) }))
+        .catch(e=>({ agent:a, text:'⚠ '+e.message }));
+    };
+    let typing = consShowTyping({emoji:'🤝',color:'#7c3aed'});
+    const statements = await Promise.all(depts.map(deptAsk));
+    consRemove(typing);
+    statements.forEach(s=>{ consRenderMsg('ai', s.text, s.agent); record.statements.push({agent:s.agent.id,name:s.agent.name,text:s.text}); });
+    consScrollEnd();
+    const brief = statements.map(s=>s.agent.emoji+' '+s.agent.name+': '+s.text).join('\n');
+
+    // ② CEO 중간 제안 — 부서들이 반박/동의할 구체 방향을 던진다
+    consSysMsg('🧠 CEO가 중간 방향을 제안합니다. 각 부서가 동의하거나 반박해요.');
+    const interimSys = consAgentSystem(ceo, ctx)+'\n\n【전체 팀 회의 — CEO 중간 제안 차례】 각 부서 발언을 듣고, 오늘 팀이 바꾸면 좋을 구체적 방향을 1~2가지 제안해라(예: "스크리닝 기준을 더 높이자", "타임스톱을 더 빨리"). 어느 부서가 관련되는지 짚어라(3~4문장). 아직 최종 결론은 아니다. [[PARAM]]은 쓰지 마라.';
+    const interimUser = (userText?('사용자 질문: '+userText+'\n\n'):'')+'각 부서 발언:\n'+brief+'\n\n중간 방향을 제안해줘.';
+    const iStream = consRenderStreaming(ceo);
+    const interim = await consComplete({ model:'claude-sonnet-4-5', max_tokens:700, system:interimSys, messages:[{role:'user',content:interimUser}] }, '회의:ceo제안', cur=>iStream.set('【CEO 제안】\n'+cur));
+    iStream.done('【CEO 제안】\n'+interim); record.interim=interim;
+
+    // ③ 토론 라운드 — 각 부서가 CEO 제안에 동의/반박
+    const debateAsk = (a)=>{
+      const sys = consAgentSystem(a, ctx)+'\n\n【전체 팀 회의 — 토론 차례】 CEO가 다음을 제안했다:\n"'+interim+'"\n네 관할에 영향이 있으면 동의 또는 정중한 반박을 근거와 함께 2~3문장. 관할과 무관하면 정확히 "관할 무관"이라고만 답해라. [[PARAM]]·[[ASK]]는 쓰지 마라.';
+      return callClaude({ model:'claude-haiku-4-5', max_tokens:500, system:sys, messages:[{role:'user',content:'CEO 제안에 대한 네 관할 입장을 말해줘.'}] }, '회의토론:'+a.id)
+        .then(d=>({ agent:a, text:consStripTokens((d.content&&d.content[0]&&d.content[0].text)||'(발언 없음)') }))
+        .catch(e=>({ agent:a, text:'⚠ '+e.message }));
+    };
+    typing = consShowTyping({emoji:'💬',color:'#7c3aed'});
+    const debate = await Promise.all(depts.map(debateAsk));
+    consRemove(typing);
+    debate.forEach(s=>{
+      if(/^관할\s*무관/.test(s.text.trim())) return;   // 무관 부서는 잡음 줄이려 생략
+      consRenderMsg('ai', '💬 '+s.text, s.agent); record.debate.push({agent:s.agent.id,name:s.agent.name,text:s.text});
+    });
+    consScrollEnd();
+    const debateBrief = record.debate.map(s=>s.name+': '+s.text).join('\n') || '(반박/이견 없음 — 대체로 동의)';
+
+    // ④ CEO 최종 종합 + 합의 개선안([[PARAM]]) 추출
+    const allKeys = Object.keys(CONS_TUNABLE);
+    const tunList = allKeys.map(k=>k+'('+CONS_TUNABLE[k].label+')').join(', ');
+    let ceoSys, ceoUser;
+    if(userText){
+      ceoSys = consAgentSystem(ceo, ctx)+'\n\n【전체 팀 회의 — CEO 최종 종합】 부서 발언과 토론을 종합해 사용자 질문에 팀 대표로 답해라. 핵심 결론 → 근거 → 다음 한 걸음(3~6문장). 토론에서 합의된 개선이 있으면 답변 맨 끝에 각각 한 줄로 [[PARAM:키=값|이유]] 형식(키는 이것만: '+tunList+'). 합의 안 된 건 적지 마라.';
+      ceoUser = '사용자 질문: '+userText+'\n\n부서 발언:\n'+brief+'\n\n토론:\n'+debateBrief+'\n\n최종 종합 답변과 (있으면) 개선안을 줘.';
+    }else{
+      ceoSys = consAgentSystem(ceo, ctx)+'\n\n【전체 팀 회의 — CEO 최종 종합】 토론을 듣고 ①오늘 팀 총평 2~3줄 ②가장 먼저 할 일 1가지 ③모드 유지/전환 의견. 합의된 개선이 있으면 맨 끝에 한 줄씩 [[PARAM:키=값|이유]](키는 이것만: '+tunList+'). 합의 안 된 건 적지 마라.';
+      ceoUser = '부서 발언:\n'+brief+'\n\n토론:\n'+debateBrief+'\n\n최종 종합해줘.';
+    }
+    const cStream = consRenderStreaming(ceo);
+    const ctext = await consComplete({ model:'claude-sonnet-4-5', max_tokens:1200, system:ceoSys, messages:[{role:'user',content:ceoUser}] }, '회의:ceo종합', cur=>cStream.set('【CEO 최종 종합】\n'+cur));
+    const parsed = cStream.done('【CEO 최종 종합】\n'+ctext, allKeys);
+    record.ceo = parsed.text.replace(/^【CEO 최종 종합】\s*/,'');
+    record.improvements = parsed.params.map(p=>({key:p.key, val:p.val, reason:p.reason}));
+    consState.meetingLog.push({ q:userText||'(정기 회의)', a:ctext });
+
+    // ⑤ 기록 저장 + 깃 커밋
+    record.ts = new Date().toISOString();
+    await consSaveMeeting(record);
+  }catch(e){
+    consRenderMsg('ai', '⚠ 회의 중 오류: '+e.message, {emoji:'🤝',color:'#7c3aed',name:'팀 회의'});
+  }finally{
+    consState.busy = false;
+    const sb=document.getElementById('consSend'); if(sb && consState.meeting) sb.disabled=false;
+  }
+}
+// ── 회의 결과 저장 + 깃 커밋(요구 2) ──
+async function consSaveMeeting(record){
+  try{
+    const r=await fetch('/api/agent/consult/meeting/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(record)});
+    const d=await r.json();
+    if(d && d.ok){
+      const c=d.committed?(' · 깃 커밋 '+(d.commit||'')):(d.reason?(' · '+d.reason):'');
+      let msg='🗂 회의 기록을 저장했어요 (총 '+(d.count||0)+'건)'+c+'. 다음 상담 때 참고할게요.';
+      if(record.improvements && record.improvements.length) msg+=' 합의 개선안 '+record.improvements.length+'건은 위 카드의 ✅ 적용으로 반영할 수 있어요.';
+      consSysMsg(msg);
+      consState.ctxAt=0;   // 컨텍스트 캐시 무효화 → 다음 호출 시 최신 회의 반영
+    }else{
+      consSysMsg('⚠ 회의 기록 저장 실패: '+((d&&d.reason)||'알 수 없음'));
+    }
+  }catch(e){ consSysMsg('⚠ 회의 기록 저장 통신 오류: '+e.message); }
+}
+
+// ── 렌더 헬퍼 ──
+function consClearBody(){ const b=document.getElementById('consChatBody'); if(b) b.innerHTML=''; }
+function consClearChat(){
+  if(consState.agent){ consState.history[consState.agent.id]=[]; }
+  consClearBody();
+  if(consState.agent){ consSelect(consState.agent.id); }
+}
+function consSysMsg(t){
+  const b=document.getElementById('consChatBody'); if(!b) return;
+  const d=document.createElement('div'); d.className='cons-row sys'; d.style.alignSelf='center'; d.style.maxWidth='94%';
+  d.innerHTML='<div class="cons-bub">'+consEsc(t)+'</div>';
+  b.appendChild(d); consScrollEnd();
+}
+function consRenderMsg(side, text, agent){
+  const b=document.getElementById('consChatBody'); if(!b) return;
+  const row=document.createElement('div'); row.className='cons-row '+side;
+  const emoji = side==='me' ? '🙋' : (agent&&agent.emoji||'💬');
+  const avaBg = side==='me' ? 'var(--b)' : ((agent&&agent.color? agent.color+'1a':'var(--card)'));
+  const avaCol = side==='me' ? '#fff' : 'inherit';
+  let inner = '<div class="cons-row-ava" style="background:'+avaBg+';color:'+avaCol+';">'+emoji+'</div>';
+  let bub = '';
+  if(side==='ai' && agent && agent.name){ bub += '<div class="cons-name-tag">'+consEsc(agent.name)+'</div>'; }
+  // 파라미터 제안 토큰 추출 — 제안 부서의 관할 키만 카드로 만든다(영역 침범 차단)
+  const allow = (agent && agent.tunables) ? agent.tunables : Object.keys(CONS_TUNABLE);
+  const parsed = consExtractParams(text, allow);
+  bub += '<div>'+consFmt(parsed.text)+'</div>';
+  parsed.params.forEach(p=>{ bub += consParamCard(p); });
+  inner += '<div class="cons-bub" style="flex:1;">'+bub+'</div>';
+  row.innerHTML = inner;
+  b.appendChild(row);
+}
+// [[PARAM:key=value|이유]] 토큰 파싱 — allow(허용 키 목록) 안의 키만 카드화
+function consExtractParams(text, allow){
+  const params=[];
+  const ok = allow || Object.keys(CONS_TUNABLE);
+  const re=/\[\[PARAM:\s*([a-zA-Z0-9_.]+)\s*=\s*([^|\]]+?)\s*(?:\|\s*([^\]]+?))?\s*\]\]/g;
+  let m;
+  while((m=re.exec(text))!==null){
+    const key=m[1].trim(); const val=m[2].trim(); const reason=(m[3]||'').trim();
+    if(CONS_TUNABLE[key] && ok.indexOf(key)>=0) params.push({key,val,reason});
+  }
+  const clean = text.replace(re,'').trim();
+  return { text:clean, params };
+}
+// [[ASK:부서id|질문]] 토큰 파싱(요구 3: 부서 간 협력 요청)
+function consExtractAsks(text){
+  const asks=[];
+  const re=/\[\[ASK:\s*([a-zA-Z_]+)\s*\|\s*([^\]]+?)\s*\]\]/g;
+  let m;
+  while((m=re.exec(text))!==null){
+    const dept=m[1].trim().toLowerCase(); const q=m[2].trim();
+    if(CONS_OWNER[dept]) asks.push({dept,q});
+  }
+  return { text:text.replace(re,'').trim(), asks };
+}
+// 스트리밍 중 토큰이 잠깐 보이지 않게 PARAM/ASK 토큰을 즉시 제거
+function consStripTokens(text){
+  return String(text==null?'':text)
+    .replace(/\[\[PARAM:[^\]]*\]\]/g,'')
+    .replace(/\[\[ASK:[^\]]*\]\]/g,'');
+}
+// ── 스트리밍 말풍선(요구 1): set()으로 점진 렌더, done()에서 토큰 정리 + 파라미터 카드 ──
+function consRenderStreaming(agent){
+  const b=document.getElementById('consChatBody'); if(!b) return null;
+  const row=document.createElement('div'); row.className='cons-row ai';
+  const emoji=(agent&&agent.emoji)||'💬';
+  const avaBg=(agent&&agent.color? agent.color+'1a':'var(--card)');
+  const nameTag=(agent&&agent.name)? '<div class="cons-name-tag">'+consEsc(agent.name)+'</div>':'';
+  row.innerHTML='<div class="cons-row-ava" style="background:'+avaBg+';">'+emoji+'</div>'+
+    '<div class="cons-bub" style="flex:1;">'+nameTag+'<div class="cons-stream-body"><span class="cons-cursor"></span></div></div>';
+  b.appendChild(row); consScrollEnd();
+  const sbody=row.querySelector('.cons-stream-body');
+  return {
+    row, agent,
+    set(text){ if(sbody){ sbody.innerHTML=consFmt(consStripTokens(text))+'<span class="cons-cursor"></span>'; } consScrollEnd(); },
+    // text=전체 텍스트, allowOverride=파라미터 허용 키(없으면 agent.tunables)
+    done(text, allowOverride){
+      const allow=allowOverride||(agent&&agent.tunables)||Object.keys(CONS_TUNABLE);
+      const asks=consExtractAsks(text);
+      const parsed=consExtractParams(asks.text, allow);
+      const bub=row.querySelector('.cons-bub');
+      if(bub){
+        let html=nameTag+'<div>'+consFmt(parsed.text)+'</div>';
+        parsed.params.forEach(p=>{ html+=consParamCard(p); });
+        bub.innerHTML=html;
+      }
+      consScrollEnd();
+      return { text:parsed.text, params:parsed.params, asks:asks.asks, raw:text };
+    },
+    fail(msg){ const bub=row.querySelector('.cons-bub'); if(bub) bub.innerHTML=nameTag+'<div>'+consFmt(msg)+'</div>'; }
+  };
+}
+let _consParamSeq=0;
+function consParamCard(p){
+  const meta=CONS_TUNABLE[p.key]||{label:p.key,hint:''};
+  const id='consPC'+(++_consParamSeq);
+  const cur=(consState.ctx&&consState.ctx.params&&consState.ctx.params[p.key]);
+  const locked=(consState.ctx&&consState.ctx.mode==='live');
+  const safe=consEsc.bind(null);
+  let html='<div class="cons-param" id="'+id+'">';
+  html+='<div class="cons-param-t">⚙ 파라미터 제안 · '+safe(meta.label)+'</div>';
+  if(p.reason) html+='<div class="cons-param-d">'+safe(p.reason)+'</div>';
+  else if(meta.hint) html+='<div class="cons-param-d">'+safe(meta.hint)+'</div>';
+  html+='<div class="cons-param-val">'+safe(p.key)+': '+(cur!=null?safe(String(cur))+' → ':'')+'<b>'+safe(p.val)+'</b></div>';
+  if(locked){
+    html+='<button class="cons-param-btn" disabled>🔒 실전 모드 — 모의에서만 적용</button>';
+  }else{
+    html+='<button class="cons-param-btn" onclick="consApplyParam(\''+id+'\',\''+safe(p.key)+'\',\''+safe(p.val)+'\')">✅ 적용 (yaml 수정 + 깃 커밋)</button>';
+  }
+  html+='</div>';
+  return html;
+}
+// 파라미터 적용 → 서버가 yaml 수정 + git 커밋 (paper 전용)
+async function consApplyParam(cardId, key, val){
+  const card=document.getElementById(cardId); if(!card) return;
+  const btn=card.querySelector('.cons-param-btn');
+  if(btn){ btn.disabled=true; btn.textContent='⏳ 적용 중…'; }
+  try{
+    const r=await fetch('/api/agent/consult/apply-param',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key,value:val})});
+    const d=await r.json();
+    if(d && d.ok){
+      card.classList.add('done');
+      const commit=d.commit?(' · 커밋 '+d.commit):(d.committed===false&&d.gitReason?(' · '+d.gitReason):'');
+      if(btn){ btn.textContent='✅ 적용 완료 ('+(d.applied&&d.applied[0]?d.applied[0].from+'→'+d.applied[0].to:val)+')'+commit; }
+      // 캐시 갱신
+      if(consState.ctx&&consState.ctx.params) consState.ctx.params[key]=isNaN(+val)?val:+val;
+    }else{
+      card.classList.add('fail');
+      if(btn){ btn.disabled=false; btn.style.background='var(--r)'; btn.textContent='❌ '+((d&&d.reason)||'적용 실패'); }
+    }
+  }catch(e){
+    card.classList.add('fail');
+    if(btn){ btn.disabled=false; btn.style.background='var(--r)'; btn.textContent='❌ 통신 오류: '+e.message; }
+  }
+}
+function consShowTyping(agent){
+  const b=document.getElementById('consChatBody'); if(!b) return null;
+  const row=document.createElement('div'); row.className='cons-row ai';
+  row.innerHTML='<div class="cons-row-ava" style="background:'+((agent&&agent.color?agent.color+'1a':'var(--card)'))+';">'+((agent&&agent.emoji)||'💬')+'</div><div class="cons-bub"><div class="cons-typing"><span></span><span></span><span></span></div></div>';
+  b.appendChild(row); consScrollEnd(); return row;
+}
+function consRemove(el){ if(el&&el.parentNode) el.parentNode.removeChild(el); }
+function consScrollEnd(){ const b=document.getElementById('consChatBody'); if(b) b.scrollTop=b.scrollHeight; }
+function consEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+// 안전 마크다운: **굵게** + 줄바꿈만
+function consFmt(s){ return consEsc(s).replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>').replace(/\n/g,'<br>'); }
 </script>
 
 <!-- 동적 참조 요소 -->

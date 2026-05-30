@@ -2,6 +2,7 @@ const http = require('http');
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const PORT = process.env.PORT || 3000;
 
@@ -78,8 +79,33 @@ console.log('✅ 설정 로드:', {
   notion: runtimeConfig.notionToken ? '✅' : '❌',
 });
 
-// ── KIS 토큰 캐시
+// ── KIS 토큰 캐시 (메모리 + 디스크 영속)
+// KIS access_token은 24시간 유효하지만 발급은 "앱키당 1분 1회"로 제한된다(EGW00133).
+// 잦은 재발급이 레이트리밋을 유발 → soft TTL을 23h로 늘리고 디스크에 영속화한다.
+// (특히 부팅 직후 mock 토큰 발급 → 곧바로 real 토큰 발급 시 같은 앱키라 real이
+//  레이트리밋에 걸려 volume-rank/investor가 "토큰 없음"으로 실패하던 문제 해소)
 const kisTokenCache = {};
+const TOKEN_CACHE_PATH = path.join(__dirname, 'kis_token_cache.json');
+const TOKEN_SOFT_TTL_MS = 23 * 60 * 60 * 1000;
+const TOKEN_HARD_TTL_MS = 24 * 60 * 60 * 1000;
+
+(function loadTokenCache() {
+  try { Object.assign(kisTokenCache, JSON.parse(fs.readFileSync(TOKEN_CACHE_PATH, 'utf8'))); }
+  catch (e) {}
+})();
+
+function saveTokenCache() {
+  try { fs.writeFileSync(TOKEN_CACHE_PATH, JSON.stringify(kisTokenCache)); } catch (e) {}
+}
+
+function tokenErrorMessage(data) {
+  return data.error_description || data.msg1 || data.error || data.msg_cd || 'unknown';
+}
+
+function isTokenRateLimited(data) {
+  const m = `${tokenErrorMessage(data)} ${data.msg_cd || ''} ${data.error_code || ''}`;
+  return /EGW00133|1\s*분|초과|접근.*토큰.*발급/i.test(m);
+}
 
 function kisHost(mode) {
   return mode === 'real'
@@ -118,8 +144,9 @@ function kisRequest(opts, body) {
 
 async function getKisToken(appKey, appSecret, mode) {
   const cacheKey = appKey + mode;
+  const now = Date.now();
   const cached = kisTokenCache[cacheKey];
-  if (cached && cached.expires > Date.now()) return cached.token;
+  if (cached && cached.token && cached.expires > now) return cached.token;
 
   const body = JSON.stringify({ grant_type: 'client_credentials', appkey: appKey, appsecret: appSecret });
   const result = await kisRequest({
@@ -130,14 +157,34 @@ async function getKisToken(appKey, appSecret, mode) {
     headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
   }, body);
 
-  if (!result.data.access_token) {
-    console.error('[KIS 토큰 실패]', 'mode:', mode, 'host:', kisHost(mode), 'port:', kisPort(mode), 'status:', result.status, 'response:', JSON.stringify(result.data).slice(0, 300));
-  }
   const token = result.data.access_token;
   if (token) {
-    kisTokenCache[cacheKey] = { token, expires: Date.now() + 29 * 60 * 1000 };
+    kisTokenCache[cacheKey] = {
+      token,
+      expires: now + TOKEN_SOFT_TTL_MS,
+      hardExpires: now + TOKEN_HARD_TTL_MS,
+    };
+    saveTokenCache();
+    return token;
   }
-  return token || null;
+
+  // ── 발급 실패 — 사유 분류 + 캐시 폴백 ──
+  console.error('[KIS 토큰 실패]', 'mode:', mode, 'host:', kisHost(mode),
+    'port:', kisPort(mode), 'status:', result.status,
+    'response:', JSON.stringify(result.data).slice(0, 300));
+
+  // 24시간 하드 만료 전이면 (soft 만료됐어도) 기존 토큰 재사용 → 레이트리밋 회피
+  if (cached && cached.token && cached.hardExpires && cached.hardExpires > now) {
+    console.warn('[KIS 토큰] 재발급 실패 — 캐시 토큰 재사용 (hard TTL 내)');
+    return cached.token;
+  }
+
+  const msg = tokenErrorMessage(result.data);
+  if (isTokenRateLimited(result.data)) {
+    // ai-agent가 auth-error로 오해해 즉시 재발급(해머링)하지 않도록 별도 메시지 사용
+    throw new Error(`토큰 발급 제한(1분당 1회, 잠시 후 재시도): ${msg}`);
+  }
+  throw new Error(`토큰 발급 실패: ${msg}`);
 }
 
 function httpsGet(url) {
@@ -180,6 +227,308 @@ const CORP_CODE_MAP = {
   '알테오젠': '00562360', '한미반도체': '00109533', 'HMM': '00107517',
   '대한항공': '00104667', '크래프톤': '01520734',
 };
+
+// ── ai-agent 현황 요약 빌더 (대시보드 패널용) ───────────────────────────
+const AGENT_DIR = process.env.AI_AGENT_DIR || 'C:\\ai-team';
+
+// ── 백테스트 프로세스 제어 (traidair 시작/중지/리셋 버튼, §17.7) ──
+const { spawn } = require('child_process');
+let btProc = null;   // 실행 중인 run_backtest.py 자식 프로세스
+
+function btPython() {
+  const venv = path.join(AGENT_DIR, '.venv', 'Scripts', 'python.exe');
+  return process.env.AI_AGENT_PY || (fs.existsSync(venv) ? venv : 'python');
+}
+
+function btStopSentinel()  { return path.join(AGENT_DIR, 'state', 'BACKTEST_STOP'); }
+function btPauseSentinel() { return path.join(AGENT_DIR, 'state', 'BACKTEST_PAUSE'); }
+function btStateFile()     { return path.join(AGENT_DIR, 'state', 'backtest_live.json'); }
+
+// 백테스트 엔진이 "지금 살아서 진행 중"인지 — 추적 PID + 상태파일 신선도(2초)로 판정.
+// 일시정지 중에도 대시보드가 250ms마다 파일을 갱신하므로 fresh=true → 살아있음으로 본다.
+function btAlive() {
+  if (btProc && !btProc.killed) return true;
+  try { return (Date.now() - fs.statSync(btStateFile()).mtimeMs) < 2000; } catch (e) { return false; }
+}
+function btPaused() { try { return fs.existsSync(btPauseSentinel()); } catch (e) { return false; } }
+
+// 새 백테스트 시작 — 가상잔고는 **항상 정확히 100만원**(요구 3, 엔진이 하드코딩),
+// 날짜 범위는 주입하지 않아 로컬 수집 데이터 전체에서 **랜덤 추첨**(요구 2).
+function startBacktest(extraEnv = {}) {
+  if (btAlive()) return { ok: false, error: '이미 실행 중이에요' };
+  try { fs.unlinkSync(btStopSentinel());  } catch (e) {}
+  try { fs.unlinkSync(btPauseSentinel()); } catch (e) {}
+  try { fs.unlinkSync(btStateFile());     } catch (e) {}   // 깨끗한 시작(이전 잔재 제거)
+  const env = { ...process.env, ...extraEnv };
+  env.BACKTEST_AUTO_SPEED = env.BACKTEST_AUTO_SPEED || '1';   // 자동 배속 기본 ON
+  env.BACKTEST_STEP_MS = env.BACKTEST_STEP_MS || '45';        // 캔들 하나씩 보이는 속도
+  const script = path.join(AGENT_DIR, 'scripts', 'run_backtest.py');
+  try {
+    btProc = spawn(btPython(), [script], { cwd: AGENT_DIR, env, windowsHide: true, stdio: 'ignore' });
+    btProc.on('exit', () => { btProc = null; });
+    return { ok: true, state: 'started', pid: btProc.pid };
+  } catch (e) {
+    btProc = null;
+    return { ok: false, error: e.message };
+  }
+}
+
+// 일시정지(센티넬 기록) — 엔진은 살아있고 가상 시각 전진만 멈춘다('이어서 진행' 가능).
+function pauseBacktest()  { try { fs.writeFileSync(btPauseSentinel(), String(Date.now())); } catch (e) {} return { ok: true, state: 'paused' }; }
+function resumeBacktest() { try { fs.unlinkSync(btPauseSentinel()); } catch (e) {} return { ok: true, state: 'resumed' }; }
+
+// 토글(요구 1) — 버튼 하나로 시작 ↔ 일시정지 ↔ 이어서 진행.
+function toggleBacktest() {
+  if (!btAlive()) return startBacktest();          // 정지/완료 → 새로 시작
+  if (btPaused())  return resumeBacktest();         // 일시정지 → 이어서 진행
+  return pauseBacktest();                           // 진행 중 → 일시정지
+}
+
+// 완전 정지 + 초기화 — 프로세스 종료, 센티넬/상태파일 제거(다음 시작은 100만원부터).
+function stopBacktest() {
+  try { fs.writeFileSync(btStopSentinel(), String(Date.now())); } catch (e) {}
+  try { fs.unlinkSync(btPauseSentinel()); } catch (e) {}
+  if (btProc && !btProc.killed) {
+    const pid = btProc.pid;
+    try {
+      spawn('taskkill', ['/PID', String(pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' });
+    } catch (e) {
+      try { btProc.kill(); } catch (_) {}
+    }
+    btProc = null;
+    return { ok: true, pid };
+  }
+  btProc = null;
+  return { ok: true, msg: '정지 센티넬 기록 (추적 PID 없음 — 고아 프로세스도 곧 종료)' };
+}
+
+// ── 메타 진화(최적화 제안 실행) 프로세스 제어 (HTS 🧬 진화+ 버튼, §2.7) ──
+let evProc = null;   // 실행 중인 run_evolve.py 자식 프로세스
+
+function startEvolve({ days } = {}) {
+  if (evProc && !evProc.killed) return { ok: false, error: '진화가 이미 실행 중이에요' };
+  const env = { ...process.env };
+  if (days) env.EVOLVE_DAYS = String(days);
+  const script = path.join(AGENT_DIR, 'scripts', 'run_evolve.py');
+  try {
+    // windowsHide:true → 별도 콘솔(검은 창) 안 뜸.
+    evProc = spawn(btPython(), [script], { cwd: AGENT_DIR, env, windowsHide: true, stdio: 'ignore' });
+    evProc.on('exit', () => { evProc = null; });
+    return { ok: true, pid: evProc.pid };
+  } catch (e) {
+    evProc = null;
+    return { ok: false, error: e.message };
+  }
+}
+
+function kstDateStr() {
+  // 서버 TZ와 무관하게 KST(UTC+9) 기준 YYYYMMDD
+  return new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10).replace(/-/g, '');
+}
+
+// ════════════════════════════════════════════════════════════════════════
+//  ai-agent ↔ traidair 통합 레이어 (/api/agent/*)
+//  원칙: KIS API는 traidair만 호출. ai-agent는 X-Agent-Key 헤더로 HTTP만 호출.
+//  구현: 검증된 기존 /api/kis/* · /api/market-data 라우트를 내부 루프백으로 래핑하고,
+//        traidair가 보관한 KIS 키를 주입한다(에이전트는 키를 모름).
+// ════════════════════════════════════════════════════════════════════════
+const AGENT_KEY = process.env.AGENT_KEY || _localCfg.agentKey || 'traidair-agent-dev';
+function agentAuthOk(req) {
+  const k = req.headers['x-agent-key'];
+  return !AGENT_KEY || k === AGENT_KEY;
+}
+function agentDeny(res) {
+  res.writeHead(401, { 'Content-Type': 'application/json', ...CORS });
+  res.end(JSON.stringify({ ok: false, error: 'unauthorized — X-Agent-Key 헤더 필요' }));
+}
+// traidair가 보관한 KIS 키/계좌(에이전트에 노출하지 않음).
+function kisKeys() {
+  return { appKey: runtimeConfig.kisAppKey, appSecret: runtimeConfig.kisAppSecret, mode: runtimeConfig.kisMode || 'real' };
+}
+function kisAccount() { return runtimeConfig.kisAccount || ''; }
+
+// 내부 루프백 — 같은 서버의 기존 라우트를 HTTP로 호출(기존 로직 재사용, 무수정).
+function callSelf(routePath, { method = 'GET', body = null } = {}) {
+  return new Promise((resolve) => {
+    const data = body != null ? (typeof body === 'string' ? body : JSON.stringify(body)) : null;
+    const opts = {
+      hostname: '127.0.0.1', port: PORT, path: routePath, method,
+      headers: { 'Content-Type': 'application/json', ...(data ? { 'Content-Length': Buffer.byteLength(data) } : {}) },
+    };
+    const r = http.request(opts, resp => {
+      let d = ''; resp.on('data', c => d += c);
+      resp.on('end', () => { try { resolve(JSON.parse(d)); } catch (e) { resolve({ ok: false, error: 'loopback parse 실패' }); } });
+    });
+    r.on('error', e => resolve({ ok: false, error: e.message }));
+    r.setTimeout(9000, () => { r.destroy(); resolve({ ok: false, error: 'loopback timeout' }); });
+    if (data) r.write(data);
+    r.end();
+  });
+}
+
+// ── 보조지표 계산(신호분석 에이전트용) ──
+function _sma(a, p) { const o = Array(a.length).fill(null); let s = 0; for (let i = 0; i < a.length; i++) { s += a[i]; if (i >= p) s -= a[i - p]; if (i >= p - 1) o[i] = s / p; } return o; }
+function _ema(a, p) { const o = Array(a.length).fill(null); const k = 2 / (p + 1); let e = null; for (let i = 0; i < a.length; i++) { e = (e == null) ? a[i] : a[i] * k + e * (1 - k); if (i >= p - 1) o[i] = e; } return o; }
+function _rsiArr(a, p) { const o = Array(a.length).fill(null); let ag = 0, al = 0; for (let i = 1; i < a.length; i++) { const ch = a[i] - a[i - 1], g = ch > 0 ? ch : 0, l = ch < 0 ? -ch : 0; if (i <= p) { ag += g; al += l; if (i === p) { ag /= p; al /= p; o[i] = al === 0 ? 100 : 100 - 100 / (1 + ag / al); } } else { ag = (ag * (p - 1) + g) / p; al = (al * (p - 1) + l) / p; o[i] = al === 0 ? 100 : 100 - 100 / (1 + ag / al); } } return o; }
+function _lastNN(a) { for (let i = a.length - 1; i >= 0; i--) if (a[i] != null) return a[i]; return null; }
+function computeIndicators(candles) {
+  const c = candles.map(x => x.c), v = candles.map(x => x.v || 0);
+  if (!c.length) return { lastClose: null, ma5: null, ma20: null, ma60: null, rsi: null, macd: { macd: null, signal: null, hist: null }, volumeRatio: null };
+  const m5 = _sma(c, 5), m20 = _sma(c, 20), m60 = _sma(c, 60), rsi = _rsiArr(c, 14);
+  const e12 = _ema(c, 12), e26 = _ema(c, 26);
+  const macd = c.map((_, i) => (e12[i] != null && e26[i] != null) ? e12[i] - e26[i] : null);
+  const sig = _ema(macd.map(x => x == null ? 0 : x), 9).map((x, i) => macd[i] == null ? null : x);
+  const hist = macd.map((x, i) => (x != null && sig[i] != null) ? x - sig[i] : null);
+  const last = c.length - 1;
+  const recentVol = v.slice(Math.max(0, last - 20), last);
+  const avgVol = recentVol.length ? recentVol.reduce((a, b) => a + b, 0) / recentVol.length : 0;
+  return {
+    lastClose: c[last], ma5: _lastNN(m5), ma20: _lastNN(m20), ma60: _lastNN(m60),
+    rsi: _lastNN(rsi), macd: { macd: _lastNN(macd), signal: _lastNN(sig), hist: _lastNN(hist) },
+    volumeRatio: avgVol > 0 ? Number((v[last] / avgVol).toFixed(3)) : null,
+  };
+}
+
+// ── WebSocket(/ws/market) — 의존성 없이 RFC6455 텍스트 프레임 직접 구현 ──
+const wsClients = new Set();
+let wsTimer = null;
+function wsFrame(str) {
+  const payload = Buffer.from(str, 'utf8'), len = payload.length;
+  let header;
+  if (len < 126) { header = Buffer.from([0x81, len]); }
+  else if (len < 65536) { header = Buffer.alloc(4); header[0] = 0x81; header[1] = 126; header.writeUInt16BE(len, 2); }
+  else { header = Buffer.alloc(10); header[0] = 0x81; header[1] = 127; header.writeUInt32BE(0, 2); header.writeUInt32BE(len, 6); }
+  return Buffer.concat([header, payload]);
+}
+async function wsMarketSnapshot() {
+  try { return await callSelf('/api/market-data?mode=realtime', { method: 'GET' }); }
+  catch (e) { return { ok: false, error: e.message }; }
+}
+function wsBroadcastStart() {
+  if (wsTimer) return;
+  wsTimer = setInterval(async () => {
+    if (!wsClients.size) return;
+    const data = await wsMarketSnapshot();
+    const frame = wsFrame(JSON.stringify({ type: 'market', ts: new Date().toISOString(), data }));
+    for (const s of wsClients) { try { s.write(frame); } catch (e) { wsClients.delete(s); } }
+  }, 3000);
+  if (wsTimer.unref) wsTimer.unref();
+}
+
+function readAgentMode() {
+  try {
+    const t = fs.readFileSync(path.join(AGENT_DIR, 'config', 'mode.yaml'), 'utf8');
+    const m = t.match(/current_mode:\s*([A-Za-z]+)/);
+    return m ? m[1] : 'unknown';
+  } catch (e) { return 'unknown'; }
+}
+
+function summarizeRecord(topic, p) {
+  try {
+    switch (topic) {
+      case 'screening.candidates': return `${p.code || ''} ${p.name || ''} (${(p.score != null ? Number(p.score).toFixed(0) : '?')}점)`;
+      case 'signal.entry': return `${p.symbol} ${p.signal} ${p.score_count || ''}/5`;
+      case 'signal.exit': return `${p.symbol} ${p.kind} ${p.pnl_pct != null ? (p.pnl_pct * 100).toFixed(2) + '%' : ''}`;
+      case 'risk.decision.approved': return `APPROVE ${p.symbol} qty=${p.qty} @${p.price}`;
+      case 'risk.decision.rejected': { const v = (p.violations && p.violations[0]) || {}; return `REJECT ${p.symbol} ${v.rule_id || ''}`; }
+      case 'order.event': return `${(p.side || '').toUpperCase()} ${p.symbol} qty=${p.qty} @${p.price}`;
+      case 'order.failed': return `FAIL ${p.symbol} ${(p.error || '').slice(0, 40)}`;
+      case 'market.state': return `${p.grade} (${p.reason || ''})`;
+      case 'meta.observation': { const pf = p.performance || {}; return `trades=${pf.trades || 0} win=${pf.win_rate != null ? (pf.win_rate * 100).toFixed(0) + '%' : '?'}`; }
+      case 'learning.proposal': return `${p.kind || 'proposal'} ${p.proposal_id || ''} ${(p.rationale || '').slice(0, 50)}`;
+      default: return '';
+    }
+  } catch (e) { return ''; }
+}
+
+function buildAgentStatus() {
+  const today = kstDateStr();
+  const status = {
+    ok: true,
+    agentDir: AGENT_DIR,
+    date: today,
+    mode: readAgentMode(),
+    killed: fs.existsSync(path.join(AGENT_DIR, 'state', 'KILL_SWITCH')),
+    online: false,            // 오늘 journal 기록이 있으면 true로 간주
+    market: null,
+    counts: {},
+    trades: 0, wins: 0, losses: 0, winRate: 0, totalPnlPct: 0,
+    openPositions: [],
+    proposals: [],
+    observation: null,
+    recent: [],
+    updatedAt: new Date().toISOString(),
+  };
+
+  const jpath = path.join(AGENT_DIR, 'data', 'journal', `${today}.jsonl`);
+  let records = [];
+  try {
+    const raw = fs.readFileSync(jpath, 'utf8');
+    for (const line of raw.split('\n')) {
+      if (!line.trim()) continue;
+      try { records.push(JSON.parse(line)); } catch (e) {}
+    }
+  } catch (e) { /* 오늘 기록 없음 */ }
+
+  status.online = records.length > 0;
+
+  const counts = {};
+  const netQty = {};        // 심볼별 매수-매도 추정
+  const exits = [];
+  let lastMarket = null, lastObs = null;
+  const proposals = {};
+
+  for (const rec of records) {
+    const topic = rec.topic || '';
+    const p = (rec.payload && typeof rec.payload === 'object') ? rec.payload : {};
+    counts[topic] = (counts[topic] || 0) + 1;
+    if (topic === 'order.event') {
+      const q = Number(p.qty) || 0;
+      const sign = (p.side === 'sell') ? -1 : 1;
+      netQty[p.symbol] = (netQty[p.symbol] || 0) + sign * q;
+    } else if (topic === 'signal.exit') {
+      exits.push(Number(p.pnl_pct) || 0);
+    } else if (topic === 'market.state') {
+      lastMarket = { grade: p.grade, reason: p.reason, ts: rec.ts };
+    } else if (topic === 'meta.observation') {
+      lastObs = p;
+    } else if (topic === 'learning.proposal' && p.proposal_id) {
+      proposals[p.proposal_id] = { id: p.proposal_id, kind: p.kind, rationale: p.rationale, ts: rec.ts };
+    }
+  }
+
+  status.counts = counts;
+  status.market = lastMarket;
+  status.observation = lastObs ? {
+    performance: lastObs.performance || null,
+    tokenCalls: (lastObs.tokens && lastObs.tokens.total_calls) || 0,
+    wasteFindings: (lastObs.tokens && lastObs.tokens.waste_findings) ? lastObs.tokens.waste_findings.length : 0,
+  } : null;
+  status.proposals = Object.values(proposals);
+
+  status.trades = exits.length;
+  status.wins = exits.filter(x => x > 0).length;
+  status.losses = exits.filter(x => x < 0).length;
+  status.winRate = status.trades ? status.wins / status.trades : 0;
+  status.totalPnlPct = exits.reduce((a, b) => a + b, 0);
+
+  status.openPositions = Object.entries(netQty)
+    .filter(([, q]) => q > 0)
+    .map(([code, qty]) => ({ code, qty }));
+
+  status.recent = records.slice(-40).reverse().map(rec => ({
+    ts: rec.ts,
+    topic: rec.topic,
+    summary: summarizeRecord(rec.topic, (rec.payload && typeof rec.payload === 'object') ? rec.payload : {}),
+  }));
+
+  // 신용 원장 (있으면)
+  try {
+    status.creditLedger = JSON.parse(fs.readFileSync(path.join(AGENT_DIR, 'state', 'credit_ledger.json'), 'utf8'));
+  } catch (e) { status.creditLedger = null; }
+
+  return status;
+}
 
 const server = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') {
@@ -323,6 +672,58 @@ const server = http.createServer(async (req, res) => {
         });
       });
       pr.on('error', e => { res.writeHead(500, CORS); res.end(JSON.stringify({ error: e.message })); });
+      pr.write(bodyToSend); pr.end();
+    });
+    return;
+  }
+
+  // ── Claude 스트리밍 (/api/claude/stream) — SSE 그대로 중계 (상담 말풍선 잘림 해결, 요구 1) ──
+  // /api/claude 와 동일한 system 캐싱 처리 후 stream:true 로 Anthropic 응답을 클라이언트에
+  // text/event-stream 으로 흘려보낸다. 클라이언트는 델타를 누적해 말풍선을 점진 렌더한다.
+  if (url === '/api/claude/stream' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      const apiKey = runtimeConfig.claudeKey || '';
+      const sseErr = (msg) => {
+        res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive', ...CORS });
+        res.write('event: error\ndata: ' + JSON.stringify({ error: msg }) + '\n\n');
+        res.end();
+      };
+      if (!apiKey) { sseErr('Claude API 키 없음. 설정창에서 키를 입력하세요.'); return; }
+      let bodyToSend = body;
+      try {
+        const parsed = JSON.parse(body);
+        let extractedLecture = '';
+        if (Array.isArray(parsed.messages) && parsed.messages.length) {
+          const lastUser = parsed.messages.find(m => m.role === 'user');
+          if (lastUser && typeof lastUser.content === 'string') {
+            const m = lastUser.content.match(/【강의 원칙[^】]*】[\s\S]*?(?=\n【|\n\d|$)/);
+            if (m && m[0].length > 200) { extractedLecture = m[0]; lastUser.content = lastUser.content.replace(m[0], '').trim(); }
+          }
+        }
+        let baseSys = parsed.system;
+        if (typeof baseSys === 'string' && baseSys) baseSys = [{ type: 'text', text: baseSys }];
+        if (!baseSys) baseSys = [{ type: 'text', text: MENTOR_SYSTEM }];
+        const sysArr = baseSys.map(b => ({ ...b, cache_control: { type: 'ephemeral' } }));
+        if (extractedLecture) sysArr.push({ type: 'text', text: extractedLecture, cache_control: { type: 'ephemeral' } });
+        parsed.system = sysArr;
+        parsed.stream = true;                      // ★ 스트리밍 강제
+        bodyToSend = JSON.stringify(parsed);
+      } catch (e) { /* 파싱 실패 시 원본 그대로 + stream 보장 못함 → 그냥 전달 */ }
+      res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive', ...CORS });
+      const opts = {
+        hostname: 'api.anthropic.com', path: '/v1/messages', method: 'POST',
+        headers: {
+          'Content-Type': 'application/json', 'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01', 'Content-Length': Buffer.byteLength(bodyToSend),
+        },
+      };
+      const pr = https.request(opts, proxyRes => {
+        proxyRes.on('data', c => { try { res.write(c); } catch (e) {} });
+        proxyRes.on('end', () => { try { res.end(); } catch (e) {} });
+      });
+      pr.on('error', e => { try { res.write('event: error\ndata: ' + JSON.stringify({ error: e.message }) + '\n\n'); res.end(); } catch (_) {} });
       pr.write(bodyToSend); pr.end();
     });
     return;
@@ -1354,6 +1755,508 @@ const server = http.createServer(async (req, res) => {
     res.end(JSON.stringify({version:"1.0.3", buildTs:String(buildTs), htmlSize:_hs?_hs.size:0, ts:Date.now()}));
     return;
   }
+  // ── ai-agent 실시간 현황 (/api/agent/status) ──
+  // 같은 머신의 ai-agent(C:\ai-team) journal/state 파일을 읽어 요약 반환.
+  // 데이터 소스 경로는 AI_AGENT_DIR 환경변수로 변경 가능.
+  if (url === '/api/agent/status') {
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache, no-store, must-revalidate', ...CORS });
+    res.end(JSON.stringify(buildAgentStatus()));
+    return;
+  }
+
+  // ════════════════ ai-agent 통합 API (/api/agent/*) — X-Agent-Key 인증 ════════════════
+
+  // [스크리닝] 거래대금 상위 후보 — GET /api/agent/screen/candidates?market=kospi&limit=30
+  if (url === '/api/agent/screen/candidates' && req.method === 'GET') {
+    if (!agentAuthOk(req)) return agentDeny(res);
+    const market = ({ all: '0000', kospi: '0001', kosdaq: '1001' })[query.get('market') || 'kospi'] || '0001';
+    const limit = parseInt(query.get('limit') || '30');
+    const r = await callSelf('/api/kis/volume-rank', { method: 'POST', body: { ...kisKeys(), market, rankBy: 3, topN: limit } });
+    res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+    res.end(JSON.stringify({
+      ok: r.ok !== false, market, count: (r.items || []).length,
+      candidates: (r.items || []).map(it => ({
+        code: it.code, name: it.name, price: it.price, changePct: it.changePct,
+        volume: it.volume, turnover: it.turnover, volSurgePct: it.volSurgePct,
+      })),
+      error: r.error,
+    }));
+    return;
+  }
+
+  // [시장상황] 매크로 지수 스냅샷 — GET /api/agent/market/snapshot
+  if (url === '/api/agent/market/snapshot' && req.method === 'GET') {
+    if (!agentAuthOk(req)) return agentDeny(res);
+    const data = await callSelf('/api/market-data?mode=realtime', { method: 'GET' });
+    res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+    res.end(JSON.stringify({ ok: data && data.ok !== false, data, updatedAt: new Date().toISOString() }));
+    return;
+  }
+
+  // [신호분석] 종목 보조지표 — GET /api/agent/quote/:code/indicators?tf=1&date=YYYY-MM-DD
+  if (url.startsWith('/api/agent/quote/') && url.endsWith('/indicators') && req.method === 'GET') {
+    if (!agentAuthOk(req)) return agentDeny(res);
+    const code = url.split('/')[4];
+    const tf = query.get('tf') || '1';
+    const date = query.get('date') || undefined;
+    const r = await callSelf('/api/kis/chart', { method: 'POST', body: { ...kisKeys(), code, tf, date } });
+    const candles = (r.candles || []).filter(c => !c.isPrev);
+    res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+    res.end(JSON.stringify({
+      ok: r.ok !== false, code, tf, candleCount: candles.length,
+      indicators: computeIndicators(candles), candles, error: r.error,
+    }));
+    return;
+  }
+
+  // [리스크] 주문 전 게이트 데이터 — GET /api/agent/risk/check?code=&price=&qty=&orderType=
+  if (url === '/api/agent/risk/check' && req.method === 'GET') {
+    if (!agentAuthOk(req)) return agentDeny(res);
+    const code = query.get('code') || '';
+    const price = query.get('price') || 0;
+    const orderType = query.get('orderType') || 'limit';
+    const account = query.get('account') || kisAccount();
+    const [psbl, ob, bal] = await Promise.all([
+      callSelf('/api/kis/inquire-psbl-order', { method: 'POST', body: { ...kisKeys(), account, code, price, orderType } }),
+      code ? callSelf('/api/kis/orderbook', { method: 'POST', body: { ...kisKeys(), code } }) : Promise.resolve(null),
+      callSelf('/api/kis/balance', { method: 'POST', body: { ...kisKeys(), account } }),
+    ]);
+    res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+    res.end(JSON.stringify({
+      ok: true, code,
+      buyable: { orderCashable: psbl.orderCashable, maxBuyAmt: psbl.maxBuyAmt, maxBuyQty: psbl.maxBuyQty, reusableAmt: psbl.reusableAmt },
+      orderbook: (ob && ob.ok !== false) ? ob : null,
+      positionsCount: (bal.positions || []).filter(p => p.qty > 0).length,
+      positions: bal.positions || [],
+    }));
+    return;
+  }
+
+  // [리스크] 보유/잔고 — GET /api/agent/positions
+  if (url === '/api/agent/positions' && req.method === 'GET') {
+    if (!agentAuthOk(req)) return agentDeny(res);
+    const account = query.get('account') || kisAccount();
+    const r = await callSelf('/api/kis/balance', { method: 'POST', body: { ...kisKeys(), account } });
+    res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+    res.end(JSON.stringify(r));
+    return;
+  }
+
+  // [주문실행] 현금/신용 주문 — POST /api/agent/order
+  // body: { side:"buy|sell", code, qty, price, orderType?, credit?, crdtType?, loanDate?, account? }
+  if (url === '/api/agent/order' && req.method === 'POST') {
+    if (!agentAuthOk(req)) return agentDeny(res);
+    let body = ''; req.on('data', c => body += c);
+    req.on('end', async () => {
+      let o = {}; try { o = JSON.parse(body || '{}'); } catch (e) {}
+      const account = o.account || kisAccount();
+      const route = o.credit ? '/api/kis/order-credit' : '/api/kis/order';
+      const r = await callSelf(route, { method: 'POST', body: {
+        ...kisKeys(), account, side: o.side, code: o.code, qty: o.qty, price: o.price,
+        orderType: o.orderType || 'limit', crdtType: o.crdtType, loanDate: o.loanDate,
+      } });
+      res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+      res.end(JSON.stringify(r));
+    });
+    return;
+  }
+
+  // [학습부] 저널 기록 — POST /api/agent/journal  (body = 임의 이벤트, 서버가 ts 스탬프)
+  if (url === '/api/agent/journal' && req.method === 'POST') {
+    if (!agentAuthOk(req)) return agentDeny(res);
+    let body = ''; req.on('data', c => body += c);
+    req.on('end', () => {
+      let entry = {}; try { entry = JSON.parse(body || '{}'); } catch (e) {}
+      const today = kstDateStr();
+      const jdir = path.join(AGENT_DIR, 'data', 'journal');
+      const jpath = path.join(jdir, `${today}.jsonl`);
+      const rec = { ts: new Date().toISOString(), ...entry };
+      try {
+        fs.mkdirSync(jdir, { recursive: true });
+        fs.appendFileSync(jpath, JSON.stringify(rec) + '\n');
+        res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+        res.end(JSON.stringify({ ok: true, date: today }));
+      } catch (e) {
+        res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+        res.end(JSON.stringify({ ok: false, error: e.message }));
+      }
+    });
+    return;
+  }
+
+  // [학습부] 오늘 저널 조회 — GET /api/agent/journal/today?limit=200
+  if (url === '/api/agent/journal/today' && req.method === 'GET') {
+    if (!agentAuthOk(req)) return agentDeny(res);
+    const today = kstDateStr();
+    const jpath = path.join(AGENT_DIR, 'data', 'journal', `${today}.jsonl`);
+    const limit = parseInt(query.get('limit') || '200');
+    const entries = [];
+    try {
+      const raw = fs.readFileSync(jpath, 'utf8');
+      for (const line of raw.split('\n')) { if (!line.trim()) continue; try { entries.push(JSON.parse(line)); } catch (e) {} }
+    } catch (e) { /* 오늘 기록 없음 */ }
+    res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+    res.end(JSON.stringify({ ok: true, date: today, count: entries.length, entries: entries.slice(-limit) }));
+    return;
+  }
+
+  // [백테스트] 실행 — POST /api/agent/backtest/run  (body: { days?, start?, end? })
+  if (url === '/api/agent/backtest/run' && req.method === 'POST') {
+    if (!agentAuthOk(req)) return agentDeny(res);
+    let body = ''; req.on('data', c => body += c);
+    req.on('end', () => {
+      let o = {}; try { o = JSON.parse(body || '{}'); } catch (e) {}
+      const extra = {};
+      if (o.days) extra.BACKTEST_DAYS = String(o.days);
+      if (o.start) extra.BACKTEST_START = o.start;
+      if (o.end) extra.BACKTEST_END = o.end;
+      const r = startBacktest(extra);
+      res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+      res.end(JSON.stringify(r));
+    });
+    return;
+  }
+
+  // ── 백테스트 실시간 현황 (/api/backtest/state) ──
+  // ai-agent(run_backtest.py)가 state/backtest_live.json 을 250ms 간격으로 기록한다.
+  // 그 파일을 그대로 서빙하되, 파일 신선도(mtime)로 running 여부를 보정한다.
+  if (url === '/api/backtest/state') {
+    const bp = btStateFile();
+    fs.readFile(bp, 'utf8', (err, raw) => {
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache, no-store, must-revalidate', ...CORS });
+      if (err) { res.end(JSON.stringify({ ok: false, running: false, paused: false, error: '백테스트 미실행' })); return; }
+      let data;
+      try { data = JSON.parse(raw); } catch (e) { res.end(JSON.stringify({ ok: false, running: false, paused: false, error: 'state 파싱 실패' })); return; }
+      // 2초 이상 갱신이 없으면 엔진이 죽은 것으로 간주(일시정지 중에도 250ms마다 갱신됨).
+      try {
+        const ageMs = Date.now() - fs.statSync(bp).mtimeMs;
+        if (ageMs > 2000) { data.running = false; data.paused = false; }
+        data.staleMs = Math.round(ageMs);
+      } catch (e) {}
+      res.end(JSON.stringify(data));
+    });
+    return;
+  }
+
+  // ── 백테스트 토글(시작/일시정지/이어서) + 리셋 — 버튼 하나로 제어(요구 1) ──
+  if (url === '/api/backtest/toggle' && req.method === 'POST') {
+    const r = toggleBacktest();
+    res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+    res.end(JSON.stringify(r));
+    return;
+  }
+  if (url === '/api/backtest/reset' && req.method === 'POST') {
+    stopBacktest();
+    try { fs.unlinkSync(btStateFile()); } catch (e) {}        // 잔고 100만원으로 초기화(요구 3)
+    res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+    res.end(JSON.stringify({ ok: true, state: 'reset', msg: '리셋 완료' }));
+    return;
+  }
+  // 하위호환 별칭(레거시 HTS 툴바 🚀/■ 버튼) — 내부적으로 시작/정지에 매핑.
+  if (url === '/api/backtest/start' && req.method === 'POST') {
+    let body = ''; req.on('data', c => body += c);
+    req.on('end', () => {
+      const r = startBacktest();
+      res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+      res.end(JSON.stringify(r));
+    });
+    return;
+  }
+  if (url === '/api/backtest/stop' && req.method === 'POST') {
+    const r = stopBacktest();
+    res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+    res.end(JSON.stringify(r));
+    return;
+  }
+
+  // ── 메타 진화 실행/결과 (HTS 🧬 진화+ 버튼) ──
+  if (url === '/api/backtest/evolve' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      let opt = {};
+      try { opt = JSON.parse(body || '{}'); } catch (e) {}
+      const r = startEvolve(opt);
+      res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+      res.end(JSON.stringify(r));
+    });
+    return;
+  }
+  if (url === '/api/backtest/evolve-result') {
+    const ep = path.join(AGENT_DIR, 'state', 'evolve_result.json');
+    fs.readFile(ep, 'utf8', (err, raw) => {
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache, no-store, must-revalidate', ...CORS });
+      if (err) { res.end(JSON.stringify({ ok: false, running: false, error: '진화 결과 없음 (아직 실행 안 함)' })); return; }
+      let data;
+      try { data = JSON.parse(raw); } catch (e) { res.end(JSON.stringify({ ok: false, running: false, error: 'evolve 결과 파싱 실패' })); return; }
+      // 자식 프로세스가 살아있으면 running 보정.
+      if (evProc && !evProc.killed) data.running = true;
+      res.end(JSON.stringify(data));
+    });
+    return;
+  }
+
+  // ── 에이전트 상담 컨텍스트 (💬 상담 탭, 동일 출처 UI — 인증 불필요) ──
+  // 모드 + 수정 가능한 전략 파라미터 현재값 + 오늘 저널 토픽 요약을 한 번에 돌려준다.
+  if (url === '/api/agent/consult/context') {
+    const out = { ok: true, mode: 'paper', tunable: {}, journal: null };
+    // mode.yaml
+    try {
+      const mraw = fs.readFileSync(path.join(AGENT_DIR, 'config', 'mode.yaml'), 'utf8');
+      const mm = mraw.match(/^current_mode:\s*([a-zA-Z]+)/m);
+      if (mm) out.mode = mm[1].trim();
+    } catch (e) {}
+    // strategy_params.yaml — 화이트리스트 4개 키만 추출(간단 라인 파서, 외부 의존 없음)
+    try {
+      const sraw = fs.readFileSync(path.join(AGENT_DIR, 'config', 'strategy_params.yaml'), 'utf8');
+      const pick = (section, key) => {
+        // "section:" 블록 안에서 "  key: value" 찾기
+        const re = new RegExp('^' + section + ':[\\s\\S]*?^\\s{2,}' + key + ':\\s*([0-9.+-]+)', 'm');
+        const m = sraw.match(re);
+        return m ? Number(m[1]) : null;
+      };
+      const t = {};
+      const thr = sraw.match(/^screening:\s*[\s\S]*?^\s{2,}threshold:\s*([0-9.+-]+)/m);
+      if (thr) t['screening.threshold'] = Number(thr[1]);
+      const vsm = sraw.match(/^signal:\s*[\s\S]*?^\s{2,}volume_surge_multiplier:\s*([0-9.+-]+)/m);
+      if (vsm) t['signal.volume_surge_multiplier'] = Number(vsm[1]);
+      const em = sraw.match(/^time_stop:\s*[\s\S]*?^\s{2,}evaluation_minutes:\s*([0-9.+-]+)/m);
+      if (em) t['time_stop.evaluation_minutes'] = Number(em[1]);
+      const fb = sraw.match(/^time_stop:\s*[\s\S]*?^\s{2,}flat_box_pct:\s*([0-9.+-]+)/m);
+      if (fb) t['time_stop.flat_box_pct'] = Number(fb[1]);
+      out.tunable = t;
+    } catch (e) {}
+    // 오늘 저널 토픽 요약
+    try {
+      const today = kstDateStr();
+      const jpath = path.join(AGENT_DIR, 'data', 'journal', `${today}.jsonl`);
+      const raw = fs.readFileSync(jpath, 'utf8');
+      const byTopic = {}; let total = 0;
+      for (const line of raw.split('\n')) {
+        if (!line.trim()) continue;
+        let ev; try { ev = JSON.parse(line); } catch (e) { continue; }
+        const tp = ev.topic || (ev.payload && ev.payload.topic) || '기타';
+        byTopic[tp] = (byTopic[tp] || 0) + 1; total++;
+      }
+      if (total) out.journal = { total, byTopic };
+    } catch (e) {}
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...CORS });
+    res.end(JSON.stringify(out));
+    return;
+  }
+
+  // ── 상담 중 파라미터 직접 적용 + 검수 + 자동커밋 (💬 상담 ✅ 적용 버튼, paper 전용) ──
+  // scripts/consult_apply.py <key> <value> → yaml 수정 → 재읽기 검증 → git 커밋 → JSON.
+  if (url === '/api/agent/consult/apply-param' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      let key = '', value = '';
+      try { const o = JSON.parse(body || '{}'); key = String(o.key || '').trim(); value = String(o.value != null ? o.value : '').trim(); } catch (e) {}
+      const reply = (obj) => {
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...CORS });
+        res.end(JSON.stringify(obj));
+      };
+      if (!key || value === '') { reply({ ok: false, reason: '키 또는 값이 비었어요.' }); return; }
+      const script = path.join(AGENT_DIR, 'scripts', 'consult_apply.py');
+      let out = '', err = '', child;
+      try {
+        child = spawn(btPython(), [script, key, value], { cwd: AGENT_DIR, env: { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' }, windowsHide: true });
+      } catch (e) { reply({ ok: false, reason: '적용기 실행 실패: ' + e.message }); return; }
+      child.stdout.on('data', d => { out += d; });
+      child.stderr.on('data', d => { err += d; });
+      child.on('error', e => reply({ ok: false, reason: '적용기 오류: ' + e.message }));
+      child.on('close', () => {
+        const line = out.trim().split('\n').filter(s => s.trim().startsWith('{')).pop();
+        let data = null; if (line) { try { data = JSON.parse(line); } catch (e) {} }
+        if (!data) { reply({ ok: false, reason: '적용 결과 파싱 실패: ' + (err.trim().slice(-200) || out.trim().slice(-200) || '출력 없음') }); return; }
+        reply(data);
+      });
+    });
+    return;
+  }
+
+  // ── 전체 팀 회의 기록 조회 (💬 상담 → 다음 상담 시작 시 지난 회의 참고, 인증 불필요) ──
+  // data/memory/team_meeting_log.json 의 최근 N건을 그대로 돌려준다.
+  if (url.split('?')[0] === '/api/agent/consult/meeting/log' && req.method === 'GET') {
+    const reply = (obj) => {
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...CORS });
+      res.end(JSON.stringify(obj));
+    };
+    let limit = 5;
+    try { const m = url.match(/[?&]limit=(\d+)/); if (m) limit = Math.max(1, Math.min(50, +m[1])); } catch (e) {}
+    let log = [];
+    try {
+      const raw = fs.readFileSync(path.join(AGENT_DIR, 'data', 'memory', 'team_meeting_log.json'), 'utf8');
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) log = arr;
+    } catch (e) {}
+    reply({ ok: true, total: log.length, meetings: log.slice(-limit) });
+    return;
+  }
+
+  // ── 전체 팀 회의 결과 저장 + 자동커밋 (💬 상담 회의 종료 시, 요구 2) ──
+  // scripts/save_meeting.py 가 team_meeting_log.json append + git commit → 결과 JSON.
+  if (url === '/api/agent/consult/meeting/save' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      const reply = (obj) => {
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...CORS });
+        res.end(JSON.stringify(obj));
+      };
+      const rec = (body || '').trim();
+      if (!rec) { reply({ ok: false, reason: '회의 레코드가 비었어요.' }); return; }
+      const script = path.join(AGENT_DIR, 'scripts', 'save_meeting.py');
+      let out = '', err = '', child;
+      try {
+        child = spawn(btPython(), [script], { cwd: AGENT_DIR, env: { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' }, windowsHide: true });
+      } catch (e) { reply({ ok: false, reason: '저장기 실행 실패: ' + e.message }); return; }
+      child.stdout.on('data', d => { out += d; });
+      child.stderr.on('data', d => { err += d; });
+      child.on('error', e => reply({ ok: false, reason: '저장기 오류: ' + e.message }));
+      child.on('close', () => {
+        const line = out.trim().split('\n').filter(s => s.trim().startsWith('{')).pop();
+        let data = null; if (line) { try { data = JSON.parse(line); } catch (e) {} }
+        if (!data) { reply({ ok: false, reason: '저장 결과 파싱 실패: ' + (err.trim().slice(-200) || out.trim().slice(-200) || '출력 없음') }); return; }
+        reply(data);
+      });
+      // 레코드를 stdin 으로 전달(긴 한글 JSON 도 인자 길이 제한 없이 안전).
+      try { child.stdin.write(rec); child.stdin.end(); } catch (e) {}
+    });
+    return;
+  }
+
+  // ── 단일 제안 적용 + 검수 + 자동커밋 (제안 카드 ✅ 적용 버튼, §2.7/§3.3) ──
+  // scripts/apply_proposal.py가 strategy_params.yaml 수정 → 재읽기 검증 → git 커밋하고
+  // 결과 JSON을 stdout으로 돌려준다. paper 모드에서만 적용(아니면 locked).
+  if (url === '/api/backtest/apply-proposal' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      let pid = '';
+      try { pid = String((JSON.parse(body || '{}').id) || '').trim(); } catch (e) {}
+      const reply = (obj) => {
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...CORS });
+        res.end(JSON.stringify(obj));
+      };
+      if (!pid) { reply({ ok: false, reason: 'proposal id가 없어요.' }); return; }
+      const script = path.join(AGENT_DIR, 'scripts', 'apply_proposal.py');
+      let out = '', err = '';
+      let child;
+      try {
+        child = spawn(btPython(), [script, pid], { cwd: AGENT_DIR, env: { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' }, windowsHide: true });
+      } catch (e) { reply({ ok: false, reason: '적용기 실행 실패: ' + e.message }); return; }
+      child.stdout.on('data', d => { out += d; });
+      child.stderr.on('data', d => { err += d; });
+      child.on('error', e => reply({ ok: false, reason: '적용기 오류: ' + e.message }));
+      child.on('close', () => {
+        let data = null;
+        // stdout 마지막 JSON 라인만 취한다(로그 라인 섞임 방지).
+        const line = out.trim().split('\n').filter(s => s.trim().startsWith('{')).pop();
+        if (line) { try { data = JSON.parse(line); } catch (e) {} }
+        if (!data) { reply({ ok: false, reason: '적용 결과 파싱 실패: ' + (err.trim().slice(-200) || out.trim().slice(-200) || '출력 없음') }); return; }
+        reply(data);
+      });
+    });
+    return;
+  }
+
+  // ── 노션 학습 현황 (💬 상담 탭 "노션 학습 현황") — GET ──
+  // 학습부가 저장한 data/memory/notion_knowledge.json + notion_updates.log 를 그대로 요약 서빙.
+  if ((url === '/api/agent/notion/status' || url === '/api/agent/notion-status') && req.method === 'GET') {
+    const reply = (obj) => {
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...CORS });
+      res.end(JSON.stringify(obj));
+    };
+    let data = null, updates = [];
+    try { data = JSON.parse(fs.readFileSync(path.join(AGENT_DIR, 'data', 'memory', 'notion_knowledge.json'), 'utf8')); } catch (e) {}
+    try { updates = fs.readFileSync(path.join(AGENT_DIR, 'data', 'memory', 'notion_updates.log'), 'utf8').trim().split('\n').filter(Boolean).slice(-20); } catch (e) {}
+    if (!data) { reply({ ok: true, synced: false, message: '아직 노션을 동기화하지 않았어요. 🔄 지금 업데이트를 눌러주세요.', agents: {}, updates }); return; }
+    const cats = data.categories || {};
+    const agents = {};
+    for (const [k, c] of Object.entries(cats)) {
+      agents[k] = {
+        label: c.label || '', agent: c.agent || '', count: c.count || 0,
+        headings: (c.headings || []).slice(0, 6),
+        sample_rules: (c.rules || []).slice(0, 5).map(r => r.text || ''),
+      };
+    }
+    reply({
+      ok: true, synced: true, title: data.title || '', page_id: data.source_page_id || '',
+      last_update: data.fetched_at || '', last_checked: data.last_checked || data.fetched_at || '',
+      total_rules: (data.stats || {}).total_rules || 0, agents, updates,
+    });
+    return;
+  }
+
+  // ── 노션 수동 동기화 (💬 상담 탭 "🔄 지금 업데이트" 버튼) — POST ──
+  // scripts/sync_notion.py --force --json 을 실행해 페이지를 다시 읽고 분류·저장한다.
+  // 토큰은 ai-agent config/kis_api.yaml(notion.token) 우선, 없으면 traidair runtimeConfig 폴백.
+  if (url === '/api/agent/notion/sync' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      let force = true;
+      try { if (JSON.parse(body || '{}').force === false) force = false; } catch (e) {}
+      const reply = (obj) => {
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...CORS });
+        res.end(JSON.stringify(obj));
+      };
+      const script = path.join(AGENT_DIR, 'scripts', 'sync_notion.py');
+      const args = [script, '--json'];
+      if (force) args.push('--force');
+      const env = {
+        ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8',
+        // ai-agent kis_api.yaml 의 notion.token 이 placeholder 면 이 env 로 폴백한다.
+        NOTION_TOKEN: runtimeConfig.notionToken || process.env.NOTION_TOKEN || '',
+        NOTION_PAGE_ID: runtimeConfig.notionPageId || process.env.NOTION_PAGE_ID || '',
+      };
+      let out = '', err = '', child;
+      try {
+        child = spawn(btPython(), args, { cwd: AGENT_DIR, env, windowsHide: true });
+      } catch (e) { reply({ ok: false, reason: '동기화 실행 실패: ' + e.message }); return; }
+      child.stdout.on('data', d => { out += d; });
+      child.stderr.on('data', d => { err += d; });
+      child.on('error', e => reply({ ok: false, reason: '동기화 오류: ' + e.message }));
+      child.on('close', () => {
+        const line = out.trim().split('\n').filter(s => s.trim().startsWith('{')).pop();
+        let data = null; if (line) { try { data = JSON.parse(line); } catch (e) {} }
+        if (!data) { reply({ ok: false, reason: '동기화 결과 파싱 실패: ' + (err.trim().slice(-200) || out.trim().slice(-200) || '출력 없음') }); return; }
+        reply(data);
+      });
+    });
+    return;
+  }
+
+  // ── HTS 화면 (/hts) — start.bat 자동 오픈 대상 ──
+  if (url === '/hts' || url === '/hts/') {
+    fs.readFile(path.join(__dirname, 'trading-hts.html'), (err, data) => {
+      if (err) { res.writeHead(404, CORS); res.end('trading-hts.html not found'); return; }
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, no-store, must-revalidate', ...CORS });
+      res.end(data);
+    });
+    return;
+  }
+
+  // ── ai-agent 대시보드 페이지 (/agent) ──
+  if (url === '/agent' || url === '/agent/') {
+    fs.readFile(path.join(__dirname, 'agent-dashboard.html'), (err, data) => {
+      if (err) { res.writeHead(404, CORS); res.end('agent-dashboard.html not found'); return; }
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, no-store, must-revalidate', ...CORS });
+      res.end(data);
+    });
+    return;
+  }
+
+  // ── API 경로 가드: 매칭되지 않은 /api/* 요청은 절대 HTML(trading-hts.html)로
+  //     폴백하지 않고 항상 JSON 404 를 반환한다. (클라이언트 "Unexpected token '<'" 방지)
+  if (url.startsWith('/api/')) {
+    res.writeHead(404, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...CORS });
+    res.end(JSON.stringify({ ok: false, error: 'not_found', route: url }));
+    return;
+  }
+
   // 정적 파일
   let filePath = req.url === '/' ? '/trading-hts.html' : req.url.split('?')[0];
   filePath = path.join(__dirname, filePath);
@@ -1372,6 +2275,31 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(200, { 'Content-Type': mimeType, ...CORS, ...cacheHeader });
     res.end(data);
   });
+});
+
+// ── WebSocket /ws/market — 시장상황 에이전트 실시간 구독 (X-Agent-Key 또는 ?key=) ──
+server.on('upgrade', (req, socket) => {
+  const u = req.url.split('?')[0];
+  if (u !== '/ws/market') { socket.destroy(); return; }
+  const q = new URLSearchParams(req.url.includes('?') ? req.url.split('?')[1] : '');
+  const key = req.headers['x-agent-key'] || q.get('key');
+  if (AGENT_KEY && key !== AGENT_KEY) { socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n'); socket.destroy(); return; }
+  const wsKey = req.headers['sec-websocket-key'];
+  if (!wsKey) { socket.destroy(); return; }
+  const accept = crypto.createHash('sha1').update(wsKey + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11').digest('base64');
+  socket.write(
+    'HTTP/1.1 101 Switching Protocols\r\n' +
+    'Upgrade: websocket\r\n' +
+    'Connection: Upgrade\r\n' +
+    'Sec-WebSocket-Accept: ' + accept + '\r\n\r\n'
+  );
+  wsClients.add(socket);
+  socket.on('data', buf => { if (buf.length && (buf[0] & 0x0f) === 0x8) { try { socket.end(); } catch (e) {} } });
+  socket.on('close', () => wsClients.delete(socket));
+  socket.on('error', () => wsClients.delete(socket));
+  // 접속 즉시 1회 스냅샷 푸시
+  wsMarketSnapshot().then(data => { try { socket.write(wsFrame(JSON.stringify({ type: 'market', ts: new Date().toISOString(), data }))); } catch (e) {} });
+  wsBroadcastStart();
 });
 
 server.listen(PORT, () => {
