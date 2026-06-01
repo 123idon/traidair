@@ -2091,15 +2091,31 @@ const server = http.createServer(async (req, res) => {
   // 그 파일을 그대로 서빙하되, 파일 신선도(mtime)로 running 여부를 보정한다.
   if (url === '/api/backtest/state') {
     const bp = btStateFile();
+    // 서버가 직접 spawn 해 추적 중인 엔진(btProc)이 살아있는가 — **부팅 창 레이스의 핵심**.
+    // 엔진 spawn 직후 ~수초간은 backtest_live.json 을 아직 못 써서 파일이 없거나(=err)
+    // 직전 잔재라 stale 하다. 이때 mtime 만 보면 running:false 로 오판되고, 그 순간 /hts
+    // 로드(start.bat 자동 오픈·새로고침·새 탭)의 _agentFullReset 이 "안 돌아가네" 하고
+    // /api/backtest/stop 을 쏴서 **방금 띄운 엔진을 죽인다**(2일 만에 멈춤의 근본 원인).
+    // → btProc 가 살아있으면(서버가 방금 띄웠고 exit 콜백도 안 옴) running:true 로 본다.
+    //   (server 재시작으로 추적을 잃은 고아 엔진은 btProc=null → 아래 mtime 신선도로 폴백,
+    //    기존 동작 그대로라 회귀 없음.)
+    const tracked = !!(btProc && !btProc.killed);
     fs.readFile(bp, 'utf8', (err, raw) => {
       res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache, no-store, must-revalidate', ...CORS });
-      if (err) { res.end(JSON.stringify({ ok: false, running: false, paused: false, error: '백테스트 미실행' })); return; }
+      if (err) {
+        // 상태파일이 아직 없음 — 추적 엔진이 살아있으면 '부팅 중'이며 죽이면 안 된다.
+        res.end(JSON.stringify({ ok: tracked, running: tracked, paused: false, booting: tracked,
+          error: tracked ? '백테스트 부팅 중' : '백테스트 미실행' }));
+        return;
+      }
       let data;
-      try { data = JSON.parse(raw); } catch (e) { res.end(JSON.stringify({ ok: false, running: false, paused: false, error: 'state 파싱 실패' })); return; }
+      try { data = JSON.parse(raw); } catch (e) { res.end(JSON.stringify({ ok: tracked, running: tracked, paused: false, error: 'state 파싱 실패' })); return; }
       // 2초 이상 갱신이 없으면 엔진이 죽은 것으로 간주(일시정지 중에도 250ms마다 갱신됨).
+      // 단, 서버가 추적하는 엔진(btProc)이 살아있으면 부팅/일시 멈춤일 뿐이므로 죽이지 않는다.
       try {
         const ageMs = Date.now() - fs.statSync(bp).mtimeMs;
-        if (ageMs > 2000) { data.running = false; data.paused = false; }
+        if (ageMs > 2000 && !tracked) { data.running = false; data.paused = false; }
+        else if (ageMs > 2000 && tracked && data.running === false) { data.running = true; data.booting = true; }
         data.staleMs = Math.round(ageMs);
       } catch (e) {}
       res.end(JSON.stringify(data));
