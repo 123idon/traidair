@@ -2395,7 +2395,9 @@ canvas{image-rendering:pixelated;}
     if(!rowsEl) return;
     if(!d||!d.ok){
       runEl.textContent='대기'; runEl.style.background='#f1f3f5'; runEl.style.color='#8b95a1';
-      clockEl.textContent='--:--';
+      // 백테스트 진행 중에는 중앙 시계(updateTime)가 시계를 소유한다. 일시적 파싱 실패로
+      // 여기서 '--:--'로 덮어쓰면 시계가 깜빡이므로, 정지 상태일 때만 비운다(요구 2).
+      if(!(window.agentBT && window.agentBT.running)) clockEl.textContent='--:--';
       dateEl.textContent='백테스트를 시작하면 팀이 일을 시작해요';
       rowsEl.innerHTML=idle();
       return;
@@ -2404,8 +2406,9 @@ canvas{image-rendering:pixelated;}
     runEl.textContent=run?'● 실행중':'정지/완료';
     runEl.style.background=run?'#e7f6ee':'#f1f3f5';
     runEl.style.color=run?'#00c473':'#8b95a1';
-    var t=(d.sim&&d.sim.time)?d.sim.time.slice(0,5):'--:--';
-    clockEl.textContent=t;
+    // 시계는 직접 쓰지 않고 단일 함수(updateTime)로만 갱신 → 중앙 시계 SSOT (요구 2).
+    // updateTime이 msTime과 agentTeamClock을 동시에, 단조 증가로만 갱신한다.
+    if(d.sim&&d.sim.time){ try{ updateTime(d.sim.time, (d.sim&&d.sim.date)||''); }catch(_e){ clockEl.textContent=d.sim.time.slice(0,5); } }
     var dd=(d.sim&&d.sim.date)||'';
     dateEl.textContent=dd?('📅 백테스트 날짜 '+dd.slice(0,4)+'.'+dd.slice(4,6)+'.'+dd.slice(6,8)):'—';
     var a=d.agents||{};
@@ -2924,7 +2927,7 @@ function loadState(){
   const c=localStorage.getItem("htsCfg");if(c)cfg={...cfg,...JSON.parse(c)};
   const m=localStorage.getItem("htsMock");if(m){const p=JSON.parse(m);mock={...mock,...p};}
   mock.cash=mock.cash||cfg.capital;
-  if(window.backtestState) window.backtestState.cash=mock.cash;   // 단일 상태 동기화 (요구 2)
+  updateCash(mock.cash);   // 단일 함수 경유 — 상태+상단/보유탭 동시 동기화 (요구 2·5)
   if(!mock.positions)mock.positions={};
   if(!mock.trades)mock.trades=[];
   const so=localStorage.getItem("htsStopOrders");
@@ -2934,7 +2937,7 @@ function loadState(){
     if(ok) {
       // 서버 데이터로 덮어쓰기
       const m2=localStorage.getItem("htsMock");
-      if(m2){const p=JSON.parse(m2);mock={...mock,...p};mock.cash=mock.cash||cfg.capital;if(window.backtestState) window.backtestState.cash=mock.cash;if(!mock.positions)mock.positions={};if(!mock.trades)mock.trades=[];}
+      if(m2){const p=JSON.parse(m2);mock={...mock,...p};mock.cash=mock.cash||cfg.capital;updateCash(mock.cash);if(!mock.positions)mock.positions={};if(!mock.trades)mock.trades=[];}
       const so2=localStorage.getItem("htsStopOrders");
       if(so2){try{stopOrders={...JSON.parse(so2)};}catch(e){}}
       // 시뮬 상태(날짜/TF/현재종목) 복원
@@ -4287,7 +4290,51 @@ let sim={playing:false,speed:60,idx:0,candles:[],timer:null,date:todayStr(),tf:"
 //  - updateCash 호출 시 상단 헤더(hdrCash)와 보유탭(cashVal)을 동시에 갱신한다.
 //  - 백테스트 매수/매도/리셋, 수동 매매, KIS 동기화 모두 이 함수를 통해서만 잔고를 바꾼다.
 // ════════════════════════════════════════════════════════════════
-window.backtestState = window.backtestState || { cash: (mock.cash||0) };
+window.backtestState = window.backtestState || { cash: (mock.cash||0), currentTime: '' };
+if(window.backtestState.currentTime===undefined) window.backtestState.currentTime='';
+// 단조 시계 가드 상태(요구 2): 마지막으로 반영한 거래일/시각.
+if(window.backtestState._clockDay===undefined)  window.backtestState._clockDay=null;
+if(window.backtestState._clockTime===undefined) window.backtestState._clockTime='';
+// ════════════════════════════════════════════════════════════════
+// 요구 2: 백테스트 가상 시각 단일 진실 공급원(SSOT)
+//  - 시각 상태는 window.backtestState.currentTime 하나로만 통일한다.
+//  - 시각 변경은 반드시 updateTime(time) 단일 함수로만 처리한다.
+//  - 상단/하단/패널 시각 표시(msTime 등)는 전부 이 함수가 동시에 갱신한다.
+//  - 백테스트 진행 중에는 레거시 차트 렌더(updChartToIdx)가 시각을 건드리지 않는다.
+//    → 에이전트 시각과 캔들 시각이 번갈아 쓰여 "장 시간이 왔다갔다" 하던 버그 차단.
+// ════════════════════════════════════════════════════════════════
+function updateTime(time, dayKey){
+  if(time==null) return;
+  time = String(time);
+  // ── 단조 증가 가드(요구 2: 시간이 왔다갔다 하지 않게) ──
+  //  500ms 폴링은 응답이 순서가 뒤바뀌어 도착할 수 있다. 같은 거래일(dayKey) 안에서는
+  //  더 과거의 시각을 무시해 중앙 시계가 거꾸로 가지 않게 한다. 거래일이 바뀌면(다음
+  //  랜덤일) 09:00로 되돌아가는 것은 정상이므로 허용한다.
+  if(dayKey!=null && dayKey!==''){
+    const bs = window.backtestState;
+    if(bs._clockDay===dayKey && bs._clockTime && time < bs._clockTime) return;  // out-of-order → 무시
+    bs._clockDay = dayKey;
+    bs._clockTime = time;
+  }
+  const hhmm = time.length>=5 ? time.slice(0,5) : time;
+  window.backtestState.currentTime = time;
+  // 단일 변수(window.backtestState.currentTime)를 모든 시계 표시가 공유한다.
+  // 상단/하단 푸터 시계(msTime)와 좌하단 에이전트팀 시계(agentTeamClock) 동시 갱신.
+  const el = document.getElementById('msTime');
+  if(el) el.textContent = hhmm;
+  const tc = document.getElementById('agentTeamClock');
+  if(tc) tc.textContent = hhmm;
+}
+// 중앙 시계를 초기 상태로 되돌린다(정지/리셋/페이지 로드 시). 단조 가드 상태도 비워
+// 다음 백테스트가 09:00부터 깨끗하게 시작되게 한다.
+function resetClock(){
+  const bs = window.backtestState;
+  bs.currentTime = '';
+  bs._clockDay = null;
+  bs._clockTime = '';
+  const el = document.getElementById('msTime'); if(el) el.textContent = '09:00';
+  const tc = document.getElementById('agentTeamClock'); if(tc) tc.textContent = '--:--';
+}
 function updateCash(amount){
   amount = Number(amount);
   if(!isFinite(amount)) amount = 0;
@@ -5670,7 +5717,7 @@ function openBacktestDialog(){
         <button class="ibtn" onclick="agentBTReset()" title="가상잔고/진행 초기화" style="font-size:11px;">↺ 리셋</button>
         <div style="display:flex;gap:8px;">
           <button class="ibtn" onclick="document.getElementById('btDialog').remove()" style="font-size:11px;">닫기</button>
-          <button class="ibtn ${running?'':'pur'}" id="btToggleBtn" onclick="agentBTToggle()" style="font-size:11px;${running?'background:var(--r);color:#fff;border:none;':''}">${running?'■ 정지':'▶ 시작'}</button>
+          <button class="ibtn pur" id="btToggleBtn" onclick="agentBTToggle()" style="font-size:11px;">▶ 백테스트</button>
         </div>
       </div>
     </div>
@@ -5681,6 +5728,7 @@ function openBacktestDialog(){
   d2.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9999;background:var(--pan);border-radius:14px;box-shadow:0 8px 40px rgba(0,0,0,.2);width:340px;max-width:92vw;';
   d2.innerHTML=html;
   document.body.appendChild(d2);
+  try{ _syncBtToggleBtn(); }catch(_e){}   // 현재 실제 상태(정지/진행/일시정지)로 버튼 동기화 (요구 3)
 }
 function setTF(el,tf){
   try{
@@ -11396,8 +11444,11 @@ function updChartToIdx(){
   if(pf) pf.style.width = pct + '%';
   const msBar = document.getElementById('msBar');
   if(msBar) msBar.textContent = sim.idx;
-  const msTime = document.getElementById('msTime');
-  if(msTime && lc) msTime.textContent = lc.t || '--:--';
+  // 백테스트 진행 중에는 에이전트(agentBTApply)가 중앙 시계를 소유한다.
+  // 레거시 캔들 시각으로 덮어쓰면 시각이 왔다갔다 하므로 이때는 건드리지 않는다(요구 2).
+  if(!window._agentActive && !(window.agentBT && window.agentBT.running)){
+    if(lc) updateTime(lc.t || '--:--');
+  }
   // 자동 우측 스크롤 (드래그 중 아닐 때만)
   if(!window._chartUserDragging){
     const viewEnd = chartViewStart + chartViewCount;
@@ -12553,8 +12604,9 @@ function resetBalance(){
 /* DEPLOY-v437431 */
 function toggleAutoTrade(){if(autoState.running){stopAuto();}else{startAuto();}}
 
-window.agentBT = window.agentBT || { running:false, timer:null, curKey:null, state:null, _reported:false, epoch:0 };
+window.agentBT = window.agentBT || { running:false, paused:false, timer:null, curKey:null, state:null, _reported:false, epoch:0 };
 if(agentBT.epoch===undefined) agentBT.epoch=0;
+if(agentBT.paused===undefined) agentBT.paused=false;
 
 function _agentToast(msg){
   try{ if(typeof addMsg==='function'){ addMsg('ai', msg); return; } }catch(_e){}
@@ -12574,6 +12626,7 @@ function agentBTStart(opt){
     .then(r=>r.json()).then(r=>{
       if(!r.ok){ agentBT.running=false; _syncBtToggleBtn(); alert('백테스트 시작 실패: '+(r.error||'알 수 없음')); return; }
       agentBT.running=true; agentBT.curKey=null; agentBT._reported=false; window._agentMarkers=null;
+      resetClock();   // 새 백테스트는 09:00부터 — 이전 런의 단조 가드 상태 비움 (요구 2)
       _agentToast('🤖 ai-agent 백테스트 시작 (가상잔고 '+(body.cash||1000000).toLocaleString()+'원, 자동 최고속)');
       _syncBtToggleBtn();
       agentBTStartPoll();
@@ -12583,7 +12636,7 @@ function agentBTStop(){
   // epoch을 올려 이후 도착하는 stale 폴링 응답이 running을 되살리지 못하게 한다.
   agentBT.epoch=(agentBT.epoch||0)+1;
   agentBTStopPoll();                 // 폴링 즉시 중단 (계속 진행되는 것처럼 보이던 버그 차단)
-  agentBT.running=false; _syncBtToggleBtn();
+  agentBT.running=false; agentBT.paused=false; _syncBtToggleBtn();
   fetch('/api/backtest/stop',{method:'POST'}).then(r=>r.json()).then(()=>{
     _agentToast('■ 백테스트 정지');
   }).catch(()=>{});
@@ -12595,22 +12648,58 @@ function agentBTStop(){
     }).catch(()=>{});
   }, 1300);
 }
-// 요구 2: 팝업의 단일 토글 버튼 (▶ 시작 ↔ ■ 정지). 팝업은 닫지 않고 제자리 토글.
+// 요구 3·4: 단일 토글 버튼.
+//  진행 중 → ⏸ 정지(일시정지: 프로세스는 살아 있어 '이어서 진행' 가능, 폴링 타이머는 클리어)
+//  일시정지/정지 → ▶ 백테스트(시작 또는 멈춘 시점부터 이어서 진행)
+//  하드 종료(프로세스 kill)는 ↺ 리셋 버튼이 담당한다.
 function agentBTToggle(){
-  if(window.agentBT && agentBT.running){
-    agentBTStop();
-  } else {
-    const dEl=document.getElementById('btDays');
-    agentBTStart({days: dEl?dEl.value:''});
-    agentBT.running=true;   // 낙관적 — 폴링이 곧 실제 상태로 정정
+  const wasRunning = !!(window.agentBT && agentBT.running);
+  const wasPaused  = !!(window.agentBT && agentBT.paused);
+  const dEl=document.getElementById('btDays');
+  const body={ days: dEl?dEl.value:'' };
+  if(wasRunning && !wasPaused){
+    // 진행 중 → 일시정지. 폴링을 즉시 끊어 '완전 멈춤'으로 보이게 한다(요구 4).
+    agentBT.epoch=(agentBT.epoch||0)+1;
+    agentBTStopPoll();
+    agentBT.paused=true;
+    _syncBtToggleBtn();
+    fetch('/api/backtest/toggle',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+      .then(r=>r.json()).then(()=>{ _agentToast('⏸ 일시정지 (이어서 진행 가능)'); })
+      .catch(()=>{});
+    // 마지막 상태 1회만 반영(폴링은 재개하지 않음)
+    setTimeout(()=>{ fetch('/api/backtest/state',{cache:'no-store'}).then(r=>r.json()).then(s=>{ if(s&&s.ok){ try{ agentBTApply(s); }catch(_e){} } agentBT.paused=true; agentBT.running=true; _syncBtToggleBtn(); }).catch(()=>{}); }, 400);
+    return;
   }
-  _syncBtToggleBtn();
+  // 완전 정지/미실행 → **새로 시작**: /api/backtest/start 로 보낸다.
+  //   startBacktest 가 ① 살아있는 고아 엔진을 먼저 graceful 정리(중복 실행 방지)하고
+  //   ② 설정한 거래일 수(BACKTEST_DAYS)대로 깔끔히 새로 시작한다.
+  //   (toggle 로 보내면 고아 엔진이 살아있을 때 새 시작 대신 그 고아를 '일시정지'만 해서
+  //    설정한 일수가 무시되고 1일만 한 것처럼 멈춰 보이던 버그 — /start 로 우회.)
+  if(!wasPaused){
+    agentBTStart({ days: (dEl ? dEl.value : '') });   // resetClock·폴링·토스트·상태 동기화 포함
+    return;
+  }
+  // 일시정지 → 이어서 진행(멈춘 시점부터, 시계 유지)
+  agentBT._reported=false; window._agentMarkers=null;
+  fetch('/api/backtest/toggle',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+    .then(r=>r.json()).then(r=>{
+      if(!r.ok){ agentBT.running=false; agentBT.paused=false; _syncBtToggleBtn(); alert('백테스트 실패: '+(r.error||'알 수 없음')); return; }
+      agentBT.running=true; agentBT.paused=false;
+      _agentToast('▶ 이어서 진행 (멈춘 시점부터)');
+      _syncBtToggleBtn();
+      agentBTStartPoll();
+    }).catch(e=>{ agentBT.running=false; agentBT.paused=false; _syncBtToggleBtn(); alert('백테스트 실패: '+e.message); });
+  // 낙관적 — 폴링이 곧 실제 상태로 정정
+  agentBT.running=true; agentBT.paused=false; _syncBtToggleBtn();
 }
 function _syncBtToggleBtn(){
   const btn=document.getElementById('btToggleBtn'); if(!btn) return;
   const run=!!(window.agentBT && agentBT.running);
-  btn.textContent = run ? '■ 정지' : '▶ 시작';
-  if(run){ btn.classList.remove('pur'); btn.style.background='var(--r)'; btn.style.color='#fff'; btn.style.border='none'; }
+  const paused=!!(window.agentBT && agentBT.paused);
+  // 진행 중(=정지 가능) → ⏸ 정지 / 그 외(정지·일시정지) → ▶ 백테스트
+  const active = run && !paused;
+  btn.textContent = active ? '⏸ 정지' : (paused ? '▶ 이어서' : '▶ 백테스트');
+  if(active){ btn.classList.remove('pur'); btn.style.background='var(--r)'; btn.style.color='#fff'; btn.style.border='none'; }
   else { btn.classList.add('pur'); btn.style.background=''; btn.style.color=''; btn.style.border=''; }
 }
 // 우측 탭을 비운 초기 상태(가상잔고 100만·무보유)로 되돌림 (요구 3 리셋)
@@ -12642,7 +12731,7 @@ function agentBTReset(){
   // epoch을 즉시 올려서, 리셋 전 출발한 in-flight 폴링 응답이 화면을 되돌리지 못하게 한다.
   agentBT.epoch=(agentBT.epoch||0)+1;
   agentBTStopPoll();
-  agentBT.running=false; agentBT.curKey=null; agentBT.state=null; agentBT._reported=true;
+  agentBT.running=false; agentBT.paused=false; agentBT.curKey=null; agentBT.state=null; agentBT._reported=true;
   window._agentState=null; window._agentMarkers=null;
   // 화면 즉시 초기화 (네트워크 응답을 기다리지 않음)
   _agentResetFooter();
@@ -12650,10 +12739,12 @@ function agentBTReset(){
   _syncBtToggleBtn();
   const panel=document.getElementById('backtestPanel'); if(panel)panel.style.display='none';
   try{ drawChart(); }catch(_e){}
-  fetch('/api/backtest/reset',{method:'POST'}).then(r=>r.json()).then(()=>{
-    // 서버 state 삭제 후 한 번 더 초기화 보장(혹시 그 사이 갱신됐을 경우)
+  fetch('/api/backtest/reset',{method:'POST'}).then(r=>r.json()).then(r=>{
+    // 서버가 **실행 중 백테스트를 graceful 정지(완료까지 대기)한 뒤** state를 지우고 응답한다.
+    // 한 번 더 초기화 보장(혹시 그 사이 갱신됐을 경우)
     _agentResetRightPanels(); _agentResetFooter();
-    _agentToast('↺ 백테스트 리셋 (가상잔고 1,000,000원 초기화 · 보유 전부 청산)');
+    const how = (r && r.forced) ? ' · 강제 정지' : '';
+    _agentToast('✅ '+((r&&r.msg)||'초기화 완료 (잔고 100만원 · 보유 0 · 매매 0)')+how);
   }).catch(e=>{ _agentToast('리셋 경고: '+e.message+' (화면은 초기화됨)'); });
 }
 
@@ -12661,11 +12752,15 @@ function agentBTReset(){
 function agentBTStartPoll(){ if(agentBT.timer) return; agentBTPollOnce(); agentBT.timer=setInterval(agentBTPollOnce, 500); }
 function agentBTStopPoll(){ if(agentBT.timer){ clearInterval(agentBT.timer); agentBT.timer=null; } }
 function agentBTPollOnce(){
+  // 이전 요청이 아직 응답 전이면 새 요청을 보내지 않는다 → 응답이 순서 뒤바뀌어 도착해
+  // 시각/상태가 왔다갔다 하던 문제 방지(요구 2). 단조 가드와 이중 안전장치.
+  if(agentBT._inflight) return;
+  agentBT._inflight = true;
   const ep = agentBT.epoch||0;
   fetch('/api/backtest/state',{cache:'no-store'}).then(r=>r.json()).then(s=>{
     if((agentBT.epoch||0)!==ep) return;   // 리셋/정지 후 도착한 stale 응답 무시
     agentBTApply(s);
-  }).catch(()=>{});
+  }).catch(()=>{}).finally(()=>{ agentBT._inflight = false; });
 }
 
 // ── 상태 반영 ────────────────────────────────────────────────
@@ -12686,6 +12781,7 @@ function _agentResetFooter(){
   ['msPnl','msTodayPnl'].forEach(id=>{const e=document.getElementById(id);if(e){e.textContent='+0원';e.className='ms-v cu';}});
   const p=document.getElementById('msPct'); if(p){p.textContent='0.00%';p.className='ms-v cu';}
   const t=document.getElementById('msTrades'); if(t)t.textContent='0회';
+  resetClock();   // 중앙 시계 09:00 초기화 + 단조 가드 상태 비움 (요구 2)
 }
 // ── 우측 탭 전체를 백테스트(ai-agent) 상태로 실시간 동기화 ──────────────
 function _agentSyncRightPanels(s){
@@ -12877,6 +12973,7 @@ function agentBTApply(s){
   agentBT.state = s;
   window._agentState = s;
   agentBT.running = !!s.running;
+  agentBT.paused = !!s.paused;
   // 좌측 관심종목 = 스크리닝 에이전트 결과로 실시간 동기화 (점수·이유·상태)
   try{ updateCandsFromDash(s.screening||[]); }catch(_e){}
   // 우측 탭(주문/보유/거래/미체결/AI) 전부 백테스트 상태로 실시간 동기화
@@ -12893,7 +12990,9 @@ function agentBTApply(s){
     : ((s.positions||[]).reduce((a,p)=>a+(p.pnl||0),0));
   _setMsSigned('msTodayPnl', todayPnl, '원', false);
   const trEl=document.getElementById('msTrades'); if(trEl) trEl.textContent=(cum.trades||0)+'회';
-  if(s.sim && s.sim.time){ const tEl=document.getElementById('msTime'); if(tEl) tEl.textContent=s.sim.time; }
+  // 시각은 단일 함수(updateTime)로만 갱신 → 중앙 시계 SSOT (요구 2)
+  // 거래일(sim.date)을 함께 넘겨 같은 날 안에서는 시간이 거꾸로 가지 않게 한다.
+  if(s.sim && s.sim.time){ updateTime(s.sim.time, (s.sim && s.sim.date) || ''); }
 
   // 진행 패널
   _agentBTPanel(s);
@@ -12942,11 +13041,18 @@ function _agentBTPanel(s){
     ? s.positions.map(p=>`${p.name||p.code} ${(p.pnlPct>=0?'+':'')+p.pnlPct}%`).join(', ')
     : '무보유';
   const retUp = (cum.totalReturnPct||0)>=0;
+  // 진행 표시(요구 3): "N일차 / M일". dayIndex=현재 진행 중인 일차(1-based), totalDays=설정 총일수.
+  // 무제한(totalDays=null)이면 "N일차"만, 완료 후엔 "M일 완료"로 표시한다.
+  const _di = cum.dayIndex || cum.days || 0;
+  const _td = cum.totalDays;
+  const progTxt = s.running
+    ? (_td ? `<b>${_di}</b>일차 / ${_td}일` : `<b>${_di}</b>일차`)
+    : `<b>${cum.days||0}</b>일 완료${_td?` / ${_td}일`:''}`;
   panel.innerHTML = `
     <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;font-size:11px;">
       <span style="font-weight:800;color:var(--p);">🤖 ai-agent ${s.running?'<span style="color:var(--g);">진행 중</span>':'<span style="color:var(--tm);">정지</span>'}</span>
       <span>📅 ${dstr} <b>${sim.time||''}</b></span>
-      <span>일수 <b>${cum.days||0}</b></span>
+      <span>진행 ${progTxt}</span>
       <span>누적 <b style="color:${retUp?'var(--r)':'var(--b,#2563eb)'};">${(retUp?'+':'')+(cum.totalReturnPct||0)}%</b></span>
       <span>매매 <b>${cum.trades||0}</b>회 · 승률 <b>${cum.tradeWinRate||0}%</b></span>
       <span>시장 <b style="color:${gColor};">${grade}</b></span>
@@ -13105,20 +13211,39 @@ function agentEvolveShowResult(res){
   document.body.appendChild(m);
 }
 
-// 요구 3: 페이지 로드 시 백테스트 상태를 항상 '정지'로 완전 초기화한다.
+// 요구 1·3: 페이지 로드 시 백테스트 상태를 항상 '정지'로 완전 초기화한다.
 //  - 이전 세션의 서버 state가 running:true로 남아 있어도 자동 재연결/재생하지 않는다.
 //  - isRunning=false 고정 + 버튼을 '▶ 시작'(정지 상태)으로 동기화한다.
+//  - 이전 세션의 고아 백테스트 프로세스를 서버에 정지 요청해 잔재를 제거한다
+//    → 첫 진입 시 ▶ 시작이 "이미 실행 중"으로 거절되던 버그(요구 1) 자가 복구.
+//  - 타이머/폴링/로컬 잔재를 전부 정리한다(요구 1·6).
 //  - 사용자가 ▶ 시작을 누르면 그때 실제 실행 + 폴링이 시작되고, 정지를 누르면 중단된다.
-window.addEventListener('load', function(){
+function _agentFullReset(){
   try{
     agentBT.epoch = (agentBT.epoch||0) + 1;   // 직전 세션의 in-flight 폴링 응답 무효화
     agentBTStopPoll();                         // 혹시 살아있는 폴링 타이머 중단
+    if(typeof _evolvePollTimer!=='undefined' && _evolvePollTimer){ try{ clearInterval(_evolvePollTimer); }catch(_e){} _evolvePollTimer=null; }
     agentBT.running = false;                    // 초기 상태 = 정지로 고정
+    agentBT.paused = false;
     agentBT.curKey = null;
     agentBT.state = null;
     agentBT._reported = false;
+    window._agentActive = false;
+    window._agentState = null;
+    window._agentMarkers = null;
+    resetClock();   // 중앙 시계 + 단조 가드 상태 초기화 (요구 2)
+    // 로컬 잔재 제거(백테스트 상태는 원래 localStorage에 보관하지 않지만 방어적으로 정리)
+    try{ ['htsBacktestState','agentBTState','backtest_live'].forEach(k=>localStorage.removeItem(k)); }catch(_e){}
     _syncBtToggleBtn();                         // 버튼 라벨/색을 정지(▶ 시작) 상태로 동기화
   }catch(_e){}
+  // 서버에 정지 요청 — 이전 세션 고아 프로세스/상태파일을 정리(요구 1). 응답은 기다리지 않음.
+  try{ fetch('/api/backtest/stop',{method:'POST'}).catch(()=>{}); }catch(_e){}
+}
+window.addEventListener('load', _agentFullReset);
+// 요구 6: 페이지 이탈 시 폴링/타이머를 정리해 좀비 인터벌이 남지 않게 한다.
+window.addEventListener('beforeunload', function(){
+  try{ agentBTStopPoll(); }catch(_e){}
+  try{ if(typeof _evolvePollTimer!=='undefined' && _evolvePollTimer){ clearInterval(_evolvePollTimer); _evolvePollTimer=null; } }catch(_e){}
 });
 
 // ═══════════════════════════════════════════════════════════════
