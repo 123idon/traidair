@@ -13519,8 +13519,18 @@ window.addEventListener('beforeunload', function(){
 const CONS_TUNABLE = {
   'screening.threshold':       { label:'스크리닝 통과 점수', hint:'높을수록 후보가 까다로워져 거래 수가 줄어요', range:'0~100' },
   'signal.volume_surge_multiplier': { label:'거래량 급증 배수', hint:'직전 20분 평균 대비 몇 배여야 신호로 볼지 (기본 2.0)', range:'1.2~4.0' },
-  'time_stop.evaluation_minutes':   { label:'타임스톱 평가 시간(분)', hint:'진입 후 방향 안 나올 때 재평가까지 기다리는 시간', range:'10~60' },
-  'time_stop.flat_box_pct':         { label:'타임스톱 무방향 박스(%)', hint:'±이 범위 안이면 방향 미발생으로 봐요 (0.005=±0.5%)', range:'0.001~0.02' },
+  // 손절 (§5.4) — 상담/회의에서 조정
+  'stop_loss.hard_max_pct':         { label:'하드 손절(%)', hint:'최대 손절선. -0.02=-2% (안전범위 -0.5%~-10%)', range:'-0.10~-0.005' },
+  'stop_loss.technical_buffer_pct': { label:'기술적 손절 버퍼(%)', hint:'진입캔들 저점 아래로 이 폭만큼 더 빠지면 손절 (0.005=-0.5%)', range:'0~0.05' },
+  'stop_loss.technical_stop_enabled': { label:'기술적 손절 사용', hint:'진입캔들 저점 이탈 손절 on/off (끄면 하드 손절만)', range:'true/false' },
+  // 타임스톱 (§5.5 2단 체크) — 상담/회의에서 조정
+  'time_stop.enabled':              { label:'타임스톱 사용', hint:'타임스톱 전체 on/off', range:'true/false' },
+  'time_stop.evaluation_minutes':   { label:'타임스톱 평가 시간(분)', hint:'진입 후 방향 안 나올 때 재평가까지 기다리는 시간(메인 체크)', range:'5~120' },
+  'time_stop.min_profit_pct':       { label:'타임스톱 수익 기준(%)', hint:'이 수익 미달이면 동작 발동 (0.01=+1%)', range:'0~0.05' },
+  'time_stop.action':               { label:'타임스톱 동작', hint:'reduce_50(절반 청산) 또는 exit_all(전량 청산)', range:'reduce_50/exit_all' },
+  'time_stop.first_check_minutes':  { label:'1차 타임스톱 시간(분)', hint:'메인 체크 전 1차 점검 시간 (0이면 1차 비활성)', range:'0~60' },
+  'time_stop.first_check_action':   { label:'1차 타임스톱 동작', hint:'hold(보류)/reduce_50/exit_all', range:'hold/reduce_50/exit_all' },
+  'time_stop.flat_box_pct':         { label:'타임스톱 무방향 박스(%)', hint:'(구) 호환용·미사용', range:'0.001~0.02' },
 };
 
 // ── 각 에이전트 정의 — 관할(jurisdiction)을 완전히 분리 ──
@@ -13561,7 +13571,7 @@ const CONS_AGENTS = [
       talk:'오늘 하드리밋이 발동했는지(동시보유 3종목·연속손절 쿨다운·시간대 금지·슬리피지 5틱·담보비율), 위험했던 순간, 손절 집행 내역과 익절 기준. 하드리밋은 절대 변경 불가임을 분명히 한다.',
       never:'어떤 종목을 고를지(스크리닝 관할), 지표 분석 수치(신호분석 관할), 주문을 실제로 어떻게 넣었는지의 체결 과정(주문실행 관할).',
       reflect:'리스크 관리 실수(늦은 손절, 과도한 사이징, 쿨다운 누락)만 돌아본다.' },
-    scope:['riskParam','hardLimits'], topicPrefix:['risk'], tunables:['time_stop.evaluation_minutes','time_stop.flat_box_pct'] },
+    scope:['riskParam','hardLimits'], topicPrefix:['risk'], tunables:['stop_loss.hard_max_pct','stop_loss.technical_buffer_pct','stop_loss.technical_stop_enabled','time_stop.enabled','time_stop.evaluation_minutes','time_stop.min_profit_pct','time_stop.action','time_stop.first_check_minutes','time_stop.first_check_action'] },
 
   { id:'order', emoji:'⚡', color:'#ff9900', name:'주문실행 담당', role:'KIS 주문 · 체결 · 슬리피지',
     identity:'너는 실행부 주문실행 담당이다. 리스크부 승인(APPROVE)을 받은 주문만 KIS로 보내고 체결을 관리한다.',
@@ -13585,7 +13595,7 @@ const CONS_AGENTS = [
       talk:'어떤 에이전트가 잘했고 어떤 에이전트가 부진했는지, 토큰 낭비·중복 호출 분석, 근거 기반 파라미터 최적화 제안(paper에서만 적용, 승인 후 반영).',
       never:'특정 종목을 사라/팔아 같은 직접 매매 지시, 실시간 체결 개입. 나는 "시스템을 관찰·개선"할 뿐이다.',
       reflect:'관찰·제안의 실수(잘못된 성과 귀속, 근거 약한 제안)만 돌아본다.' },
-    scope:['mode','perfOverall','teamActivity','allParams'], topicPrefix:['meta','*'], tunables:['screening.threshold','signal.volume_surge_multiplier','time_stop.evaluation_minutes','time_stop.flat_box_pct'] },
+    scope:['mode','perfOverall','teamActivity','allParams'], topicPrefix:['meta','*'], tunables:['screening.threshold','signal.volume_surge_multiplier','stop_loss.hard_max_pct','stop_loss.technical_buffer_pct','stop_loss.technical_stop_enabled','time_stop.enabled','time_stop.evaluation_minutes','time_stop.min_profit_pct','time_stop.action','time_stop.first_check_minutes','time_stop.first_check_action'] },
 ];
 
 // 부서 id → 한글 담당명 (관할 밖 질문을 떠넘길 때 사용)
@@ -13887,8 +13897,16 @@ function consScopedCtx(agent, ctx){
   if(has('threshold') && p['screening.threshold']!=null) L.push('현재 스크리닝 통과 점수(threshold): '+p['screening.threshold']);
   if(has('signalParam') && p['signal.volume_surge_multiplier']!=null) L.push('현재 거래량 급증 배수: '+p['signal.volume_surge_multiplier']);
   if(has('riskParam')){
-    if(p['time_stop.evaluation_minutes']!=null) L.push('현재 타임스톱 평가시간: '+p['time_stop.evaluation_minutes']+'분');
-    if(p['time_stop.flat_box_pct']!=null) L.push('현재 타임스톱 무방향 박스: ±'+(p['time_stop.flat_box_pct']*100).toFixed(2)+'%');
+    // 손절 (§5.4)
+    if(p['stop_loss.hard_max_pct']!=null) L.push('현재 하드 손절: '+(p['stop_loss.hard_max_pct']*100).toFixed(2)+'%');
+    if(p['stop_loss.technical_buffer_pct']!=null) L.push('현재 기술적 손절 버퍼: -'+(p['stop_loss.technical_buffer_pct']*100).toFixed(2)+'% (진입캔들 저점 이탈)');
+    if(p['stop_loss.technical_stop_enabled']!=null) L.push('기술적 손절 사용: '+(p['stop_loss.technical_stop_enabled']?'켜짐':'꺼짐'));
+    // 타임스톱 (§5.5 2단 체크)
+    if(p['time_stop.enabled']!=null) L.push('타임스톱 사용: '+(p['time_stop.enabled']?'켜짐':'꺼짐'));
+    if(p['time_stop.evaluation_minutes']!=null) L.push('현재 타임스톱 평가시간(메인): '+p['time_stop.evaluation_minutes']+'분');
+    if(p['time_stop.min_profit_pct']!=null) L.push('타임스톱 수익 기준: +'+(p['time_stop.min_profit_pct']*100).toFixed(2)+'% 미달 시 청산');
+    if(p['time_stop.action']!=null) L.push('타임스톱 동작: '+(p['time_stop.action']==='exit_all'?'전량 청산':'절반 청산(reduce_50)'));
+    if(p['time_stop.first_check_minutes']!=null) L.push('1차 타임스톱: '+(Number(p['time_stop.first_check_minutes'])>0?p['time_stop.first_check_minutes']+'분('+(p['time_stop.first_check_action']||'hold')+')':'비활성'));
   }
   if(has('hardLimits')) L.push('하드리밋(변경불가): 동시보유 3종목 / 연속손절 3회→1시간 쿨다운 / 09:00~09:30·14:30이후 진입금지 / 슬리피지 5틱 / 신용 담보비율 버퍼.');
   if(has('allParams')){

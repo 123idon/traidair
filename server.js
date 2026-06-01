@@ -2223,14 +2223,35 @@ const server = http.createServer(async (req, res) => {
         return m ? Number(m[1]) : null;
       };
       const t = {};
-      const thr = sraw.match(/^screening:\s*[\s\S]*?^\s{2,}threshold:\s*([0-9.+-]+)/m);
-      if (thr) t['screening.threshold'] = Number(thr[1]);
-      const vsm = sraw.match(/^signal:\s*[\s\S]*?^\s{2,}volume_surge_multiplier:\s*([0-9.+-]+)/m);
-      if (vsm) t['signal.volume_surge_multiplier'] = Number(vsm[1]);
-      const em = sraw.match(/^time_stop:\s*[\s\S]*?^\s{2,}evaluation_minutes:\s*([0-9.+-]+)/m);
-      if (em) t['time_stop.evaluation_minutes'] = Number(em[1]);
-      const fb = sraw.match(/^time_stop:\s*[\s\S]*?^\s{2,}flat_box_pct:\s*([0-9.+-]+)/m);
-      if (fb) t['time_stop.flat_box_pct'] = Number(fb[1]);
+      // section 블록 안에서 "  key: value" 숫자/문자/bool 추출 헬퍼.
+      const pickNum = (section, key) => {
+        const m = sraw.match(new RegExp('^' + section + ':\\s*[\\s\\S]*?^\\s{2,}' + key + ':\\s*([0-9.+-]+)', 'm'));
+        return m ? Number(m[1]) : null;
+      };
+      const pickRaw = (section, key) => {
+        // 문자열("reduce_50")·bool(true) 등 — 따옴표/공백/주석 제거.
+        const m = sraw.match(new RegExp('^' + section + ':\\s*[\\s\\S]*?^\\s{2,}' + key + ':\\s*([^#\\n]+)', 'm'));
+        if (!m) return null;
+        let v = m[1].trim().replace(/^["']|["']$/g, '');
+        if (v === 'true' || v === 'false') return v === 'true';
+        return v;
+      };
+      const setNum = (k, sec, key) => { const v = pickNum(sec, key); if (v != null) t[k] = v; };
+      const setRaw = (k, sec, key) => { const v = pickRaw(sec, key); if (v != null) t[k] = v; };
+      setNum('screening.threshold', 'screening', 'threshold');
+      setNum('signal.volume_surge_multiplier', 'signal', 'volume_surge_multiplier');
+      // 손절 (§5.4)
+      setNum('stop_loss.hard_max_pct', 'stop_loss', 'hard_max_pct');
+      setNum('stop_loss.technical_buffer_pct', 'stop_loss', 'technical_buffer_pct');
+      setRaw('stop_loss.technical_stop_enabled', 'stop_loss', 'technical_stop_enabled');
+      // 타임스톱 (§5.5 2단 체크)
+      setRaw('time_stop.enabled', 'time_stop', 'enabled');
+      setNum('time_stop.evaluation_minutes', 'time_stop', 'evaluation_minutes');
+      setNum('time_stop.min_profit_pct', 'time_stop', 'min_profit_pct');
+      setRaw('time_stop.action', 'time_stop', 'action');
+      setNum('time_stop.first_check_minutes', 'time_stop', 'first_check_minutes');
+      setRaw('time_stop.first_check_action', 'time_stop', 'first_check_action');
+      setNum('time_stop.flat_box_pct', 'time_stop', 'flat_box_pct');
       out.tunable = t;
     } catch (e) {}
     // 오늘 저널 토픽 요약
