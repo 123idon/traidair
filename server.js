@@ -242,7 +242,12 @@ function btPython() {
 
 function btStopSentinel()  { return path.join(AGENT_DIR, 'state', 'BACKTEST_STOP'); }
 function btPauseSentinel() { return path.join(AGENT_DIR, 'state', 'BACKTEST_PAUSE'); }
+function btKillSentinel()  { return path.join(AGENT_DIR, 'state', 'KILL_SWITCH'); }
 function btStateFile()     { return path.join(AGENT_DIR, 'state', 'backtest_live.json'); }
+function btLockFile()      { return path.join(AGENT_DIR, 'state', 'backtest.lock'); }
+
+// 두 번 동시에 시작 버튼을 눌러도 엔진이 두 개 뜨지 않도록 하는 재진입 가드(요구 3).
+let btStarting = false;
 
 // 백테스트 엔진이 "지금 살아서 진행 중"인지 — 추적 PID + 상태파일 신선도(2초)로 판정.
 // 일시정지 중에도 대시보드가 250ms마다 파일을 갱신하므로 fresh=true → 살아있음으로 본다.
@@ -252,24 +257,82 @@ function btAlive() {
 }
 function btPaused() { try { return fs.existsSync(btPauseSentinel()); } catch (e) { return false; } }
 
+// 추적되지 않는(고아) 백테스트 프로세스의 PID를 상태파일에서 읽는다.
+// server.js 가 재시작되면 btProc 추적을 잃지만, 이전 run_backtest.py 가 계속
+// state 파일을 갱신해 btAlive()=true → 새 시작이 "이미 실행 중"으로 거절되던 버그(요구 1).
+function btStateFilePid() {
+  try {
+    const raw = fs.readFileSync(btStateFile(), 'utf8');
+    const pid = JSON.parse(raw).pid;
+    return (pid && Number.isInteger(pid)) ? pid : null;
+  } catch (e) { return null; }
+}
 // 새 백테스트 시작 — 가상잔고는 **항상 정확히 100만원**(요구 3, 엔진이 하드코딩),
 // 날짜 범위는 주입하지 않아 로컬 수집 데이터 전체에서 **랜덤 추첨**(요구 2).
-function startBacktest(extraEnv = {}) {
-  if (btAlive()) return { ok: false, error: '이미 실행 중이에요' };
-  try { fs.unlinkSync(btStopSentinel());  } catch (e) {}
-  try { fs.unlinkSync(btPauseSentinel()); } catch (e) {}
-  try { fs.unlinkSync(btStateFile());     } catch (e) {}   // 깨끗한 시작(이전 잔재 제거)
-  const env = { ...process.env, ...extraEnv };
-  env.BACKTEST_AUTO_SPEED = env.BACKTEST_AUTO_SPEED || '1';   // 자동 배속 기본 ON
-  env.BACKTEST_STEP_MS = env.BACKTEST_STEP_MS || '45';        // 캔들 하나씩 보이는 속도
-  const script = path.join(AGENT_DIR, 'scripts', 'run_backtest.py');
+async function startBacktest(extraEnv = {}) {
+  // ── 단일 실행 보장(요구 1·3): 서버가 백테스트 실행 상태를 단독으로 관리한다. ──
+  // 1) 동시 시작 클릭 가드 — 시작 처리 중에 또 시작하면 즉시 거절(엔진 두 개 방지).
+  if (btStarting) return { ok: false, error: '백테스트를 시작하는 중이에요. 잠시만요.' };
+  btStarting = true;
   try {
-    btProc = spawn(btPython(), [script], { cwd: AGENT_DIR, env, windowsHide: true, stdio: 'ignore' });
-    btProc.on('exit', () => { btProc = null; });
+    // 2) 이 서버가 추적 중인 엔진이 진짜로 살아있으면 **중복 시작을 막는다**(요구 3).
+    //    (다시 시작하려면 ■ 정지 또는 ↺ 리셋으로 먼저 끝낸다.)
+    if (btProc && !btProc.killed) {
+      return { ok: false, error: '이미 백테스트가 실행 중이에요. 정지(■) 또는 리셋(↺) 후 다시 시작하세요.' };
+    }
+    // 3) 추적이 끊긴 고아 엔진(state 파일만 신선 — 예: server 재시작)이면 거절 대신
+    //    graceful 정지로 자가 복구한 뒤 새로 시작한다(요구 1).
+    if (btAlive()) {
+      const r = await stopBacktest({ graceMs: 8000 });
+      console.log('[backtest] 고아 백테스트 정리 후 새로 시작 (graceful=' + r.graceful + ', pid=' + r.pid + ')');
+    }
+    // 4) 모든 제어 센티넬 + 상태파일 제거 → 시작 직후 즉시종료(STOP/KILL 잔재)·
+    //    유령 상태(이전 완료 리포트)로 결과창만 뜨던 버그 원천 차단(요구 2).
+    // backtest.lock 도 함께 제거 — 이 시점엔 이전 엔진이 (graceful/force) 정지됨이 보장되므로
+    // (위 btProc 추적·stopBacktest), 새 엔진이 단일 실행 락을 즉시 획득할 수 있게 한다.
+    // (강제종료 시 엔진의 atexit 락 해제가 안 돌 수 있어 잔재가 남는 것을 서버가 정리.)
+    for (const f of [btStopSentinel(), btPauseSentinel(), btKillSentinel(), btStateFile(), btLockFile()]) {
+      try { fs.unlinkSync(f); } catch (e) {}
+    }
+    // 직전 엔진이 막 종료했다면 그 마지막 파일 쓰기가 정착할 시간을 잠깐 준다(경합 차단).
+    await sleepMs(250);
+    const env = { ...process.env, ...extraEnv };
+    env.BACKTEST_AUTO_SPEED = env.BACKTEST_AUTO_SPEED || '1';   // 자동 배속 기본 ON
+    env.BACKTEST_STEP_MS = env.BACKTEST_STEP_MS || '45';        // 캔들 하나씩 보이는 속도
+    const script = path.join(AGENT_DIR, 'scripts', 'run_backtest.py');
+    // python stdout/stderr 를 파일로 캡처(요구 B) — 기존 'ignore' 는 import 단계 크래시·
+    // 인터프리터 가드·raw traceback 을 통째로 버려 다음 디버깅 때 증거가 없었다. 이제
+    // logging 미설정 단계(import 등) 출력까지 logs/backtest_spawn.log 에 남는다.
+    // (정상 INFO 로그는 run_backtest.py 가 logs/backtest.log 에 따로 기록한다.)
+    let btOut = 'ignore';
+    try {
+      const logDir = path.join(AGENT_DIR, 'logs');
+      fs.mkdirSync(logDir, { recursive: true });
+      btOut = fs.openSync(path.join(logDir, 'backtest_spawn.log'), 'a');
+      fs.writeSync(btOut, `\n===== spawn ${new Date().toISOString()} =====\n`);
+    } catch (e) { btOut = 'ignore'; }
+    btProc = spawn(btPython(), [script], {
+      cwd: AGENT_DIR, env, windowsHide: true,
+      stdio: ['ignore', btOut, btOut],
+    });
+    console.log('[backtest] spawn pid=' + btProc.pid
+      + ' days=' + (env.BACKTEST_DAYS || '무제한')
+      + ' start=' + (env.BACKTEST_START || '기본')
+      + ' end=' + (env.BACKTEST_END || '기본')
+      + ' cash=' + (env.BACKTEST_CASH || '1000000(기본)')
+      + ' py=' + btPython());
+    btProc.on('exit', (code, sig) => {
+      console.log('[backtest] python 종료 pid=' + (btProc && btProc.pid)
+        + ' code=' + code + ' signal=' + sig);
+      btProc = null;
+      try { if (btOut !== 'ignore') fs.closeSync(btOut); } catch (e) {}
+    });
     return { ok: true, state: 'started', pid: btProc.pid };
   } catch (e) {
     btProc = null;
     return { ok: false, error: e.message };
+  } finally {
+    btStarting = false;
   }
 }
 
@@ -277,29 +340,95 @@ function startBacktest(extraEnv = {}) {
 function pauseBacktest()  { try { fs.writeFileSync(btPauseSentinel(), String(Date.now())); } catch (e) {} return { ok: true, state: 'paused' }; }
 function resumeBacktest() { try { fs.unlinkSync(btPauseSentinel()); } catch (e) {} return { ok: true, state: 'resumed' }; }
 
-// 토글(요구 1) — 버튼 하나로 시작 ↔ 일시정지 ↔ 이어서 진행.
-function toggleBacktest() {
-  if (!btAlive()) return startBacktest();          // 정지/완료 → 새로 시작
-  if (btPaused())  return resumeBacktest();         // 일시정지 → 이어서 진행
-  return pauseBacktest();                           // 진행 중 → 일시정지
+// 토글(요구 1·4) — 버튼 하나로 시작 ↔ 일시정지 ↔ 이어서 진행.
+async function toggleBacktest(extraEnv = {}) {
+  if (!btAlive()) return await startBacktest(extraEnv);  // 정지/완료 → 새로 시작
+  if (btPaused())  return resumeBacktest();              // 일시정지 → 이어서 진행(멈춘 시점부터)
+  return pauseBacktest();                                // 진행 중 → 일시정지
+}
+// 요청 body({days,cash,start,end})를 백테스트 env로 변환.
+function btEnvFromBody(body) {
+  let o = {};
+  try { o = JSON.parse(body || '{}'); } catch (e) {}
+  const env = {};
+  if (o.days  && Number(o.days)  > 0) env.BACKTEST_DAYS  = String(Math.floor(Number(o.days)));
+  if (o.cash  && Number(o.cash)  > 0) env.BACKTEST_CASH  = String(Math.floor(Number(o.cash)));
+  if (o.start) env.BACKTEST_START = String(o.start);
+  if (o.end)   env.BACKTEST_END   = String(o.end);
+  return env;
 }
 
-// 완전 정지 + 초기화 — 프로세스 종료, 센티넬/상태파일 제거(다음 시작은 100만원부터).
-function stopBacktest() {
+// 엔진이 **자발적으로 종료**했는지 판정 — 추적 프로세스가 끝났고(또는 없고) 상태파일이
+// 더 이상 신선하지 않으면(>2s, 대시보드가 250ms마다 갱신하므로) run_backtest.py 는 스스로
+// 빠져나간 것이다. 상태파일이 아예 없으면 당연히 종료됨.
+function _btProcessGone() {
+  if (btProc && !btProc.killed) return false;
+  try { return (Date.now() - fs.statSync(btStateFile()).mtimeMs) >= 2000; }
+  catch (e) { return true; }
+}
+
+const sleepMs = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// 완전 정지 + 초기화 — **graceful**(요구 1·2). 핵심 버그 수정:
+//   기존 stopBacktest 는 STOP 센티넬을 쓰자마자 곧바로 `taskkill /F`로 강제종료해서,
+//   run_backtest.py(=run_paper 위임)가 센티넬을 감지해 **스스로 종료코드 0**으로 빠져나갈
+//   틈도 없이 강제로 죽었다 → 리셋/정지 때마다 **종료코드 1**(강제종료)로 보이던 원인.
+//   이제는 ① STOP 센티넬을 기록하고 ② 유예시간 동안 엔진이 스스로 끝나길 기다린 뒤,
+//   ③ 유예를 넘겨도 살아있을 때만 마지막 수단으로 force-kill 한다. 정상 흐름에서는 더 이상
+//   강제종료가 일어나지 않아 run_paper 가 깔끔히(코드 0) 종료된다.
+// 종료 후 항상 상태파일을 삭제해 btAlive()를 즉시 false로 만든다(정지 직후 ▶ 시작이
+// "이미 실행 중"으로 거절되지 않고 fresh start — 기존 동작 유지).
+async function stopBacktest({ graceMs = 6000, removeState = true } = {}) {
+  const wasAlive = btAlive();
+  console.log('[backtest] STOP 요청 — STOP 센티넬 기록 (wasAlive=' + wasAlive
+    + ', graceMs=' + graceMs + ', trackedPid=' + (btProc && btProc.pid)
+    + ', statePid=' + btStateFilePid() + ')');
+  // 1) graceful 정지 신호 — 엔진의 _stop_watcher 가 0.2s 내 감지해 스스로 0 으로 종료한다.
+  //    일시정지 중이면 풀어줘야 종료가 진행되므로 PAUSE 센티넬 제거.
   try { fs.writeFileSync(btStopSentinel(), String(Date.now())); } catch (e) {}
   try { fs.unlinkSync(btPauseSentinel()); } catch (e) {}
-  if (btProc && !btProc.killed) {
-    const pid = btProc.pid;
-    try {
-      spawn('taskkill', ['/PID', String(pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' });
-    } catch (e) {
-      try { btProc.kill(); } catch (_) {}
+  // 2) 자발적 종료 대기(유예, 200ms 폴링). 보통 1~3초 내 스스로 끝난다.
+  //    종료 판정은 **실제 엔진의 상태파일 하트비트**(250ms 주기)로만 한다(_btProcessGone).
+  //    btProc.exitCode 같은 추적 핸들은 venv python.exe 가 런처라 실제 엔진보다 먼저 종료될 수
+  //    있어(자식 pid≠상태파일 pid) 거짓 양성을 낸다 → 신뢰하지 않는다. 상태파일이 2초 이상
+  //    갱신되지 않아야(엔진이 멈춰야) 비로소 '자발적 종료'로 본다.
+  let exitedGracefully = !wasAlive;
+  if (wasAlive) {
+    const deadline = Date.now() + graceMs;
+    while (Date.now() < deadline) {
+      if (_btProcessGone()) { exitedGracefully = true; break; }
+      await sleepMs(200);
     }
-    btProc = null;
-    return { ok: true, pid };
+  }
+  // 3) 유예를 넘겨도 살아있을 때만 마지막 수단으로 force-kill(드문 경우 — 멈춘 프로세스).
+  let killedPid = null;
+  let forced = false;
+  if (!exitedGracefully) {
+    forced = true;
+    if (btProc && !btProc.killed) {
+      killedPid = btProc.pid;
+      try { spawn('taskkill', ['/PID', String(killedPid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' }); }
+      catch (e) { try { btProc.kill(); } catch (_) {} }
+    } else {
+      const pid = btStateFilePid();   // 페이지 재로드로 추적을 잃은 이전 세션 고아 프로세스
+      if (pid) {
+        killedPid = pid;
+        try { spawn('taskkill', ['/PID', String(pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' }); } catch (e) {}
+      }
+    }
   }
   btProc = null;
-  return { ok: true, msg: '정지 센티넬 기록 (추적 PID 없음 — 고아 프로세스도 곧 종료)' };
+  console.log('[backtest] STOP 완료 — graceful=' + exitedGracefully
+    + ', forced=' + forced + ', killedPid=' + killedPid);
+  // 4) 상태파일 제거 → btAlive() 즉시 false. STOP 센티넬은 엔진이 자발적 종료 시 자기 finally
+  //    에서 지우고, force-kill 된 경우엔 다음 startBacktest 가 정리한다.
+  if (removeState) { try { fs.unlinkSync(btStateFile()); } catch (e) {} }
+  return {
+    ok: true, pid: killedPid, graceful: exitedGracefully, forced,
+    msg: !wasAlive ? '실행 중인 백테스트 없음'
+       : exitedGracefully ? '백테스트 정상 종료(graceful)'
+       : '백테스트 강제 종료(pid=' + killedPid + ')',
+  };
 }
 
 // ── 메타 진화(최적화 제안 실행) 프로세스 제어 (HTS 🧬 진화+ 버튼, §2.7) ──
@@ -1524,9 +1653,37 @@ const server = http.createServer(async (req, res) => {
       return d;
     };
 
-    if (mode === 'sim' && simDate && simTime) {
-      const [yr, mo, dy] = simDate.split('-').map(Number);
-      const [hh, mm] = simTime.split(':').map(Number);
+    // 유효하지 않은 Date여도 절대 throw하지 않는 ISO 변환 헬퍼.
+    // (과거 시각 파싱 실패 시 'Invalid time value' 예외로 500이 나던 버그 방지)
+    const isoSafe = (ms) => {
+      const d = new Date(ms);
+      return Number.isFinite(d.getTime()) ? d.toISOString() : null;
+    };
+    const kstSafe = (sec) => {
+      if (!Number.isFinite(sec)) return null;
+      const d = new Date((sec + KST_OFFSET) * 1000);
+      return Number.isFinite(d.getTime())
+        ? d.toISOString().replace('T', ' ').substring(0, 19) + ' KST'
+        : null;
+    };
+
+    // sim 파라미터(date+time) 안전 파싱. 형식이 깨졌으면 null → 실시간 폴백.
+    // 지원: date=YYYY-MM-DD, time=HH:MM / HH:MM:SS / HHMM
+    const simParse = (mode === 'sim' && simDate && simTime) ? (() => {
+      const dm = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(String(simDate).trim());
+      const tStr = String(simTime).trim().replace('：', ':');
+      const tm = /^(\d{1,2}):(\d{2})/.exec(tStr) || /^(\d{2})(\d{2})$/.exec(tStr);
+      if (!dm || !tm) return null;
+      const yr = +dm[1], mo = +dm[2], dy = +dm[3], hh = +tm[1], mm = +tm[2];
+      if (![yr, mo, dy, hh, mm].every(Number.isFinite)) return null;
+      if (mo < 1 || mo > 12 || dy < 1 || dy > 31 || hh > 23 || mm > 59) return null;
+      return { yr, mo, dy, hh, mm };
+    })() : null;
+    // sim 의도였으나 파싱 실패 → 빈 구조라도 200으로 정상 반환(백테스트를 죽이지 않음)
+    const isSim = !!simParse;
+
+    if (simParse) {
+      const { yr, mo, dy, hh, mm } = simParse;
       const prevDay = getPrevBusinessDay(yr, mo, dy);
       const prevYr = prevDay.getUTCFullYear(), prevMo = prevDay.getUTCMonth()+1, prevDy = prevDay.getUTCDate();
 
@@ -1538,12 +1695,13 @@ const server = http.createServer(async (req, res) => {
       // simTime 기준 cutoff (미래 차단)
       cutoffTs = Math.floor(new Date(Date.UTC(yr, mo-1, dy, hh-9, mm, 0)).getTime() / 1000) + tf * 60;
     } else {
-      // 실시간 모드
+      // 실시간 모드 (또는 sim 파라미터가 깨진 경우의 안전 폴백)
       const now = Math.floor(Date.now() / 1000);
       period1 = now - 2 * 24 * 3600;
       period2 = now;
       cutoffTs = now;
     }
+    if (!Number.isFinite(cutoffTs)) cutoffTs = Math.floor(Date.now() / 1000);
 
     // 캐시 키
     const cacheKey = `${mode}_${simDate}_${simTime}_${tf}`;
@@ -1572,8 +1730,9 @@ const server = http.createServer(async (req, res) => {
 
       // 과거 날짜(60일 이상)는 5분봉 없음 → 1d 인터벌 사용
     const isHistorical = (() => {
-      if (mode !== 'sim' || !simDate) return false;
+      if (!isSim) return false;
       const simMs = new Date(simDate).getTime();
+      if (!Number.isFinite(simMs)) return false;
       const nowMs = Date.now();
       return (nowMs - simMs) > 55 * 24 * 3600 * 1000; // 55일 이상 과거
     })();
@@ -1595,10 +1754,10 @@ const server = http.createServer(async (req, res) => {
         let useCutoff = cutoffTs;
         const isKorean = ['kospi','kosdq','kospi200'].includes(item.key);
         const isUS = ['nasdaq','sp500','dow','vix'].includes(item.key);
-        if (mode === 'sim' && simDate) {
+        if (isSim) {
           if (isUS) {
             // 미국 장: 전날 KST 06:00 마감 (당일 KST 기준 전날 미국 마감)
-            const [yr, mo, dy] = simDate.split('-').map(Number);
+            const { yr, mo, dy } = simParse;
             useCutoff = Math.floor(new Date(Date.UTC(yr, mo-1, dy, 6-9, 0, 0)).getTime() / 1000);
             // 음수 방지: 전날 21:00 UTC
             if (useCutoff < 0) useCutoff = Math.floor(new Date(Date.UTC(yr, mo-1, dy-1, 21, 0, 0)).getTime() / 1000);
@@ -1608,9 +1767,9 @@ const server = http.createServer(async (req, res) => {
         const filteredBars = item.bars.filter(b => b.ts < useCutoff);
         const lastBar = filteredBars[filteredBars.length - 1];
         // 전일 종가: 국내는 전일 15:30, 미국은 전전일 마감
-        const prevBars = isKorean && mode === 'sim' && simDate
+        const prevBars = isKorean && isSim
           ? item.bars.filter(b => {
-              const [yr, mo, dy] = simDate.split('-').map(Number);
+              const { yr, mo, dy } = simParse;
               const dayStart = Math.floor(new Date(Date.UTC(yr, mo-1, dy, 0, 0, 0)).getTime() / 1000);
               return b.ts < dayStart;
             })
@@ -1626,10 +1785,10 @@ const server = http.createServer(async (req, res) => {
           price: currentPrice ? Math.round(currentPrice * 100) / 100 : null,
           prev: prevClose ? Math.round(prevClose * 100) / 100 : null,
           chgPct: chgPct != null ? Math.round(chgPct * 100) / 100 : null,
-          lastUpdated: lastTs ? new Date(lastTs * 1000).toISOString() : null,
-          lastUpdatedKST: lastTs ? new Date((lastTs + KST_OFFSET) * 1000).toISOString().replace('T', ' ').substring(0, 19) + ' KST' : null,
+          lastUpdated: lastTs ? isoSafe(lastTs * 1000) : null,
+          lastUpdatedKST: lastTs ? kstSafe(lastTs) : null,
           barsCount: filteredBars.length,
-          bars: mode === 'sim' ? filteredBars.map(b => ({ ts: b.ts, c: b.c, o: b.o, h: b.h, l: b.l })) : [],
+          bars: isSim ? filteredBars.map(b => ({ ts: b.ts, c: b.c, o: b.o, h: b.h, l: b.l })) : [],
         };
       }
 
@@ -1637,10 +1796,10 @@ const server = http.createServer(async (req, res) => {
       // (나스닥 기반 추정값은 가짜 데이터이므로 제거)
 
       const responseData = {
-        mode,
-        simDate,
-        simTime,
-        cutoffKST: new Date((cutoffTs + KST_OFFSET) * 1000).toISOString().replace('T',' ').substring(0,19) + ' KST',
+        mode: isSim ? 'sim' : mode,
+        simDate: simDate || null,
+        simTime: simTime || null,
+        cutoffKST: kstSafe(cutoffTs),
         fetchedAt: new Date().toISOString(),
         indices: result,
       };
@@ -1651,9 +1810,19 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
       res.end(JSON.stringify(responseData));
     } catch(e) {
-      console.error('market-data error:', e.message);
-      res.writeHead(500, { 'Content-Type': 'application/json', ...CORS });
-      res.end(JSON.stringify({ error: e.message }));
+      // 어떤 에러여도 500으로 죽이지 않는다 — 항상 올바른 형식의 JSON(빈 indices)을
+      // 200으로 반환해 ai-agent 백테스트가 직전 값/GREEN 폴백으로 계속 진행하게 한다.
+      console.error('market-data error:', e && e.message);
+      res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+      res.end(JSON.stringify({
+        mode: isSim ? 'sim' : mode,
+        simDate: simDate || null,
+        simTime: simTime || null,
+        cutoffKST: kstSafe(cutoffTs),
+        fetchedAt: new Date().toISOString(),
+        indices: {},
+        error: (e && e.message) || 'market-data failed',
+      }));
     }
     return;
   }
@@ -1904,13 +2073,13 @@ const server = http.createServer(async (req, res) => {
   if (url === '/api/agent/backtest/run' && req.method === 'POST') {
     if (!agentAuthOk(req)) return agentDeny(res);
     let body = ''; req.on('data', c => body += c);
-    req.on('end', () => {
+    req.on('end', async () => {
       let o = {}; try { o = JSON.parse(body || '{}'); } catch (e) {}
       const extra = {};
       if (o.days) extra.BACKTEST_DAYS = String(o.days);
       if (o.start) extra.BACKTEST_START = o.start;
       if (o.end) extra.BACKTEST_END = o.end;
-      const r = startBacktest(extra);
+      const r = await startBacktest(extra);
       res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
       res.end(JSON.stringify(r));
     });
@@ -1938,32 +2107,42 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // ── 백테스트 토글(시작/일시정지/이어서) + 리셋 — 버튼 하나로 제어(요구 1) ──
+  // ── 백테스트 토글(시작/일시정지/이어서) + 리셋 — 버튼 하나로 제어(요구 1·4) ──
   if (url === '/api/backtest/toggle' && req.method === 'POST') {
-    const r = toggleBacktest();
-    res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
-    res.end(JSON.stringify(r));
+    let body = ''; req.on('data', c => body += c);
+    req.on('end', async () => {
+      const r = await toggleBacktest(btEnvFromBody(body));
+      res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+      res.end(JSON.stringify(r));
+    });
     return;
   }
   if (url === '/api/backtest/reset' && req.method === 'POST') {
-    stopBacktest();
-    try { fs.unlinkSync(btStateFile()); } catch (e) {}        // 잔고 100만원으로 초기화(요구 3)
+    // 리셋 = ① 실행 중이면 **먼저 graceful 정지**(run_paper 가 스스로 코드 0 종료하도록
+    // 기다림) → ② 정지 완료 후에만 상태 초기화(잔고 100만/보유 0/매매 0). 순서를 await 로
+    // 보장해 "정지 전에 상태가 사라져 프로세스가 죽는" 경합을 차단한다(요구 1·2·3).
+    const s = await stopBacktest({ graceMs: 10000 });         // ① 안전 정지(완료까지 대기)
+    try { fs.unlinkSync(btStateFile()); } catch (e) {}        // ② 상태파일 제거 → 다음 시작 100만원
     res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
-    res.end(JSON.stringify({ ok: true, state: 'reset', msg: '리셋 완료' }));
+    res.end(JSON.stringify({
+      ok: true, state: 'reset', graceful: s.graceful, forced: s.forced,
+      cash: 1000000, positions: 0, trades: 0,
+      msg: '초기화 완료 (잔고 100만원 · 보유 0 · 매매 0)',
+    }));
     return;
   }
   // 하위호환 별칭(레거시 HTS 툴바 🚀/■ 버튼) — 내부적으로 시작/정지에 매핑.
   if (url === '/api/backtest/start' && req.method === 'POST') {
     let body = ''; req.on('data', c => body += c);
-    req.on('end', () => {
-      const r = startBacktest();
+    req.on('end', async () => {
+      const r = await startBacktest(btEnvFromBody(body));   // days/cash/start/end 반영(요구 4)
       res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
       res.end(JSON.stringify(r));
     });
     return;
   }
   if (url === '/api/backtest/stop' && req.method === 'POST') {
-    const r = stopBacktest();
+    const r = await stopBacktest({ graceMs: 10000 });   // graceful — run_paper 가 코드 0 으로 스스로 종료
     res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
     res.end(JSON.stringify(r));
     return;
