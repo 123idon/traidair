@@ -2163,6 +2163,18 @@ const server = http.createServer(async (req, res) => {
     res.end(JSON.stringify(r));
     return;
   }
+  // ── 완전 중단(⏹ 정지) — 프로세스만 graceful 종료하고 **상태파일은 보존**한다(요구). ──
+  //  → 잔고/누적성과/리포트가 그대로 남아 정지 후 결과 리포트를 표시할 수 있다(리셋 ↺ 과 구분:
+  //    리셋은 stopBacktest 가 상태파일을 지워 다음 시작이 100만원으로 초기화됨).
+  //  엔진은 종료 직전 dashboard 가 running:false 최종 스냅샷을 backtest_live.json 에 쓰므로,
+  //  파일 mtime 이 2초 지나 stale 해지면 /api/backtest/state 가 자동으로 running:false 를 보고한다.
+  //  다음 ▶ 시작(startBacktest)이 상태파일을 지우고 새 백테스트로 깔끔히 출발한다.
+  if (url === '/api/backtest/halt' && req.method === 'POST') {
+    const r = await stopBacktest({ graceMs: 10000, removeState: false });
+    res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+    res.end(JSON.stringify({ ...r, state: 'halted' }));
+    return;
+  }
 
   // ── 메타 진화 실행/결과 (HTS 🧬 진화+ 버튼) ──
   if (url === '/api/backtest/evolve' && req.method === 'POST') {
@@ -2322,6 +2334,47 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ── 회의 내용 적용 (📋 버튼) : scripts/meeting_apply.py --action {extract|apply|history|rollback} ──
+  // extract/apply/rollback 은 stdin 으로 페이로드(JSON)를 받고, history 는 입력 없음.
+  // extract=실행항목 추출(읽기전용), apply=선택항목 yaml 반영+회의결정 기록+깃커밋,
+  // history=적용 이력 타임라인+효과+롤백후보, rollback=결정 원복(paper 전용).
+  {
+    const mm = url.split('?')[0].match(/^\/api\/agent\/consult\/meeting\/(extract|apply|history|rollback)$/);
+    if (mm) {
+      const action = mm[1];
+      const wantGet = (action === 'history');
+      if ((wantGet && req.method !== 'GET') || (!wantGet && req.method !== 'POST')) {
+        // 메서드 불일치는 아래로 흘려보냄(다른 핸들러/404).
+      } else {
+        let body = '';
+        req.on('data', c => body += c);
+        req.on('end', () => {
+          const reply = (obj) => {
+            res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...CORS });
+            res.end(JSON.stringify(obj));
+          };
+          const script = path.join(AGENT_DIR, 'scripts', 'meeting_apply.py');
+          let out = '', err = '', child;
+          try {
+            child = spawn(btPython(), [script, '--action', action], { cwd: AGENT_DIR, env: { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' }, windowsHide: true });
+          } catch (e) { reply({ ok: false, reason: '회의 적용기 실행 실패: ' + e.message }); return; }
+          child.stdout.on('data', d => { out += d; });
+          child.stderr.on('data', d => { err += d; });
+          child.on('error', e => reply({ ok: false, reason: '회의 적용기 오류: ' + e.message }));
+          child.on('close', () => {
+            const line = out.trim().split('\n').filter(s => s.trim().startsWith('{')).pop();
+            let data = null; if (line) { try { data = JSON.parse(line); } catch (e) {} }
+            if (!data) { reply({ ok: false, reason: '회의 적용 결과 파싱 실패: ' + (err.trim().slice(-200) || out.trim().slice(-200) || '출력 없음') }); return; }
+            reply(data);
+          });
+          // history 외에는 stdin 으로 페이로드 전달(긴 한글 JSON 안전).
+          if (!wantGet) { try { child.stdin.write(body || '{}'); child.stdin.end(); } catch (e) {} }
+        });
+        return;
+      }
+    }
+  }
+
   // ── 단일 제안 적용 + 검수 + 자동커밋 (제안 카드 ✅ 적용 버튼, §2.7/§3.3) ──
   // scripts/apply_proposal.py가 strategy_params.yaml 수정 → 재읽기 검증 → git 커밋하고
   // 결과 JSON을 stdout으로 돌려준다. paper 모드에서만 적용(아니면 locked).
@@ -2422,6 +2475,46 @@ const server = http.createServer(async (req, res) => {
       });
     });
     return;
+  }
+
+  // ── 노션 학습 적용 (💬 상담 탭 "📚 노션 학습 적용하기") : scripts/notion_apply.py ──
+  //  extract = notion_knowledge.json 에서 적용 가능 항목 + 도입 가능(미반영) 항목 추출(읽기전용),
+  //  apply   = 선택 항목 yaml 반영 + 깃 커밋 + notion_applied.json 이력 기록(paper 전용),
+  //  history = 적용 이력 타임라인(GET, 입력 없음).
+  {
+    const nm = url.split('?')[0].match(/^\/api\/agent\/notion\/(extract|apply|history)$/);
+    if (nm) {
+      const action = nm[1];
+      const wantGet = (action === 'history');
+      if ((wantGet && req.method !== 'GET') || (!wantGet && req.method !== 'POST')) {
+        // 메서드 불일치는 아래로 흘려보냄.
+      } else {
+        let body = '';
+        req.on('data', c => body += c);
+        req.on('end', () => {
+          const reply = (obj) => {
+            res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...CORS });
+            res.end(JSON.stringify(obj));
+          };
+          const script = path.join(AGENT_DIR, 'scripts', 'notion_apply.py');
+          let out = '', err = '', child;
+          try {
+            child = spawn(btPython(), [script, '--action', action], { cwd: AGENT_DIR, env: { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' }, windowsHide: true });
+          } catch (e) { reply({ ok: false, reason: '노션 적용기 실행 실패: ' + e.message }); return; }
+          child.stdout.on('data', d => { out += d; });
+          child.stderr.on('data', d => { err += d; });
+          child.on('error', e => reply({ ok: false, reason: '노션 적용기 오류: ' + e.message }));
+          child.on('close', (code) => {
+            const line = out.trim().split('\n').filter(s => s.trim().startsWith('{')).pop();
+            let data = null; if (line) { try { data = JSON.parse(line); } catch (e) {} }
+            if (!data) { reply({ ok: false, reason: '노션 적용 결과 파싱 실패(코드 ' + code + '): ' + (err.trim().slice(-200) || out.trim().slice(-200) || '출력 없음') }); return; }
+            reply(data);
+          });
+          if (!wantGet) { try { child.stdin.write(body || '{}'); child.stdin.end(); } catch (e) {} }
+        });
+        return;
+      }
+    }
   }
 
   // ── HTS 화면 (/hts) — start.bat 자동 오픈 대상 ──
