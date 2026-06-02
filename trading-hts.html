@@ -1121,7 +1121,7 @@ canvas{image-rendering:pixelated;}
       </div>
       <div class="vsep" style="height:18px;"></div>
       <button class="play-btn" id="playBtn" onclick="togPlay()" style="font-size:14px;line-height:1;">▶</button>
-      <button class="ibtn pur" onclick="openBacktestDialog()" title="여러 영업일 연속 백테스트" style="font-size:10px;padding:3px 8px;">🚀 백테스트</button>
+      <button class="ibtn pur" id="btToolbarBtn" onclick="openBacktestDialog()" title="여러 영업일 연속 백테스트" style="font-size:10px;padding:3px 8px;">🚀 백테스트</button>
       <button class="ibtn" id="evolveBtn" onclick="runAgentEvolve()" title="진화+ — 메타 에이전트 최적화 제안 실행 (저널 관찰 → 전략 파라미터 진화)" style="font-size:10px;padding:3px 8px;background:linear-gradient(135deg,rgba(139,92,246,.18),rgba(5,192,114,.12));color:var(--p);border:1px solid rgba(139,92,246,.3);font-weight:700;">🧬 진화+</button>
       <!-- 배속 버튼 제거: 백테스트는 AutoSpeedGovernor(시스템 부하 기반)로 항상 자동 최고속 -->
       <div class="prog" style="flex:1;position:relative;cursor:pointer;" onclick="seekToPos(event,this)" title="클릭으로 이동">
@@ -1795,6 +1795,18 @@ canvas{image-rendering:pixelated;}
           <button id="notionSyncBtn" onclick="notionSync()" style="font-size:10px;padding:4px 8px;border-radius:8px;border:none;background:var(--b,#3b82f6);color:#fff;cursor:pointer;white-space:nowrap;">🔄 지금 업데이트</button>
         </div>
         <div id="notionStatus" style="font-size:10px;color:var(--ts,#9aa);line-height:1.5;">불러오는 중…</div>
+        <!-- 📚 노션 학습 적용하기: 수집한 노션 지식을 실제 전략(strategy_params.yaml)에 반영 -->
+        <button id="notionApplyBtn" onclick="notionApplyOpen()" style="margin-top:8px;width:100%;font-size:11px;font-weight:800;padding:8px;border-radius:9px;border:none;background:linear-gradient(135deg,#3182f6,#7c3aed);color:#fff;cursor:pointer;">📚 노션 학습 적용하기</button>
+        <div id="notionApplyBox" style="margin-top:8px;"></div>
+      </div>
+
+      <!-- 🗳 회의 적용 이력 (회의에서 적용한 전략 변경 타임라인 + 효과 + 롤백) -->
+      <div id="meetingHistPanel" style="margin-top:12px;padding:10px;border-radius:10px;background:var(--card,#16181d);border:1px solid var(--bd,#2a2d35);">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:6px;">
+          <div style="font-size:12px;font-weight:800;">🗳 회의 적용 이력</div>
+          <button onclick="consMeetingHistoryLoad()" style="font-size:10px;padding:4px 8px;border-radius:8px;border:none;background:var(--b,#3b82f6);color:#fff;cursor:pointer;white-space:nowrap;">🔄 새로고침</button>
+        </div>
+        <div id="meetingHistBody" style="font-size:10px;color:var(--ts,#9aa);line-height:1.5;">불러오는 중…</div>
       </div>
     </aside>
 
@@ -1829,6 +1841,37 @@ canvas{image-rendering:pixelated;}
   <div class="stats-page" style="max-width:960px;">
     <h2 style="font-size:18px;font-weight:800;margin-bottom:16px;">📋 TraidAIr 전체 기능 목록</h2>
     <p style="font-size:11px;color:var(--ts);margin-bottom:20px;">작동 안 하는 기능이나 추가하고 싶은 기능을 체크해보세요. 총 180개+ 기능.</p>
+
+    <!-- ⚙️ 매매 설정 (손절/익절 — strategy_params.yaml 즉시 반영, CLAUDE.md §5.3~5.4/§24) -->
+    <style>
+    .ts-card{background:var(--pan);border-radius:16px;box-shadow:var(--sh0);padding:16px 18px;}
+    .ts-h{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:800;color:var(--tp);}
+    .ts-badge{margin-left:auto;font-size:10px;font-weight:700;padding:3px 9px;border-radius:8px;background:var(--card);color:var(--ts);}
+    .ts-sub{font-size:11px;color:var(--ts);margin-top:4px;line-height:1.5;}
+    .ts-grp-t{font-size:12.5px;font-weight:800;color:var(--p);margin:16px 0 4px;}
+    .ts-row{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:11px 0;border-top:1px solid var(--br);}
+    .ts-txt{flex:1;min-width:0;}
+    .ts-lab{font-size:12.5px;font-weight:700;color:var(--tp);}
+    .ts-hint{font-size:10px;color:var(--ts);margin-top:2px;line-height:1.45;}
+    .ts-cur{font-size:10.5px;color:var(--b);font-weight:700;margin-top:3px;}
+    .ts-fb{font-size:10.5px;margin-top:3px;min-height:12px;}
+    .ts-ctl{display:flex;align-items:center;gap:5px;flex-shrink:0;padding-top:2px;}
+    .ts-in{width:62px;padding:7px 8px;border:1.5px solid var(--br);border-radius:9px;font-size:12.5px;text-align:right;background:var(--bg);color:var(--tp);}
+    .ts-in:focus{border-color:var(--b);outline:none;}
+    .ts-in:disabled{opacity:.5;}
+    .ts-unit{font-size:11px;color:var(--ts);}
+    .ts-sel{padding:7px 8px;border:1.5px solid var(--br);border-radius:9px;font-size:12px;background:var(--bg);color:var(--tp);}
+    .ts-sel:disabled{opacity:.5;}
+    .ts-switch{position:relative;display:inline-block;width:44px;height:24px;flex-shrink:0;}
+    .ts-switch input{opacity:0;width:0;height:0;}
+    .ts-switch span{position:absolute;cursor:pointer;inset:0;background:#cbd5e1;border-radius:24px;transition:.18s;}
+    .ts-switch span:before{content:"";position:absolute;height:18px;width:18px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.18s;}
+    .ts-switch input:checked+span{background:var(--b);}
+    .ts-switch input:checked+span:before{transform:translateX(20px);}
+    .ts-switch input:disabled+span{opacity:.5;cursor:not-allowed;}
+    .ts-lock{background:#fff6e5;color:#8a5a00;border-radius:11px;padding:10px 12px;font-size:11.5px;font-weight:700;margin-top:12px;line-height:1.5;}
+    </style>
+    <div id="tradeSettingsPanel" style="margin-bottom:22px;"></div>
 
     <div id="featList" style="display:flex;flex-direction:column;gap:16px;">
 
@@ -2395,7 +2438,9 @@ canvas{image-rendering:pixelated;}
     if(!rowsEl) return;
     if(!d||!d.ok){
       runEl.textContent='대기'; runEl.style.background='#f1f3f5'; runEl.style.color='#8b95a1';
-      clockEl.textContent='--:--';
+      // 백테스트 진행 중에는 중앙 시계(updateTime)가 시계를 소유한다. 일시적 파싱 실패로
+      // 여기서 '--:--'로 덮어쓰면 시계가 깜빡이므로, 정지 상태일 때만 비운다(요구 2).
+      if(!(window.agentBT && window.agentBT.running)) clockEl.textContent='--:--';
       dateEl.textContent='백테스트를 시작하면 팀이 일을 시작해요';
       rowsEl.innerHTML=idle();
       return;
@@ -2404,8 +2449,9 @@ canvas{image-rendering:pixelated;}
     runEl.textContent=run?'● 실행중':'정지/완료';
     runEl.style.background=run?'#e7f6ee':'#f1f3f5';
     runEl.style.color=run?'#00c473':'#8b95a1';
-    var t=(d.sim&&d.sim.time)?d.sim.time.slice(0,5):'--:--';
-    clockEl.textContent=t;
+    // 시계는 직접 쓰지 않고 단일 함수(updateTime)로만 갱신 → 중앙 시계 SSOT (요구 2).
+    // updateTime이 msTime과 agentTeamClock을 동시에, 단조 증가로만 갱신한다.
+    if(d.sim&&d.sim.time){ try{ updateTime(d.sim.time, (d.sim&&d.sim.date)||''); }catch(_e){ clockEl.textContent=d.sim.time.slice(0,5); } }
     var dd=(d.sim&&d.sim.date)||'';
     dateEl.textContent=dd?('📅 백테스트 날짜 '+dd.slice(0,4)+'.'+dd.slice(4,6)+'.'+dd.slice(6,8)):'—';
     var a=d.agents||{};
@@ -2924,7 +2970,7 @@ function loadState(){
   const c=localStorage.getItem("htsCfg");if(c)cfg={...cfg,...JSON.parse(c)};
   const m=localStorage.getItem("htsMock");if(m){const p=JSON.parse(m);mock={...mock,...p};}
   mock.cash=mock.cash||cfg.capital;
-  if(window.backtestState) window.backtestState.cash=mock.cash;   // 단일 상태 동기화 (요구 2)
+  updateCash(mock.cash);   // 단일 함수 경유 — 상태+상단/보유탭 동시 동기화 (요구 2·5)
   if(!mock.positions)mock.positions={};
   if(!mock.trades)mock.trades=[];
   const so=localStorage.getItem("htsStopOrders");
@@ -2934,7 +2980,7 @@ function loadState(){
     if(ok) {
       // 서버 데이터로 덮어쓰기
       const m2=localStorage.getItem("htsMock");
-      if(m2){const p=JSON.parse(m2);mock={...mock,...p};mock.cash=mock.cash||cfg.capital;if(window.backtestState) window.backtestState.cash=mock.cash;if(!mock.positions)mock.positions={};if(!mock.trades)mock.trades=[];}
+      if(m2){const p=JSON.parse(m2);mock={...mock,...p};mock.cash=mock.cash||cfg.capital;updateCash(mock.cash);if(!mock.positions)mock.positions={};if(!mock.trades)mock.trades=[];}
       const so2=localStorage.getItem("htsStopOrders");
       if(so2){try{stopOrders={...JSON.parse(so2)};}catch(e){}}
       // 시뮬 상태(날짜/TF/현재종목) 복원
@@ -4287,7 +4333,51 @@ let sim={playing:false,speed:60,idx:0,candles:[],timer:null,date:todayStr(),tf:"
 //  - updateCash 호출 시 상단 헤더(hdrCash)와 보유탭(cashVal)을 동시에 갱신한다.
 //  - 백테스트 매수/매도/리셋, 수동 매매, KIS 동기화 모두 이 함수를 통해서만 잔고를 바꾼다.
 // ════════════════════════════════════════════════════════════════
-window.backtestState = window.backtestState || { cash: (mock.cash||0) };
+window.backtestState = window.backtestState || { cash: (mock.cash||0), currentTime: '' };
+if(window.backtestState.currentTime===undefined) window.backtestState.currentTime='';
+// 단조 시계 가드 상태(요구 2): 마지막으로 반영한 거래일/시각.
+if(window.backtestState._clockDay===undefined)  window.backtestState._clockDay=null;
+if(window.backtestState._clockTime===undefined) window.backtestState._clockTime='';
+// ════════════════════════════════════════════════════════════════
+// 요구 2: 백테스트 가상 시각 단일 진실 공급원(SSOT)
+//  - 시각 상태는 window.backtestState.currentTime 하나로만 통일한다.
+//  - 시각 변경은 반드시 updateTime(time) 단일 함수로만 처리한다.
+//  - 상단/하단/패널 시각 표시(msTime 등)는 전부 이 함수가 동시에 갱신한다.
+//  - 백테스트 진행 중에는 레거시 차트 렌더(updChartToIdx)가 시각을 건드리지 않는다.
+//    → 에이전트 시각과 캔들 시각이 번갈아 쓰여 "장 시간이 왔다갔다" 하던 버그 차단.
+// ════════════════════════════════════════════════════════════════
+function updateTime(time, dayKey){
+  if(time==null) return;
+  time = String(time);
+  // ── 단조 증가 가드(요구 2: 시간이 왔다갔다 하지 않게) ──
+  //  500ms 폴링은 응답이 순서가 뒤바뀌어 도착할 수 있다. 같은 거래일(dayKey) 안에서는
+  //  더 과거의 시각을 무시해 중앙 시계가 거꾸로 가지 않게 한다. 거래일이 바뀌면(다음
+  //  랜덤일) 09:00로 되돌아가는 것은 정상이므로 허용한다.
+  if(dayKey!=null && dayKey!==''){
+    const bs = window.backtestState;
+    if(bs._clockDay===dayKey && bs._clockTime && time < bs._clockTime) return;  // out-of-order → 무시
+    bs._clockDay = dayKey;
+    bs._clockTime = time;
+  }
+  const hhmm = time.length>=5 ? time.slice(0,5) : time;
+  window.backtestState.currentTime = time;
+  // 단일 변수(window.backtestState.currentTime)를 모든 시계 표시가 공유한다.
+  // 상단/하단 푸터 시계(msTime)와 좌하단 에이전트팀 시계(agentTeamClock) 동시 갱신.
+  const el = document.getElementById('msTime');
+  if(el) el.textContent = hhmm;
+  const tc = document.getElementById('agentTeamClock');
+  if(tc) tc.textContent = hhmm;
+}
+// 중앙 시계를 초기 상태로 되돌린다(정지/리셋/페이지 로드 시). 단조 가드 상태도 비워
+// 다음 백테스트가 09:00부터 깨끗하게 시작되게 한다.
+function resetClock(){
+  const bs = window.backtestState;
+  bs.currentTime = '';
+  bs._clockDay = null;
+  bs._clockTime = '';
+  const el = document.getElementById('msTime'); if(el) el.textContent = '09:00';
+  const tc = document.getElementById('agentTeamClock'); if(tc) tc.textContent = '--:--';
+}
 function updateCash(amount){
   amount = Number(amount);
   if(!isFinite(amount)) amount = 0;
@@ -4354,6 +4444,18 @@ let inds={ma:true,vol:true,rsi:false,macd:false,bb:false,vwap:false};
 let mChart=null,rsiChart=null,macdChart=null,pnlChart=null;
 let chartViewStart=0,chartViewCount=60;
 let _chartRaf=null;
+let _chartFullSpan=0;   // 백테스트: 전일+당일 전체 슬롯(예약 폭). 0이면 일반 모드.
+let _chartSlots=0;      // 현재 렌더의 X축 분모(슬롯 수) — 서브차트(RSI/MACD) 정렬 공유.
+
+// 줌 상한(슬롯). 백테스트에선 전일+당일 전체 슬롯까지 줌아웃 허용(우측 여백 = 아직 안 온 시간).
+function _chartMaxSlots(aLen){
+  return Math.max(aLen||0, _chartFullSpan||0) || aLen || 10;
+}
+// 타임프레임(분)별 정규장 09:00~15:30 풀세션 캔들 수.
+function _agentSessionSlots(tf){
+  const m=parseInt((''+(tf||'1')).replace(/[^0-9]/g,''))||1;
+  return Math.max(10, Math.ceil(391/m));   // 09:00~15:30 = 391분
+}
 
 // 뷰 상태
 function _cvAll(){
@@ -4362,8 +4464,9 @@ function _cvAll(){
 }
 function _cvCs(){
   const a=_cvAll();
-  chartViewCount=Math.max(10,Math.min(chartViewCount,a.length));
-  chartViewStart=Math.max(0,Math.min(chartViewStart,a.length-chartViewCount));
+  // 상한 클램프 제거: 슬롯(chartViewCount) > 봉수 허용 → 좌측 정렬 + 우측 여백(아직 안 온 시간).
+  chartViewCount=Math.max(10,Math.round(chartViewCount));
+  chartViewStart=Math.max(0,Math.min(chartViewStart,Math.max(0,a.length-chartViewCount)));
   return a.slice(chartViewStart,chartViewStart+chartViewCount);
 }
 
@@ -4407,9 +4510,12 @@ function _drawChartInner(){
   yMin-=yPad; yMax+=yPad;
   const yR=yMax-yMin||1;
 
-  const toX=i=>PL+(i+0.5)*(cw/cs.length);
+  // 슬롯 수(줌). 사용가능 봉 < 슬롯이면 좌측 정렬 + 우측 여백 → 봉이 누적돼도 캔들 폭 일정.
+  const _slots=Math.max(cs.length,Math.round(chartViewCount)||cs.length);
+  _chartSlots=_slots;
+  const toX=i=>PL+(i+0.5)*(cw/_slots);
   const toY=v=>PT+mainH*(1-(v-yMin)/yR);
-  const bw=Math.max(1.5,Math.min(10,cw/cs.length*0.55));
+  const bw=Math.max(1.5,Math.min(10,cw/_slots*0.55));
 
   // 배경
   ctx.clearRect(0,0,W,H);
@@ -4462,15 +4568,20 @@ function _drawChartInner(){
     });
   }
 
-  // 캔들
+  // 캔들 (전일 봉은 흐리게 — 당일과 시각적으로 구분)
+  const _prevCntC=_kisChartMeta?._prevCount||0;
   cs.forEach((c,i)=>{
     const x=toX(i),yO=toY(c.o),yC=toY(c.c),yH=toY(c.h),yL=toY(c.l);
     const up=c.c>=c.o,col=up?'#dc2626':'#2563eb';
     const top=Math.min(yO,yC),ht=Math.max(1,Math.abs(yO-yC));
+    const isPrev=_prevCntC>0&&(chartViewStart+i)<_prevCntC;
+    ctx.save();
+    if(isPrev)ctx.globalAlpha=0.38;        // 전일 분봉 = 흐리게
     ctx.strokeStyle=col;ctx.lineWidth=1;
     ctx.beginPath();ctx.moveTo(x,yH);ctx.lineTo(x,top);
     ctx.moveTo(x,top+ht);ctx.lineTo(x,yL);ctx.stroke();
     ctx.fillStyle=col;ctx.fillRect(x-bw/2,top,bw,ht);
+    ctx.restore();
   });
 
   // ── ai-agent 매수/매도 마커 (백테스트 연동, §17.6) ──
@@ -4488,7 +4599,7 @@ function _drawChartInner(){
     const absIdx = _prevCnt - 1; // candles 전체에서의 인덱스
     const viewIdx = absIdx - chartViewStart; // 현재 뷰에서의 인덱스
     if(viewIdx >= 0 && viewIdx < cs.length){
-      const lx = toX(viewIdx) + (cw/cs.length)/2; // 봉과 봉 사이
+      const lx = toX(viewIdx) + (cw/_slots)/2; // 봉과 봉 사이
       ctx.save();
       ctx.strokeStyle = 'rgba(49,130,246,.5)';
       ctx.lineWidth = 1.5;
@@ -4516,9 +4627,12 @@ function _drawChartInner(){
     const vY0=PT+mainH+PB+2;
     const vMax=Math.max(...vls)||1;
     ctx.fillStyle='rgba(0,0,0,.04)';ctx.fillRect(PL,vY0,cw,volH-4);
+    const _pvc=_kisChartMeta?._prevCount||0;
     cs.forEach((c,i)=>{
       const x=toX(i),bh=Math.max(1,(c.v/vMax)*(volH-4));
-      ctx.fillStyle=c.c>=c.o?'rgba(220,38,38,.45)':'rgba(37,99,235,.45)';
+      const isPrevV=_pvc>0&&(chartViewStart+i)<_pvc;
+      const up=c.c>=c.o;
+      ctx.fillStyle=isPrevV?(up?'rgba(220,38,38,.18)':'rgba(37,99,235,.18)'):(up?'rgba(220,38,38,.45)':'rgba(37,99,235,.45)');
       ctx.fillRect(x-bw/2,vY0+volH-4-bh,bw,bh);
     });
   }
@@ -4548,7 +4662,7 @@ function _drawChartInner(){
       ctx.fillText(Math.round(pv).toLocaleString(),W-PR+4,canvas._cy+3);
     }
     // 해당 캔들 OHLCV 표시
-    const idx=Math.floor((canvas._cx-PL)/(cw/cs.length));
+    const idx=Math.floor((canvas._cx-PL)/(cw/_slots));
     if(idx>=0&&idx<cs.length){
       const c=cs[idx];
       const ci=document.getElementById('cinfo');
@@ -4614,7 +4728,8 @@ function _drawRSI(cs,cls){
   ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);
   const rsi=calcRSI(cls,14);
   const PL=4,PR=54,PT=2,PB=2,cw=W-PL-PR,ch=H-PT-PB;
-  const toX=i=>PL+(i+0.5)*(cw/cs.length);
+  const _den=_chartSlots||cs.length;
+  const toX=i=>PL+(i+0.5)*(cw/_den);
   const toY=v=>PT+ch*(1-v/100);
   [[70,'rgba(220,38,38,.2)'],[50,'rgba(0,0,0,.08)'],[30,'rgba(37,99,235,.2)']].forEach(([v,c])=>{
     ctx.strokeStyle=c;ctx.lineWidth=1;
@@ -4648,7 +4763,8 @@ function _drawMACD(cs,cls){
   vMin-=vP;vMax+=vP;
   const vR=vMax-vMin||1;
   const PL=4,PR=54,PT=2,PB=2,cw=W-PL-PR,ch=H-PT-PB;
-  const toX=i=>PL+(i+0.5)*(cw/cs.length);
+  const _den=_chartSlots||cs.length;
+  const toX=i=>PL+(i+0.5)*(cw/_den);
   const toY=v=>PT+ch*(1-(v-vMin)/vR);
   // 0선
   ctx.strokeStyle='rgba(0,0,0,.1)';ctx.lineWidth=1;
@@ -4694,8 +4810,9 @@ function initChartEvents(){
     const a=_cvAll();if(!a.length)return;
     const factor=e.deltaY>0?1.25:0.8;
     const center=chartViewStart+chartViewCount/2;
-    chartViewCount=Math.max(10,Math.min(Math.round(chartViewCount*factor),a.length));
-    chartViewStart=Math.max(0,Math.min(Math.round(center-chartViewCount/2),a.length-chartViewCount));
+    chartViewCount=Math.max(10,Math.min(Math.round(chartViewCount*factor),_chartMaxSlots(a.length)));
+    chartViewStart=Math.max(0,Math.min(Math.round(center-chartViewCount/2),Math.max(0,a.length-chartViewCount)));
+    if(window.agentBT) agentBT._userZoomed=true;   // 백테스트 자동 줌 고정 해제(사용자 우선)
     drawChart();
   },{passive:false});
 
@@ -4812,8 +4929,9 @@ function initChartEvents(){
       const nd=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
       const factor=tDist/nd; tDist=nd;
       const center=chartViewStart+chartViewCount/2;
-      chartViewCount=Math.max(10,Math.min(Math.round(chartViewCount*factor),a.length));
-      chartViewStart=Math.max(0,Math.min(Math.round(center-chartViewCount/2),a.length-chartViewCount));
+      chartViewCount=Math.max(10,Math.min(Math.round(chartViewCount*factor),_chartMaxSlots(a.length)));
+      chartViewStart=Math.max(0,Math.min(Math.round(center-chartViewCount/2),Math.max(0,a.length-chartViewCount)));
+      if(window.agentBT) agentBT._userZoomed=true;
       drawChart();
     }
   },{passive:false});
@@ -4825,14 +4943,22 @@ function initChartEvents(){
 function chartZoom(f){
   const a=_cvAll();if(!a.length)return;
   const center=chartViewStart+chartViewCount/2;
-  chartViewCount=Math.max(10,Math.min(Math.round(chartViewCount*f),a.length));
-  chartViewStart=Math.max(0,Math.min(Math.round(center-chartViewCount/2),a.length-chartViewCount));
+  chartViewCount=Math.max(10,Math.min(Math.round(chartViewCount*f),_chartMaxSlots(a.length)));
+  chartViewStart=Math.max(0,Math.min(Math.round(center-chartViewCount/2),Math.max(0,a.length-chartViewCount)));
+  if(window.agentBT) agentBT._userZoomed=true;   // 사용자 줌 우선(자동 2일치 고정 해제)
   drawChart();
 }
 function chartReset(){
   const a=_cvAll();
-  const sel=document.getElementById('candleCount');
-  chartViewCount=Math.min(parseInt(sel?.value||60),a.length)||a.length;
+  // 백테스트 중엔 기본 줌 = 전일+당일 전체(한 화면). 일반 모드는 봉수 드롭다운 값.
+  if(window.agentBT && agentBT.running && _chartFullSpan){
+    agentBT._userZoomed=false;                   // 자동 2일치 고정 복귀
+    chartViewCount=_chartFullSpan;
+    window._followLatest=true; window._chartUserDragging=false;
+  } else {
+    const sel=document.getElementById('candleCount');
+    chartViewCount=Math.min(parseInt(sel?.value||60),a.length)||a.length;
+  }
   chartViewStart=Math.max(0,a.length-chartViewCount);
   drawChart();
 }
@@ -5659,18 +5785,20 @@ function openBacktestDialog(){
       <div style="font-size:9px;color:var(--tm);margin-bottom:10px;line-height:1.5;">멀티에이전트(스크리닝·신호·리스크·실행·학습)가 <b>로컬 분봉이 있는 랜덤 거래일</b>을 골라 실제처럼 재생합니다.<br>배속은 시스템 부하를 보며 <b>항상 자동 최고속</b>(성능 저하 없는 선)으로 동작해요.</div>
       <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;">
         <label style="font-size:10px;color:var(--ts);display:flex;align-items:center;gap:6px;">며칠분 돌릴까요?
-          <input type="number" id="btDays" value="5" placeholder="비우면 무제한" min="1" style="flex:1;padding:4px 6px;border:1px solid var(--br);border-radius:6px;font-family:var(--mono);text-align:right;"> 거래일
+          <input type="number" id="btDays" value="" placeholder="비우면 무제한 (정지 시까지)" min="1" style="flex:1;padding:4px 6px;border:1px solid var(--br);border-radius:6px;font-family:var(--mono);text-align:right;"> 거래일
         </label>
       </div>
       <div style="font-size:9px;color:var(--tm);line-height:1.5;background:var(--bg);padding:6px 8px;border-radius:6px;margin-bottom:10px;">
         • 날짜는 묻지 않아요 — 로컬에 수집된 분봉(<code>scripts/collect_candles.py</code>) 중에서 자동으로 랜덤 추첨됩니다.<br>
         • 진행 상황·매수/매도 마커가 이 차트와 하단에 실시간 표시돼요.
       </div>
-      <div style="display:flex;gap:8px;justify-content:space-between;align-items:center;">
-        <button class="ibtn" onclick="agentBTReset()" title="가상잔고/진행 초기화" style="font-size:11px;">↺ 리셋</button>
-        <div style="display:flex;gap:8px;">
+      <div style="display:flex;gap:8px;justify-content:space-between;align-items:center;flex-wrap:wrap;">
+        <button class="ibtn" onclick="agentBTReset()" title="모든 것 초기화 — 가상잔고 100만원·보유 0 (정지와 달리 성과도 비움)" style="font-size:11px;">↺ 리셋</button>
+        <div style="display:flex;gap:6px;align-items:center;">
           <button class="ibtn" onclick="document.getElementById('btDialog').remove()" style="font-size:11px;">닫기</button>
-          <button class="ibtn ${running?'':'pur'}" id="btToggleBtn" onclick="agentBTToggle()" style="font-size:11px;${running?'background:var(--r);color:#fff;border:none;':''}">${running?'■ 정지':'▶ 시작'}</button>
+          <button class="ibtn pur" id="btStartBtn" onclick="agentBTStartBtn()" title="정지 상태에서 새 백테스트 시작" style="font-size:11px;">▶ 시작</button>
+          <button class="ibtn" id="btPauseBtn" onclick="agentBTPauseBtn()" title="현재 위치에서 멈춤 · 다시 누르면(▶ 재개) 멈춘 지점부터 이어서 진행" style="font-size:11px;">⏸ 일시정지</button>
+          <button class="ibtn" id="btStopBtn" onclick="agentBTHaltBtn()" title="완전 중단 — 프로세스 종료·진행 초기화(idle)·잔고/성과 유지·결과 리포트 표시" style="font-size:11px;">⏹ 정지</button>
         </div>
       </div>
     </div>
@@ -5681,6 +5809,15 @@ function openBacktestDialog(){
   d2.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9999;background:var(--pan);border-radius:14px;box-shadow:0 8px 40px rgba(0,0,0,.2);width:340px;max-width:92vw;';
   d2.innerHTML=html;
   document.body.appendChild(d2);
+  try{ _syncBtToggleBtn(); }catch(_e){}   // 현재 실제 상태(정지/진행/일시정지)로 버튼 동기화 (요구 3)
+  // 요구 2: 화면 상태(agentBT.running)와 서버 실제 상태를 다이얼로그 열 때 한 번 더 맞춘다.
+  // (다른 탭/새로고침으로 desync 됐어도 '실행 중'이 정확히 표시되고 시작 버튼이 ⏸ 정지로 바뀐다.)
+  try{
+    _btQueryRunning().then(function(s){
+      if(s && !(window.agentBT && agentBT.running)){ _btReattach(s); }
+      else { try{ _syncBtToggleBtn(); }catch(_e){} }
+    });
+  }catch(_e){}
 }
 function setTF(el,tf){
   try{
@@ -10676,9 +10813,11 @@ function goPage(p,el){
       if(typeof renderJPage==='function') renderJPage();
     } else if(p==='features'){
       if(typeof loadNotionFeatures==='function') loadNotionFeatures();
+      if(typeof tradeSettingsLoad==='function') tradeSettingsLoad();
     } else if(p==='consult'){
       if(typeof consInit==='function') consInit();
       if(typeof notionStatusLoad==='function') notionStatusLoad();
+      if(typeof consMeetingHistoryLoad==='function') consMeetingHistoryLoad();
     }
   }catch(_e){ console.warn('goPage 렌더:', _e.message); }
   // ── 날짜 동기화 ──
@@ -10946,7 +11085,7 @@ function initChartRightClick(){
     const cs = _cvCs();
     if(!cs.length) return;
     const PL=4, PR=54, cw=(canvas.width||700)-PL-PR;
-    const idx = Math.floor((x-PL)/(cw/cs.length));
+    const idx = Math.floor((x-PL)/(cw/(_chartSlots||cs.length)));
     const c = cs[Math.max(0,Math.min(idx,cs.length-1))];
     _ctxCandle = c;
     const menu = document.getElementById('chartCtxMenu');
@@ -11396,8 +11535,11 @@ function updChartToIdx(){
   if(pf) pf.style.width = pct + '%';
   const msBar = document.getElementById('msBar');
   if(msBar) msBar.textContent = sim.idx;
-  const msTime = document.getElementById('msTime');
-  if(msTime && lc) msTime.textContent = lc.t || '--:--';
+  // 백테스트 진행 중에는 에이전트(agentBTApply)가 중앙 시계를 소유한다.
+  // 레거시 캔들 시각으로 덮어쓰면 시각이 왔다갔다 하므로 이때는 건드리지 않는다(요구 2).
+  if(!window._agentActive && !(window.agentBT && window.agentBT.running)){
+    if(lc) updateTime(lc.t || '--:--');
+  }
   // 자동 우측 스크롤 (드래그 중 아닐 때만)
   if(!window._chartUserDragging){
     const viewEnd = chartViewStart + chartViewCount;
@@ -12553,16 +12695,129 @@ function resetBalance(){
 /* DEPLOY-v437431 */
 function toggleAutoTrade(){if(autoState.running){stopAuto();}else{startAuto();}}
 
-window.agentBT = window.agentBT || { running:false, timer:null, curKey:null, state:null, _reported:false, epoch:0 };
+window.agentBT = window.agentBT || { running:false, paused:false, timer:null, curKey:null, _viewKey:null, _userZoomed:false, state:null, _reported:false, epoch:0 };
 if(agentBT.epoch===undefined) agentBT.epoch=0;
+if(agentBT.paused===undefined) agentBT.paused=false;
 
 function _agentToast(msg){
   try{ if(typeof addMsg==='function'){ addMsg('ai', msg); return; } }catch(_e){}
   console.log('[agentBT]', msg);
 }
 
+// ── 중복 실행/상태동기화 헬퍼 (요구 1·2·3·4) ────────────────────
+// 시작/정지/이어서 클릭이 진행되는 동안 토글 버튼을 비활성화해 **중복 클릭**을 막는다(요구 3).
+function _btSetBusy(on){
+  if(window.agentBT) agentBT._busy = !!on;
+  ['btStartBtn','btPauseBtn','btStopBtn'].forEach(function(id){
+    const b=document.getElementById(id); if(!b) return;
+    b.disabled = !!on;
+    b.style.opacity = on ? '0.55' : '';
+    b.style.pointerEvents = on ? 'none' : '';
+  });
+  // 레거시 단일 토글 버튼 호환(존재 시)
+  const btn=document.getElementById('btToggleBtn');
+  if(btn){
+    btn.disabled = !!on;
+    btn.style.opacity = on ? '0.55' : '';
+    btn.style.pointerEvents = on ? 'none' : '';
+    if(on) btn.textContent = '⏳ 처리 중…';
+  }
+  if(!on){ try{ _syncBtToggleBtn(); }catch(_e){} }
+}
+// 서버의 **실제** 실행 여부를 묻는다(화면 상태 agentBT.running 과 별개 — desync 방지, 요구 2).
+function _btQueryRunning(){
+  return fetch('/api/backtest/state',{cache:'no-store'}).then(r=>r.json())
+    .then(s=> (s && s.ok && s.running) ? s : null).catch(()=>null);
+}
+// 살아있는 엔진에 화면을 다시 연결(폴링 재개) — '기존 진행 보기' / 새로고침 reattach 공용(요구 2).
+function _btReattach(s){
+  agentBT.epoch=(agentBT.epoch||0)+1;
+  agentBT.running=true; agentBT.paused=!!(s&&s.paused);
+  agentBT._reported=false;
+  _syncBtToggleBtn();
+  agentBTStartPoll();
+}
+function _btProgressText(s){
+  try{
+    const d=(s&&s.sim&&s.sim.date)?s.sim.date:''; const t=(s&&s.sim&&s.sim.time)?s.sim.time:'';
+    return d ? ('현재 진행: '+d+(t?(' '+t):'')) : '';
+  }catch(_e){ return ''; }
+}
+// 툴바 🚀 버튼에도 실행 중 표시(요구 2) — _syncBtToggleBtn/agentBTApply 에서 호출.
+function _btSyncToolbar(){
+  const tb=document.getElementById('btToolbarBtn'); if(!tb) return;
+  const run=!!(window.agentBT && agentBT.running);
+  const paused=!!(window.agentBT && agentBT.paused);
+  if(run && !paused){ tb.textContent='🟢 백테스트 진행중'; tb.title='백테스트 실행 중 — 클릭해 진행 상황 보기/정지'; }
+  else if(run && paused){ tb.textContent='⏸ 백테스트 일시정지'; tb.title='일시정지 — 클릭해 이어서/정지'; }
+  else { tb.textContent='🚀 백테스트'; tb.title='여러 영업일 연속 백테스트'; }
+}
+// 요구 1: 이미 실행 중일 때 **조용히 죽지 않고** 명확히 안내 + 선택 제공.
+function _btDuplicateDialog(s){
+  const prog = _btProgressText(s);
+  const old=document.getElementById('btDupDialog'); if(old)old.remove();
+  const d=document.createElement('div');
+  d.id='btDupDialog';
+  d.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:10001;background:var(--pan);border-radius:14px;box-shadow:0 8px 40px rgba(0,0,0,.28);width:330px;max-width:92vw;';
+  d.innerHTML=
+    '<div style="padding:16px;">'
+    +'<div style="font-size:13px;font-weight:800;margin-bottom:6px;">⚠️ 이미 백테스트가 실행 중이에요</div>'
+    +'<div style="font-size:10px;color:var(--tm);line-height:1.6;margin-bottom:14px;">'
+    +'한 번에 하나의 백테스트만 돌 수 있어요.'+(prog?('<br><b>'+prog+'</b>'):'')+'<br>'
+    +'기존 진행을 이어서 볼지, 정지하고 새로 시작할지 선택하세요.</div>'
+    +'<div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;">'
+    +'<button class="ibtn" id="btDupClose" style="font-size:11px;">닫기</button>'
+    +'<button class="ibtn" id="btDupView" style="font-size:11px;">👀 기존 진행 보기</button>'
+    +'<button class="ibtn pur" id="btDupRestart" style="font-size:11px;">↺ 정지 후 재시작</button>'
+    +'</div></div>';
+  document.body.appendChild(d);
+  document.getElementById('btDupClose').onclick=function(){ d.remove(); };
+  document.getElementById('btDupView').onclick=function(){
+    d.remove(); _btReattach(s||{}); _agentToast('👀 실행 중인 백테스트에 다시 연결했어요');
+  };
+  document.getElementById('btDupRestart').onclick=function(){
+    d.remove();
+    const dEl=document.getElementById('btDays'); const days=dEl?dEl.value:'';
+    _btSetBusy(true);
+    _agentToast('■ 기존 백테스트 정지 중… (완료 후 새로 시작)');
+    // 요구 4: 정지 → (완료 대기) → 시작. 서버 /stop 은 graceful 완료까지 대기 후 응답한다.
+    fetch('/api/backtest/stop',{method:'POST'}).then(r=>r.json()).then(function(){
+      _btWaitStopped(9000).then(function(){ agentBTStart({ days:days }, function(){ _btSetBusy(false); }); });
+    }).catch(function(e){ _btSetBusy(false); alert('정지 실패: '+e.message); });
+  };
+}
+// running:false 가 될 때까지(또는 타임아웃) 대기 — '정지 후 재시작' 안전 보장.
+function _btWaitStopped(timeoutMs){
+  const deadline=Date.now()+(timeoutMs||9000);
+  return new Promise(function(resolve){
+    (function chk(){
+      fetch('/api/backtest/state',{cache:'no-store'}).then(r=>r.json()).then(function(s){
+        if(!s || !s.running || Date.now()>deadline){ resolve(); return; }
+        setTimeout(chk, 400);
+      }).catch(function(){ resolve(); });
+    })();
+  });
+}
+// 시작 직후 엔진이 실제로 떴는지 확인 — 락 양보/인터프리터 문제로 '켜자마자 꺼짐'을 감지(요구 1·2).
+function _btVerifyStarted(){
+  let tries=0;
+  (function chk(){
+    tries++;
+    fetch('/api/backtest/state',{cache:'no-store'}).then(r=>r.json()).then(function(s){
+      if(s && s.ok && s.running){ return; }            // 정상 가동 확인 — 끝.
+      if(tries>=8){                                     // ~4초간 안 뜸 = 시작 직후 종료
+        agentBT.running=false; agentBT.paused=false; agentBTStopPoll(); _syncBtToggleBtn();
+        _btDuplicateDialog(s && s.ok && s.running ? s : null);
+        _agentToast('⚠️ 백테스트가 시작 직후 종료됐어요 — 이미 다른 엔진이 실행 중이거나 설정 문제일 수 있어요. ↺ 리셋 후 다시 시작해 보세요.');
+        return;
+      }
+      setTimeout(chk, 500);
+    }).catch(function(){ if(tries<8) setTimeout(chk, 500); });
+  })();
+}
+
 // ── 시작/정지/리셋 ──────────────────────────────────────────
-function agentBTStart(opt){
+function agentBTStart(opt, done){
   opt = opt || {};
   agentBT._reported = false;
   const body = {};
@@ -12572,18 +12827,27 @@ function agentBTStart(opt){
   if(opt.days && Number(opt.days)>0) body.days = Math.floor(Number(opt.days));
   fetch('/api/backtest/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
     .then(r=>r.json()).then(r=>{
-      if(!r.ok){ agentBT.running=false; _syncBtToggleBtn(); alert('백테스트 시작 실패: '+(r.error||'알 수 없음')); return; }
-      agentBT.running=true; agentBT.curKey=null; agentBT._reported=false; window._agentMarkers=null;
+      if(!r.ok){
+        // 요구 1: 서버가 '이미 실행 중'으로 거절 → 조용히 죽지 말고 실제 상태 확인 후 선택 제공.
+        agentBT.running=false; _syncBtToggleBtn(); if(done) done();
+        _btQueryRunning().then(function(s){ _btDuplicateDialog(s); });
+        return;
+      }
+      agentBT.running=true; agentBT.curKey=null; agentBT._viewKey=null; agentBT._userZoomed=false; agentBT._reported=false; window._agentMarkers=null;
+      _chartFullSpan=0; window._followLatest=true; window._chartUserDragging=false;
+      resetClock();   // 새 백테스트는 09:00부터 — 이전 런의 단조 가드 상태 비움 (요구 2)
       _agentToast('🤖 ai-agent 백테스트 시작 (가상잔고 '+(body.cash||1000000).toLocaleString()+'원, 자동 최고속)');
       _syncBtToggleBtn();
       agentBTStartPoll();
-    }).catch(e=>{ agentBT.running=false; _syncBtToggleBtn(); alert('백테스트 시작 실패: '+e.message); });
+      if(done) done();
+      _btVerifyStarted();   // 시작 직후 실제로 떴는지 확인('켜자마자 꺼짐' 감지)
+    }).catch(e=>{ agentBT.running=false; _syncBtToggleBtn(); if(done) done(); alert('백테스트 시작 실패: '+e.message); });
 }
 function agentBTStop(){
   // epoch을 올려 이후 도착하는 stale 폴링 응답이 running을 되살리지 못하게 한다.
   agentBT.epoch=(agentBT.epoch||0)+1;
   agentBTStopPoll();                 // 폴링 즉시 중단 (계속 진행되는 것처럼 보이던 버그 차단)
-  agentBT.running=false; _syncBtToggleBtn();
+  agentBT.running=false; agentBT.paused=false; _syncBtToggleBtn();
   fetch('/api/backtest/stop',{method:'POST'}).then(r=>r.json()).then(()=>{
     _agentToast('■ 백테스트 정지');
   }).catch(()=>{});
@@ -12595,23 +12859,159 @@ function agentBTStop(){
     }).catch(()=>{});
   }, 1300);
 }
-// 요구 2: 팝업의 단일 토글 버튼 (▶ 시작 ↔ ■ 정지). 팝업은 닫지 않고 제자리 토글.
+// 요구 3·4: 단일 토글 버튼.
+//  진행 중 → ⏸ 정지(일시정지: 프로세스는 살아 있어 '이어서 진행' 가능, 폴링 타이머는 클리어)
+//  일시정지/정지 → ▶ 백테스트(시작 또는 멈춘 시점부터 이어서 진행)
+//  하드 종료(프로세스 kill)는 ↺ 리셋 버튼이 담당한다.
 function agentBTToggle(){
-  if(window.agentBT && agentBT.running){
-    agentBTStop();
-  } else {
-    const dEl=document.getElementById('btDays');
-    agentBTStart({days: dEl?dEl.value:''});
-    agentBT.running=true;   // 낙관적 — 폴링이 곧 실제 상태로 정정
+  if(window.agentBT && agentBT._busy) return;   // 요구 3: 처리 중엔 중복 클릭 무시
+  const wasRunning = !!(window.agentBT && agentBT.running);
+  const wasPaused  = !!(window.agentBT && agentBT.paused);
+  const dEl=document.getElementById('btDays');
+  const body={ days: dEl?dEl.value:'' };
+  if(wasRunning && !wasPaused){
+    // 진행 중 → 일시정지. 폴링을 즉시 끊어 '완전 멈춤'으로 보이게 한다(요구 4).
+    agentBT.epoch=(agentBT.epoch||0)+1;
+    agentBTStopPoll();
+    agentBT.paused=true;
+    _syncBtToggleBtn();
+    fetch('/api/backtest/toggle',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+      .then(r=>r.json()).then(()=>{ _agentToast('⏸ 일시정지 (이어서 진행 가능)'); })
+      .catch(()=>{});
+    // 마지막 상태 1회만 반영(폴링은 재개하지 않음)
+    setTimeout(()=>{ fetch('/api/backtest/state',{cache:'no-store'}).then(r=>r.json()).then(s=>{ if(s&&s.ok){ try{ agentBTApply(s); }catch(_e){} } agentBT.paused=true; agentBT.running=true; _syncBtToggleBtn(); }).catch(()=>{}); }, 400);
+    return;
   }
-  _syncBtToggleBtn();
+  // 완전 정지/미실행 → **새로 시작**: /api/backtest/start 로 보낸다.
+  //   startBacktest 가 ① 살아있는 고아 엔진을 먼저 graceful 정리(중복 실행 방지)하고
+  //   ② 설정한 거래일 수(BACKTEST_DAYS)대로 깔끔히 새로 시작한다.
+  //   (toggle 로 보내면 고아 엔진이 살아있을 때 새 시작 대신 그 고아를 '일시정지'만 해서
+  //    설정한 일수가 무시되고 1일만 한 것처럼 멈춰 보이던 버그 — /start 로 우회.)
+  if(!wasPaused){
+    // 요구 2·4: 화면은 정지로 보여도 서버에 살아있는 엔진이 있을 수 있다(desync/다른 탭).
+    // 무턱대고 start 하면 두 번째가 락 못 잡고 조용히 죽는다 → 먼저 실제 상태를 확인해서
+    // 살아있으면 선택 다이얼로그, 진짜 없을 때만 새로 시작한다.
+    _btSetBusy(true);
+    _btQueryRunning().then(function(s){
+      if(s){ _btSetBusy(false); _btReattach(s); _btDuplicateDialog(s); return; }
+      agentBTStart({ days: (dEl ? dEl.value : '') }, function(){ _btSetBusy(false); });
+    });
+    return;
+  }
+  // 일시정지 → 이어서 진행(멈춘 시점부터, 시계 유지)
+  agentBT._reported=false; window._agentMarkers=null;
+  fetch('/api/backtest/toggle',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+    .then(r=>r.json()).then(r=>{
+      if(!r.ok){ agentBT.running=false; agentBT.paused=false; _syncBtToggleBtn(); alert('백테스트 실패: '+(r.error||'알 수 없음')); return; }
+      agentBT.running=true; agentBT.paused=false;
+      _agentToast('▶ 이어서 진행 (멈춘 시점부터)');
+      _syncBtToggleBtn();
+      agentBTStartPoll();
+    }).catch(e=>{ agentBT.running=false; agentBT.paused=false; _syncBtToggleBtn(); alert('백테스트 실패: '+e.message); });
+  // 낙관적 — 폴링이 곧 실제 상태로 정정
+  agentBT.running=true; agentBT.paused=false; _syncBtToggleBtn();
 }
+
+// ── 3버튼 분리 제어 (▶ 시작 / ⏸ 일시정지·재개 / ⏹ 정지) ───────────────
+// ▶ 시작 — 정지(idle) 상태에서만. 새 백테스트로 시작(잔고 100만, 엔진이 상태파일을 새로 씀).
+function agentBTStartBtn(){
+  if(window.agentBT && agentBT._busy) return;
+  if(window.agentBT && agentBT.running) return;   // idle 에서만 동작
+  const dEl=document.getElementById('btDays');
+  // 화면은 정지여도 서버에 살아있는 엔진이 있을 수 있다(desync/다른 탭) → 먼저 실제 상태 확인.
+  _btSetBusy(true);
+  _btQueryRunning().then(function(s){
+    if(s){ _btSetBusy(false); _btReattach(s); _btDuplicateDialog(s); return; }
+    agentBTStart({ days: (dEl ? dEl.value : '') }, function(){ _btSetBusy(false); });
+  });
+}
+// ⏸ 일시정지 / ▶ 재개 — 실행 중에만. 현재 위치에서 멈춤(상태 유지), 다시 누르면 멈춘 지점부터 이어서.
+function agentBTPauseBtn(){
+  if(window.agentBT && agentBT._busy) return;
+  if(!(window.agentBT && agentBT.running)) return;   // 실행/일시정지 중에만
+  const dEl=document.getElementById('btDays');
+  const body={ days: dEl?dEl.value:'' };
+  if(!agentBT.paused){
+    // 진행 중 → 일시정지. 폴링을 즉시 끊어 '멈춤'으로 보이게 한다(엔진은 살아있음).
+    agentBT.epoch=(agentBT.epoch||0)+1;
+    agentBTStopPoll();
+    agentBT.paused=true;
+    _syncBtToggleBtn();
+    fetch('/api/backtest/toggle',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+      .then(r=>r.json()).then(()=>{ _agentToast('⏸ 일시정지 (현재 위치에서 멈춤 · 재개 가능)'); }).catch(()=>{});
+    // 마지막 상태 1회만 반영(폴링 재개 안 함)
+    setTimeout(()=>{ fetch('/api/backtest/state',{cache:'no-store'}).then(r=>r.json()).then(s=>{ if(s&&s.ok){ try{ agentBTApply(s); }catch(_e){} } agentBT.paused=true; agentBT.running=true; _syncBtToggleBtn(); }).catch(()=>{}); }, 400);
+    return;
+  }
+  // 일시정지 → 재개(멈춘 지점부터, 가상시계 유지)
+  agentBT._reported=false; window._agentMarkers=null;
+  fetch('/api/backtest/toggle',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+    .then(r=>r.json()).then(r=>{
+      if(!r.ok){ agentBT.running=false; agentBT.paused=false; _syncBtToggleBtn(); alert('재개 실패: '+(r.error||'알 수 없음')); return; }
+      agentBT.running=true; agentBT.paused=false;
+      _agentToast('▶ 재개 (멈춘 지점부터 이어서 진행)');
+      _syncBtToggleBtn();
+      agentBTStartPoll();
+    }).catch(e=>{ agentBT.running=false; agentBT.paused=false; _syncBtToggleBtn(); alert('재개 실패: '+e.message); });
+  // 낙관적 — 폴링이 곧 실제 상태로 정정
+  agentBT.running=true; agentBT.paused=false; _syncBtToggleBtn();
+}
+// ⏹ 정지 (완전 중단) — 실행/일시정지 중 활성. 프로세스 종료 + 진행 idle 초기화. 단, 잔고/누적
+// 성과는 유지하고(리셋과 구분) 결과 리포트를 표시한다. 다음 ▶ 시작은 새 백테스트로 시작된다.
+function agentBTHaltBtn(){
+  if(window.agentBT && agentBT._busy) return;
+  if(!(window.agentBT && agentBT.running)) return;   // 실행/일시정지 중에만
+  // stale 폴링이 running 을 되살리지 못하게 epoch 증가 + 폴링 중단.
+  agentBT.epoch=(agentBT.epoch||0)+1;
+  agentBTStopPoll();
+  agentBT.running=false; agentBT.paused=false;
+  _btSetBusy(true);
+  _syncBtToggleBtn();
+  _agentToast('⏹ 백테스트 완전 정지 중… (잔고·성과는 유지돼요)');
+  // /halt = graceful 종료 + **상태파일 보존**(리셋과 달리 잔고/성과/리포트 유지).
+  fetch('/api/backtest/halt',{method:'POST'}).then(r=>r.json()).then(()=>{
+    _agentToast('⏹ 백테스트 정지 완료 — 잔고·누적성과는 유지돼요 (리셋은 ↺)');
+    // 종료 후 최종 상태 1회 반영 + 결과 리포트 표시. 패널을 비우지 않아 잔고/성과가 유지된다.
+    setTimeout(()=>{
+      fetch('/api/backtest/state',{cache:'no-store'}).then(r=>r.json()).then(s=>{
+        if(s && s.ok){
+          s.running=false; agentBT.state=s; agentBT._reported=true;
+          try{ agentBTApply(s); }catch(_e){}
+          try{ agentBTShowReport(s); }catch(_e){}   // 정지 후 결과 리포트
+        }
+        agentBT.running=false; agentBT.paused=false; agentBT._reported=true;
+        _btSetBusy(false); _syncBtToggleBtn();      // → idle(▶ 시작만 활성)
+      }).catch(()=>{ _btSetBusy(false); agentBT.running=false; agentBT.paused=false; _syncBtToggleBtn(); });
+    }, 1200);
+  }).catch(()=>{ _btSetBusy(false); agentBT.running=false; agentBT.paused=false; _syncBtToggleBtn(); });
+}
+// 3버튼 상태머신 동기화(요구): idle → ▶ 시작만 활성 / running → ⏸ 일시정지·⏹ 정지 활성 /
+// paused → ▶ 재개·⏹ 정지 활성. _busy 동안엔 전부 비활성(중복 클릭 방지).
 function _syncBtToggleBtn(){
-  const btn=document.getElementById('btToggleBtn'); if(!btn) return;
   const run=!!(window.agentBT && agentBT.running);
-  btn.textContent = run ? '■ 정지' : '▶ 시작';
-  if(run){ btn.classList.remove('pur'); btn.style.background='var(--r)'; btn.style.color='#fff'; btn.style.border='none'; }
-  else { btn.classList.add('pur'); btn.style.background=''; btn.style.color=''; btn.style.border=''; }
+  const paused=!!(window.agentBT && agentBT.paused);
+  const busy=!!(window.agentBT && agentBT._busy);
+  const idle = !run;
+  const setBtn=function(id, enabled, label){
+    const b=document.getElementById(id); if(!b) return;
+    if(label!=null) b.textContent=label;
+    const on = enabled && !busy;
+    b.disabled = !on;
+    b.style.opacity = on ? '' : '0.45';
+    b.style.pointerEvents = on ? '' : 'none';
+  };
+  setBtn('btStartBtn', idle, '▶ 시작');                              // 정지 상태에서만
+  setBtn('btPauseBtn', run, paused ? '▶ 재개' : '⏸ 일시정지');        // 실행 중에만(일시정지=재개)
+  setBtn('btStopBtn',  run, '⏹ 정지');                               // 실행/일시정지 중
+  // 레거시 단일 토글 버튼(존재 시) 호환
+  const btn=document.getElementById('btToggleBtn');
+  if(btn){
+    const active = run && !paused;
+    btn.textContent = active ? '⏸ 정지' : (paused ? '▶ 이어서' : '▶ 백테스트');
+    if(active){ btn.classList.remove('pur'); btn.style.background='var(--r)'; btn.style.color='#fff'; btn.style.border='none'; }
+    else { btn.classList.add('pur'); btn.style.background=''; btn.style.color=''; btn.style.border=''; }
+  }
+  try{ _btSyncToolbar(); }catch(_e){}   // 툴바 🚀 버튼도 실행 중 표시 동기화 (요구 2)
 }
 // 우측 탭을 비운 초기 상태(가상잔고 100만·무보유)로 되돌림 (요구 3 리셋)
 function _agentResetRightPanels(){
@@ -12642,7 +13042,7 @@ function agentBTReset(){
   // epoch을 즉시 올려서, 리셋 전 출발한 in-flight 폴링 응답이 화면을 되돌리지 못하게 한다.
   agentBT.epoch=(agentBT.epoch||0)+1;
   agentBTStopPoll();
-  agentBT.running=false; agentBT.curKey=null; agentBT.state=null; agentBT._reported=true;
+  agentBT.running=false; agentBT.paused=false; agentBT.curKey=null; agentBT.state=null; agentBT._reported=true;
   window._agentState=null; window._agentMarkers=null;
   // 화면 즉시 초기화 (네트워크 응답을 기다리지 않음)
   _agentResetFooter();
@@ -12650,10 +13050,12 @@ function agentBTReset(){
   _syncBtToggleBtn();
   const panel=document.getElementById('backtestPanel'); if(panel)panel.style.display='none';
   try{ drawChart(); }catch(_e){}
-  fetch('/api/backtest/reset',{method:'POST'}).then(r=>r.json()).then(()=>{
-    // 서버 state 삭제 후 한 번 더 초기화 보장(혹시 그 사이 갱신됐을 경우)
+  fetch('/api/backtest/reset',{method:'POST'}).then(r=>r.json()).then(r=>{
+    // 서버가 **실행 중 백테스트를 graceful 정지(완료까지 대기)한 뒤** state를 지우고 응답한다.
+    // 한 번 더 초기화 보장(혹시 그 사이 갱신됐을 경우)
     _agentResetRightPanels(); _agentResetFooter();
-    _agentToast('↺ 백테스트 리셋 (가상잔고 1,000,000원 초기화 · 보유 전부 청산)');
+    const how = (r && r.forced) ? ' · 강제 정지' : '';
+    _agentToast('✅ '+((r&&r.msg)||'초기화 완료 (잔고 100만원 · 보유 0 · 매매 0)')+how);
   }).catch(e=>{ _agentToast('리셋 경고: '+e.message+' (화면은 초기화됨)'); });
 }
 
@@ -12661,11 +13063,15 @@ function agentBTReset(){
 function agentBTStartPoll(){ if(agentBT.timer) return; agentBTPollOnce(); agentBT.timer=setInterval(agentBTPollOnce, 500); }
 function agentBTStopPoll(){ if(agentBT.timer){ clearInterval(agentBT.timer); agentBT.timer=null; } }
 function agentBTPollOnce(){
+  // 이전 요청이 아직 응답 전이면 새 요청을 보내지 않는다 → 응답이 순서 뒤바뀌어 도착해
+  // 시각/상태가 왔다갔다 하던 문제 방지(요구 2). 단조 가드와 이중 안전장치.
+  if(agentBT._inflight) return;
+  agentBT._inflight = true;
   const ep = agentBT.epoch||0;
   fetch('/api/backtest/state',{cache:'no-store'}).then(r=>r.json()).then(s=>{
     if((agentBT.epoch||0)!==ep) return;   // 리셋/정지 후 도착한 stale 응답 무시
     agentBTApply(s);
-  }).catch(()=>{});
+  }).catch(()=>{}).finally(()=>{ agentBT._inflight = false; });
 }
 
 // ── 상태 반영 ────────────────────────────────────────────────
@@ -12686,6 +13092,7 @@ function _agentResetFooter(){
   ['msPnl','msTodayPnl'].forEach(id=>{const e=document.getElementById(id);if(e){e.textContent='+0원';e.className='ms-v cu';}});
   const p=document.getElementById('msPct'); if(p){p.textContent='0.00%';p.className='ms-v cu';}
   const t=document.getElementById('msTrades'); if(t)t.textContent='0회';
+  resetClock();   // 중앙 시계 09:00 초기화 + 단조 가드 상태 비움 (요구 2)
 }
 // ── 우측 탭 전체를 백테스트(ai-agent) 상태로 실시간 동기화 ──────────────
 function _agentSyncRightPanels(s){
@@ -12725,18 +13132,32 @@ function _agentRenderPortItems(s){
     </div>`;
   }).join('');
 }
-// 거래 탭 — 오늘 체결 전체(진입/청산)
+// 거래 탭 — 전체 기간 누적 체결(진입/청산), 날짜별 구분 (요구 2: 날짜 바뀌어도 보존)
 function _agentRenderTradeLog(s){
   const c=document.getElementById('tradeLog'); if(!c) return;
-  const tr=s.todayTrades||[];   // dashboard에서 최신순(reversed)
-  if(!tr.length){ c.innerHTML="<div style='font-size:9px;color:var(--tm);text-align:center;padding:12px;'>오늘 체결 없음</div>"; return; }
-  c.innerHTML=tr.map(t=>{
+  // 누적 우선(allTrades). 없으면 당일(todayTrades) 폴백. 둘 다 최신순(reversed).
+  const tr=(s.allTrades&&s.allTrades.length)?s.allTrades:(s.todayTrades||[]);
+  if(!tr.length){ c.innerHTML="<div style='font-size:9px;color:var(--tm);text-align:center;padding:12px;'>체결 없음</div>"; return; }
+  const today=(s.sim&&s.sim.date)||'';
+  // 날짜별 거래 수 집계(헤더에 표시)
+  const cntByDate={}; tr.forEach(t=>{ const d=t.date||today; cntByDate[d]=(cntByDate[d]||0)+1; });
+  let html=''; let curDate=null;
+  tr.forEach(t=>{
+    const d=t.date||today;
+    if(d!==curDate){
+      curDate=d;
+      const ds=d&&d.length>=8?(d.slice(0,4)+'.'+d.slice(4,6)+'.'+d.slice(6,8)):(d||'');
+      const isToday=d===today;
+      html+=`<div style="position:sticky;top:0;z-index:1;background:var(--bg);font-size:8px;font-weight:800;color:${isToday?'var(--p)':'var(--tm)'};padding:4px 6px;border-bottom:1px solid var(--br);display:flex;justify-content:space-between;">
+        <span>📅 ${ds}${isToday?' <span style="color:var(--g);">· 오늘</span>':''}</span><span style="color:var(--ts);font-weight:600;">${cntByDate[d]}건</span></div>`;
+    }
     const ex=t.kind==='exit'; const side=ex?'매도':'매수'; const nm=t.name||t.code;
     const pnlTxt = ex?`<div class="tl-pnl ${t.pnlPct>=0?'cu':'cd'}">${t.pnlPct>=0?'+':''}${t.pnlPct}%</div>`:'';
     const reason = ex&&t.exitKind?`<div style="font-size:7px;color:var(--ts);margin-top:1px;">↳ ${t.exitKind}${t.reason?(' · '+t.reason):''}</div>`:'';
-    return `<div class="tl-i"><div class="tl-side ${ex?'sell':'buy'}">${side}</div>
+    html+=`<div class="tl-i"><div class="tl-side ${ex?'sell':'buy'}">${side}</div>
       <div class="tl-info">${nm}<span style='color:var(--p);font-size:8px;'>[AI]</span> <span style="color:var(--tm);font-size:8px;">${t.time||''}</span><br>${Math.round(t.price||0).toLocaleString()}×${t.qty||0}${reason}</div>${pnlTxt}</div>`;
-  }).join('');
+  });
+  c.innerHTML=html;
 }
 // 미체결 탭 — 백테스트는 즉시 체결(미체결 없음) → 최근 체결 안내
 function _agentRenderPending(s){
@@ -12751,7 +13172,7 @@ function _agentRenderPending(s){
 // 주문 탭 상단 — 에이전트가 실행한 매수/매도 주문 내역
 function _agentRenderOrderFeed(s){
   const el=document.getElementById('agentOrderFeed'); if(!el) return;
-  const tr=(s.todayTrades||[]).slice(0,12);
+  const tr=((s.allTrades&&s.allTrades.length)?s.allTrades:(s.todayTrades||[])).slice(0,12);
   const hdr='<div style="font-size:10px;font-weight:800;color:var(--p);padding:6px 8px 3px;">🤖 에이전트 주문 내역 <span style="font-size:8px;color:var(--tm);font-weight:600;">실시간</span></div>';
   if(!tr.length){ el.innerHTML=hdr+'<div style="font-size:9px;color:var(--tm);padding:2px 8px 8px;border-bottom:1px solid var(--br);margin-bottom:6px;">아직 에이전트 주문이 없어요. 🚀 백테스트를 시작하면 표시됩니다.</div>'; return; }
   el.innerHTML=hdr+'<div style="max-height:150px;overflow:auto;border-bottom:1px solid var(--br);margin-bottom:6px;">'+tr.map(t=>{
@@ -12815,16 +13236,32 @@ function _agentRenderChart(s){
   const nm=ch.name || (typeof STOCKS!=='undefined'&&((STOCKS.find(x=>x.tk===code)||{}).nm)) || code;
   const hNm=document.getElementById('chartHdrNm'); if(hNm) hNm.textContent=nm;
   const hTk=document.getElementById('chartHdrTk'); if(hTk) hTk.textContent=code;
-  // 오늘 봉 주입 (prevClose는 등락 기준). 서버가 이미 미래봉을 잘랐으므로 전부 '현재까지'.
+  // 전일+당일 봉 주입 (prevClose는 등락 기준). 서버가 미래봉은 이미 잘랐고, 전일 봉은 전체.
   sim.candles=ch.candles.map(c=>({t:c.t,o:c.o,h:c.h,l:c.l,c:c.c,v:c.v}));
-  _kisChartMeta=_kisChartMeta||{}; _kisChartMeta.prevCount=0; _kisChartMeta._prevCount=0;
-  _kisChartMeta.todayCount=sim.candles.length; _kisChartMeta.prevDate='';
+  const prevN=Math.max(0, Math.min(ch.prevCount||0, sim.candles.length));
+  _kisChartMeta=_kisChartMeta||{}; _kisChartMeta.prevCount=prevN; _kisChartMeta._prevCount=prevN;
+  _kisChartMeta.todayCount=sim.candles.length-prevN; _kisChartMeta.prevDate=ch.prevDate||'';
   sim.idx=sim.candles.length-1;
-  window._agentDayBase = ch.prevClose || (sim.candles[0]&&sim.candles[0].o) || 0;
-  // 최신 봉 따라가기 (사용자가 드래그 중이 아니면)
+  window._agentDayBase = ch.prevClose || (sim.candles[prevN]&&sim.candles[prevN].o) || (sim.candles[0]&&sim.candles[0].o) || 0;
+  // 초기 줌 = 전일+당일 전 세션이 한 화면에(슬롯 예약). 봉이 쌓여도 캔들 폭이 일정해
+  // 시작부터 과확대되지 않고 하루 전체 흐름이 보인다. 새 날/종목으로 바뀔 때만 재설정.
   const total=sim.candles.length;
-  chartViewCount=Math.max(10, Math.min(chartViewCount||80, total));
+  // 당일 풀세션 슬롯 ≈ 전일 봉수(전일은 이미 완전한 하루). 전일 데이터 없으면 1분봉 풀세션으로 폴백.
+  _chartFullSpan = prevN + (prevN || _agentSessionSlots('1'));
+  const _vk = code+'@'+ymd;
+  if(agentBT._viewKey !== _vk){               // 새 날/종목 → 줌·사용자조작 초기화
+    agentBT._viewKey = _vk;
+    agentBT._userZoomed = false;
+    window._followLatest = true; window._chartUserDragging = false;
+  }
+  // 사용자가 직접 줌(🔍±/휠/핀치)하기 전까지는 매 렌더마다 '전일+당일 2일치' 줌으로 고정.
+  // → 새 분봉이 쌓여도 자동 확대되지 않고, 어떤 경로로 chartViewCount가 흔들려도 복원된다.
+  if(!agentBT._userZoomed){
+    chartViewCount = _chartFullSpan;
+  }
+  chartViewCount=Math.max(10, chartViewCount);
   if(window._followLatest!==false && !window._chartUserDragging){
+    // 데이터가 슬롯보다 많아지면 최신 따라가기, 적으면 좌측 정렬(우측은 아직 안 온 시간).
     chartViewStart=Math.max(0, total-chartViewCount);
   }
   _agentUpdTopInfo(s);          // 현재가·등락률 (상단/호가 현재가)
@@ -12877,6 +13314,7 @@ function agentBTApply(s){
   agentBT.state = s;
   window._agentState = s;
   agentBT.running = !!s.running;
+  agentBT.paused = !!s.paused;
   // 좌측 관심종목 = 스크리닝 에이전트 결과로 실시간 동기화 (점수·이유·상태)
   try{ updateCandsFromDash(s.screening||[]); }catch(_e){}
   // 우측 탭(주문/보유/거래/미체결/AI) 전부 백테스트 상태로 실시간 동기화
@@ -12893,7 +13331,9 @@ function agentBTApply(s){
     : ((s.positions||[]).reduce((a,p)=>a+(p.pnl||0),0));
   _setMsSigned('msTodayPnl', todayPnl, '원', false);
   const trEl=document.getElementById('msTrades'); if(trEl) trEl.textContent=(cum.trades||0)+'회';
-  if(s.sim && s.sim.time){ const tEl=document.getElementById('msTime'); if(tEl) tEl.textContent=s.sim.time; }
+  // 시각은 단일 함수(updateTime)로만 갱신 → 중앙 시계 SSOT (요구 2)
+  // 거래일(sim.date)을 함께 넘겨 같은 날 안에서는 시간이 거꾸로 가지 않게 한다.
+  if(s.sim && s.sim.time){ updateTime(s.sim.time, (s.sim && s.sim.date) || ''); }
 
   // 진행 패널
   _agentBTPanel(s);
@@ -12942,11 +13382,18 @@ function _agentBTPanel(s){
     ? s.positions.map(p=>`${p.name||p.code} ${(p.pnlPct>=0?'+':'')+p.pnlPct}%`).join(', ')
     : '무보유';
   const retUp = (cum.totalReturnPct||0)>=0;
+  // 진행 표시(요구 3): "N일차 / M일". dayIndex=현재 진행 중인 일차(1-based), totalDays=설정 총일수.
+  // 무제한(totalDays=null)이면 "N일차"만, 완료 후엔 "M일 완료"로 표시한다.
+  const _di = cum.dayIndex || cum.days || 0;
+  const _td = cum.totalDays;
+  const progTxt = s.running
+    ? (_td ? `<b>${_di}</b>일차 / ${_td}일` : `<b>${_di}</b>일차`)
+    : `<b>${cum.days||0}</b>일 완료${_td?` / ${_td}일`:''}`;
   panel.innerHTML = `
     <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;font-size:11px;">
       <span style="font-weight:800;color:var(--p);">🤖 ai-agent ${s.running?'<span style="color:var(--g);">진행 중</span>':'<span style="color:var(--tm);">정지</span>'}</span>
       <span>📅 ${dstr} <b>${sim.time||''}</b></span>
-      <span>일수 <b>${cum.days||0}</b></span>
+      <span>진행 ${progTxt}</span>
       <span>누적 <b style="color:${retUp?'var(--r)':'var(--b,#2563eb)'};">${(retUp?'+':'')+(cum.totalReturnPct||0)}%</b></span>
       <span>매매 <b>${cum.trades||0}</b>회 · 승률 <b>${cum.tradeWinRate||0}%</b></span>
       <span>시장 <b style="color:${gColor};">${grade}</b></span>
@@ -12970,10 +13417,19 @@ function agentBTLoadChart(code, ymd){
           sim.candles = ic;
           const pc=(_kisChartMeta&&_kisChartMeta.prevCount)||0;
           sim.idx = ic.length-1;
-          const todayLen = Math.max(1, ic.length-pc);
-          chartViewCount = Math.min(ic.length, Math.max(todayLen+8, 80));
-          chartViewStart = Math.max(0, ic.length-chartViewCount);
           if(_kisChartMeta) _kisChartMeta._prevCount = pc;
+          // 초기 줌 = 전일+당일 전 세션(한 화면). 새 날/종목일 때만 재설정.
+          _chartFullSpan = pc + (pc || _agentSessionSlots(sim.tf));
+          const _vk2 = code+'@'+ymd;
+          if(agentBT._viewKey !== _vk2){
+            agentBT._viewKey = _vk2; agentBT._userZoomed=false;
+            window._followLatest = true; window._chartUserDragging = false;
+          }
+          if(!agentBT._userZoomed){ chartViewCount = _chartFullSpan; }
+          chartViewCount=Math.max(10, chartViewCount);
+          if(window._followLatest!==false && !window._chartUserDragging){
+            chartViewStart = Math.max(0, ic.length-chartViewCount);
+          }
           drawChart();
         } else { genCandles(code, dstr); drawChart(); }
       }).catch(()=>{ try{ genCandles(code, dstr); drawChart(); }catch(_e){} });
@@ -13105,20 +13561,62 @@ function agentEvolveShowResult(res){
   document.body.appendChild(m);
 }
 
-// 요구 3: 페이지 로드 시 백테스트 상태를 항상 '정지'로 완전 초기화한다.
+// 요구 1·3: 페이지 로드 시 백테스트 상태를 항상 '정지'로 완전 초기화한다.
 //  - 이전 세션의 서버 state가 running:true로 남아 있어도 자동 재연결/재생하지 않는다.
 //  - isRunning=false 고정 + 버튼을 '▶ 시작'(정지 상태)으로 동기화한다.
+//  - 이전 세션의 고아 백테스트 프로세스를 서버에 정지 요청해 잔재를 제거한다
+//    → 첫 진입 시 ▶ 시작이 "이미 실행 중"으로 거절되던 버그(요구 1) 자가 복구.
+//  - 타이머/폴링/로컬 잔재를 전부 정리한다(요구 1·6).
 //  - 사용자가 ▶ 시작을 누르면 그때 실제 실행 + 폴링이 시작되고, 정지를 누르면 중단된다.
-window.addEventListener('load', function(){
+function _agentFullReset(){
   try{
     agentBT.epoch = (agentBT.epoch||0) + 1;   // 직전 세션의 in-flight 폴링 응답 무효화
     agentBTStopPoll();                         // 혹시 살아있는 폴링 타이머 중단
+    if(typeof _evolvePollTimer!=='undefined' && _evolvePollTimer){ try{ clearInterval(_evolvePollTimer); }catch(_e){} _evolvePollTimer=null; }
     agentBT.running = false;                    // 초기 상태 = 정지로 고정
+    agentBT.paused = false;
     agentBT.curKey = null;
+    agentBT._viewKey = null;
+    agentBT._userZoomed = false;
+    _chartFullSpan = 0; _chartSlots = 0;
     agentBT.state = null;
     agentBT._reported = false;
+    window._agentActive = false;
+    window._agentState = null;
+    window._agentMarkers = null;
+    resetClock();   // 중앙 시계 + 단조 가드 상태 초기화 (요구 2)
+    // 로컬 잔재 제거(백테스트 상태는 원래 localStorage에 보관하지 않지만 방어적으로 정리)
+    try{ ['htsBacktestState','agentBTState','backtest_live'].forEach(k=>localStorage.removeItem(k)); }catch(_e){}
     _syncBtToggleBtn();                         // 버튼 라벨/색을 정지(▶ 시작) 상태로 동기화
   }catch(_e){}
+  // ── 실행 중 백테스트를 페이지 로드가 죽이지 않게 한다(2일 만에 멈춤 근본 원인). ──
+  // 기존엔 페이지가 load 될 때마다 **무조건** /api/backtest/stop 을 쏴서, 실행 중인
+  // 백테스트를 새로고침·새 탭·start.bat 의 /hts 자동 오픈이 STOP 센티넬로 조기 종료시켰다
+  // (시작 18초 뒤 STOP 이 날아가던 그 지점). 이제는 서버 상태를 먼저 확인해서:
+  //  · 진짜 살아있는(신선한) 엔진이면 → 죽이지 말고 화면을 다시 연결(reattach)한다.
+  //    (/api/backtest/state 의 running 은 상태파일 mtime 2초 신선도로 보정되므로,
+  //     죽은 잔재는 자동으로 running:false 가 되어 아래 정리 분기로 간다.)
+  //  · 죽은 잔재(orphan)거나 미실행이면 → 그때만 정리용 stop 을 보낸다(살아있는 엔진엔 무영향).
+  try{
+    fetch('/api/backtest/state',{cache:'no-store'}).then(r=>r.json()).then(s=>{
+      if(s && s.ok && s.running){
+        // 실행 중 — 정지시키지 말고 현재 진행 상황에 다시 붙는다(폴링 재개).
+        agentBT.epoch=(agentBT.epoch||0)+1;
+        agentBT.running=true; agentBT.paused=!!s.paused;
+        _syncBtToggleBtn();
+        agentBTStartPoll();
+      }else{
+        // 죽은 잔재만 정리 — 첫 진입 시 ▶ 시작이 "이미 실행 중"으로 거절되던 버그 자가 복구(요구 1).
+        fetch('/api/backtest/stop',{method:'POST'}).catch(()=>{});
+      }
+    }).catch(()=>{ /* 상태 조회 실패 시 보수적으로 아무 엔진도 죽이지 않는다 */ });
+  }catch(_e){}
+}
+window.addEventListener('load', _agentFullReset);
+// 요구 6: 페이지 이탈 시 폴링/타이머를 정리해 좀비 인터벌이 남지 않게 한다.
+window.addEventListener('beforeunload', function(){
+  try{ agentBTStopPoll(); }catch(_e){}
+  try{ if(typeof _evolvePollTimer!=='undefined' && _evolvePollTimer){ clearInterval(_evolvePollTimer); _evolvePollTimer=null; } }catch(_e){}
 });
 
 // ═══════════════════════════════════════════════════════════════
@@ -13129,11 +13627,34 @@ window.addEventListener('load', function(){
 // ═══════════════════════════════════════════════════════════════
 
 // 수정 가능한 전략 파라미터 화이트리스트 (ai-team optimizer TUNABLE_KEYS와 동일)
+// 상담(💬)에서 자연어로 바꿀 수 있는 모든 키. 하드리밋(hard_limits.yaml: 동시보유·쿨다운·
+// 진입금지 시간·슬리피지·담보비율)은 여기에 없으며 변경 불가(§4). 그 외는 모의 모드에서 전부 적용.
 const CONS_TUNABLE = {
-  'screening.threshold':       { label:'스크리닝 통과 점수', hint:'높을수록 후보가 까다로워져 거래 수가 줄어요', range:'0~100' },
-  'signal.volume_surge_multiplier': { label:'거래량 급증 배수', hint:'직전 20분 평균 대비 몇 배여야 신호로 볼지 (기본 2.0)', range:'1.2~4.0' },
-  'time_stop.evaluation_minutes':   { label:'타임스톱 평가 시간(분)', hint:'진입 후 방향 안 나올 때 재평가까지 기다리는 시간', range:'10~60' },
-  'time_stop.flat_box_pct':         { label:'타임스톱 무방향 박스(%)', hint:'±이 범위 안이면 방향 미발생으로 봐요 (0.005=±0.5%)', range:'0.001~0.02' },
+  // 스크리닝
+  'screening.threshold':       { label:'스크리닝 통과 점수', hint:'높을수록 후보가 까다로워져 거래 수가 줄어요 (SSOT 75)', range:'70~80' },
+  // 신호분석 — 진입 조건 개수(요구 4: "신호 조건 N개로")
+  'signal.entry_rules.strong_min_indicators':      { label:'진입 필요 지표 수(STRONG)', hint:'분봉 타점 4개 중 몇 개 충족해야 강한 진입인지 (예: 4개→3개)', range:'1~4' },
+  'signal.entry_rules.conditional_min_indicators': { label:'조건부 진입 지표 수', hint:'몇 개 충족하면 조건부 진입인지', range:'1~4' },
+  // 신호분석 — 지표 임계
+  'signal.rsi.entry_zone':     { label:'RSI 진입 구간', hint:'분봉 매수 타점 RSI 구간 [낮음,높음] (예: 55~65)', range:'45~72' },
+  'signal.rsi.overbought':     { label:'RSI 과매수 상단', hint:'이 위면 진입 금지', range:'65~80' },
+  'signal.breakout.volume_mult': { label:'돌파 거래량 배수', hint:'돌파 캔들 거래량이 직전 캔들 대비 몇 배여야 하는지', range:'1.0~5.0' },
+  'signal.breakout.lookback':  { label:'돌파 고점 룩백', hint:'직전 몇 봉의 고점을 돌파 기준으로 볼지', range:'3~30' },
+  'signal.volume_surge_multiplier': { label:'거래량 급증 배수(구)', hint:'호환용 — 실제 매매는 돌파 거래량 배수 사용', range:'1.5~3.0' },
+  // 포지션 사이징 (§25.3)
+  'entry.sizing.cash_fraction_strong':      { label:'진입 비중(STRONG)', hint:'가용현금 대비 매수 비중 (0.7=70%)', range:'0.1~1.0' },
+  'entry.sizing.cash_fraction_conditional': { label:'진입 비중(조건부)', hint:'조건부 진입 시 매수 비중', range:'0.1~1.0' },
+  'entry.sizing.credit_multiplier':         { label:'신용 배수', hint:'신용 포함 매수여력 배수 (가용현금 × N)', range:'1.0~2.5' },
+  'entry.conditional_cap_pct':              { label:'조건부 진입 상한', hint:'조건부 진입 비중 캡', range:'0.1~1.0' },
+  // 손절 (§5.4)
+  'stop_loss.hard_max_pct':         { label:'하드 손절(%)', hint:'최대 손절선. -0.02=-2% (안전범위 -0.5%~-10%)', range:'-0.10~-0.005' },
+  'stop_loss.technical_buffer_pct': { label:'기술적 손절 버퍼(%)', hint:'진입캔들 저점 아래로 이 폭만큼 더 빠지면 손절 (0.005=-0.5%)', range:'0~0.05' },
+  'stop_loss.technical_stop_enabled': { label:'기술적 손절 사용', hint:'진입캔들 저점 이탈 손절 on/off (끄면 하드 손절만)', range:'true/false' },
+  // 익절 (§5.3)
+  'take_profit.step1.pct_range':   { label:'1차 익절 목표', hint:'1차 익절 수익 구간 [낮음,높음]', range:'0~1' },
+  'take_profit.step2.pct_range':   { label:'2차 익절 목표', hint:'2차 익절 수익 구간 [낮음,높음]', range:'0~1' },
+  'take_profit.step3_trailing.trail_from_high_pct': { label:'트레일링 이탈(%)', hint:'고점 대비 이만큼 밀리면 잔량 전량 청산', range:'0.005~0.10' },
+  // 타임스톱(시간 기반 매도)은 제거되었다(§5.5) — 시간 경과를 이유로 파는 일은 없다.
 };
 
 // ── 각 에이전트 정의 — 관할(jurisdiction)을 완전히 분리 ──
@@ -13166,7 +13687,7 @@ const CONS_AGENTS = [
       talk:'오늘 신호가 몇 번 발생했는지, STRONG_ENTRY/CONDITIONAL_ENTRY/NO_ENTRY를 왜 그렇게 판정했는지(5지표 중 몇 개 충족), 놓친 신호.',
       never:'어떤 종목을 후보로 뽑을지(스크리닝 관할), 주문을 어떻게 낼지(주문실행 관할), 리스크 한도·사이징(리스크 관할).',
       reflect:'지표 판정 실수(거짓 신호, 늦은 포착, 임계값 문제)만 돌아본다.' },
-    scope:['signalParam'], topicPrefix:['signal'], tunables:['signal.volume_surge_multiplier'] },
+    scope:['signalParam'], topicPrefix:['signal'], tunables:['signal.entry_rules.strong_min_indicators','signal.entry_rules.conditional_min_indicators','signal.rsi.entry_zone','signal.rsi.overbought','signal.breakout.volume_mult','signal.breakout.lookback','signal.volume_surge_multiplier'] },
 
   { id:'risk', emoji:'🛡', color:'#f03e3e', name:'리스크 담당', role:'하드리밋 · 손절/익절 · 쿨다운',
     identity:'너는 리스크부 담당이다. 하드리밋(HL-01~06)을 감시하고 손절·익절·연속손절 쿨다운을 집행한다.',
@@ -13174,7 +13695,7 @@ const CONS_AGENTS = [
       talk:'오늘 하드리밋이 발동했는지(동시보유 3종목·연속손절 쿨다운·시간대 금지·슬리피지 5틱·담보비율), 위험했던 순간, 손절 집행 내역과 익절 기준. 하드리밋은 절대 변경 불가임을 분명히 한다.',
       never:'어떤 종목을 고를지(스크리닝 관할), 지표 분석 수치(신호분석 관할), 주문을 실제로 어떻게 넣었는지의 체결 과정(주문실행 관할).',
       reflect:'리스크 관리 실수(늦은 손절, 과도한 사이징, 쿨다운 누락)만 돌아본다.' },
-    scope:['riskParam','hardLimits'], topicPrefix:['risk'], tunables:['time_stop.evaluation_minutes','time_stop.flat_box_pct'] },
+    scope:['riskParam','hardLimits'], topicPrefix:['risk'], tunables:['stop_loss.hard_max_pct','stop_loss.technical_buffer_pct','stop_loss.technical_stop_enabled','take_profit.step1.pct_range','take_profit.step2.pct_range','take_profit.step3_trailing.trail_from_high_pct','entry.sizing.cash_fraction_strong','entry.sizing.cash_fraction_conditional','entry.sizing.credit_multiplier','entry.conditional_cap_pct'] },
 
   { id:'order', emoji:'⚡', color:'#ff9900', name:'주문실행 담당', role:'KIS 주문 · 체결 · 슬리피지',
     identity:'너는 실행부 주문실행 담당이다. 리스크부 승인(APPROVE)을 받은 주문만 KIS로 보내고 체결을 관리한다.',
@@ -13198,7 +13719,7 @@ const CONS_AGENTS = [
       talk:'어떤 에이전트가 잘했고 어떤 에이전트가 부진했는지, 토큰 낭비·중복 호출 분석, 근거 기반 파라미터 최적화 제안(paper에서만 적용, 승인 후 반영).',
       never:'특정 종목을 사라/팔아 같은 직접 매매 지시, 실시간 체결 개입. 나는 "시스템을 관찰·개선"할 뿐이다.',
       reflect:'관찰·제안의 실수(잘못된 성과 귀속, 근거 약한 제안)만 돌아본다.' },
-    scope:['mode','perfOverall','teamActivity','allParams'], topicPrefix:['meta','*'], tunables:['screening.threshold','signal.volume_surge_multiplier','time_stop.evaluation_minutes','time_stop.flat_box_pct'] },
+    scope:['mode','perfOverall','teamActivity','allParams'], topicPrefix:['meta','*'], tunables:Object.keys(CONS_TUNABLE) },
 ];
 
 // 부서 id → 한글 담당명 (관할 밖 질문을 떠넘길 때 사용)
@@ -13220,6 +13741,207 @@ function consInit(){
   consRenderCards();
   consLoadContext(true).then(()=>consUpdateModeBadge());
   consState.initDone = true;
+}
+
+// ════════ ⚙️ 매매 설정 (손절/익절 → strategy_params.yaml 즉시 반영) ════════
+// 읽기: GET /api/agent/strategy/settings (scripts/strategy_settings.py)
+// 저장: POST /api/agent/consult/apply-param (consult_apply.py → StrategyEditor 단일 진입점:
+//       화이트리스트 → leaf 교체 → 재읽기 검증 → git 커밋 → ImprovementLog)
+// 안전장치: 범위 밖 입력 거부+경고 / 하드리밋은 화이트리스트 밖이라 애초에 노출 안 함 / live 잠금.
+let _tsItems={}, _tsCur={}, _tsLocked=false;
+function _tsEsc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function _tsId(k){ return 'ts_'+k.replace(/\./g,'_'); }
+function _tsRound6(v){ return Math.round(v*1e6)/1e6; }
+function _tsFmt(v){ if(!isFinite(v)) return v; return parseFloat((+v).toFixed(4)); }
+
+// 친화 라벨/힌트/그룹 (쉬운 한국어, 토스 스타일)
+const TS_META={
+  'stop_loss.hard_max_pct':            {g:'📉 손절',   label:'최대 손절선',     hint:'이만큼 손해 나면 무조건 팔아요 (예: -2%)', unit:'%'},
+  'stop_loss.technical_stop_enabled':  {g:'📉 손절',   label:'기술적 손절 사용', hint:'진입했던 캔들 저점이 깨지면 바로 손절해요'},
+  'stop_loss.technical_buffer_pct':    {g:'📉 손절',   label:'저점 이탈 버퍼',   hint:'진입 캔들 저점에서 이만큼 더 빠지면 손절', unit:'%'},
+  // 타임스톱(시간 기반 매도)은 제거되었다(§5.5) — 시간 때문에 파는 항목은 없다.
+  'take_profit.step1.pct_range':       {g:'✅ 익절',   label:'1차 익절 목표',    hint:'이 수익 구간에서 1차 익절 (낮음~높음)', unit:'%', range:true},
+  'take_profit.step1.close_ratio':     {g:'✅ 익절',   label:'1차 청산 비중',    hint:'1차 익절 때 몇 % 팔지', unit:'%'},
+  'take_profit.step2.pct_range':       {g:'✅ 익절',   label:'2차 익절 목표',    hint:'이 수익 구간에서 2차 익절 (낮음~높음)', unit:'%', range:true},
+  'take_profit.step2.close_ratio':     {g:'✅ 익절',   label:'2차 청산 비중',    hint:'2차 익절 때 몇 % 팔지', unit:'%'},
+  'take_profit.step3_trailing.trail_from_high_pct':{g:'✅ 익절', label:'트레일링 이탈', hint:'고점 대비 이만큼 밀리면 잔량 전부 팔아요', unit:'%'},
+};
+// 서버 가드레일이 없는 항목의 클라이언트 안전범위 (화면 % 단위)
+const TS_CLIENT_BOUNDS={
+  'take_profit.step1.pct_range':[0.5,30], 'take_profit.step2.pct_range':[0.5,30],
+  'take_profit.step1.close_ratio':[0,100], 'take_profit.step2.close_ratio':[0,100],
+  'take_profit.step3_trailing.trail_from_high_pct':[0.5,10],
+};
+
+// yaml 값 → 화면 표시값 (소수→%)
+function _tsToDisp(key, val){
+  const m=TS_META[key]||{};
+  if(m.range && Array.isArray(val)) return val.map(v=>_tsFmt(v*100));
+  if(m.unit==='%') return _tsFmt(val*100);
+  return val; // 분/그 외 숫자, bool, choice 그대로
+}
+// 화면 표시값 → yaml 저장 문자열 (%→소수)
+function _tsToYaml(key, disp){
+  const m=TS_META[key]||{}, it=_tsItems[key]||{};
+  if(m.range){ return '['+disp.map(v=>_tsRound6(v/100)).join(', ')+']'; }
+  if(m.unit==='%') return String(_tsRound6(disp/100));
+  if(it.kind==='minutes') return String(Math.round(disp));
+  return String(disp);
+}
+// 안전범위 (화면 % 단위) — 서버 bounds 우선, 없으면 클라이언트 fallback
+function _tsBounds(key){
+  const it=_tsItems[key]||{}, m=TS_META[key]||{};
+  if(m.range){
+    let b = it.list_bounds ? it.list_bounds.map(p=>p.map(x=>m.unit==='%'?x*100:x))
+          : (TS_CLIENT_BOUNDS[key] ? [TS_CLIENT_BOUNDS[key],TS_CLIENT_BOUNDS[key]] : null);
+    return b;
+  }
+  if(it.bounds){ const f=m.unit==='%'?100:1; return [it.bounds[0]*f, it.bounds[1]*f]; }
+  if(TS_CLIENT_BOUNDS[key]) return TS_CLIENT_BOUNDS[key];
+  return null;
+}
+
+async function tradeSettingsLoad(){
+  const host=document.getElementById('tradeSettingsPanel');
+  if(!host) return;
+  host.innerHTML='<div class="ts-card"><div class="ts-h">⚙️ 매매 설정</div><div class="ts-sub">불러오는 중…</div></div>';
+  try{
+    const r=await fetch('/api/agent/strategy/settings',{cache:'no-store'});
+    const d=await r.json();
+    tradeSettingsRender(d);
+  }catch(e){
+    host.innerHTML='<div class="ts-card"><div class="ts-h">⚙️ 매매 설정</div><div class="ts-sub" style="color:#ef4444;">불러오기 실패: '+_tsEsc(e.message)+'</div></div>';
+  }
+}
+
+function tradeSettingsRender(d){
+  const host=document.getElementById('tradeSettingsPanel');
+  if(!host) return;
+  if(!d||!d.ok){ host.innerHTML='<div class="ts-card"><div class="ts-h">⚙️ 매매 설정</div><div class="ts-sub" style="color:#ef4444;">'+_tsEsc((d&&d.reason)||'서버 응답 없음')+'</div></div>'; return; }
+  _tsItems={}; _tsCur={};
+  (d.items||[]).forEach(it=>{ _tsItems[it.key]=it; _tsCur[it.key]=it.value; });
+  _tsLocked=!!d.locked;
+  const mode=d.mode||'paper';
+
+  let h='<div class="ts-card">';
+  h+='<div class="ts-h">⚙️ 매매 설정<span class="ts-badge">'+(mode==='live'?'🔴 실전':'🟢 모의')+' 모드</span></div>';
+  h+='<div class="ts-sub">손절·익절 값을 바꾸면 <b>바로 저장</b>되고 다음 매매/백테스트부터 적용돼요. 안전범위를 벗어나면 거부돼요. 하드리밋(동시보유·진입금지 시간 등)은 바꿀 수 없어요.</div>';
+  if(_tsLocked) h+='<div class="ts-lock">🔒 실전 모드에서는 전략 값을 바꿀 수 없어요. 설정을 바꾸려면 모의(paper) 모드로 전환하세요.</div>';
+
+  // 그룹 순서대로 렌더 (TS_META 정의 순서)
+  let curGrp=null;
+  Object.keys(TS_META).forEach(key=>{
+    const it=_tsItems[key]; if(!it) return;
+    const m=TS_META[key];
+    if(m.g!==curGrp){ curGrp=m.g; h+='<div class="ts-grp-t">'+m.g+'</div>'; }
+    h+=_tsRowHtml(key);
+  });
+  h+='</div>';
+  host.innerHTML=h;
+}
+
+function _tsRowHtml(key){
+  const it=_tsItems[key], m=TS_META[key];
+  const id=_tsId(key), dis=_tsLocked?'disabled':'';
+  let ctl='', cur='';
+  if(it.kind==='bool'){
+    ctl='<label class="ts-switch"><input type="checkbox" id="'+id+'" '+(it.value?'checked':'')+' '+dis+' onchange="tsSaveToggle(\''+key+'\')"><span></span></label>';
+    cur='현재: '+(it.value?'켜짐 ✅':'꺼짐 ⛔');
+  } else if(it.kind==='choice'){
+    let opts='';
+    (it.choices||[]).forEach(c=>{ const lbl=(m.choices&&m.choices[c])||c; opts+='<option value="'+c+'" '+(c===it.value?'selected':'')+'>'+_tsEsc(lbl)+'</option>'; });
+    ctl='<select class="ts-sel" id="'+id+'" '+dis+' onchange="tsSaveChoice(\''+key+'\')">'+opts+'</select>';
+    cur='현재: '+_tsEsc((m.choices&&m.choices[it.value])||it.value);
+  } else if(m.range){
+    const dv=_tsToDisp(key,it.value);
+    ctl='<input class="ts-in" style="width:50px;" type="number" step="any" id="'+id+'_lo" value="'+dv[0]+'" '+dis+' onchange="tsSaveRange(\''+key+'\')">'
+       +'<span class="ts-unit">~</span>'
+       +'<input class="ts-in" style="width:50px;" type="number" step="any" id="'+id+'_hi" value="'+dv[1]+'" '+dis+' onchange="tsSaveRange(\''+key+'\')">'
+       +'<span class="ts-unit">'+(m.unit||'')+'</span>';
+    cur='현재: '+dv[0]+(m.unit||'')+' ~ '+dv[1]+(m.unit||'');
+  } else {
+    const dv=_tsToDisp(key,it.value);
+    const b=_tsBounds(key);
+    const minmax=b?(' min="'+b[0]+'" max="'+b[1]+'"'):'';
+    ctl='<input class="ts-in" type="number" step="any" id="'+id+'" value="'+dv+'"'+minmax+' '+dis+' onchange="tsSaveNum(\''+key+'\')"><span class="ts-unit">'+(m.unit||'')+'</span>';
+    cur='현재: '+dv+(m.unit||'');
+  }
+  const b=_tsBounds(key);
+  let range='';
+  if(b && !m.range && it.kind!=='bool' && it.kind!=='choice') range=' · 범위 '+b[0]+'~'+b[1]+(m.unit||'');
+  else if(b && m.range) range=' · 범위 '+b[0][0]+'~'+b[1][1]+(m.unit||'');
+  return '<div class="ts-row"><div class="ts-txt"><div class="ts-lab">'+_tsEsc(m.label)+'</div>'
+    +'<div class="ts-hint">'+_tsEsc(m.hint||'')+'</div>'
+    +'<div class="ts-cur" id="'+id+'_cur">'+_tsEsc(cur)+range+'</div>'
+    +'<div class="ts-fb" id="'+id+'_fb"></div></div>'
+    +'<div class="ts-ctl">'+ctl+'</div></div>';
+}
+
+function _tsFb(key, msg, color){
+  const el=document.getElementById(_tsId(key)+'_fb');
+  if(el){ el.textContent=msg; el.style.color=color||'var(--ts)'; }
+}
+function _tsCurText(key){
+  const it=_tsItems[key], m=TS_META[key]; const el=document.getElementById(_tsId(key)+'_cur'); if(!el) return;
+  let cur;
+  if(it.kind==='bool') cur='현재: '+(it.value?'켜짐 ✅':'꺼짐 ⛔');
+  else if(it.kind==='choice') cur='현재: '+((m.choices&&m.choices[it.value])||it.value);
+  else if(m.range){ const dv=_tsToDisp(key,it.value); cur='현재: '+dv[0]+(m.unit||'')+' ~ '+dv[1]+(m.unit||''); }
+  else { const dv=_tsToDisp(key,it.value); cur='현재: '+dv+(m.unit||''); }
+  const b=_tsBounds(key); let range='';
+  if(b && !m.range && it.kind!=='bool' && it.kind!=='choice') range=' · 범위 '+b[0]+'~'+b[1]+(m.unit||'');
+  else if(b && m.range) range=' · 범위 '+b[0][0]+'~'+b[1][1]+(m.unit||'');
+  el.textContent=cur+range;
+}
+
+// 실제 저장 (모든 입력 타입 공통)
+async function _tsApply(key, valueStr){
+  if(_tsLocked){ _tsFb(key,'🔒 실전 모드에서는 바꿀 수 없어요.','#ef4444'); return; }
+  _tsFb(key,'저장 중…','var(--ts)');
+  try{
+    const r=await fetch('/api/agent/consult/apply-param',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key,value:valueStr})});
+    const d=await r.json();
+    if(d.locked){ _tsLocked=true; _tsFb(key,'🔒 실전 모드 잠금','#ef4444'); return; }
+    if(d.ok){
+      _tsItems[key].value=d.to;
+      _tsCur[key]=d.to;
+      _tsCurText(key);
+      let msg='✓ 저장됨';
+      if(d.commit) msg+=' · 커밋 '+d.commit;
+      _tsFb(key,msg,'#16a34a');
+      // 서버가 안전범위로 보정했으면 입력칸도 보정값으로 갱신
+      _tsSyncInput(key);
+    } else if(typeof d.reason==='string' && d.reason.indexOf('이미')>=0){
+      _tsFb(key,'✓ 이미 적용된 값이에요','#16a34a');
+    } else {
+      _tsFb(key,'❌ '+_tsEsc(d.reason||'적용 실패'),'#ef4444');
+    }
+  }catch(e){ _tsFb(key,'❌ 저장 실패: '+_tsEsc(e.message),'#ef4444'); }
+}
+// 입력칸을 현재 저장값으로 되돌림 (거부/보정 후)
+function _tsSyncInput(key){
+  const it=_tsItems[key], m=TS_META[key], id=_tsId(key);
+  if(m.range){ const dv=_tsToDisp(key,it.value); const lo=document.getElementById(id+'_lo'),hi=document.getElementById(id+'_hi'); if(lo)lo.value=dv[0]; if(hi)hi.value=dv[1]; }
+  else { const el=document.getElementById(id); if(el) el.value=_tsToDisp(key,it.value); }
+}
+
+function tsSaveToggle(key){ const el=document.getElementById(_tsId(key)); if(!el) return; _tsApply(key, el.checked?'true':'false'); }
+function tsSaveChoice(key){ const el=document.getElementById(_tsId(key)); if(!el) return; _tsApply(key, el.value); }
+function tsSaveNum(key){
+  const el=document.getElementById(_tsId(key)); if(!el) return;
+  const v=parseFloat(el.value);
+  if(!isFinite(v)){ _tsFb(key,'❌ 숫자를 입력해 주세요.','#ef4444'); _tsSyncInput(key); return; }
+  const b=_tsBounds(key);
+  if(b && (v<b[0]||v>b[1])){ _tsFb(key,'⚠️ 범위(안전값 '+b[0]+'~'+b[1]+')를 벗어나 거부됐어요.','#ef4444'); _tsSyncInput(key); return; }
+  _tsApply(key, _tsToYaml(key, v));
+}
+function tsSaveRange(key){
+  const id=_tsId(key); const lo=parseFloat((document.getElementById(id+'_lo')||{}).value), hi=parseFloat((document.getElementById(id+'_hi')||{}).value);
+  if(!isFinite(lo)||!isFinite(hi)){ _tsFb(key,'❌ 숫자를 입력해 주세요.','#ef4444'); _tsSyncInput(key); return; }
+  if(lo>=hi){ _tsFb(key,'⚠️ 낮은 값이 높은 값보다 작아야 해요.','#ef4444'); _tsSyncInput(key); return; }
+  const b=_tsBounds(key);
+  if(b && (lo<b[0][0]||lo>b[0][1]||hi<b[1][0]||hi>b[1][1])){ _tsFb(key,'⚠️ 범위(안전값 '+b[0][0]+'~'+b[1][1]+')를 벗어나 거부됐어요.','#ef4444'); _tsSyncInput(key); return; }
+  _tsApply(key, _tsToYaml(key, [lo,hi]));
 }
 
 // ── 📚 노션 학습 현황 (학습부 노션 동기화 → 전 부서 반영) ──
@@ -13263,6 +13985,142 @@ async function notionSync(){
     else { await notionStatusLoad(); }
   }catch(e){ if(el) el.innerHTML='<div style="color:#ef4444;">❌ '+_notionEsc(e.message)+'</div>'; }
   finally{ if(btn){ btn.disabled=false; btn.textContent='🔄 지금 업데이트'; } }
+}
+
+// ════════ 📚 노션 학습 적용하기 (수집 → 실제 전략 반영) ════════
+// notion_knowledge.json 에서 적용 가능 항목 + 도입 가능(미반영) 항목을 추출 → 체크리스트 →
+// 선택 적용(yaml 수정 + 검증 + 깃 커밋 + notion_applied.json 이력).
+let _notionApplyData = { items:null, pending:null };
+
+async function notionApplyOpen(){
+  const box=document.getElementById('notionApplyBox'); const btn=document.getElementById('notionApplyBtn');
+  if(!box) return;
+  if(btn){ btn.disabled=true; btn.textContent='⏳ 노션 내용 분석 중…'; }
+  try{
+    const r=await fetch('/api/agent/notion/extract',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+    const d=await r.json();
+    if(!d){ box.innerHTML='<div style="font-size:11px;color:#ef4444;">❌ 분석 실패: 서버에서 빈 응답이 왔어요.</div>'; if(btn){btn.disabled=false;btn.textContent='📚 노션 학습 적용하기';} return; }
+    if(!d.ok){
+      const why=d.reason||d.message||'분석 중 문제가 발생했어요(상세 사유 없음).';
+      let h='<div style="font-size:11px;color:#ef4444;">❌ 분석 실패: '+_notionEsc(why)+'</div>';
+      if(d.detail){ h+='<details style="margin-top:3px;"><summary style="cursor:pointer;font-size:9.5px;color:var(--ts,#9aa);">자세히</summary><div style="font-size:9px;color:var(--ts,#9aa);white-space:pre-wrap;">'+_notionEsc(d.detail)+'</div></details>'; }
+      box.innerHTML=h; if(btn){btn.disabled=false;btn.textContent='📚 노션 학습 적용하기';} return;
+    }
+    if(d.synced===false){ box.innerHTML='<div style="font-size:11px;color:#fbbf24;">'+_notionEsc(d.message||'먼저 동기화해 주세요.')+'</div>'; if(btn){btn.disabled=false;btn.textContent='📚 노션 학습 적용하기';} return; }
+    _notionApplyData.items=d.items||[]; _notionApplyData.pending=d.pending||[];
+    notionApplyRenderChecklist(d);
+    if(btn){ btn.style.display='none'; }
+    notionAppliedHistoryLoad();
+  }catch(e){
+    box.innerHTML='<div style="font-size:11px;color:#ef4444;">❌ 통신 오류: '+_notionEsc(e.message)+'</div>';
+    if(btn){ btn.disabled=false; btn.textContent='📚 노션 학습 적용하기'; }
+  }
+}
+
+function notionApplyRenderChecklist(d){
+  const box=document.getElementById('notionApplyBox'); if(!box) return;
+  const items=d.items||[], pending=d.pending||[];
+  if(!items.length && !pending.length){
+    box.innerHTML='<div style="font-size:11px;color:var(--ts,#9aa);">'+_notionEsc(d.message||'반영할 항목을 못 찾았어요.')+'</div>'; return;
+  }
+  const live=(d.mode && d.mode!=='paper');
+  let html='<div style="border:1px solid #3182f6;border-radius:10px;padding:10px;background:var(--card,#16181d);">';
+  html+='<div style="font-size:11.5px;font-weight:800;margin-bottom:6px;">📚 노션 → 전략 반영 ('+items.length+'개 · 적용 가능 '+(d.applicable||0)+'개)</div>';
+  // ── 적용 가능/잠금 파라미터 항목 ──
+  items.forEach((it,i)=>{
+    const cid='naChk'+i;
+    const badge = it.hard_limit ? '<span style="font-size:9px;background:#f5555533;color:#f88;padding:1px 6px;border-radius:6px;margin-left:4px;">🔒 하드리밋</span>'
+                : it.locked ? '<span style="font-size:9px;background:#fbbf2433;color:#fbbf24;padding:1px 6px;border-radius:6px;margin-left:4px;">🔒 실전</span>'
+                : (!it.applicable ? '<span style="font-size:9px;background:#88888833;color:#aaa;padding:1px 6px;border-radius:6px;margin-left:4px;">제외</span>' : '');
+    const op=it.applicable?'1':'0.55';
+    html+='<label style="display:flex;gap:8px;align-items:flex-start;padding:7px 4px;border-top:1px solid var(--bd,#2a2d35);opacity:'+op+';cursor:'+(it.applicable?'pointer':'default')+';">'
+      +'<input type="checkbox" id="'+cid+'" data-i="'+i+'" '+(it.applicable?'checked':'')+' '+(it.applicable?'':'disabled')+' style="margin-top:2px;flex:none;">'
+      +'<span style="flex:1;min-width:0;">'
+      +'<div style="font-size:11.5px;font-weight:700;">'+_notionEsc(it.agent_label||'')+' · '+_notionEsc(it.label)+badge+'</div>'
+      +'<div style="font-size:11px;color:var(--ts,#9aa);margin-top:1px;">'+_notionEsc(it.display)+'</div>'
+      +(it.note?('<div style="font-size:10px;color:#fbbf24;margin-top:1px;">'+_notionEsc(it.note)+'</div>'):'')
+      +(it.reason&&it.applicable?('<div style="font-size:10px;color:var(--ts,#9aa);margin-top:1px;">📖 '+_notionEsc(it.reason)+'</div>'):'')
+      +'</span></label>';
+  });
+  const anyApplicable=(d.applicable||0)>0;
+  if(anyApplicable && !live){
+    html+='<button id="naApplyBtn" style="margin-top:8px;width:100%;font-size:11px;font-weight:800;padding:8px;border-radius:9px;border:none;background:#22c55e;color:#fff;cursor:pointer;" onclick="notionApplySelected()">✅ 선택 항목 적용 (yaml 수정 + 깃 커밋)</button>';
+  }else if(live){
+    html+='<div style="font-size:10.5px;color:#fbbf24;margin-top:8px;">🔒 실전 모드에서는 전략을 바꿀 수 없어요(모의에서만 적용).</div>';
+  }else{
+    html+='<div style="font-size:10.5px;color:var(--ts,#9aa);margin-top:8px;">적용 가능한 파라미터 항목이 없어요(이미 같은 값이거나 보호된 키).</div>';
+  }
+  // ── 미반영(도입 가능) 항목 — R/R·VWAP·OBV·볼린저 수축·재료 강도 등 ──
+  if(pending.length){
+    html+='<div style="margin-top:12px;border-top:1px dashed var(--bd,#2a2d35);padding-top:8px;">';
+    html+='<div style="font-size:11px;font-weight:800;margin-bottom:4px;">🧩 도입 가능 (코드 구현 필요) '+pending.length+'개</div>';
+    html+='<div style="font-size:9.5px;color:var(--ts,#9aa);margin-bottom:6px;">아직 전략 파라미터로 없는 고급 규칙이에요. 적용하면 "도입 예정"으로 등록돼요(yaml 미변경).</div>';
+    pending.forEach((p,i)=>{
+      const cid='naPend'+i;
+      html+='<label style="display:flex;gap:8px;align-items:flex-start;padding:6px 4px;border-top:1px solid var(--bd,#2a2d35);cursor:pointer;">'
+        +'<input type="checkbox" id="'+cid+'" data-p="'+i+'" style="margin-top:2px;flex:none;">'
+        +'<span style="flex:1;min-width:0;">'
+        +'<div style="font-size:11px;font-weight:700;">📌 '+_notionEsc(p.label)+'</div>'
+        +(p.sample?('<div style="font-size:9.5px;color:var(--ts,#9aa);margin-top:1px;">'+_notionEsc(String(p.sample).slice(0,70))+'</div>'):'')
+        +'</span></label>';
+    });
+    html+='<button id="naPendBtn" style="margin-top:8px;width:100%;font-size:11px;font-weight:700;padding:7px;border-radius:9px;border:1px solid #7c3aed;background:transparent;color:#a78bfa;cursor:pointer;" onclick="notionApplySelected()">📌 선택한 도입 예정 등록</button>';
+    html+='</div>';
+  }
+  html+='<div id="naRes" style="margin-top:8px;"></div>';
+  html+='</div>';
+  box.innerHTML=html;
+}
+
+async function notionApplySelected(){
+  const box=document.getElementById('notionApplyBox'); if(!box||!_notionApplyData.items) return;
+  const items=[], pending=[];
+  box.querySelectorAll('input[type=checkbox]:checked').forEach(c=>{
+    const di=c.getAttribute('data-i'), dp=c.getAttribute('data-p');
+    if(di!=null){ const it=_notionApplyData.items[+di]; if(it&&it.applicable) items.push({key:it.key, value:it.proposed, label:it.label, reason:it.reason}); }
+    else if(dp!=null){ const p=_notionApplyData.pending[+dp]; if(p) pending.push({label:p.label, sample:p.sample}); }
+  });
+  const res=document.getElementById('naRes');
+  if(!items.length && !pending.length){ if(res) res.innerHTML='<div style="font-size:11px;color:#fbbf24;">선택된 항목이 없어요.</div>'; return; }
+  const ab=document.getElementById('naApplyBtn'), pb=document.getElementById('naPendBtn');
+  if(ab){ ab.disabled=true; } if(pb){ pb.disabled=true; }
+  if(res) res.innerHTML='<div style="font-size:11px;color:var(--ts,#9aa);">⏳ 적용 중…</div>';
+  try{
+    const r=await fetch('/api/agent/notion/apply',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({items,pending})});
+    const d=await r.json();
+    let html='';
+    if(d.locked){ html+='<div style="font-size:11px;color:#fbbf24;">🔒 '+_notionEsc(d.reason||'실전 모드 — 적용 불가')+'</div>'; }
+    (d.applied||[]).forEach(a=>{ html+='<div style="font-size:11px;color:#22c55e;margin-top:2px;">✅ '+_notionEsc((a.agent_label?a.agent_label+' · ':'')+(a.display||(a.key+' 적용')))+(a.commit?(' · 커밋 '+_notionEsc(a.commit)):'')+'</div>'; });
+    (d.pending_registered||[]).forEach(p=>{ html+='<div style="font-size:11px;color:#a78bfa;margin-top:2px;">📌 '+_notionEsc(p.label)+' — 도입 예정 등록</div>'; });
+    (d.failed||[]).forEach(f=>{ html+='<div style="font-size:11px;color:#ef4444;margin-top:2px;">❌ '+_notionEsc((f.label||f.key)+' — '+(f.reason||'실패'))+'</div>'; });
+    if(!html) html='<div style="font-size:11px;color:var(--ts,#9aa);">'+_notionEsc(d.message||d.reason||'결과 없음')+'</div>';
+    if(res) res.innerHTML=html;
+    notionAppliedHistoryLoad();
+    notionStatusLoad();
+  }catch(e){
+    if(res) res.innerHTML='<div style="font-size:11px;color:#ef4444;">❌ 통신 오류: '+_notionEsc(e.message)+'</div>';
+  }finally{
+    if(ab){ ab.disabled=false; } if(pb){ pb.disabled=false; }
+  }
+}
+
+async function notionAppliedHistoryLoad(){
+  const box=document.getElementById('notionApplyBox'); if(!box) return;
+  let el=document.getElementById('naHist');
+  try{
+    const r=await fetch('/api/agent/notion/history',{cache:'no-store'});
+    const d=await r.json();
+    if(!d||!d.ok||!d.decisions||!d.decisions.length) return;
+    if(!el){ el=document.createElement('div'); el.id='naHist'; el.style.cssText='margin-top:10px;font-size:9.5px;color:var(--ts,#9aa);'; box.appendChild(el); }
+    let html='<details open><summary style="cursor:pointer;font-weight:700;color:var(--b,#3b82f6);">🗂 노션 적용 이력 ('+d.param_count+'건 반영 · '+d.pending_count+'건 도입예정)</summary>';
+    d.decisions.slice(0,10).forEach(x=>{
+      const when=_notionTime(x.ts);
+      if(x.kind==='param'){ html+='<div style="padding:3px 0;border-top:1px solid var(--bd,#2a2d35);">✅ '+_notionEsc(x.label||x.key)+' <span style="color:var(--tm,#888);">'+_notionEsc(String(x.from))+'→'+_notionEsc(String(x.to))+'</span> · '+when+(x.commit?(' · '+_notionEsc(x.commit)):'')+'</div>'; }
+      else{ html+='<div style="padding:3px 0;border-top:1px solid var(--bd,#2a2d35);">📌 '+_notionEsc(x.label)+' <span style="color:#a78bfa;">도입 예정</span> · '+when+'</div>'; }
+    });
+    html+='</details>';
+    el.innerHTML=html;
+  }catch(e){}
 }
 
 function consRenderCards(){
@@ -13364,8 +14222,11 @@ function consScopedCtx(agent, ctx){
   if(has('threshold') && p['screening.threshold']!=null) L.push('현재 스크리닝 통과 점수(threshold): '+p['screening.threshold']);
   if(has('signalParam') && p['signal.volume_surge_multiplier']!=null) L.push('현재 거래량 급증 배수: '+p['signal.volume_surge_multiplier']);
   if(has('riskParam')){
-    if(p['time_stop.evaluation_minutes']!=null) L.push('현재 타임스톱 평가시간: '+p['time_stop.evaluation_minutes']+'분');
-    if(p['time_stop.flat_box_pct']!=null) L.push('현재 타임스톱 무방향 박스: ±'+(p['time_stop.flat_box_pct']*100).toFixed(2)+'%');
+    // 손절 (§5.4)
+    if(p['stop_loss.hard_max_pct']!=null) L.push('현재 하드 손절: '+(p['stop_loss.hard_max_pct']*100).toFixed(2)+'%');
+    if(p['stop_loss.technical_buffer_pct']!=null) L.push('현재 기술적 손절 버퍼: -'+(p['stop_loss.technical_buffer_pct']*100).toFixed(2)+'% (진입캔들 저점 이탈)');
+    if(p['stop_loss.technical_stop_enabled']!=null) L.push('기술적 손절 사용: '+(p['stop_loss.technical_stop_enabled']?'켜짐':'꺼짐'));
+    // 타임스톱(시간 기반 매도)은 제거되었다(§5.5) — 시간 경과로 파는 청산 없음.
   }
   if(has('hardLimits')) L.push('하드리밋(변경불가): 동시보유 3종목 / 연속손절 3회→1시간 쿨다운 / 09:00~09:30·14:30이후 진입금지 / 슬리피지 5틱 / 신용 담보비율 버퍼.');
   if(has('allParams')){
@@ -13402,7 +14263,9 @@ function consAgentSystem(agent, ctx){
   parts.push('【절대 말하지 않는 것 — 다른 부서 관할】\n'+c.never);
   parts.push('【관할 밖 질문을 받으면】\n"그건 제 관할이 아니에요, [담당]에게 물어보세요"처럼 해당 담당 부서를 명확히 알려주고 넘긴다. 추측으로 다른 부서 일을 대신 답하지 않는다. (부서: '+Object.keys(CONS_OWNER).map(k=>CONS_OWNER[k]).join(' / ')+')');
   if(tun.length){
-    parts.push('【내가 제안 가능한 파라미터】\n'+tun.join(', ')+' — 이 키만. 변경이 정말 도움된다고 판단하면 답변 맨 끝에 정확히 이 형식으로 한 줄: [[PARAM:키=값|한줄이유]]. 실전(live) 모드면 "지금은 잠겨서 모의에서만 적용돼요"라고 덧붙인다. 내 관할 밖 파라미터는 제안하지 않는다(메타나 해당 담당에게 넘긴다).');
+    parts.push('【내가 조정 가능한 파라미터】\n'+tun.join(', ')+' — 이 키들.\n'
+      +'★ 중요: 사용자가 수치를 분명히 말하면(예 "신호 조건 4개로", "RSI 55~65로", "하드 손절 -2%로") 시스템이 그 변경을 strategy_params.yaml 에 **즉시 자동 반영**한다(모의 모드). 따라서 너는 "반영할까요?"·"적용할까요?"·"여기서는 못 바꿔요" 같은 말을 절대 하지 마라 — 이미 적용됐다고 보고 확인·설명만 하라. (시스템 안내문이 함께 주어지면 그 내용을 그대로 따르라.)\n'
+      +'네가 먼저 변경을 권하고 싶을 땐 답변 맨 끝에 한 줄: [[PARAM:키=값|한줄이유]]. 실전(live) 모드면 "지금은 잠겨서 모의에서만 적용돼요"라고 덧붙인다. 내 관할 밖 파라미터는 메타나 해당 담당에게 넘긴다. 하드리밋(동시보유·연속손절 쿨다운·진입금지 시간·슬리피지·담보비율)은 바꿀 수 없다고 분명히 말하라.');
   } else {
     parts.push('【파라미터】\n내 관할에는 직접 바꿀 전략 파라미터가 없다. 파라미터 변경 얘기가 나오면 메타 옵티마이저(또는 해당 담당)에게 넘긴다. [[PARAM:...]] 형식을 쓰지 않는다.');
   }
@@ -13454,12 +14317,64 @@ async function consSelect(id){
 }
 
 // ── Claude에 질문 (단일 에이전트) — 스트리밍(요구 1) + 협력(요구 3) ──
+// ── 결정적 자동 반영(요구 1~3): 사용자 문장에서 전략 변경을 감지하면 LLM 협조 없이
+//    즉시 strategy_params.yaml 수정 + git 커밋하고, 결과 카드를 화면에 띄운다. "반영할까요?"
+//    "여기선 못해요"로 끝나지 않게 — 무조건 적용한다(하드리밋/live만 거부 사유 표시).
+//    반환값: LLM에 주입할 안내문(적용됨/거부됨). 감지 못 하면 '' (LLM이 평소처럼 대화).
+async function consAutoApplyText(userText){
+  try{
+    const r=await fetch('/api/agent/consult/apply-text',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:userText})});
+    const d=await r.json();
+    const applied=(d&&d.applied)||[];
+    if(applied.length){
+      // 캐시 갱신 + 결과 카드
+      applied.forEach(a=>{ if(consState.ctx&&consState.ctx.params) consState.ctx.params[a.key]=a.to; });
+      const lines=applied.map(a=>{
+        const commit=a.commit?(' · 커밋 '+a.commit):'';
+        return '✅ '+(a.display||(a.key+': '+a.from+' → '+a.to))+commit;
+      });
+      consAutoApplyCard('done', '✅ 적용 완료', lines);
+      return '【시스템 안내 — 반드시 따르라】 사용자의 위 요청을 strategy_params.yaml 에 이미 자동 반영 완료했다: '
+        +applied.map(a=>(a.display||(a.key+' '+a.from+'→'+a.to))).join(' / ')
+        +'. 그러니 "반영할까요?"·"적용할까요?"라고 절대 되묻지 마라. "✅ 적용 완료했어요"라고 확정해서 알리고, 그 변경이 매매에 어떤 효과·주의가 있는지만 1~3문장으로 설명하라. 다음 백테스트/세션부터 바로 적용된다는 점도 덧붙여라.';
+    }
+    if(d&&(d.hard_limit||d.locked)){
+      consAutoApplyCard('fail', (d.locked?'🔒 적용 불가':'🚫 변경 불가'), [String(d.reason||'변경할 수 없는 값이에요.')]);
+      return '【시스템 안내】 사용자의 요청은 적용하지 못했다: '+String(d.reason||'')
+        +' 왜 안 되는지(하드리밋이거나 실전 잠금) 정중히 설명하고, 바꿀 수 있는 대안이 있으면 안내하라. 절대 적용됐다고 말하지 마라.';
+    }
+    if(d&&d.failed&&d.failed.length&&!applied.length){
+      // "값이 이미 N이라 변경할 게 없어요" 등 — 조용히 알린다.
+      const reasons=d.failed.map(f=>f.reason).filter(Boolean);
+      if(reasons.some(x=>/이미/.test(x))){
+        consAutoApplyCard('info', 'ℹ️ 이미 그 값이에요', reasons.slice(0,2));
+        return '【시스템 안내】 사용자가 요청한 값은 이미 현재 설정과 같아서 바뀐 게 없다. 그 사실을 알려주고, 다른 조정이 필요한지 물어보라.';
+      }
+    }
+  }catch(e){ /* 자동반영 실패는 비치명 — LLM이 평소대로 대화 */ }
+  return '';
+}
+function consAutoApplyCard(kind, title, lines){
+  const b=document.getElementById('consChatBody'); if(!b) return;
+  const col = kind==='done' ? '#16a34a' : (kind==='fail' ? '#ef4444' : 'var(--ts,#9aa)');
+  const bg  = kind==='done' ? 'rgba(22,163,74,.10)' : (kind==='fail' ? 'rgba(239,68,68,.10)' : 'rgba(148,163,184,.10)');
+  const d=document.createElement('div'); d.className='cons-row sys'; d.style.alignSelf='center'; d.style.maxWidth='94%';
+  let h='<div class="cons-bub" style="background:'+bg+';border:1px solid '+col+'44;">'
+    +'<div style="font-size:12px;font-weight:800;color:'+col+';margin-bottom:4px;">'+consEsc(title)+'</div>';
+  (lines||[]).forEach(l=>{ h+='<div style="font-size:11px;color:var(--t,#333);margin-top:2px;">'+consEsc(l)+'</div>'; });
+  h+='</div>';
+  d.innerHTML=h; b.appendChild(d); consScrollEnd();
+}
+
 async function consAsk(agent, userText, isSelf){
   if(consState.busy) return;
   consState.busy = true;
   const ctx = await consLoadContext(false);
   consUpdateModeBadge();
-  const sys = consAgentSystem(agent, ctx);
+  // 결정적 자동 반영 먼저(요구 1~3): 감지된 변경은 LLM과 무관하게 즉시 yaml 반영 + 카드 표시.
+  const applyNote = isSelf ? '' : await consAutoApplyText(userText);
+  if(applyNote) consUpdateModeBadge();   // 적용 후 모드/값 배지 갱신
+  const sys = consAgentSystem(agent, ctx) + (applyNote ? ('\n\n'+applyNote) : '');
   const hist = consState.history[agent.id] || (consState.history[agent.id]=[]);
   const um = { role:'user', content:userText }; if(isSelf) um._self=true;
   hist.push(um);
@@ -13618,7 +14533,7 @@ async function consRunMeeting(userText){
 
     // ② CEO 중간 제안 — 부서들이 반박/동의할 구체 방향을 던진다
     consSysMsg('🧠 CEO가 중간 방향을 제안합니다. 각 부서가 동의하거나 반박해요.');
-    const interimSys = consAgentSystem(ceo, ctx)+'\n\n【전체 팀 회의 — CEO 중간 제안 차례】 각 부서 발언을 듣고, 오늘 팀이 바꾸면 좋을 구체적 방향을 1~2가지 제안해라(예: "스크리닝 기준을 더 높이자", "타임스톱을 더 빨리"). 어느 부서가 관련되는지 짚어라(3~4문장). 아직 최종 결론은 아니다. [[PARAM]]은 쓰지 마라.';
+    const interimSys = consAgentSystem(ceo, ctx)+'\n\n【전체 팀 회의 — CEO 중간 제안 차례】 각 부서 발언을 듣고, 오늘 팀이 바꾸면 좋을 구체적 방향을 1~2가지 제안해라(예: "스크리닝 기준을 더 높이자", "손절을 더 타이트하게"). 어느 부서가 관련되는지 짚어라(3~4문장). 아직 최종 결론은 아니다. [[PARAM]]은 쓰지 마라.';
     const interimUser = (userText?('사용자 질문: '+userText+'\n\n'):'')+'각 부서 발언:\n'+brief+'\n\n중간 방향을 제안해줘.';
     const iStream = consRenderStreaming(ceo);
     const interim = await consComplete({ model:'claude-sonnet-4-5', max_tokens:700, system:interimSys, messages:[{role:'user',content:interimUser}] }, '회의:ceo제안', cur=>iStream.set('【CEO 제안】\n'+cur));
@@ -13677,8 +14592,10 @@ async function consSaveMeeting(record){
     if(d && d.ok){
       const c=d.committed?(' · 깃 커밋 '+(d.commit||'')):(d.reason?(' · '+d.reason):'');
       let msg='🗂 회의 기록을 저장했어요 (총 '+(d.count||0)+'건)'+c+'. 다음 상담 때 참고할게요.';
-      if(record.improvements && record.improvements.length) msg+=' 합의 개선안 '+record.improvements.length+'건은 위 카드의 ✅ 적용으로 반영할 수 있어요.';
       consSysMsg(msg);
+      // 📋 회의 내용 적용 버튼 — 회의 화면 하단에 배치(요구 2). 대화에서 실행 항목을
+      // 추출해 체크리스트로 보여주고 선택 적용한다.
+      consMeetingApplyButton(record);
       consState.ctxAt=0;   // 컨텍스트 캐시 무효화 → 다음 호출 시 최신 회의 반영
     }else{
       consSysMsg('⚠ 회의 기록 저장 실패: '+((d&&d.reason)||'알 수 없음'));
@@ -13821,6 +14738,161 @@ async function consApplyParam(cardId, key, val){
     if(btn){ btn.disabled=false; btn.style.background='var(--r)'; btn.textContent='❌ 통신 오류: '+e.message; }
   }
 }
+// ════════ 📋 회의 내용 적용 (요구 1~5) ════════
+// 회의 대화에서 실행 항목 자동 추출 → 체크리스트 → 선택 적용 → 검증/기록/커밋 → 이력/롤백.
+let _consMeetingSeq = 0;
+const _consMeetingData = {};   // boxId → {items, record}
+
+// 회의 화면 하단 "📋 회의 내용 적용" 버튼(요구 2).
+function consMeetingApplyButton(record){
+  const b=document.getElementById('consChatBody'); if(!b) return;
+  const id='consMA'+(++_consMeetingSeq);
+  _consMeetingData[id]={record:record||{}, items:null};
+  const nImp=(record&&record.improvements&&record.improvements.length)||0;
+  const row=document.createElement('div'); row.className='cons-row sys'; row.style.alignSelf='center'; row.style.maxWidth='96%';
+  row.innerHTML='<div class="cons-bub" style="text-align:center;">'
+    +'<div style="font-size:12px;font-weight:800;margin-bottom:6px;">📋 이 회의 내용을 전략에 반영할까요?</div>'
+    +'<div style="font-size:10.5px;color:var(--ts,#9aa);margin-bottom:8px;">대화에서 바꿀 항목을 자동으로 찾아 체크리스트로 보여드려요'+(nImp?(' (합의 개선안 '+nImp+'건 포함)'):'')+'.</div>'
+    +'<button id="'+id+'btn" class="cons-param-btn" style="background:linear-gradient(135deg,#3182f6,#7c3aed);" onclick="consMeetingApplyOpen(\''+id+'\')">📋 회의 내용 적용</button>'
+    +'<div id="'+id+'box" style="margin-top:8px;text-align:left;"></div>'
+    +'</div>';
+  b.appendChild(row); consScrollEnd();
+}
+
+// 실행 항목 추출 → 체크리스트 렌더(요구 1·2).
+async function consMeetingApplyOpen(id){
+  const slot=_consMeetingData[id]; if(!slot) return;
+  const box=document.getElementById(id+'box'); const btn=document.getElementById(id+'btn');
+  if(!box) return;
+  if(btn){ btn.disabled=true; btn.textContent='⏳ 실행 항목 찾는 중…'; }
+  try{
+    const r=await fetch('/api/agent/consult/meeting/extract',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(slot.record)});
+    const d=await r.json();
+    if(!d){ box.innerHTML='<div style="font-size:11px;color:var(--r,#f55);">❌ 추출 실패: 서버에서 빈 응답이 왔어요(응답 없음).</div>'; if(btn){btn.disabled=false;btn.textContent='📋 다시 시도';} return; }
+    if(!d.ok){
+      // 구체적 사유를 항상 보여준다(빈 사유 → 안내 문구). detail 있으면 접어서 노출.
+      const why=d.reason||d.message||'추출 처리 중 문제가 발생했어요(상세 사유 없음).';
+      let h='<div style="font-size:11px;color:var(--r,#f55);">❌ 추출 실패: '+consEsc(why)+'</div>';
+      if(d.detail){ h+='<details style="margin-top:3px;"><summary style="cursor:pointer;font-size:9.5px;color:var(--ts,#9aa);">자세히</summary><div style="font-size:9px;color:var(--ts,#9aa);white-space:pre-wrap;">'+consEsc(d.detail)+'</div></details>'; }
+      box.innerHTML=h; if(btn){btn.disabled=false;btn.textContent='📋 다시 시도';} return;
+    }
+    slot.items=d.items||[];
+    consMeetingRenderChecklist(id, d);
+    if(btn){ btn.style.display='none'; }
+  }catch(e){
+    box.innerHTML='<div style="font-size:11px;color:var(--r,#f55);">❌ 통신 오류: '+consEsc(e.message)+'</div>';
+    if(btn){ btn.disabled=false; btn.textContent='📋 다시 시도'; }
+  }
+}
+
+// 체크리스트 카드(요구 2·3): 항목별 체크박스 + 적용 전후 값 + 잠금 표시.
+function consMeetingRenderChecklist(id, d){
+  const box=document.getElementById(id+'box'); if(!box) return;
+  if(!d.items||!d.items.length){
+    box.innerHTML='<div style="font-size:11px;color:var(--ts,#9aa);">'+consEsc(d.message||'바꿀 항목을 못 찾았어요.')+'</div>'; return;
+  }
+  let html='<div class="cons-param" style="border-color:#3182f6;">';
+  html+='<div class="cons-param-t">📋 실행 항목 '+d.items.length+'개 (적용 가능 '+(d.applicable||0)+'개)</div>';
+  d.items.forEach((it,i)=>{
+    const cid=id+'chk'+i;
+    const badge = it.hard_limit ? '<span style="font-size:9px;background:#f5555533;color:#f88;padding:1px 6px;border-radius:6px;margin-left:4px;">🔒 하드리밋</span>'
+                : it.locked ? '<span style="font-size:9px;background:#fbbf2433;color:#fbbf24;padding:1px 6px;border-radius:6px;margin-left:4px;">🔒 실전</span>'
+                : (!it.applicable ? '<span style="font-size:9px;background:#88888833;color:#aaa;padding:1px 6px;border-radius:6px;margin-left:4px;">제외</span>' : '');
+    const dis = it.applicable ? '' : 'disabled';
+    const op = it.applicable ? '1' : '0.55';
+    html+='<label style="display:flex;gap:8px;align-items:flex-start;padding:7px 4px;border-top:1px solid var(--bd,#2a2d35);opacity:'+op+';cursor:'+(it.applicable?'pointer':'default')+';">'
+      +'<input type="checkbox" id="'+cid+'" data-i="'+i+'" '+(it.applicable?'checked':'')+' '+dis+' style="margin-top:2px;flex:none;">'
+      +'<span style="flex:1;min-width:0;">'
+      +'<div style="font-size:11.5px;font-weight:700;">'+consEsc(it.label)+badge+'</div>'
+      +'<div style="font-size:11px;color:var(--ts,#9aa);margin-top:1px;">'+consEsc(it.display)+'</div>'
+      +(it.note?('<div style="font-size:10px;color:#fbbf24;margin-top:1px;">'+consEsc(it.note)+'</div>'):'')
+      +(it.reason&&it.applicable?('<div style="font-size:10px;color:var(--ts,#9aa);margin-top:1px;">💬 '+consEsc(it.reason)+'</div>'):'')
+      +'</span></label>';
+  });
+  const anyApplicable = (d.applicable||0)>0;
+  if(anyApplicable){
+    html+='<button id="'+id+'apply" class="cons-param-btn" style="margin-top:8px;" onclick="consMeetingApplySelected(\''+id+'\')">✅ 선택 항목 적용 (yaml 수정 + 깃 커밋)</button>';
+  }else{
+    html+='<div style="font-size:10.5px;color:var(--ts,#9aa);margin-top:8px;">적용 가능한 항목이 없어요'+(d.mode!=='paper'?' — 🔒 실전 모드에서는 전략을 바꿀 수 없어요.':'.')+'</div>';
+  }
+  html+='<div id="'+id+'res" style="margin-top:8px;"></div>';
+  html+='</div>';
+  box.innerHTML=html;
+}
+
+// 선택 항목 적용(요구 3·4): 실제 yaml 반영 + 검증 + 기록 + 커밋.
+async function consMeetingApplySelected(id){
+  const slot=_consMeetingData[id]; if(!slot||!slot.items) return;
+  const box=document.getElementById(id+'box');
+  const checks=box?box.querySelectorAll('input[type=checkbox]:checked'):[];
+  const items=[];
+  checks.forEach(c=>{ const it=slot.items[+c.getAttribute('data-i')]; if(it&&it.applicable) items.push({key:it.key, value:it.proposed, label:it.label, reason:it.reason}); });
+  const res=document.getElementById(id+'res');
+  if(!items.length){ if(res) res.innerHTML='<div style="font-size:11px;color:#fbbf24;">선택된 항목이 없어요.</div>'; return; }
+  const btn=document.getElementById(id+'apply');
+  if(btn){ btn.disabled=true; btn.textContent='⏳ 적용 중…'; }
+  const rec=slot.record||{};
+  const payload={meeting_id:rec.ts||'', meeting_q:rec.q||'회의', meeting_ts:rec.ts||'', items:items};
+  try{
+    const r=await fetch('/api/agent/consult/meeting/apply',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const d=await r.json();
+    let html='';
+    if(d.locked){ html='<div style="font-size:11px;color:#fbbf24;">🔒 '+consEsc(d.reason||'실전 모드 — 적용 불가')+'</div>'; }
+    (d.applied||[]).forEach(a=>{ html+='<div style="font-size:11px;color:#22c55e;margin-top:2px;">✅ '+consEsc(a.display||(a.key+' 적용'))+(a.commit?(' · 커밋 '+consEsc(a.commit)):'')+'</div>'; });
+    (d.failed||[]).forEach(f=>{ html+='<div style="font-size:11px;color:#f55;margin-top:2px;">❌ '+consEsc(f.display||f.key)+' — '+consEsc(f.reason||'실패')+'</div>'; });
+    if(!html) html='<div style="font-size:11px;color:var(--ts,#9aa);">'+consEsc(d.message||d.reason||'결과 없음')+'</div>';
+    if(res) res.innerHTML=html;
+    if(btn){ btn.textContent=(d.applied&&d.applied.length)?('✅ '+d.applied.length+'건 적용 완료'):'다시 시도'; btn.disabled=!(d.applied&&d.applied.length)?false:true; }
+    consMeetingHistoryLoad();   // 이력 패널 갱신
+  }catch(e){
+    if(res) res.innerHTML='<div style="font-size:11px;color:#f55;">❌ 통신 오류: '+consEsc(e.message)+'</div>';
+    if(btn){ btn.disabled=false; btn.textContent='다시 시도'; }
+  }
+}
+
+// 🗳 회의 적용 이력 패널(요구 5): 타임라인 + 효과 + 롤백 버튼.
+async function consMeetingHistoryLoad(){
+  const el=document.getElementById('meetingHistBody'); if(!el) return;
+  try{
+    const r=await fetch('/api/agent/consult/meeting/history',{cache:'no-store'});
+    const d=await r.json();
+    if(!d||!d.ok){ el.innerHTML='이력을 불러오지 못했어요.'; return; }
+    const decs=(d.decisions||[]).filter(x=>x.source!=='meeting-rollback');
+    if(!decs.length){ el.innerHTML='아직 회의에서 적용한 변경이 없어요. 회의를 열고 📋 회의 내용 적용을 눌러보세요.'; return; }
+    let html='';
+    decs.slice(0,12).forEach(x=>{
+      const when=_notionTime(x.ts);
+      const vMap={improved:'📈 효과 좋음', worse:'📉 효과 나쁨', flat:'➖ 비슷', unknown:'⏳ 측정 중'};
+      const verd=vMap[x.verdict||'unknown']||'';
+      const rolled=x.rolled_back;
+      const fromto=consEsc(String(x.from))+'→'+consEsc(String(x.to));
+      html+='<div style="padding:6px 0;border-top:1px solid var(--bd,#2a2d35);">';
+      html+='<div style="font-weight:700;color:var(--tx,#eee);">'+(rolled?'↩️ ':'• ')+consEsc(x.label||x.key)+' <span style="color:var(--ts,#9aa);font-weight:400;">'+fromto+'</span></div>';
+      html+='<div style="color:var(--ts,#9aa);">'+when+(x.meeting_q?(' · '+consEsc(String(x.meeting_q).slice(0,22))):'')+' · '+verd+(rolled?' · 되돌림':'')+'</div>';
+      if(!rolled){
+        html+='<button onclick="consMeetingRollback(\''+x.id+'\',this)" style="margin-top:3px;font-size:9.5px;padding:3px 8px;border-radius:7px;border:1px solid var(--bd,#2a2d35);background:transparent;color:#fbbf24;cursor:pointer;">↩️ 되돌리기</button>';
+      }
+      html+='</div>';
+    });
+    if(d.rollback_candidates&&d.rollback_candidates.length){
+      html='<div style="font-size:10px;color:#f88;margin-bottom:4px;">⚠️ 효과 없는 변경 '+d.rollback_candidates.length+'건 — 되돌리기 추천</div>'+html;
+    }
+    el.innerHTML=html;
+  }catch(e){ el.innerHTML='이력 통신 오류: '+consEsc(e.message); }
+}
+
+// 롤백(요구 5): 결정을 from 값으로 되돌림 + 커밋.
+async function consMeetingRollback(decId, btn){
+  if(btn){ btn.disabled=true; btn.textContent='⏳ 되돌리는 중…'; }
+  try{
+    const r=await fetch('/api/agent/consult/meeting/rollback',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:decId})});
+    const d=await r.json();
+    if(d&&d.ok){ consSysMsg('↩️ '+(d.message||'되돌렸어요.')); }
+    else { consSysMsg('⚠ 롤백 실패: '+((d&&d.reason)||'알 수 없음')); if(btn){btn.disabled=false;btn.textContent='↩️ 되돌리기';} }
+    consMeetingHistoryLoad();
+  }catch(e){ consSysMsg('⚠ 롤백 통신 오류: '+e.message); if(btn){btn.disabled=false;btn.textContent='↩️ 되돌리기';} }
+}
+
 function consShowTyping(agent){
   const b=document.getElementById('consChatBody'); if(!b) return null;
   const row=document.createElement('div'); row.className='cons-row ai';

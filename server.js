@@ -242,7 +242,12 @@ function btPython() {
 
 function btStopSentinel()  { return path.join(AGENT_DIR, 'state', 'BACKTEST_STOP'); }
 function btPauseSentinel() { return path.join(AGENT_DIR, 'state', 'BACKTEST_PAUSE'); }
+function btKillSentinel()  { return path.join(AGENT_DIR, 'state', 'KILL_SWITCH'); }
 function btStateFile()     { return path.join(AGENT_DIR, 'state', 'backtest_live.json'); }
+function btLockFile()      { return path.join(AGENT_DIR, 'state', 'backtest.lock'); }
+
+// 두 번 동시에 시작 버튼을 눌러도 엔진이 두 개 뜨지 않도록 하는 재진입 가드(요구 3).
+let btStarting = false;
 
 // 백테스트 엔진이 "지금 살아서 진행 중"인지 — 추적 PID + 상태파일 신선도(2초)로 판정.
 // 일시정지 중에도 대시보드가 250ms마다 파일을 갱신하므로 fresh=true → 살아있음으로 본다.
@@ -252,24 +257,82 @@ function btAlive() {
 }
 function btPaused() { try { return fs.existsSync(btPauseSentinel()); } catch (e) { return false; } }
 
+// 추적되지 않는(고아) 백테스트 프로세스의 PID를 상태파일에서 읽는다.
+// server.js 가 재시작되면 btProc 추적을 잃지만, 이전 run_backtest.py 가 계속
+// state 파일을 갱신해 btAlive()=true → 새 시작이 "이미 실행 중"으로 거절되던 버그(요구 1).
+function btStateFilePid() {
+  try {
+    const raw = fs.readFileSync(btStateFile(), 'utf8');
+    const pid = JSON.parse(raw).pid;
+    return (pid && Number.isInteger(pid)) ? pid : null;
+  } catch (e) { return null; }
+}
 // 새 백테스트 시작 — 가상잔고는 **항상 정확히 100만원**(요구 3, 엔진이 하드코딩),
 // 날짜 범위는 주입하지 않아 로컬 수집 데이터 전체에서 **랜덤 추첨**(요구 2).
-function startBacktest(extraEnv = {}) {
-  if (btAlive()) return { ok: false, error: '이미 실행 중이에요' };
-  try { fs.unlinkSync(btStopSentinel());  } catch (e) {}
-  try { fs.unlinkSync(btPauseSentinel()); } catch (e) {}
-  try { fs.unlinkSync(btStateFile());     } catch (e) {}   // 깨끗한 시작(이전 잔재 제거)
-  const env = { ...process.env, ...extraEnv };
-  env.BACKTEST_AUTO_SPEED = env.BACKTEST_AUTO_SPEED || '1';   // 자동 배속 기본 ON
-  env.BACKTEST_STEP_MS = env.BACKTEST_STEP_MS || '45';        // 캔들 하나씩 보이는 속도
-  const script = path.join(AGENT_DIR, 'scripts', 'run_backtest.py');
+async function startBacktest(extraEnv = {}) {
+  // ── 단일 실행 보장(요구 1·3): 서버가 백테스트 실행 상태를 단독으로 관리한다. ──
+  // 1) 동시 시작 클릭 가드 — 시작 처리 중에 또 시작하면 즉시 거절(엔진 두 개 방지).
+  if (btStarting) return { ok: false, error: '백테스트를 시작하는 중이에요. 잠시만요.' };
+  btStarting = true;
   try {
-    btProc = spawn(btPython(), [script], { cwd: AGENT_DIR, env, windowsHide: true, stdio: 'ignore' });
-    btProc.on('exit', () => { btProc = null; });
+    // 2) 이 서버가 추적 중인 엔진이 진짜로 살아있으면 **중복 시작을 막는다**(요구 3).
+    //    (다시 시작하려면 ■ 정지 또는 ↺ 리셋으로 먼저 끝낸다.)
+    if (btProc && !btProc.killed) {
+      return { ok: false, error: '이미 백테스트가 실행 중이에요. 정지(■) 또는 리셋(↺) 후 다시 시작하세요.' };
+    }
+    // 3) 추적이 끊긴 고아 엔진(state 파일만 신선 — 예: server 재시작)이면 거절 대신
+    //    graceful 정지로 자가 복구한 뒤 새로 시작한다(요구 1).
+    if (btAlive()) {
+      const r = await stopBacktest({ graceMs: 8000 });
+      console.log('[backtest] 고아 백테스트 정리 후 새로 시작 (graceful=' + r.graceful + ', pid=' + r.pid + ')');
+    }
+    // 4) 모든 제어 센티넬 + 상태파일 제거 → 시작 직후 즉시종료(STOP/KILL 잔재)·
+    //    유령 상태(이전 완료 리포트)로 결과창만 뜨던 버그 원천 차단(요구 2).
+    // backtest.lock 도 함께 제거 — 이 시점엔 이전 엔진이 (graceful/force) 정지됨이 보장되므로
+    // (위 btProc 추적·stopBacktest), 새 엔진이 단일 실행 락을 즉시 획득할 수 있게 한다.
+    // (강제종료 시 엔진의 atexit 락 해제가 안 돌 수 있어 잔재가 남는 것을 서버가 정리.)
+    for (const f of [btStopSentinel(), btPauseSentinel(), btKillSentinel(), btStateFile(), btLockFile()]) {
+      try { fs.unlinkSync(f); } catch (e) {}
+    }
+    // 직전 엔진이 막 종료했다면 그 마지막 파일 쓰기가 정착할 시간을 잠깐 준다(경합 차단).
+    await sleepMs(250);
+    const env = { ...process.env, ...extraEnv };
+    env.BACKTEST_AUTO_SPEED = env.BACKTEST_AUTO_SPEED || '1';   // 자동 배속 기본 ON
+    env.BACKTEST_STEP_MS = env.BACKTEST_STEP_MS || '45';        // 캔들 하나씩 보이는 속도
+    const script = path.join(AGENT_DIR, 'scripts', 'run_backtest.py');
+    // python stdout/stderr 를 파일로 캡처(요구 B) — 기존 'ignore' 는 import 단계 크래시·
+    // 인터프리터 가드·raw traceback 을 통째로 버려 다음 디버깅 때 증거가 없었다. 이제
+    // logging 미설정 단계(import 등) 출력까지 logs/backtest_spawn.log 에 남는다.
+    // (정상 INFO 로그는 run_backtest.py 가 logs/backtest.log 에 따로 기록한다.)
+    let btOut = 'ignore';
+    try {
+      const logDir = path.join(AGENT_DIR, 'logs');
+      fs.mkdirSync(logDir, { recursive: true });
+      btOut = fs.openSync(path.join(logDir, 'backtest_spawn.log'), 'a');
+      fs.writeSync(btOut, `\n===== spawn ${new Date().toISOString()} =====\n`);
+    } catch (e) { btOut = 'ignore'; }
+    btProc = spawn(btPython(), [script], {
+      cwd: AGENT_DIR, env, windowsHide: true,
+      stdio: ['ignore', btOut, btOut],
+    });
+    console.log('[backtest] spawn pid=' + btProc.pid
+      + ' days=' + (env.BACKTEST_DAYS || '무제한')
+      + ' start=' + (env.BACKTEST_START || '기본')
+      + ' end=' + (env.BACKTEST_END || '기본')
+      + ' cash=' + (env.BACKTEST_CASH || '1000000(기본)')
+      + ' py=' + btPython());
+    btProc.on('exit', (code, sig) => {
+      console.log('[backtest] python 종료 pid=' + (btProc && btProc.pid)
+        + ' code=' + code + ' signal=' + sig);
+      btProc = null;
+      try { if (btOut !== 'ignore') fs.closeSync(btOut); } catch (e) {}
+    });
     return { ok: true, state: 'started', pid: btProc.pid };
   } catch (e) {
     btProc = null;
     return { ok: false, error: e.message };
+  } finally {
+    btStarting = false;
   }
 }
 
@@ -277,29 +340,95 @@ function startBacktest(extraEnv = {}) {
 function pauseBacktest()  { try { fs.writeFileSync(btPauseSentinel(), String(Date.now())); } catch (e) {} return { ok: true, state: 'paused' }; }
 function resumeBacktest() { try { fs.unlinkSync(btPauseSentinel()); } catch (e) {} return { ok: true, state: 'resumed' }; }
 
-// 토글(요구 1) — 버튼 하나로 시작 ↔ 일시정지 ↔ 이어서 진행.
-function toggleBacktest() {
-  if (!btAlive()) return startBacktest();          // 정지/완료 → 새로 시작
-  if (btPaused())  return resumeBacktest();         // 일시정지 → 이어서 진행
-  return pauseBacktest();                           // 진행 중 → 일시정지
+// 토글(요구 1·4) — 버튼 하나로 시작 ↔ 일시정지 ↔ 이어서 진행.
+async function toggleBacktest(extraEnv = {}) {
+  if (!btAlive()) return await startBacktest(extraEnv);  // 정지/완료 → 새로 시작
+  if (btPaused())  return resumeBacktest();              // 일시정지 → 이어서 진행(멈춘 시점부터)
+  return pauseBacktest();                                // 진행 중 → 일시정지
+}
+// 요청 body({days,cash,start,end})를 백테스트 env로 변환.
+function btEnvFromBody(body) {
+  let o = {};
+  try { o = JSON.parse(body || '{}'); } catch (e) {}
+  const env = {};
+  if (o.days  && Number(o.days)  > 0) env.BACKTEST_DAYS  = String(Math.floor(Number(o.days)));
+  if (o.cash  && Number(o.cash)  > 0) env.BACKTEST_CASH  = String(Math.floor(Number(o.cash)));
+  if (o.start) env.BACKTEST_START = String(o.start);
+  if (o.end)   env.BACKTEST_END   = String(o.end);
+  return env;
 }
 
-// 완전 정지 + 초기화 — 프로세스 종료, 센티넬/상태파일 제거(다음 시작은 100만원부터).
-function stopBacktest() {
+// 엔진이 **자발적으로 종료**했는지 판정 — 추적 프로세스가 끝났고(또는 없고) 상태파일이
+// 더 이상 신선하지 않으면(>2s, 대시보드가 250ms마다 갱신하므로) run_backtest.py 는 스스로
+// 빠져나간 것이다. 상태파일이 아예 없으면 당연히 종료됨.
+function _btProcessGone() {
+  if (btProc && !btProc.killed) return false;
+  try { return (Date.now() - fs.statSync(btStateFile()).mtimeMs) >= 2000; }
+  catch (e) { return true; }
+}
+
+const sleepMs = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// 완전 정지 + 초기화 — **graceful**(요구 1·2). 핵심 버그 수정:
+//   기존 stopBacktest 는 STOP 센티넬을 쓰자마자 곧바로 `taskkill /F`로 강제종료해서,
+//   run_backtest.py(=run_paper 위임)가 센티넬을 감지해 **스스로 종료코드 0**으로 빠져나갈
+//   틈도 없이 강제로 죽었다 → 리셋/정지 때마다 **종료코드 1**(강제종료)로 보이던 원인.
+//   이제는 ① STOP 센티넬을 기록하고 ② 유예시간 동안 엔진이 스스로 끝나길 기다린 뒤,
+//   ③ 유예를 넘겨도 살아있을 때만 마지막 수단으로 force-kill 한다. 정상 흐름에서는 더 이상
+//   강제종료가 일어나지 않아 run_paper 가 깔끔히(코드 0) 종료된다.
+// 종료 후 항상 상태파일을 삭제해 btAlive()를 즉시 false로 만든다(정지 직후 ▶ 시작이
+// "이미 실행 중"으로 거절되지 않고 fresh start — 기존 동작 유지).
+async function stopBacktest({ graceMs = 6000, removeState = true } = {}) {
+  const wasAlive = btAlive();
+  console.log('[backtest] STOP 요청 — STOP 센티넬 기록 (wasAlive=' + wasAlive
+    + ', graceMs=' + graceMs + ', trackedPid=' + (btProc && btProc.pid)
+    + ', statePid=' + btStateFilePid() + ')');
+  // 1) graceful 정지 신호 — 엔진의 _stop_watcher 가 0.2s 내 감지해 스스로 0 으로 종료한다.
+  //    일시정지 중이면 풀어줘야 종료가 진행되므로 PAUSE 센티넬 제거.
   try { fs.writeFileSync(btStopSentinel(), String(Date.now())); } catch (e) {}
   try { fs.unlinkSync(btPauseSentinel()); } catch (e) {}
-  if (btProc && !btProc.killed) {
-    const pid = btProc.pid;
-    try {
-      spawn('taskkill', ['/PID', String(pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' });
-    } catch (e) {
-      try { btProc.kill(); } catch (_) {}
+  // 2) 자발적 종료 대기(유예, 200ms 폴링). 보통 1~3초 내 스스로 끝난다.
+  //    종료 판정은 **실제 엔진의 상태파일 하트비트**(250ms 주기)로만 한다(_btProcessGone).
+  //    btProc.exitCode 같은 추적 핸들은 venv python.exe 가 런처라 실제 엔진보다 먼저 종료될 수
+  //    있어(자식 pid≠상태파일 pid) 거짓 양성을 낸다 → 신뢰하지 않는다. 상태파일이 2초 이상
+  //    갱신되지 않아야(엔진이 멈춰야) 비로소 '자발적 종료'로 본다.
+  let exitedGracefully = !wasAlive;
+  if (wasAlive) {
+    const deadline = Date.now() + graceMs;
+    while (Date.now() < deadline) {
+      if (_btProcessGone()) { exitedGracefully = true; break; }
+      await sleepMs(200);
     }
-    btProc = null;
-    return { ok: true, pid };
+  }
+  // 3) 유예를 넘겨도 살아있을 때만 마지막 수단으로 force-kill(드문 경우 — 멈춘 프로세스).
+  let killedPid = null;
+  let forced = false;
+  if (!exitedGracefully) {
+    forced = true;
+    if (btProc && !btProc.killed) {
+      killedPid = btProc.pid;
+      try { spawn('taskkill', ['/PID', String(killedPid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' }); }
+      catch (e) { try { btProc.kill(); } catch (_) {} }
+    } else {
+      const pid = btStateFilePid();   // 페이지 재로드로 추적을 잃은 이전 세션 고아 프로세스
+      if (pid) {
+        killedPid = pid;
+        try { spawn('taskkill', ['/PID', String(pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' }); } catch (e) {}
+      }
+    }
   }
   btProc = null;
-  return { ok: true, msg: '정지 센티넬 기록 (추적 PID 없음 — 고아 프로세스도 곧 종료)' };
+  console.log('[backtest] STOP 완료 — graceful=' + exitedGracefully
+    + ', forced=' + forced + ', killedPid=' + killedPid);
+  // 4) 상태파일 제거 → btAlive() 즉시 false. STOP 센티넬은 엔진이 자발적 종료 시 자기 finally
+  //    에서 지우고, force-kill 된 경우엔 다음 startBacktest 가 정리한다.
+  if (removeState) { try { fs.unlinkSync(btStateFile()); } catch (e) {} }
+  return {
+    ok: true, pid: killedPid, graceful: exitedGracefully, forced,
+    msg: !wasAlive ? '실행 중인 백테스트 없음'
+       : exitedGracefully ? '백테스트 정상 종료(graceful)'
+       : '백테스트 강제 종료(pid=' + killedPid + ')',
+  };
 }
 
 // ── 메타 진화(최적화 제안 실행) 프로세스 제어 (HTS 🧬 진화+ 버튼, §2.7) ──
@@ -1524,9 +1653,37 @@ const server = http.createServer(async (req, res) => {
       return d;
     };
 
-    if (mode === 'sim' && simDate && simTime) {
-      const [yr, mo, dy] = simDate.split('-').map(Number);
-      const [hh, mm] = simTime.split(':').map(Number);
+    // 유효하지 않은 Date여도 절대 throw하지 않는 ISO 변환 헬퍼.
+    // (과거 시각 파싱 실패 시 'Invalid time value' 예외로 500이 나던 버그 방지)
+    const isoSafe = (ms) => {
+      const d = new Date(ms);
+      return Number.isFinite(d.getTime()) ? d.toISOString() : null;
+    };
+    const kstSafe = (sec) => {
+      if (!Number.isFinite(sec)) return null;
+      const d = new Date((sec + KST_OFFSET) * 1000);
+      return Number.isFinite(d.getTime())
+        ? d.toISOString().replace('T', ' ').substring(0, 19) + ' KST'
+        : null;
+    };
+
+    // sim 파라미터(date+time) 안전 파싱. 형식이 깨졌으면 null → 실시간 폴백.
+    // 지원: date=YYYY-MM-DD, time=HH:MM / HH:MM:SS / HHMM
+    const simParse = (mode === 'sim' && simDate && simTime) ? (() => {
+      const dm = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(String(simDate).trim());
+      const tStr = String(simTime).trim().replace('：', ':');
+      const tm = /^(\d{1,2}):(\d{2})/.exec(tStr) || /^(\d{2})(\d{2})$/.exec(tStr);
+      if (!dm || !tm) return null;
+      const yr = +dm[1], mo = +dm[2], dy = +dm[3], hh = +tm[1], mm = +tm[2];
+      if (![yr, mo, dy, hh, mm].every(Number.isFinite)) return null;
+      if (mo < 1 || mo > 12 || dy < 1 || dy > 31 || hh > 23 || mm > 59) return null;
+      return { yr, mo, dy, hh, mm };
+    })() : null;
+    // sim 의도였으나 파싱 실패 → 빈 구조라도 200으로 정상 반환(백테스트를 죽이지 않음)
+    const isSim = !!simParse;
+
+    if (simParse) {
+      const { yr, mo, dy, hh, mm } = simParse;
       const prevDay = getPrevBusinessDay(yr, mo, dy);
       const prevYr = prevDay.getUTCFullYear(), prevMo = prevDay.getUTCMonth()+1, prevDy = prevDay.getUTCDate();
 
@@ -1538,12 +1695,13 @@ const server = http.createServer(async (req, res) => {
       // simTime 기준 cutoff (미래 차단)
       cutoffTs = Math.floor(new Date(Date.UTC(yr, mo-1, dy, hh-9, mm, 0)).getTime() / 1000) + tf * 60;
     } else {
-      // 실시간 모드
+      // 실시간 모드 (또는 sim 파라미터가 깨진 경우의 안전 폴백)
       const now = Math.floor(Date.now() / 1000);
       period1 = now - 2 * 24 * 3600;
       period2 = now;
       cutoffTs = now;
     }
+    if (!Number.isFinite(cutoffTs)) cutoffTs = Math.floor(Date.now() / 1000);
 
     // 캐시 키
     const cacheKey = `${mode}_${simDate}_${simTime}_${tf}`;
@@ -1572,8 +1730,9 @@ const server = http.createServer(async (req, res) => {
 
       // 과거 날짜(60일 이상)는 5분봉 없음 → 1d 인터벌 사용
     const isHistorical = (() => {
-      if (mode !== 'sim' || !simDate) return false;
+      if (!isSim) return false;
       const simMs = new Date(simDate).getTime();
+      if (!Number.isFinite(simMs)) return false;
       const nowMs = Date.now();
       return (nowMs - simMs) > 55 * 24 * 3600 * 1000; // 55일 이상 과거
     })();
@@ -1595,10 +1754,10 @@ const server = http.createServer(async (req, res) => {
         let useCutoff = cutoffTs;
         const isKorean = ['kospi','kosdq','kospi200'].includes(item.key);
         const isUS = ['nasdaq','sp500','dow','vix'].includes(item.key);
-        if (mode === 'sim' && simDate) {
+        if (isSim) {
           if (isUS) {
             // 미국 장: 전날 KST 06:00 마감 (당일 KST 기준 전날 미국 마감)
-            const [yr, mo, dy] = simDate.split('-').map(Number);
+            const { yr, mo, dy } = simParse;
             useCutoff = Math.floor(new Date(Date.UTC(yr, mo-1, dy, 6-9, 0, 0)).getTime() / 1000);
             // 음수 방지: 전날 21:00 UTC
             if (useCutoff < 0) useCutoff = Math.floor(new Date(Date.UTC(yr, mo-1, dy-1, 21, 0, 0)).getTime() / 1000);
@@ -1608,9 +1767,9 @@ const server = http.createServer(async (req, res) => {
         const filteredBars = item.bars.filter(b => b.ts < useCutoff);
         const lastBar = filteredBars[filteredBars.length - 1];
         // 전일 종가: 국내는 전일 15:30, 미국은 전전일 마감
-        const prevBars = isKorean && mode === 'sim' && simDate
+        const prevBars = isKorean && isSim
           ? item.bars.filter(b => {
-              const [yr, mo, dy] = simDate.split('-').map(Number);
+              const { yr, mo, dy } = simParse;
               const dayStart = Math.floor(new Date(Date.UTC(yr, mo-1, dy, 0, 0, 0)).getTime() / 1000);
               return b.ts < dayStart;
             })
@@ -1626,10 +1785,10 @@ const server = http.createServer(async (req, res) => {
           price: currentPrice ? Math.round(currentPrice * 100) / 100 : null,
           prev: prevClose ? Math.round(prevClose * 100) / 100 : null,
           chgPct: chgPct != null ? Math.round(chgPct * 100) / 100 : null,
-          lastUpdated: lastTs ? new Date(lastTs * 1000).toISOString() : null,
-          lastUpdatedKST: lastTs ? new Date((lastTs + KST_OFFSET) * 1000).toISOString().replace('T', ' ').substring(0, 19) + ' KST' : null,
+          lastUpdated: lastTs ? isoSafe(lastTs * 1000) : null,
+          lastUpdatedKST: lastTs ? kstSafe(lastTs) : null,
           barsCount: filteredBars.length,
-          bars: mode === 'sim' ? filteredBars.map(b => ({ ts: b.ts, c: b.c, o: b.o, h: b.h, l: b.l })) : [],
+          bars: isSim ? filteredBars.map(b => ({ ts: b.ts, c: b.c, o: b.o, h: b.h, l: b.l })) : [],
         };
       }
 
@@ -1637,10 +1796,10 @@ const server = http.createServer(async (req, res) => {
       // (나스닥 기반 추정값은 가짜 데이터이므로 제거)
 
       const responseData = {
-        mode,
-        simDate,
-        simTime,
-        cutoffKST: new Date((cutoffTs + KST_OFFSET) * 1000).toISOString().replace('T',' ').substring(0,19) + ' KST',
+        mode: isSim ? 'sim' : mode,
+        simDate: simDate || null,
+        simTime: simTime || null,
+        cutoffKST: kstSafe(cutoffTs),
         fetchedAt: new Date().toISOString(),
         indices: result,
       };
@@ -1651,9 +1810,19 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
       res.end(JSON.stringify(responseData));
     } catch(e) {
-      console.error('market-data error:', e.message);
-      res.writeHead(500, { 'Content-Type': 'application/json', ...CORS });
-      res.end(JSON.stringify({ error: e.message }));
+      // 어떤 에러여도 500으로 죽이지 않는다 — 항상 올바른 형식의 JSON(빈 indices)을
+      // 200으로 반환해 ai-agent 백테스트가 직전 값/GREEN 폴백으로 계속 진행하게 한다.
+      console.error('market-data error:', e && e.message);
+      res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+      res.end(JSON.stringify({
+        mode: isSim ? 'sim' : mode,
+        simDate: simDate || null,
+        simTime: simTime || null,
+        cutoffKST: kstSafe(cutoffTs),
+        fetchedAt: new Date().toISOString(),
+        indices: {},
+        error: (e && e.message) || 'market-data failed',
+      }));
     }
     return;
   }
@@ -1904,13 +2073,13 @@ const server = http.createServer(async (req, res) => {
   if (url === '/api/agent/backtest/run' && req.method === 'POST') {
     if (!agentAuthOk(req)) return agentDeny(res);
     let body = ''; req.on('data', c => body += c);
-    req.on('end', () => {
+    req.on('end', async () => {
       let o = {}; try { o = JSON.parse(body || '{}'); } catch (e) {}
       const extra = {};
       if (o.days) extra.BACKTEST_DAYS = String(o.days);
       if (o.start) extra.BACKTEST_START = o.start;
       if (o.end) extra.BACKTEST_END = o.end;
-      const r = startBacktest(extra);
+      const r = await startBacktest(extra);
       res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
       res.end(JSON.stringify(r));
     });
@@ -1922,15 +2091,31 @@ const server = http.createServer(async (req, res) => {
   // 그 파일을 그대로 서빙하되, 파일 신선도(mtime)로 running 여부를 보정한다.
   if (url === '/api/backtest/state') {
     const bp = btStateFile();
+    // 서버가 직접 spawn 해 추적 중인 엔진(btProc)이 살아있는가 — **부팅 창 레이스의 핵심**.
+    // 엔진 spawn 직후 ~수초간은 backtest_live.json 을 아직 못 써서 파일이 없거나(=err)
+    // 직전 잔재라 stale 하다. 이때 mtime 만 보면 running:false 로 오판되고, 그 순간 /hts
+    // 로드(start.bat 자동 오픈·새로고침·새 탭)의 _agentFullReset 이 "안 돌아가네" 하고
+    // /api/backtest/stop 을 쏴서 **방금 띄운 엔진을 죽인다**(2일 만에 멈춤의 근본 원인).
+    // → btProc 가 살아있으면(서버가 방금 띄웠고 exit 콜백도 안 옴) running:true 로 본다.
+    //   (server 재시작으로 추적을 잃은 고아 엔진은 btProc=null → 아래 mtime 신선도로 폴백,
+    //    기존 동작 그대로라 회귀 없음.)
+    const tracked = !!(btProc && !btProc.killed);
     fs.readFile(bp, 'utf8', (err, raw) => {
       res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache, no-store, must-revalidate', ...CORS });
-      if (err) { res.end(JSON.stringify({ ok: false, running: false, paused: false, error: '백테스트 미실행' })); return; }
+      if (err) {
+        // 상태파일이 아직 없음 — 추적 엔진이 살아있으면 '부팅 중'이며 죽이면 안 된다.
+        res.end(JSON.stringify({ ok: tracked, running: tracked, paused: false, booting: tracked,
+          error: tracked ? '백테스트 부팅 중' : '백테스트 미실행' }));
+        return;
+      }
       let data;
-      try { data = JSON.parse(raw); } catch (e) { res.end(JSON.stringify({ ok: false, running: false, paused: false, error: 'state 파싱 실패' })); return; }
+      try { data = JSON.parse(raw); } catch (e) { res.end(JSON.stringify({ ok: tracked, running: tracked, paused: false, error: 'state 파싱 실패' })); return; }
       // 2초 이상 갱신이 없으면 엔진이 죽은 것으로 간주(일시정지 중에도 250ms마다 갱신됨).
+      // 단, 서버가 추적하는 엔진(btProc)이 살아있으면 부팅/일시 멈춤일 뿐이므로 죽이지 않는다.
       try {
         const ageMs = Date.now() - fs.statSync(bp).mtimeMs;
-        if (ageMs > 2000) { data.running = false; data.paused = false; }
+        if (ageMs > 2000 && !tracked) { data.running = false; data.paused = false; }
+        else if (ageMs > 2000 && tracked && data.running === false) { data.running = true; data.booting = true; }
         data.staleMs = Math.round(ageMs);
       } catch (e) {}
       res.end(JSON.stringify(data));
@@ -1938,34 +2123,56 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // ── 백테스트 토글(시작/일시정지/이어서) + 리셋 — 버튼 하나로 제어(요구 1) ──
+  // ── 백테스트 토글(시작/일시정지/이어서) + 리셋 — 버튼 하나로 제어(요구 1·4) ──
   if (url === '/api/backtest/toggle' && req.method === 'POST') {
-    const r = toggleBacktest();
-    res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
-    res.end(JSON.stringify(r));
+    let body = ''; req.on('data', c => body += c);
+    req.on('end', async () => {
+      const r = await toggleBacktest(btEnvFromBody(body));
+      res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+      res.end(JSON.stringify(r));
+    });
     return;
   }
   if (url === '/api/backtest/reset' && req.method === 'POST') {
-    stopBacktest();
-    try { fs.unlinkSync(btStateFile()); } catch (e) {}        // 잔고 100만원으로 초기화(요구 3)
+    // 리셋 = ① 실행 중이면 **먼저 graceful 정지**(run_paper 가 스스로 코드 0 종료하도록
+    // 기다림) → ② 정지 완료 후에만 상태 초기화(잔고 100만/보유 0/매매 0). 순서를 await 로
+    // 보장해 "정지 전에 상태가 사라져 프로세스가 죽는" 경합을 차단한다(요구 1·2·3).
+    const s = await stopBacktest({ graceMs: 10000 });         // ① 안전 정지(완료까지 대기)
+    try { fs.unlinkSync(btStateFile()); } catch (e) {}        // ② 상태파일 제거 → 다음 시작 100만원
     res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
-    res.end(JSON.stringify({ ok: true, state: 'reset', msg: '리셋 완료' }));
+    res.end(JSON.stringify({
+      ok: true, state: 'reset', graceful: s.graceful, forced: s.forced,
+      cash: 1000000, positions: 0, trades: 0,
+      msg: '초기화 완료 (잔고 100만원 · 보유 0 · 매매 0)',
+    }));
     return;
   }
   // 하위호환 별칭(레거시 HTS 툴바 🚀/■ 버튼) — 내부적으로 시작/정지에 매핑.
   if (url === '/api/backtest/start' && req.method === 'POST') {
     let body = ''; req.on('data', c => body += c);
-    req.on('end', () => {
-      const r = startBacktest();
+    req.on('end', async () => {
+      const r = await startBacktest(btEnvFromBody(body));   // days/cash/start/end 반영(요구 4)
       res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
       res.end(JSON.stringify(r));
     });
     return;
   }
   if (url === '/api/backtest/stop' && req.method === 'POST') {
-    const r = stopBacktest();
+    const r = await stopBacktest({ graceMs: 10000 });   // graceful — run_paper 가 코드 0 으로 스스로 종료
     res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
     res.end(JSON.stringify(r));
+    return;
+  }
+  // ── 완전 중단(⏹ 정지) — 프로세스만 graceful 종료하고 **상태파일은 보존**한다(요구). ──
+  //  → 잔고/누적성과/리포트가 그대로 남아 정지 후 결과 리포트를 표시할 수 있다(리셋 ↺ 과 구분:
+  //    리셋은 stopBacktest 가 상태파일을 지워 다음 시작이 100만원으로 초기화됨).
+  //  엔진은 종료 직전 dashboard 가 running:false 최종 스냅샷을 backtest_live.json 에 쓰므로,
+  //  파일 mtime 이 2초 지나 stale 해지면 /api/backtest/state 가 자동으로 running:false 를 보고한다.
+  //  다음 ▶ 시작(startBacktest)이 상태파일을 지우고 새 백테스트로 깔끔히 출발한다.
+  if (url === '/api/backtest/halt' && req.method === 'POST') {
+    const r = await stopBacktest({ graceMs: 10000, removeState: false });
+    res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+    res.end(JSON.stringify({ ...r, state: 'halted' }));
     return;
   }
 
@@ -2016,14 +2223,28 @@ const server = http.createServer(async (req, res) => {
         return m ? Number(m[1]) : null;
       };
       const t = {};
-      const thr = sraw.match(/^screening:\s*[\s\S]*?^\s{2,}threshold:\s*([0-9.+-]+)/m);
-      if (thr) t['screening.threshold'] = Number(thr[1]);
-      const vsm = sraw.match(/^signal:\s*[\s\S]*?^\s{2,}volume_surge_multiplier:\s*([0-9.+-]+)/m);
-      if (vsm) t['signal.volume_surge_multiplier'] = Number(vsm[1]);
-      const em = sraw.match(/^time_stop:\s*[\s\S]*?^\s{2,}evaluation_minutes:\s*([0-9.+-]+)/m);
-      if (em) t['time_stop.evaluation_minutes'] = Number(em[1]);
-      const fb = sraw.match(/^time_stop:\s*[\s\S]*?^\s{2,}flat_box_pct:\s*([0-9.+-]+)/m);
-      if (fb) t['time_stop.flat_box_pct'] = Number(fb[1]);
+      // section 블록 안에서 "  key: value" 숫자/문자/bool 추출 헬퍼.
+      const pickNum = (section, key) => {
+        const m = sraw.match(new RegExp('^' + section + ':\\s*[\\s\\S]*?^\\s{2,}' + key + ':\\s*([0-9.+-]+)', 'm'));
+        return m ? Number(m[1]) : null;
+      };
+      const pickRaw = (section, key) => {
+        // 문자열("reduce_50")·bool(true) 등 — 따옴표/공백/주석 제거.
+        const m = sraw.match(new RegExp('^' + section + ':\\s*[\\s\\S]*?^\\s{2,}' + key + ':\\s*([^#\\n]+)', 'm'));
+        if (!m) return null;
+        let v = m[1].trim().replace(/^["']|["']$/g, '');
+        if (v === 'true' || v === 'false') return v === 'true';
+        return v;
+      };
+      const setNum = (k, sec, key) => { const v = pickNum(sec, key); if (v != null) t[k] = v; };
+      const setRaw = (k, sec, key) => { const v = pickRaw(sec, key); if (v != null) t[k] = v; };
+      setNum('screening.threshold', 'screening', 'threshold');
+      setNum('signal.volume_surge_multiplier', 'signal', 'volume_surge_multiplier');
+      // 손절 (§5.4)
+      setNum('stop_loss.hard_max_pct', 'stop_loss', 'hard_max_pct');
+      setNum('stop_loss.technical_buffer_pct', 'stop_loss', 'technical_buffer_pct');
+      setRaw('stop_loss.technical_stop_enabled', 'stop_loss', 'technical_stop_enabled');
+      // 타임스톱(시간 기반 매도)은 제거되었다(§5.5) — time_stop 키는 더 이상 노출하지 않는다.
       out.tunable = t;
     } catch (e) {}
     // 오늘 저널 토픽 요약
@@ -2072,6 +2293,73 @@ const server = http.createServer(async (req, res) => {
         if (!data) { reply({ ok: false, reason: '적용 결과 파싱 실패: ' + (err.trim().slice(-200) || out.trim().slice(-200) || '출력 없음') }); return; }
         reply(data);
       });
+    });
+    return;
+  }
+
+  // ── 상담 중 자연어 → 전략 자동 반영 (💬 상담 채팅, paper 전용) ──
+  // 사용자가 "신호 조건 4개로 바꿔줘"처럼 말하면 규칙 파서가 화이트리스트 키 변경을
+  // 추출해 즉시 strategy_params.yaml 수정 + 재읽기 검증 + git 커밋. LLM 협조 없이도
+  // 결정적으로 적용된다(요구: "반영할까요?" 묻지 말고 무조건 적용). 하드리밋/live는 거부 사유 반환.
+  // scripts/consult_apply.py --text "<문장>" → {ok, applied[], failed[], hard_limit, warning}.
+  if (url === '/api/agent/consult/apply-text' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      let text = '';
+      try { const o = JSON.parse(body || '{}'); text = String(o.text || '').trim(); } catch (e) {}
+      const reply = (obj) => {
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...CORS });
+        res.end(JSON.stringify(obj));
+      };
+      if (!text) { reply({ ok: false, reason: '문장이 비었어요.' }); return; }
+      console.log(`[consult/apply-text] ${new Date().toISOString()} 요청 수신 — text="${text}"`);
+      const script = path.join(AGENT_DIR, 'scripts', 'consult_apply.py');
+      let out = '', err = '', child;
+      try {
+        // 한글 문장은 argv 로 넘기면 Windows 코드페이지에서 깨질 수 있어 stdin(UTF-8)으로 전달.
+        child = spawn(btPython(), [script, '--stdin'], { cwd: AGENT_DIR, env: { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' }, windowsHide: true });
+      } catch (e) { reply({ ok: false, reason: '적용기 실행 실패: ' + e.message }); return; }
+      child.stdout.on('data', d => { out += d; });
+      child.stderr.on('data', d => { err += d; });
+      child.on('error', e => reply({ ok: false, reason: '적용기 오류: ' + e.message }));
+      child.on('close', () => {
+        const line = out.trim().split('\n').filter(s => s.trim().startsWith('{')).pop();
+        let data = null; if (line) { try { data = JSON.parse(line); } catch (e) {} }
+        if (!data) {
+          console.log(`[consult/apply-text] 적용 결과 파싱 실패 — ${(err.trim().slice(-200) || out.trim().slice(-200) || '출력 없음')}`);
+          reply({ ok: false, reason: '적용 결과 파싱 실패: ' + (err.trim().slice(-200) || out.trim().slice(-200) || '출력 없음') }); return;
+        }
+        const _ap = (data.applied || []).map(a => `${a.key} ${a.from}→${a.to}${a.commit ? ' ('+a.commit+')' : ''}`);
+        console.log(`[consult/apply-text] 결과 — applied=${_ap.length ? _ap.join(', ') : '없음'} failed=${(data.failed || []).length}${data.message ? ' | ' + data.message : ''}`);
+        reply(data);
+      });
+      try { child.stdin.write(JSON.stringify({ text })); child.stdin.end(); } catch (e) {}
+    });
+    return;
+  }
+
+  // ── ⚙️ 매매 설정 현재값/안전범위 조회 (기능 탭 패널, 인증 불필요) ──
+  // scripts/strategy_settings.py --get → strategy_params.yaml 현재값 + 가드레일 + 모드(잠금).
+  // 저장은 기존 /api/agent/consult/apply-param (consult_apply.py → StrategyEditor) 재사용.
+  if (url.split('?')[0] === '/api/agent/strategy/settings' && req.method === 'GET') {
+    const reply = (obj) => {
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...CORS });
+      res.end(JSON.stringify(obj));
+    };
+    const script = path.join(AGENT_DIR, 'scripts', 'strategy_settings.py');
+    let out = '', err = '', child;
+    try {
+      child = spawn(btPython(), [script, '--get'], { cwd: AGENT_DIR, env: { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' }, windowsHide: true });
+    } catch (e) { reply({ ok: false, reason: '설정 조회 실행 실패: ' + e.message }); return; }
+    child.stdout.on('data', d => { out += d; });
+    child.stderr.on('data', d => { err += d; });
+    child.on('error', e => reply({ ok: false, reason: '설정 조회 오류: ' + e.message }));
+    child.on('close', () => {
+      const line = out.trim().split('\n').filter(s => s.trim().startsWith('{')).pop();
+      let data = null; if (line) { try { data = JSON.parse(line); } catch (e) {} }
+      if (!data) { reply({ ok: false, reason: '설정 파싱 실패: ' + (err.trim().slice(-200) || out.trim().slice(-200) || '출력 없음') }); return; }
+      reply(data);
     });
     return;
   }
@@ -2125,6 +2413,47 @@ const server = http.createServer(async (req, res) => {
       try { child.stdin.write(rec); child.stdin.end(); } catch (e) {}
     });
     return;
+  }
+
+  // ── 회의 내용 적용 (📋 버튼) : scripts/meeting_apply.py --action {extract|apply|history|rollback} ──
+  // extract/apply/rollback 은 stdin 으로 페이로드(JSON)를 받고, history 는 입력 없음.
+  // extract=실행항목 추출(읽기전용), apply=선택항목 yaml 반영+회의결정 기록+깃커밋,
+  // history=적용 이력 타임라인+효과+롤백후보, rollback=결정 원복(paper 전용).
+  {
+    const mm = url.split('?')[0].match(/^\/api\/agent\/consult\/meeting\/(extract|apply|history|rollback)$/);
+    if (mm) {
+      const action = mm[1];
+      const wantGet = (action === 'history');
+      if ((wantGet && req.method !== 'GET') || (!wantGet && req.method !== 'POST')) {
+        // 메서드 불일치는 아래로 흘려보냄(다른 핸들러/404).
+      } else {
+        let body = '';
+        req.on('data', c => body += c);
+        req.on('end', () => {
+          const reply = (obj) => {
+            res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...CORS });
+            res.end(JSON.stringify(obj));
+          };
+          const script = path.join(AGENT_DIR, 'scripts', 'meeting_apply.py');
+          let out = '', err = '', child;
+          try {
+            child = spawn(btPython(), [script, '--action', action], { cwd: AGENT_DIR, env: { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' }, windowsHide: true });
+          } catch (e) { reply({ ok: false, reason: '회의 적용기 실행 실패: ' + e.message }); return; }
+          child.stdout.on('data', d => { out += d; });
+          child.stderr.on('data', d => { err += d; });
+          child.on('error', e => reply({ ok: false, reason: '회의 적용기 오류: ' + e.message }));
+          child.on('close', () => {
+            const line = out.trim().split('\n').filter(s => s.trim().startsWith('{')).pop();
+            let data = null; if (line) { try { data = JSON.parse(line); } catch (e) {} }
+            if (!data) { reply({ ok: false, reason: '회의 적용 결과 파싱 실패: ' + (err.trim().slice(-200) || out.trim().slice(-200) || '출력 없음') }); return; }
+            reply(data);
+          });
+          // history 외에는 stdin 으로 페이로드 전달(긴 한글 JSON 안전).
+          if (!wantGet) { try { child.stdin.write(body || '{}'); child.stdin.end(); } catch (e) {} }
+        });
+        return;
+      }
+    }
   }
 
   // ── 단일 제안 적용 + 검수 + 자동커밋 (제안 카드 ✅ 적용 버튼, §2.7/§3.3) ──
@@ -2227,6 +2556,46 @@ const server = http.createServer(async (req, res) => {
       });
     });
     return;
+  }
+
+  // ── 노션 학습 적용 (💬 상담 탭 "📚 노션 학습 적용하기") : scripts/notion_apply.py ──
+  //  extract = notion_knowledge.json 에서 적용 가능 항목 + 도입 가능(미반영) 항목 추출(읽기전용),
+  //  apply   = 선택 항목 yaml 반영 + 깃 커밋 + notion_applied.json 이력 기록(paper 전용),
+  //  history = 적용 이력 타임라인(GET, 입력 없음).
+  {
+    const nm = url.split('?')[0].match(/^\/api\/agent\/notion\/(extract|apply|history)$/);
+    if (nm) {
+      const action = nm[1];
+      const wantGet = (action === 'history');
+      if ((wantGet && req.method !== 'GET') || (!wantGet && req.method !== 'POST')) {
+        // 메서드 불일치는 아래로 흘려보냄.
+      } else {
+        let body = '';
+        req.on('data', c => body += c);
+        req.on('end', () => {
+          const reply = (obj) => {
+            res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...CORS });
+            res.end(JSON.stringify(obj));
+          };
+          const script = path.join(AGENT_DIR, 'scripts', 'notion_apply.py');
+          let out = '', err = '', child;
+          try {
+            child = spawn(btPython(), [script, '--action', action], { cwd: AGENT_DIR, env: { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' }, windowsHide: true });
+          } catch (e) { reply({ ok: false, reason: '노션 적용기 실행 실패: ' + e.message }); return; }
+          child.stdout.on('data', d => { out += d; });
+          child.stderr.on('data', d => { err += d; });
+          child.on('error', e => reply({ ok: false, reason: '노션 적용기 오류: ' + e.message }));
+          child.on('close', (code) => {
+            const line = out.trim().split('\n').filter(s => s.trim().startsWith('{')).pop();
+            let data = null; if (line) { try { data = JSON.parse(line); } catch (e) {} }
+            if (!data) { reply({ ok: false, reason: '노션 적용 결과 파싱 실패(코드 ' + code + '): ' + (err.trim().slice(-200) || out.trim().slice(-200) || '출력 없음') }); return; }
+            reply(data);
+          });
+          if (!wantGet) { try { child.stdin.write(body || '{}'); child.stdin.end(); } catch (e) {} }
+        });
+        return;
+      }
+    }
   }
 
   // ── HTS 화면 (/hts) — start.bat 자동 오픈 대상 ──
