@@ -1842,6 +1842,37 @@ canvas{image-rendering:pixelated;}
     <h2 style="font-size:18px;font-weight:800;margin-bottom:16px;">📋 TraidAIr 전체 기능 목록</h2>
     <p style="font-size:11px;color:var(--ts);margin-bottom:20px;">작동 안 하는 기능이나 추가하고 싶은 기능을 체크해보세요. 총 180개+ 기능.</p>
 
+    <!-- ⚙️ 매매 설정 (손절/익절 — strategy_params.yaml 즉시 반영, CLAUDE.md §5.3~5.4/§24) -->
+    <style>
+    .ts-card{background:var(--pan);border-radius:16px;box-shadow:var(--sh0);padding:16px 18px;}
+    .ts-h{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:800;color:var(--tp);}
+    .ts-badge{margin-left:auto;font-size:10px;font-weight:700;padding:3px 9px;border-radius:8px;background:var(--card);color:var(--ts);}
+    .ts-sub{font-size:11px;color:var(--ts);margin-top:4px;line-height:1.5;}
+    .ts-grp-t{font-size:12.5px;font-weight:800;color:var(--p);margin:16px 0 4px;}
+    .ts-row{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:11px 0;border-top:1px solid var(--br);}
+    .ts-txt{flex:1;min-width:0;}
+    .ts-lab{font-size:12.5px;font-weight:700;color:var(--tp);}
+    .ts-hint{font-size:10px;color:var(--ts);margin-top:2px;line-height:1.45;}
+    .ts-cur{font-size:10.5px;color:var(--b);font-weight:700;margin-top:3px;}
+    .ts-fb{font-size:10.5px;margin-top:3px;min-height:12px;}
+    .ts-ctl{display:flex;align-items:center;gap:5px;flex-shrink:0;padding-top:2px;}
+    .ts-in{width:62px;padding:7px 8px;border:1.5px solid var(--br);border-radius:9px;font-size:12.5px;text-align:right;background:var(--bg);color:var(--tp);}
+    .ts-in:focus{border-color:var(--b);outline:none;}
+    .ts-in:disabled{opacity:.5;}
+    .ts-unit{font-size:11px;color:var(--ts);}
+    .ts-sel{padding:7px 8px;border:1.5px solid var(--br);border-radius:9px;font-size:12px;background:var(--bg);color:var(--tp);}
+    .ts-sel:disabled{opacity:.5;}
+    .ts-switch{position:relative;display:inline-block;width:44px;height:24px;flex-shrink:0;}
+    .ts-switch input{opacity:0;width:0;height:0;}
+    .ts-switch span{position:absolute;cursor:pointer;inset:0;background:#cbd5e1;border-radius:24px;transition:.18s;}
+    .ts-switch span:before{content:"";position:absolute;height:18px;width:18px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.18s;}
+    .ts-switch input:checked+span{background:var(--b);}
+    .ts-switch input:checked+span:before{transform:translateX(20px);}
+    .ts-switch input:disabled+span{opacity:.5;cursor:not-allowed;}
+    .ts-lock{background:#fff6e5;color:#8a5a00;border-radius:11px;padding:10px 12px;font-size:11.5px;font-weight:700;margin-top:12px;line-height:1.5;}
+    </style>
+    <div id="tradeSettingsPanel" style="margin-bottom:22px;"></div>
+
     <div id="featList" style="display:flex;flex-direction:column;gap:16px;">
 
       <div class="chart-card"><div class="chart-card-t">📊 차트</div>
@@ -4413,6 +4444,18 @@ let inds={ma:true,vol:true,rsi:false,macd:false,bb:false,vwap:false};
 let mChart=null,rsiChart=null,macdChart=null,pnlChart=null;
 let chartViewStart=0,chartViewCount=60;
 let _chartRaf=null;
+let _chartFullSpan=0;   // 백테스트: 전일+당일 전체 슬롯(예약 폭). 0이면 일반 모드.
+let _chartSlots=0;      // 현재 렌더의 X축 분모(슬롯 수) — 서브차트(RSI/MACD) 정렬 공유.
+
+// 줌 상한(슬롯). 백테스트에선 전일+당일 전체 슬롯까지 줌아웃 허용(우측 여백 = 아직 안 온 시간).
+function _chartMaxSlots(aLen){
+  return Math.max(aLen||0, _chartFullSpan||0) || aLen || 10;
+}
+// 타임프레임(분)별 정규장 09:00~15:30 풀세션 캔들 수.
+function _agentSessionSlots(tf){
+  const m=parseInt((''+(tf||'1')).replace(/[^0-9]/g,''))||1;
+  return Math.max(10, Math.ceil(391/m));   // 09:00~15:30 = 391분
+}
 
 // 뷰 상태
 function _cvAll(){
@@ -4421,8 +4464,9 @@ function _cvAll(){
 }
 function _cvCs(){
   const a=_cvAll();
-  chartViewCount=Math.max(10,Math.min(chartViewCount,a.length));
-  chartViewStart=Math.max(0,Math.min(chartViewStart,a.length-chartViewCount));
+  // 상한 클램프 제거: 슬롯(chartViewCount) > 봉수 허용 → 좌측 정렬 + 우측 여백(아직 안 온 시간).
+  chartViewCount=Math.max(10,Math.round(chartViewCount));
+  chartViewStart=Math.max(0,Math.min(chartViewStart,Math.max(0,a.length-chartViewCount)));
   return a.slice(chartViewStart,chartViewStart+chartViewCount);
 }
 
@@ -4466,9 +4510,12 @@ function _drawChartInner(){
   yMin-=yPad; yMax+=yPad;
   const yR=yMax-yMin||1;
 
-  const toX=i=>PL+(i+0.5)*(cw/cs.length);
+  // 슬롯 수(줌). 사용가능 봉 < 슬롯이면 좌측 정렬 + 우측 여백 → 봉이 누적돼도 캔들 폭 일정.
+  const _slots=Math.max(cs.length,Math.round(chartViewCount)||cs.length);
+  _chartSlots=_slots;
+  const toX=i=>PL+(i+0.5)*(cw/_slots);
   const toY=v=>PT+mainH*(1-(v-yMin)/yR);
-  const bw=Math.max(1.5,Math.min(10,cw/cs.length*0.55));
+  const bw=Math.max(1.5,Math.min(10,cw/_slots*0.55));
 
   // 배경
   ctx.clearRect(0,0,W,H);
@@ -4521,15 +4568,20 @@ function _drawChartInner(){
     });
   }
 
-  // 캔들
+  // 캔들 (전일 봉은 흐리게 — 당일과 시각적으로 구분)
+  const _prevCntC=_kisChartMeta?._prevCount||0;
   cs.forEach((c,i)=>{
     const x=toX(i),yO=toY(c.o),yC=toY(c.c),yH=toY(c.h),yL=toY(c.l);
     const up=c.c>=c.o,col=up?'#dc2626':'#2563eb';
     const top=Math.min(yO,yC),ht=Math.max(1,Math.abs(yO-yC));
+    const isPrev=_prevCntC>0&&(chartViewStart+i)<_prevCntC;
+    ctx.save();
+    if(isPrev)ctx.globalAlpha=0.38;        // 전일 분봉 = 흐리게
     ctx.strokeStyle=col;ctx.lineWidth=1;
     ctx.beginPath();ctx.moveTo(x,yH);ctx.lineTo(x,top);
     ctx.moveTo(x,top+ht);ctx.lineTo(x,yL);ctx.stroke();
     ctx.fillStyle=col;ctx.fillRect(x-bw/2,top,bw,ht);
+    ctx.restore();
   });
 
   // ── ai-agent 매수/매도 마커 (백테스트 연동, §17.6) ──
@@ -4547,7 +4599,7 @@ function _drawChartInner(){
     const absIdx = _prevCnt - 1; // candles 전체에서의 인덱스
     const viewIdx = absIdx - chartViewStart; // 현재 뷰에서의 인덱스
     if(viewIdx >= 0 && viewIdx < cs.length){
-      const lx = toX(viewIdx) + (cw/cs.length)/2; // 봉과 봉 사이
+      const lx = toX(viewIdx) + (cw/_slots)/2; // 봉과 봉 사이
       ctx.save();
       ctx.strokeStyle = 'rgba(49,130,246,.5)';
       ctx.lineWidth = 1.5;
@@ -4575,9 +4627,12 @@ function _drawChartInner(){
     const vY0=PT+mainH+PB+2;
     const vMax=Math.max(...vls)||1;
     ctx.fillStyle='rgba(0,0,0,.04)';ctx.fillRect(PL,vY0,cw,volH-4);
+    const _pvc=_kisChartMeta?._prevCount||0;
     cs.forEach((c,i)=>{
       const x=toX(i),bh=Math.max(1,(c.v/vMax)*(volH-4));
-      ctx.fillStyle=c.c>=c.o?'rgba(220,38,38,.45)':'rgba(37,99,235,.45)';
+      const isPrevV=_pvc>0&&(chartViewStart+i)<_pvc;
+      const up=c.c>=c.o;
+      ctx.fillStyle=isPrevV?(up?'rgba(220,38,38,.18)':'rgba(37,99,235,.18)'):(up?'rgba(220,38,38,.45)':'rgba(37,99,235,.45)');
       ctx.fillRect(x-bw/2,vY0+volH-4-bh,bw,bh);
     });
   }
@@ -4607,7 +4662,7 @@ function _drawChartInner(){
       ctx.fillText(Math.round(pv).toLocaleString(),W-PR+4,canvas._cy+3);
     }
     // 해당 캔들 OHLCV 표시
-    const idx=Math.floor((canvas._cx-PL)/(cw/cs.length));
+    const idx=Math.floor((canvas._cx-PL)/(cw/_slots));
     if(idx>=0&&idx<cs.length){
       const c=cs[idx];
       const ci=document.getElementById('cinfo');
@@ -4673,7 +4728,8 @@ function _drawRSI(cs,cls){
   ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);
   const rsi=calcRSI(cls,14);
   const PL=4,PR=54,PT=2,PB=2,cw=W-PL-PR,ch=H-PT-PB;
-  const toX=i=>PL+(i+0.5)*(cw/cs.length);
+  const _den=_chartSlots||cs.length;
+  const toX=i=>PL+(i+0.5)*(cw/_den);
   const toY=v=>PT+ch*(1-v/100);
   [[70,'rgba(220,38,38,.2)'],[50,'rgba(0,0,0,.08)'],[30,'rgba(37,99,235,.2)']].forEach(([v,c])=>{
     ctx.strokeStyle=c;ctx.lineWidth=1;
@@ -4707,7 +4763,8 @@ function _drawMACD(cs,cls){
   vMin-=vP;vMax+=vP;
   const vR=vMax-vMin||1;
   const PL=4,PR=54,PT=2,PB=2,cw=W-PL-PR,ch=H-PT-PB;
-  const toX=i=>PL+(i+0.5)*(cw/cs.length);
+  const _den=_chartSlots||cs.length;
+  const toX=i=>PL+(i+0.5)*(cw/_den);
   const toY=v=>PT+ch*(1-(v-vMin)/vR);
   // 0선
   ctx.strokeStyle='rgba(0,0,0,.1)';ctx.lineWidth=1;
@@ -4753,8 +4810,9 @@ function initChartEvents(){
     const a=_cvAll();if(!a.length)return;
     const factor=e.deltaY>0?1.25:0.8;
     const center=chartViewStart+chartViewCount/2;
-    chartViewCount=Math.max(10,Math.min(Math.round(chartViewCount*factor),a.length));
-    chartViewStart=Math.max(0,Math.min(Math.round(center-chartViewCount/2),a.length-chartViewCount));
+    chartViewCount=Math.max(10,Math.min(Math.round(chartViewCount*factor),_chartMaxSlots(a.length)));
+    chartViewStart=Math.max(0,Math.min(Math.round(center-chartViewCount/2),Math.max(0,a.length-chartViewCount)));
+    if(window.agentBT) agentBT._userZoomed=true;   // 백테스트 자동 줌 고정 해제(사용자 우선)
     drawChart();
   },{passive:false});
 
@@ -4871,8 +4929,9 @@ function initChartEvents(){
       const nd=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
       const factor=tDist/nd; tDist=nd;
       const center=chartViewStart+chartViewCount/2;
-      chartViewCount=Math.max(10,Math.min(Math.round(chartViewCount*factor),a.length));
-      chartViewStart=Math.max(0,Math.min(Math.round(center-chartViewCount/2),a.length-chartViewCount));
+      chartViewCount=Math.max(10,Math.min(Math.round(chartViewCount*factor),_chartMaxSlots(a.length)));
+      chartViewStart=Math.max(0,Math.min(Math.round(center-chartViewCount/2),Math.max(0,a.length-chartViewCount)));
+      if(window.agentBT) agentBT._userZoomed=true;
       drawChart();
     }
   },{passive:false});
@@ -4884,14 +4943,22 @@ function initChartEvents(){
 function chartZoom(f){
   const a=_cvAll();if(!a.length)return;
   const center=chartViewStart+chartViewCount/2;
-  chartViewCount=Math.max(10,Math.min(Math.round(chartViewCount*f),a.length));
-  chartViewStart=Math.max(0,Math.min(Math.round(center-chartViewCount/2),a.length-chartViewCount));
+  chartViewCount=Math.max(10,Math.min(Math.round(chartViewCount*f),_chartMaxSlots(a.length)));
+  chartViewStart=Math.max(0,Math.min(Math.round(center-chartViewCount/2),Math.max(0,a.length-chartViewCount)));
+  if(window.agentBT) agentBT._userZoomed=true;   // 사용자 줌 우선(자동 2일치 고정 해제)
   drawChart();
 }
 function chartReset(){
   const a=_cvAll();
-  const sel=document.getElementById('candleCount');
-  chartViewCount=Math.min(parseInt(sel?.value||60),a.length)||a.length;
+  // 백테스트 중엔 기본 줌 = 전일+당일 전체(한 화면). 일반 모드는 봉수 드롭다운 값.
+  if(window.agentBT && agentBT.running && _chartFullSpan){
+    agentBT._userZoomed=false;                   // 자동 2일치 고정 복귀
+    chartViewCount=_chartFullSpan;
+    window._followLatest=true; window._chartUserDragging=false;
+  } else {
+    const sel=document.getElementById('candleCount');
+    chartViewCount=Math.min(parseInt(sel?.value||60),a.length)||a.length;
+  }
   chartViewStart=Math.max(0,a.length-chartViewCount);
   drawChart();
 }
@@ -10746,6 +10813,7 @@ function goPage(p,el){
       if(typeof renderJPage==='function') renderJPage();
     } else if(p==='features'){
       if(typeof loadNotionFeatures==='function') loadNotionFeatures();
+      if(typeof tradeSettingsLoad==='function') tradeSettingsLoad();
     } else if(p==='consult'){
       if(typeof consInit==='function') consInit();
       if(typeof notionStatusLoad==='function') notionStatusLoad();
@@ -11017,7 +11085,7 @@ function initChartRightClick(){
     const cs = _cvCs();
     if(!cs.length) return;
     const PL=4, PR=54, cw=(canvas.width||700)-PL-PR;
-    const idx = Math.floor((x-PL)/(cw/cs.length));
+    const idx = Math.floor((x-PL)/(cw/(_chartSlots||cs.length)));
     const c = cs[Math.max(0,Math.min(idx,cs.length-1))];
     _ctxCandle = c;
     const menu = document.getElementById('chartCtxMenu');
@@ -12627,7 +12695,7 @@ function resetBalance(){
 /* DEPLOY-v437431 */
 function toggleAutoTrade(){if(autoState.running){stopAuto();}else{startAuto();}}
 
-window.agentBT = window.agentBT || { running:false, paused:false, timer:null, curKey:null, state:null, _reported:false, epoch:0 };
+window.agentBT = window.agentBT || { running:false, paused:false, timer:null, curKey:null, _viewKey:null, _userZoomed:false, state:null, _reported:false, epoch:0 };
 if(agentBT.epoch===undefined) agentBT.epoch=0;
 if(agentBT.paused===undefined) agentBT.paused=false;
 
@@ -12765,7 +12833,8 @@ function agentBTStart(opt, done){
         _btQueryRunning().then(function(s){ _btDuplicateDialog(s); });
         return;
       }
-      agentBT.running=true; agentBT.curKey=null; agentBT._reported=false; window._agentMarkers=null;
+      agentBT.running=true; agentBT.curKey=null; agentBT._viewKey=null; agentBT._userZoomed=false; agentBT._reported=false; window._agentMarkers=null;
+      _chartFullSpan=0; window._followLatest=true; window._chartUserDragging=false;
       resetClock();   // 새 백테스트는 09:00부터 — 이전 런의 단조 가드 상태 비움 (요구 2)
       _agentToast('🤖 ai-agent 백테스트 시작 (가상잔고 '+(body.cash||1000000).toLocaleString()+'원, 자동 최고속)');
       _syncBtToggleBtn();
@@ -13063,18 +13132,32 @@ function _agentRenderPortItems(s){
     </div>`;
   }).join('');
 }
-// 거래 탭 — 오늘 체결 전체(진입/청산)
+// 거래 탭 — 전체 기간 누적 체결(진입/청산), 날짜별 구분 (요구 2: 날짜 바뀌어도 보존)
 function _agentRenderTradeLog(s){
   const c=document.getElementById('tradeLog'); if(!c) return;
-  const tr=s.todayTrades||[];   // dashboard에서 최신순(reversed)
-  if(!tr.length){ c.innerHTML="<div style='font-size:9px;color:var(--tm);text-align:center;padding:12px;'>오늘 체결 없음</div>"; return; }
-  c.innerHTML=tr.map(t=>{
+  // 누적 우선(allTrades). 없으면 당일(todayTrades) 폴백. 둘 다 최신순(reversed).
+  const tr=(s.allTrades&&s.allTrades.length)?s.allTrades:(s.todayTrades||[]);
+  if(!tr.length){ c.innerHTML="<div style='font-size:9px;color:var(--tm);text-align:center;padding:12px;'>체결 없음</div>"; return; }
+  const today=(s.sim&&s.sim.date)||'';
+  // 날짜별 거래 수 집계(헤더에 표시)
+  const cntByDate={}; tr.forEach(t=>{ const d=t.date||today; cntByDate[d]=(cntByDate[d]||0)+1; });
+  let html=''; let curDate=null;
+  tr.forEach(t=>{
+    const d=t.date||today;
+    if(d!==curDate){
+      curDate=d;
+      const ds=d&&d.length>=8?(d.slice(0,4)+'.'+d.slice(4,6)+'.'+d.slice(6,8)):(d||'');
+      const isToday=d===today;
+      html+=`<div style="position:sticky;top:0;z-index:1;background:var(--bg);font-size:8px;font-weight:800;color:${isToday?'var(--p)':'var(--tm)'};padding:4px 6px;border-bottom:1px solid var(--br);display:flex;justify-content:space-between;">
+        <span>📅 ${ds}${isToday?' <span style="color:var(--g);">· 오늘</span>':''}</span><span style="color:var(--ts);font-weight:600;">${cntByDate[d]}건</span></div>`;
+    }
     const ex=t.kind==='exit'; const side=ex?'매도':'매수'; const nm=t.name||t.code;
     const pnlTxt = ex?`<div class="tl-pnl ${t.pnlPct>=0?'cu':'cd'}">${t.pnlPct>=0?'+':''}${t.pnlPct}%</div>`:'';
     const reason = ex&&t.exitKind?`<div style="font-size:7px;color:var(--ts);margin-top:1px;">↳ ${t.exitKind}${t.reason?(' · '+t.reason):''}</div>`:'';
-    return `<div class="tl-i"><div class="tl-side ${ex?'sell':'buy'}">${side}</div>
+    html+=`<div class="tl-i"><div class="tl-side ${ex?'sell':'buy'}">${side}</div>
       <div class="tl-info">${nm}<span style='color:var(--p);font-size:8px;'>[AI]</span> <span style="color:var(--tm);font-size:8px;">${t.time||''}</span><br>${Math.round(t.price||0).toLocaleString()}×${t.qty||0}${reason}</div>${pnlTxt}</div>`;
-  }).join('');
+  });
+  c.innerHTML=html;
 }
 // 미체결 탭 — 백테스트는 즉시 체결(미체결 없음) → 최근 체결 안내
 function _agentRenderPending(s){
@@ -13089,7 +13172,7 @@ function _agentRenderPending(s){
 // 주문 탭 상단 — 에이전트가 실행한 매수/매도 주문 내역
 function _agentRenderOrderFeed(s){
   const el=document.getElementById('agentOrderFeed'); if(!el) return;
-  const tr=(s.todayTrades||[]).slice(0,12);
+  const tr=((s.allTrades&&s.allTrades.length)?s.allTrades:(s.todayTrades||[])).slice(0,12);
   const hdr='<div style="font-size:10px;font-weight:800;color:var(--p);padding:6px 8px 3px;">🤖 에이전트 주문 내역 <span style="font-size:8px;color:var(--tm);font-weight:600;">실시간</span></div>';
   if(!tr.length){ el.innerHTML=hdr+'<div style="font-size:9px;color:var(--tm);padding:2px 8px 8px;border-bottom:1px solid var(--br);margin-bottom:6px;">아직 에이전트 주문이 없어요. 🚀 백테스트를 시작하면 표시됩니다.</div>'; return; }
   el.innerHTML=hdr+'<div style="max-height:150px;overflow:auto;border-bottom:1px solid var(--br);margin-bottom:6px;">'+tr.map(t=>{
@@ -13153,16 +13236,32 @@ function _agentRenderChart(s){
   const nm=ch.name || (typeof STOCKS!=='undefined'&&((STOCKS.find(x=>x.tk===code)||{}).nm)) || code;
   const hNm=document.getElementById('chartHdrNm'); if(hNm) hNm.textContent=nm;
   const hTk=document.getElementById('chartHdrTk'); if(hTk) hTk.textContent=code;
-  // 오늘 봉 주입 (prevClose는 등락 기준). 서버가 이미 미래봉을 잘랐으므로 전부 '현재까지'.
+  // 전일+당일 봉 주입 (prevClose는 등락 기준). 서버가 미래봉은 이미 잘랐고, 전일 봉은 전체.
   sim.candles=ch.candles.map(c=>({t:c.t,o:c.o,h:c.h,l:c.l,c:c.c,v:c.v}));
-  _kisChartMeta=_kisChartMeta||{}; _kisChartMeta.prevCount=0; _kisChartMeta._prevCount=0;
-  _kisChartMeta.todayCount=sim.candles.length; _kisChartMeta.prevDate='';
+  const prevN=Math.max(0, Math.min(ch.prevCount||0, sim.candles.length));
+  _kisChartMeta=_kisChartMeta||{}; _kisChartMeta.prevCount=prevN; _kisChartMeta._prevCount=prevN;
+  _kisChartMeta.todayCount=sim.candles.length-prevN; _kisChartMeta.prevDate=ch.prevDate||'';
   sim.idx=sim.candles.length-1;
-  window._agentDayBase = ch.prevClose || (sim.candles[0]&&sim.candles[0].o) || 0;
-  // 최신 봉 따라가기 (사용자가 드래그 중이 아니면)
+  window._agentDayBase = ch.prevClose || (sim.candles[prevN]&&sim.candles[prevN].o) || (sim.candles[0]&&sim.candles[0].o) || 0;
+  // 초기 줌 = 전일+당일 전 세션이 한 화면에(슬롯 예약). 봉이 쌓여도 캔들 폭이 일정해
+  // 시작부터 과확대되지 않고 하루 전체 흐름이 보인다. 새 날/종목으로 바뀔 때만 재설정.
   const total=sim.candles.length;
-  chartViewCount=Math.max(10, Math.min(chartViewCount||80, total));
+  // 당일 풀세션 슬롯 ≈ 전일 봉수(전일은 이미 완전한 하루). 전일 데이터 없으면 1분봉 풀세션으로 폴백.
+  _chartFullSpan = prevN + (prevN || _agentSessionSlots('1'));
+  const _vk = code+'@'+ymd;
+  if(agentBT._viewKey !== _vk){               // 새 날/종목 → 줌·사용자조작 초기화
+    agentBT._viewKey = _vk;
+    agentBT._userZoomed = false;
+    window._followLatest = true; window._chartUserDragging = false;
+  }
+  // 사용자가 직접 줌(🔍±/휠/핀치)하기 전까지는 매 렌더마다 '전일+당일 2일치' 줌으로 고정.
+  // → 새 분봉이 쌓여도 자동 확대되지 않고, 어떤 경로로 chartViewCount가 흔들려도 복원된다.
+  if(!agentBT._userZoomed){
+    chartViewCount = _chartFullSpan;
+  }
+  chartViewCount=Math.max(10, chartViewCount);
   if(window._followLatest!==false && !window._chartUserDragging){
+    // 데이터가 슬롯보다 많아지면 최신 따라가기, 적으면 좌측 정렬(우측은 아직 안 온 시간).
     chartViewStart=Math.max(0, total-chartViewCount);
   }
   _agentUpdTopInfo(s);          // 현재가·등락률 (상단/호가 현재가)
@@ -13318,10 +13417,19 @@ function agentBTLoadChart(code, ymd){
           sim.candles = ic;
           const pc=(_kisChartMeta&&_kisChartMeta.prevCount)||0;
           sim.idx = ic.length-1;
-          const todayLen = Math.max(1, ic.length-pc);
-          chartViewCount = Math.min(ic.length, Math.max(todayLen+8, 80));
-          chartViewStart = Math.max(0, ic.length-chartViewCount);
           if(_kisChartMeta) _kisChartMeta._prevCount = pc;
+          // 초기 줌 = 전일+당일 전 세션(한 화면). 새 날/종목일 때만 재설정.
+          _chartFullSpan = pc + (pc || _agentSessionSlots(sim.tf));
+          const _vk2 = code+'@'+ymd;
+          if(agentBT._viewKey !== _vk2){
+            agentBT._viewKey = _vk2; agentBT._userZoomed=false;
+            window._followLatest = true; window._chartUserDragging = false;
+          }
+          if(!agentBT._userZoomed){ chartViewCount = _chartFullSpan; }
+          chartViewCount=Math.max(10, chartViewCount);
+          if(window._followLatest!==false && !window._chartUserDragging){
+            chartViewStart = Math.max(0, ic.length-chartViewCount);
+          }
           drawChart();
         } else { genCandles(code, dstr); drawChart(); }
       }).catch(()=>{ try{ genCandles(code, dstr); drawChart(); }catch(_e){} });
@@ -13468,6 +13576,9 @@ function _agentFullReset(){
     agentBT.running = false;                    // 초기 상태 = 정지로 고정
     agentBT.paused = false;
     agentBT.curKey = null;
+    agentBT._viewKey = null;
+    agentBT._userZoomed = false;
+    _chartFullSpan = 0; _chartSlots = 0;
     agentBT.state = null;
     agentBT._reported = false;
     window._agentActive = false;
@@ -13516,21 +13627,34 @@ window.addEventListener('beforeunload', function(){
 // ═══════════════════════════════════════════════════════════════
 
 // 수정 가능한 전략 파라미터 화이트리스트 (ai-team optimizer TUNABLE_KEYS와 동일)
+// 상담(💬)에서 자연어로 바꿀 수 있는 모든 키. 하드리밋(hard_limits.yaml: 동시보유·쿨다운·
+// 진입금지 시간·슬리피지·담보비율)은 여기에 없으며 변경 불가(§4). 그 외는 모의 모드에서 전부 적용.
 const CONS_TUNABLE = {
-  'screening.threshold':       { label:'스크리닝 통과 점수', hint:'높을수록 후보가 까다로워져 거래 수가 줄어요', range:'0~100' },
-  'signal.volume_surge_multiplier': { label:'거래량 급증 배수', hint:'직전 20분 평균 대비 몇 배여야 신호로 볼지 (기본 2.0)', range:'1.2~4.0' },
-  // 손절 (§5.4) — 상담/회의에서 조정
+  // 스크리닝
+  'screening.threshold':       { label:'스크리닝 통과 점수', hint:'높을수록 후보가 까다로워져 거래 수가 줄어요 (SSOT 75)', range:'70~80' },
+  // 신호분석 — 진입 조건 개수(요구 4: "신호 조건 N개로")
+  'signal.entry_rules.strong_min_indicators':      { label:'진입 필요 지표 수(STRONG)', hint:'분봉 타점 4개 중 몇 개 충족해야 강한 진입인지 (예: 4개→3개)', range:'1~4' },
+  'signal.entry_rules.conditional_min_indicators': { label:'조건부 진입 지표 수', hint:'몇 개 충족하면 조건부 진입인지', range:'1~4' },
+  // 신호분석 — 지표 임계
+  'signal.rsi.entry_zone':     { label:'RSI 진입 구간', hint:'분봉 매수 타점 RSI 구간 [낮음,높음] (예: 55~65)', range:'45~72' },
+  'signal.rsi.overbought':     { label:'RSI 과매수 상단', hint:'이 위면 진입 금지', range:'65~80' },
+  'signal.breakout.volume_mult': { label:'돌파 거래량 배수', hint:'돌파 캔들 거래량이 직전 캔들 대비 몇 배여야 하는지', range:'1.0~5.0' },
+  'signal.breakout.lookback':  { label:'돌파 고점 룩백', hint:'직전 몇 봉의 고점을 돌파 기준으로 볼지', range:'3~30' },
+  'signal.volume_surge_multiplier': { label:'거래량 급증 배수(구)', hint:'호환용 — 실제 매매는 돌파 거래량 배수 사용', range:'1.5~3.0' },
+  // 포지션 사이징 (§25.3)
+  'entry.sizing.cash_fraction_strong':      { label:'진입 비중(STRONG)', hint:'가용현금 대비 매수 비중 (0.7=70%)', range:'0.1~1.0' },
+  'entry.sizing.cash_fraction_conditional': { label:'진입 비중(조건부)', hint:'조건부 진입 시 매수 비중', range:'0.1~1.0' },
+  'entry.sizing.credit_multiplier':         { label:'신용 배수', hint:'신용 포함 매수여력 배수 (가용현금 × N)', range:'1.0~2.5' },
+  'entry.conditional_cap_pct':              { label:'조건부 진입 상한', hint:'조건부 진입 비중 캡', range:'0.1~1.0' },
+  // 손절 (§5.4)
   'stop_loss.hard_max_pct':         { label:'하드 손절(%)', hint:'최대 손절선. -0.02=-2% (안전범위 -0.5%~-10%)', range:'-0.10~-0.005' },
   'stop_loss.technical_buffer_pct': { label:'기술적 손절 버퍼(%)', hint:'진입캔들 저점 아래로 이 폭만큼 더 빠지면 손절 (0.005=-0.5%)', range:'0~0.05' },
   'stop_loss.technical_stop_enabled': { label:'기술적 손절 사용', hint:'진입캔들 저점 이탈 손절 on/off (끄면 하드 손절만)', range:'true/false' },
-  // 타임스톱 (§5.5 2단 체크) — 상담/회의에서 조정
-  'time_stop.enabled':              { label:'타임스톱 사용', hint:'타임스톱 전체 on/off', range:'true/false' },
-  'time_stop.evaluation_minutes':   { label:'타임스톱 평가 시간(분)', hint:'진입 후 방향 안 나올 때 재평가까지 기다리는 시간(메인 체크)', range:'5~120' },
-  'time_stop.min_profit_pct':       { label:'타임스톱 수익 기준(%)', hint:'이 수익 미달이면 동작 발동 (0.01=+1%)', range:'0~0.05' },
-  'time_stop.action':               { label:'타임스톱 동작', hint:'reduce_50(절반 청산) 또는 exit_all(전량 청산)', range:'reduce_50/exit_all' },
-  'time_stop.first_check_minutes':  { label:'1차 타임스톱 시간(분)', hint:'메인 체크 전 1차 점검 시간 (0이면 1차 비활성)', range:'0~60' },
-  'time_stop.first_check_action':   { label:'1차 타임스톱 동작', hint:'hold(보류)/reduce_50/exit_all', range:'hold/reduce_50/exit_all' },
-  'time_stop.flat_box_pct':         { label:'타임스톱 무방향 박스(%)', hint:'(구) 호환용·미사용', range:'0.001~0.02' },
+  // 익절 (§5.3)
+  'take_profit.step1.pct_range':   { label:'1차 익절 목표', hint:'1차 익절 수익 구간 [낮음,높음]', range:'0~1' },
+  'take_profit.step2.pct_range':   { label:'2차 익절 목표', hint:'2차 익절 수익 구간 [낮음,높음]', range:'0~1' },
+  'take_profit.step3_trailing.trail_from_high_pct': { label:'트레일링 이탈(%)', hint:'고점 대비 이만큼 밀리면 잔량 전량 청산', range:'0.005~0.10' },
+  // 타임스톱(시간 기반 매도)은 제거되었다(§5.5) — 시간 경과를 이유로 파는 일은 없다.
 };
 
 // ── 각 에이전트 정의 — 관할(jurisdiction)을 완전히 분리 ──
@@ -13563,7 +13687,7 @@ const CONS_AGENTS = [
       talk:'오늘 신호가 몇 번 발생했는지, STRONG_ENTRY/CONDITIONAL_ENTRY/NO_ENTRY를 왜 그렇게 판정했는지(5지표 중 몇 개 충족), 놓친 신호.',
       never:'어떤 종목을 후보로 뽑을지(스크리닝 관할), 주문을 어떻게 낼지(주문실행 관할), 리스크 한도·사이징(리스크 관할).',
       reflect:'지표 판정 실수(거짓 신호, 늦은 포착, 임계값 문제)만 돌아본다.' },
-    scope:['signalParam'], topicPrefix:['signal'], tunables:['signal.volume_surge_multiplier'] },
+    scope:['signalParam'], topicPrefix:['signal'], tunables:['signal.entry_rules.strong_min_indicators','signal.entry_rules.conditional_min_indicators','signal.rsi.entry_zone','signal.rsi.overbought','signal.breakout.volume_mult','signal.breakout.lookback','signal.volume_surge_multiplier'] },
 
   { id:'risk', emoji:'🛡', color:'#f03e3e', name:'리스크 담당', role:'하드리밋 · 손절/익절 · 쿨다운',
     identity:'너는 리스크부 담당이다. 하드리밋(HL-01~06)을 감시하고 손절·익절·연속손절 쿨다운을 집행한다.',
@@ -13571,7 +13695,7 @@ const CONS_AGENTS = [
       talk:'오늘 하드리밋이 발동했는지(동시보유 3종목·연속손절 쿨다운·시간대 금지·슬리피지 5틱·담보비율), 위험했던 순간, 손절 집행 내역과 익절 기준. 하드리밋은 절대 변경 불가임을 분명히 한다.',
       never:'어떤 종목을 고를지(스크리닝 관할), 지표 분석 수치(신호분석 관할), 주문을 실제로 어떻게 넣었는지의 체결 과정(주문실행 관할).',
       reflect:'리스크 관리 실수(늦은 손절, 과도한 사이징, 쿨다운 누락)만 돌아본다.' },
-    scope:['riskParam','hardLimits'], topicPrefix:['risk'], tunables:['stop_loss.hard_max_pct','stop_loss.technical_buffer_pct','stop_loss.technical_stop_enabled','time_stop.enabled','time_stop.evaluation_minutes','time_stop.min_profit_pct','time_stop.action','time_stop.first_check_minutes','time_stop.first_check_action'] },
+    scope:['riskParam','hardLimits'], topicPrefix:['risk'], tunables:['stop_loss.hard_max_pct','stop_loss.technical_buffer_pct','stop_loss.technical_stop_enabled','take_profit.step1.pct_range','take_profit.step2.pct_range','take_profit.step3_trailing.trail_from_high_pct','entry.sizing.cash_fraction_strong','entry.sizing.cash_fraction_conditional','entry.sizing.credit_multiplier','entry.conditional_cap_pct'] },
 
   { id:'order', emoji:'⚡', color:'#ff9900', name:'주문실행 담당', role:'KIS 주문 · 체결 · 슬리피지',
     identity:'너는 실행부 주문실행 담당이다. 리스크부 승인(APPROVE)을 받은 주문만 KIS로 보내고 체결을 관리한다.',
@@ -13595,7 +13719,7 @@ const CONS_AGENTS = [
       talk:'어떤 에이전트가 잘했고 어떤 에이전트가 부진했는지, 토큰 낭비·중복 호출 분석, 근거 기반 파라미터 최적화 제안(paper에서만 적용, 승인 후 반영).',
       never:'특정 종목을 사라/팔아 같은 직접 매매 지시, 실시간 체결 개입. 나는 "시스템을 관찰·개선"할 뿐이다.',
       reflect:'관찰·제안의 실수(잘못된 성과 귀속, 근거 약한 제안)만 돌아본다.' },
-    scope:['mode','perfOverall','teamActivity','allParams'], topicPrefix:['meta','*'], tunables:['screening.threshold','signal.volume_surge_multiplier','stop_loss.hard_max_pct','stop_loss.technical_buffer_pct','stop_loss.technical_stop_enabled','time_stop.enabled','time_stop.evaluation_minutes','time_stop.min_profit_pct','time_stop.action','time_stop.first_check_minutes','time_stop.first_check_action'] },
+    scope:['mode','perfOverall','teamActivity','allParams'], topicPrefix:['meta','*'], tunables:Object.keys(CONS_TUNABLE) },
 ];
 
 // 부서 id → 한글 담당명 (관할 밖 질문을 떠넘길 때 사용)
@@ -13617,6 +13741,207 @@ function consInit(){
   consRenderCards();
   consLoadContext(true).then(()=>consUpdateModeBadge());
   consState.initDone = true;
+}
+
+// ════════ ⚙️ 매매 설정 (손절/익절 → strategy_params.yaml 즉시 반영) ════════
+// 읽기: GET /api/agent/strategy/settings (scripts/strategy_settings.py)
+// 저장: POST /api/agent/consult/apply-param (consult_apply.py → StrategyEditor 단일 진입점:
+//       화이트리스트 → leaf 교체 → 재읽기 검증 → git 커밋 → ImprovementLog)
+// 안전장치: 범위 밖 입력 거부+경고 / 하드리밋은 화이트리스트 밖이라 애초에 노출 안 함 / live 잠금.
+let _tsItems={}, _tsCur={}, _tsLocked=false;
+function _tsEsc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function _tsId(k){ return 'ts_'+k.replace(/\./g,'_'); }
+function _tsRound6(v){ return Math.round(v*1e6)/1e6; }
+function _tsFmt(v){ if(!isFinite(v)) return v; return parseFloat((+v).toFixed(4)); }
+
+// 친화 라벨/힌트/그룹 (쉬운 한국어, 토스 스타일)
+const TS_META={
+  'stop_loss.hard_max_pct':            {g:'📉 손절',   label:'최대 손절선',     hint:'이만큼 손해 나면 무조건 팔아요 (예: -2%)', unit:'%'},
+  'stop_loss.technical_stop_enabled':  {g:'📉 손절',   label:'기술적 손절 사용', hint:'진입했던 캔들 저점이 깨지면 바로 손절해요'},
+  'stop_loss.technical_buffer_pct':    {g:'📉 손절',   label:'저점 이탈 버퍼',   hint:'진입 캔들 저점에서 이만큼 더 빠지면 손절', unit:'%'},
+  // 타임스톱(시간 기반 매도)은 제거되었다(§5.5) — 시간 때문에 파는 항목은 없다.
+  'take_profit.step1.pct_range':       {g:'✅ 익절',   label:'1차 익절 목표',    hint:'이 수익 구간에서 1차 익절 (낮음~높음)', unit:'%', range:true},
+  'take_profit.step1.close_ratio':     {g:'✅ 익절',   label:'1차 청산 비중',    hint:'1차 익절 때 몇 % 팔지', unit:'%'},
+  'take_profit.step2.pct_range':       {g:'✅ 익절',   label:'2차 익절 목표',    hint:'이 수익 구간에서 2차 익절 (낮음~높음)', unit:'%', range:true},
+  'take_profit.step2.close_ratio':     {g:'✅ 익절',   label:'2차 청산 비중',    hint:'2차 익절 때 몇 % 팔지', unit:'%'},
+  'take_profit.step3_trailing.trail_from_high_pct':{g:'✅ 익절', label:'트레일링 이탈', hint:'고점 대비 이만큼 밀리면 잔량 전부 팔아요', unit:'%'},
+};
+// 서버 가드레일이 없는 항목의 클라이언트 안전범위 (화면 % 단위)
+const TS_CLIENT_BOUNDS={
+  'take_profit.step1.pct_range':[0.5,30], 'take_profit.step2.pct_range':[0.5,30],
+  'take_profit.step1.close_ratio':[0,100], 'take_profit.step2.close_ratio':[0,100],
+  'take_profit.step3_trailing.trail_from_high_pct':[0.5,10],
+};
+
+// yaml 값 → 화면 표시값 (소수→%)
+function _tsToDisp(key, val){
+  const m=TS_META[key]||{};
+  if(m.range && Array.isArray(val)) return val.map(v=>_tsFmt(v*100));
+  if(m.unit==='%') return _tsFmt(val*100);
+  return val; // 분/그 외 숫자, bool, choice 그대로
+}
+// 화면 표시값 → yaml 저장 문자열 (%→소수)
+function _tsToYaml(key, disp){
+  const m=TS_META[key]||{}, it=_tsItems[key]||{};
+  if(m.range){ return '['+disp.map(v=>_tsRound6(v/100)).join(', ')+']'; }
+  if(m.unit==='%') return String(_tsRound6(disp/100));
+  if(it.kind==='minutes') return String(Math.round(disp));
+  return String(disp);
+}
+// 안전범위 (화면 % 단위) — 서버 bounds 우선, 없으면 클라이언트 fallback
+function _tsBounds(key){
+  const it=_tsItems[key]||{}, m=TS_META[key]||{};
+  if(m.range){
+    let b = it.list_bounds ? it.list_bounds.map(p=>p.map(x=>m.unit==='%'?x*100:x))
+          : (TS_CLIENT_BOUNDS[key] ? [TS_CLIENT_BOUNDS[key],TS_CLIENT_BOUNDS[key]] : null);
+    return b;
+  }
+  if(it.bounds){ const f=m.unit==='%'?100:1; return [it.bounds[0]*f, it.bounds[1]*f]; }
+  if(TS_CLIENT_BOUNDS[key]) return TS_CLIENT_BOUNDS[key];
+  return null;
+}
+
+async function tradeSettingsLoad(){
+  const host=document.getElementById('tradeSettingsPanel');
+  if(!host) return;
+  host.innerHTML='<div class="ts-card"><div class="ts-h">⚙️ 매매 설정</div><div class="ts-sub">불러오는 중…</div></div>';
+  try{
+    const r=await fetch('/api/agent/strategy/settings',{cache:'no-store'});
+    const d=await r.json();
+    tradeSettingsRender(d);
+  }catch(e){
+    host.innerHTML='<div class="ts-card"><div class="ts-h">⚙️ 매매 설정</div><div class="ts-sub" style="color:#ef4444;">불러오기 실패: '+_tsEsc(e.message)+'</div></div>';
+  }
+}
+
+function tradeSettingsRender(d){
+  const host=document.getElementById('tradeSettingsPanel');
+  if(!host) return;
+  if(!d||!d.ok){ host.innerHTML='<div class="ts-card"><div class="ts-h">⚙️ 매매 설정</div><div class="ts-sub" style="color:#ef4444;">'+_tsEsc((d&&d.reason)||'서버 응답 없음')+'</div></div>'; return; }
+  _tsItems={}; _tsCur={};
+  (d.items||[]).forEach(it=>{ _tsItems[it.key]=it; _tsCur[it.key]=it.value; });
+  _tsLocked=!!d.locked;
+  const mode=d.mode||'paper';
+
+  let h='<div class="ts-card">';
+  h+='<div class="ts-h">⚙️ 매매 설정<span class="ts-badge">'+(mode==='live'?'🔴 실전':'🟢 모의')+' 모드</span></div>';
+  h+='<div class="ts-sub">손절·익절 값을 바꾸면 <b>바로 저장</b>되고 다음 매매/백테스트부터 적용돼요. 안전범위를 벗어나면 거부돼요. 하드리밋(동시보유·진입금지 시간 등)은 바꿀 수 없어요.</div>';
+  if(_tsLocked) h+='<div class="ts-lock">🔒 실전 모드에서는 전략 값을 바꿀 수 없어요. 설정을 바꾸려면 모의(paper) 모드로 전환하세요.</div>';
+
+  // 그룹 순서대로 렌더 (TS_META 정의 순서)
+  let curGrp=null;
+  Object.keys(TS_META).forEach(key=>{
+    const it=_tsItems[key]; if(!it) return;
+    const m=TS_META[key];
+    if(m.g!==curGrp){ curGrp=m.g; h+='<div class="ts-grp-t">'+m.g+'</div>'; }
+    h+=_tsRowHtml(key);
+  });
+  h+='</div>';
+  host.innerHTML=h;
+}
+
+function _tsRowHtml(key){
+  const it=_tsItems[key], m=TS_META[key];
+  const id=_tsId(key), dis=_tsLocked?'disabled':'';
+  let ctl='', cur='';
+  if(it.kind==='bool'){
+    ctl='<label class="ts-switch"><input type="checkbox" id="'+id+'" '+(it.value?'checked':'')+' '+dis+' onchange="tsSaveToggle(\''+key+'\')"><span></span></label>';
+    cur='현재: '+(it.value?'켜짐 ✅':'꺼짐 ⛔');
+  } else if(it.kind==='choice'){
+    let opts='';
+    (it.choices||[]).forEach(c=>{ const lbl=(m.choices&&m.choices[c])||c; opts+='<option value="'+c+'" '+(c===it.value?'selected':'')+'>'+_tsEsc(lbl)+'</option>'; });
+    ctl='<select class="ts-sel" id="'+id+'" '+dis+' onchange="tsSaveChoice(\''+key+'\')">'+opts+'</select>';
+    cur='현재: '+_tsEsc((m.choices&&m.choices[it.value])||it.value);
+  } else if(m.range){
+    const dv=_tsToDisp(key,it.value);
+    ctl='<input class="ts-in" style="width:50px;" type="number" step="any" id="'+id+'_lo" value="'+dv[0]+'" '+dis+' onchange="tsSaveRange(\''+key+'\')">'
+       +'<span class="ts-unit">~</span>'
+       +'<input class="ts-in" style="width:50px;" type="number" step="any" id="'+id+'_hi" value="'+dv[1]+'" '+dis+' onchange="tsSaveRange(\''+key+'\')">'
+       +'<span class="ts-unit">'+(m.unit||'')+'</span>';
+    cur='현재: '+dv[0]+(m.unit||'')+' ~ '+dv[1]+(m.unit||'');
+  } else {
+    const dv=_tsToDisp(key,it.value);
+    const b=_tsBounds(key);
+    const minmax=b?(' min="'+b[0]+'" max="'+b[1]+'"'):'';
+    ctl='<input class="ts-in" type="number" step="any" id="'+id+'" value="'+dv+'"'+minmax+' '+dis+' onchange="tsSaveNum(\''+key+'\')"><span class="ts-unit">'+(m.unit||'')+'</span>';
+    cur='현재: '+dv+(m.unit||'');
+  }
+  const b=_tsBounds(key);
+  let range='';
+  if(b && !m.range && it.kind!=='bool' && it.kind!=='choice') range=' · 범위 '+b[0]+'~'+b[1]+(m.unit||'');
+  else if(b && m.range) range=' · 범위 '+b[0][0]+'~'+b[1][1]+(m.unit||'');
+  return '<div class="ts-row"><div class="ts-txt"><div class="ts-lab">'+_tsEsc(m.label)+'</div>'
+    +'<div class="ts-hint">'+_tsEsc(m.hint||'')+'</div>'
+    +'<div class="ts-cur" id="'+id+'_cur">'+_tsEsc(cur)+range+'</div>'
+    +'<div class="ts-fb" id="'+id+'_fb"></div></div>'
+    +'<div class="ts-ctl">'+ctl+'</div></div>';
+}
+
+function _tsFb(key, msg, color){
+  const el=document.getElementById(_tsId(key)+'_fb');
+  if(el){ el.textContent=msg; el.style.color=color||'var(--ts)'; }
+}
+function _tsCurText(key){
+  const it=_tsItems[key], m=TS_META[key]; const el=document.getElementById(_tsId(key)+'_cur'); if(!el) return;
+  let cur;
+  if(it.kind==='bool') cur='현재: '+(it.value?'켜짐 ✅':'꺼짐 ⛔');
+  else if(it.kind==='choice') cur='현재: '+((m.choices&&m.choices[it.value])||it.value);
+  else if(m.range){ const dv=_tsToDisp(key,it.value); cur='현재: '+dv[0]+(m.unit||'')+' ~ '+dv[1]+(m.unit||''); }
+  else { const dv=_tsToDisp(key,it.value); cur='현재: '+dv+(m.unit||''); }
+  const b=_tsBounds(key); let range='';
+  if(b && !m.range && it.kind!=='bool' && it.kind!=='choice') range=' · 범위 '+b[0]+'~'+b[1]+(m.unit||'');
+  else if(b && m.range) range=' · 범위 '+b[0][0]+'~'+b[1][1]+(m.unit||'');
+  el.textContent=cur+range;
+}
+
+// 실제 저장 (모든 입력 타입 공통)
+async function _tsApply(key, valueStr){
+  if(_tsLocked){ _tsFb(key,'🔒 실전 모드에서는 바꿀 수 없어요.','#ef4444'); return; }
+  _tsFb(key,'저장 중…','var(--ts)');
+  try{
+    const r=await fetch('/api/agent/consult/apply-param',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key,value:valueStr})});
+    const d=await r.json();
+    if(d.locked){ _tsLocked=true; _tsFb(key,'🔒 실전 모드 잠금','#ef4444'); return; }
+    if(d.ok){
+      _tsItems[key].value=d.to;
+      _tsCur[key]=d.to;
+      _tsCurText(key);
+      let msg='✓ 저장됨';
+      if(d.commit) msg+=' · 커밋 '+d.commit;
+      _tsFb(key,msg,'#16a34a');
+      // 서버가 안전범위로 보정했으면 입력칸도 보정값으로 갱신
+      _tsSyncInput(key);
+    } else if(typeof d.reason==='string' && d.reason.indexOf('이미')>=0){
+      _tsFb(key,'✓ 이미 적용된 값이에요','#16a34a');
+    } else {
+      _tsFb(key,'❌ '+_tsEsc(d.reason||'적용 실패'),'#ef4444');
+    }
+  }catch(e){ _tsFb(key,'❌ 저장 실패: '+_tsEsc(e.message),'#ef4444'); }
+}
+// 입력칸을 현재 저장값으로 되돌림 (거부/보정 후)
+function _tsSyncInput(key){
+  const it=_tsItems[key], m=TS_META[key], id=_tsId(key);
+  if(m.range){ const dv=_tsToDisp(key,it.value); const lo=document.getElementById(id+'_lo'),hi=document.getElementById(id+'_hi'); if(lo)lo.value=dv[0]; if(hi)hi.value=dv[1]; }
+  else { const el=document.getElementById(id); if(el) el.value=_tsToDisp(key,it.value); }
+}
+
+function tsSaveToggle(key){ const el=document.getElementById(_tsId(key)); if(!el) return; _tsApply(key, el.checked?'true':'false'); }
+function tsSaveChoice(key){ const el=document.getElementById(_tsId(key)); if(!el) return; _tsApply(key, el.value); }
+function tsSaveNum(key){
+  const el=document.getElementById(_tsId(key)); if(!el) return;
+  const v=parseFloat(el.value);
+  if(!isFinite(v)){ _tsFb(key,'❌ 숫자를 입력해 주세요.','#ef4444'); _tsSyncInput(key); return; }
+  const b=_tsBounds(key);
+  if(b && (v<b[0]||v>b[1])){ _tsFb(key,'⚠️ 범위(안전값 '+b[0]+'~'+b[1]+')를 벗어나 거부됐어요.','#ef4444'); _tsSyncInput(key); return; }
+  _tsApply(key, _tsToYaml(key, v));
+}
+function tsSaveRange(key){
+  const id=_tsId(key); const lo=parseFloat((document.getElementById(id+'_lo')||{}).value), hi=parseFloat((document.getElementById(id+'_hi')||{}).value);
+  if(!isFinite(lo)||!isFinite(hi)){ _tsFb(key,'❌ 숫자를 입력해 주세요.','#ef4444'); _tsSyncInput(key); return; }
+  if(lo>=hi){ _tsFb(key,'⚠️ 낮은 값이 높은 값보다 작아야 해요.','#ef4444'); _tsSyncInput(key); return; }
+  const b=_tsBounds(key);
+  if(b && (lo<b[0][0]||lo>b[0][1]||hi<b[1][0]||hi>b[1][1])){ _tsFb(key,'⚠️ 범위(안전값 '+b[0][0]+'~'+b[1][1]+')를 벗어나 거부됐어요.','#ef4444'); _tsSyncInput(key); return; }
+  _tsApply(key, _tsToYaml(key, [lo,hi]));
 }
 
 // ── 📚 노션 학습 현황 (학습부 노션 동기화 → 전 부서 반영) ──
@@ -13901,12 +14226,7 @@ function consScopedCtx(agent, ctx){
     if(p['stop_loss.hard_max_pct']!=null) L.push('현재 하드 손절: '+(p['stop_loss.hard_max_pct']*100).toFixed(2)+'%');
     if(p['stop_loss.technical_buffer_pct']!=null) L.push('현재 기술적 손절 버퍼: -'+(p['stop_loss.technical_buffer_pct']*100).toFixed(2)+'% (진입캔들 저점 이탈)');
     if(p['stop_loss.technical_stop_enabled']!=null) L.push('기술적 손절 사용: '+(p['stop_loss.technical_stop_enabled']?'켜짐':'꺼짐'));
-    // 타임스톱 (§5.5 2단 체크)
-    if(p['time_stop.enabled']!=null) L.push('타임스톱 사용: '+(p['time_stop.enabled']?'켜짐':'꺼짐'));
-    if(p['time_stop.evaluation_minutes']!=null) L.push('현재 타임스톱 평가시간(메인): '+p['time_stop.evaluation_minutes']+'분');
-    if(p['time_stop.min_profit_pct']!=null) L.push('타임스톱 수익 기준: +'+(p['time_stop.min_profit_pct']*100).toFixed(2)+'% 미달 시 청산');
-    if(p['time_stop.action']!=null) L.push('타임스톱 동작: '+(p['time_stop.action']==='exit_all'?'전량 청산':'절반 청산(reduce_50)'));
-    if(p['time_stop.first_check_minutes']!=null) L.push('1차 타임스톱: '+(Number(p['time_stop.first_check_minutes'])>0?p['time_stop.first_check_minutes']+'분('+(p['time_stop.first_check_action']||'hold')+')':'비활성'));
+    // 타임스톱(시간 기반 매도)은 제거되었다(§5.5) — 시간 경과로 파는 청산 없음.
   }
   if(has('hardLimits')) L.push('하드리밋(변경불가): 동시보유 3종목 / 연속손절 3회→1시간 쿨다운 / 09:00~09:30·14:30이후 진입금지 / 슬리피지 5틱 / 신용 담보비율 버퍼.');
   if(has('allParams')){
@@ -13943,7 +14263,9 @@ function consAgentSystem(agent, ctx){
   parts.push('【절대 말하지 않는 것 — 다른 부서 관할】\n'+c.never);
   parts.push('【관할 밖 질문을 받으면】\n"그건 제 관할이 아니에요, [담당]에게 물어보세요"처럼 해당 담당 부서를 명확히 알려주고 넘긴다. 추측으로 다른 부서 일을 대신 답하지 않는다. (부서: '+Object.keys(CONS_OWNER).map(k=>CONS_OWNER[k]).join(' / ')+')');
   if(tun.length){
-    parts.push('【내가 제안 가능한 파라미터】\n'+tun.join(', ')+' — 이 키만. 변경이 정말 도움된다고 판단하면 답변 맨 끝에 정확히 이 형식으로 한 줄: [[PARAM:키=값|한줄이유]]. 실전(live) 모드면 "지금은 잠겨서 모의에서만 적용돼요"라고 덧붙인다. 내 관할 밖 파라미터는 제안하지 않는다(메타나 해당 담당에게 넘긴다).');
+    parts.push('【내가 조정 가능한 파라미터】\n'+tun.join(', ')+' — 이 키들.\n'
+      +'★ 중요: 사용자가 수치를 분명히 말하면(예 "신호 조건 4개로", "RSI 55~65로", "하드 손절 -2%로") 시스템이 그 변경을 strategy_params.yaml 에 **즉시 자동 반영**한다(모의 모드). 따라서 너는 "반영할까요?"·"적용할까요?"·"여기서는 못 바꿔요" 같은 말을 절대 하지 마라 — 이미 적용됐다고 보고 확인·설명만 하라. (시스템 안내문이 함께 주어지면 그 내용을 그대로 따르라.)\n'
+      +'네가 먼저 변경을 권하고 싶을 땐 답변 맨 끝에 한 줄: [[PARAM:키=값|한줄이유]]. 실전(live) 모드면 "지금은 잠겨서 모의에서만 적용돼요"라고 덧붙인다. 내 관할 밖 파라미터는 메타나 해당 담당에게 넘긴다. 하드리밋(동시보유·연속손절 쿨다운·진입금지 시간·슬리피지·담보비율)은 바꿀 수 없다고 분명히 말하라.');
   } else {
     parts.push('【파라미터】\n내 관할에는 직접 바꿀 전략 파라미터가 없다. 파라미터 변경 얘기가 나오면 메타 옵티마이저(또는 해당 담당)에게 넘긴다. [[PARAM:...]] 형식을 쓰지 않는다.');
   }
@@ -13995,12 +14317,64 @@ async function consSelect(id){
 }
 
 // ── Claude에 질문 (단일 에이전트) — 스트리밍(요구 1) + 협력(요구 3) ──
+// ── 결정적 자동 반영(요구 1~3): 사용자 문장에서 전략 변경을 감지하면 LLM 협조 없이
+//    즉시 strategy_params.yaml 수정 + git 커밋하고, 결과 카드를 화면에 띄운다. "반영할까요?"
+//    "여기선 못해요"로 끝나지 않게 — 무조건 적용한다(하드리밋/live만 거부 사유 표시).
+//    반환값: LLM에 주입할 안내문(적용됨/거부됨). 감지 못 하면 '' (LLM이 평소처럼 대화).
+async function consAutoApplyText(userText){
+  try{
+    const r=await fetch('/api/agent/consult/apply-text',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:userText})});
+    const d=await r.json();
+    const applied=(d&&d.applied)||[];
+    if(applied.length){
+      // 캐시 갱신 + 결과 카드
+      applied.forEach(a=>{ if(consState.ctx&&consState.ctx.params) consState.ctx.params[a.key]=a.to; });
+      const lines=applied.map(a=>{
+        const commit=a.commit?(' · 커밋 '+a.commit):'';
+        return '✅ '+(a.display||(a.key+': '+a.from+' → '+a.to))+commit;
+      });
+      consAutoApplyCard('done', '✅ 적용 완료', lines);
+      return '【시스템 안내 — 반드시 따르라】 사용자의 위 요청을 strategy_params.yaml 에 이미 자동 반영 완료했다: '
+        +applied.map(a=>(a.display||(a.key+' '+a.from+'→'+a.to))).join(' / ')
+        +'. 그러니 "반영할까요?"·"적용할까요?"라고 절대 되묻지 마라. "✅ 적용 완료했어요"라고 확정해서 알리고, 그 변경이 매매에 어떤 효과·주의가 있는지만 1~3문장으로 설명하라. 다음 백테스트/세션부터 바로 적용된다는 점도 덧붙여라.';
+    }
+    if(d&&(d.hard_limit||d.locked)){
+      consAutoApplyCard('fail', (d.locked?'🔒 적용 불가':'🚫 변경 불가'), [String(d.reason||'변경할 수 없는 값이에요.')]);
+      return '【시스템 안내】 사용자의 요청은 적용하지 못했다: '+String(d.reason||'')
+        +' 왜 안 되는지(하드리밋이거나 실전 잠금) 정중히 설명하고, 바꿀 수 있는 대안이 있으면 안내하라. 절대 적용됐다고 말하지 마라.';
+    }
+    if(d&&d.failed&&d.failed.length&&!applied.length){
+      // "값이 이미 N이라 변경할 게 없어요" 등 — 조용히 알린다.
+      const reasons=d.failed.map(f=>f.reason).filter(Boolean);
+      if(reasons.some(x=>/이미/.test(x))){
+        consAutoApplyCard('info', 'ℹ️ 이미 그 값이에요', reasons.slice(0,2));
+        return '【시스템 안내】 사용자가 요청한 값은 이미 현재 설정과 같아서 바뀐 게 없다. 그 사실을 알려주고, 다른 조정이 필요한지 물어보라.';
+      }
+    }
+  }catch(e){ /* 자동반영 실패는 비치명 — LLM이 평소대로 대화 */ }
+  return '';
+}
+function consAutoApplyCard(kind, title, lines){
+  const b=document.getElementById('consChatBody'); if(!b) return;
+  const col = kind==='done' ? '#16a34a' : (kind==='fail' ? '#ef4444' : 'var(--ts,#9aa)');
+  const bg  = kind==='done' ? 'rgba(22,163,74,.10)' : (kind==='fail' ? 'rgba(239,68,68,.10)' : 'rgba(148,163,184,.10)');
+  const d=document.createElement('div'); d.className='cons-row sys'; d.style.alignSelf='center'; d.style.maxWidth='94%';
+  let h='<div class="cons-bub" style="background:'+bg+';border:1px solid '+col+'44;">'
+    +'<div style="font-size:12px;font-weight:800;color:'+col+';margin-bottom:4px;">'+consEsc(title)+'</div>';
+  (lines||[]).forEach(l=>{ h+='<div style="font-size:11px;color:var(--t,#333);margin-top:2px;">'+consEsc(l)+'</div>'; });
+  h+='</div>';
+  d.innerHTML=h; b.appendChild(d); consScrollEnd();
+}
+
 async function consAsk(agent, userText, isSelf){
   if(consState.busy) return;
   consState.busy = true;
   const ctx = await consLoadContext(false);
   consUpdateModeBadge();
-  const sys = consAgentSystem(agent, ctx);
+  // 결정적 자동 반영 먼저(요구 1~3): 감지된 변경은 LLM과 무관하게 즉시 yaml 반영 + 카드 표시.
+  const applyNote = isSelf ? '' : await consAutoApplyText(userText);
+  if(applyNote) consUpdateModeBadge();   // 적용 후 모드/값 배지 갱신
+  const sys = consAgentSystem(agent, ctx) + (applyNote ? ('\n\n'+applyNote) : '');
   const hist = consState.history[agent.id] || (consState.history[agent.id]=[]);
   const um = { role:'user', content:userText }; if(isSelf) um._self=true;
   hist.push(um);
@@ -14159,7 +14533,7 @@ async function consRunMeeting(userText){
 
     // ② CEO 중간 제안 — 부서들이 반박/동의할 구체 방향을 던진다
     consSysMsg('🧠 CEO가 중간 방향을 제안합니다. 각 부서가 동의하거나 반박해요.');
-    const interimSys = consAgentSystem(ceo, ctx)+'\n\n【전체 팀 회의 — CEO 중간 제안 차례】 각 부서 발언을 듣고, 오늘 팀이 바꾸면 좋을 구체적 방향을 1~2가지 제안해라(예: "스크리닝 기준을 더 높이자", "타임스톱을 더 빨리"). 어느 부서가 관련되는지 짚어라(3~4문장). 아직 최종 결론은 아니다. [[PARAM]]은 쓰지 마라.';
+    const interimSys = consAgentSystem(ceo, ctx)+'\n\n【전체 팀 회의 — CEO 중간 제안 차례】 각 부서 발언을 듣고, 오늘 팀이 바꾸면 좋을 구체적 방향을 1~2가지 제안해라(예: "스크리닝 기준을 더 높이자", "손절을 더 타이트하게"). 어느 부서가 관련되는지 짚어라(3~4문장). 아직 최종 결론은 아니다. [[PARAM]]은 쓰지 마라.';
     const interimUser = (userText?('사용자 질문: '+userText+'\n\n'):'')+'각 부서 발언:\n'+brief+'\n\n중간 방향을 제안해줘.';
     const iStream = consRenderStreaming(ceo);
     const interim = await consComplete({ model:'claude-sonnet-4-5', max_tokens:700, system:interimSys, messages:[{role:'user',content:interimUser}] }, '회의:ceo제안', cur=>iStream.set('【CEO 제안】\n'+cur));

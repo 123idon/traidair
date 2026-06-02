@@ -28,7 +28,12 @@ fs.writeFileSync('./buildinfo.json', JSON.stringify({ buildTs: BUILD_TS, builtAt
 console.log('✅ buildinfo.json: ' + BUILD_TS);
 
 const PAGES = [
-  { src: 'src/hts', out: 'trading-hts.html' },
+  // ⚠️ trading-hts.html 은 src/hts 에서 빌드하지 않는다(SKIP) — 정본(SSOT) 보호.
+  //    trading-hts.html 은 직접 편집되는 정본이며 server.js 가 그대로 서빙한다(로컬·Railway 동일).
+  //    src/hts 는 현재 trading-hts.html 보다 ~1521줄(스트리밍 상담·3버튼 백테스트·회의적용·
+  //    노션적용·매매설정 패널 등) 뒤처진 죽은 코드 → 나중에 src/hts 재동기화는 기술부채로 남긴다.
+  //    여기서 src/hts 를 다시 빌드하면 Railway 배포 시 그 기능들이 전부 사라진다.
+  // { src: 'src/hts', out: 'trading-hts.html' },   // ← 의도적으로 비활성화 (정본 덮어쓰기 방지)
   { src: 'src/dashboard', out: 'trading-dashboard.html' },
 ];
 
@@ -53,9 +58,10 @@ function buildPage({ src, out }) {
   const js = fs.readFileSync(jsPath, 'utf8');
   // 함수 형태로 넘겨 replace 특수 문자($$, $&, $') 해석 회피
   const html = tpl
-    .replace('\n/*##STYLES##*/\n', () => css)
-    .replace('\n<!--##BODY##-->\n', () => body)
-    .replace('\n/*##SCRIPT##*/\n', () => js)
+    // CRLF/LF 모두 허용 (\r?\n) — Windows 작업트리(CRLF)에서도 정상 치환.
+    .replace(/\r?\n\/\*##STYLES##\*\/\r?\n/, () => css)
+    .replace(/\r?\n<!--##BODY##-->\r?\n/, () => body)
+    .replace(/\r?\n\/\*##SCRIPT##\*\/\r?\n/, () => js)
     .replace(/__BUILD_TS__/g, () => BUILD_TS);
   fs.writeFileSync(out, html);
   console.log(`✅ 빌드: ${src} → ${out} (${(html.length / 1024).toFixed(1)} KB)`);

@@ -2244,14 +2244,7 @@ const server = http.createServer(async (req, res) => {
       setNum('stop_loss.hard_max_pct', 'stop_loss', 'hard_max_pct');
       setNum('stop_loss.technical_buffer_pct', 'stop_loss', 'technical_buffer_pct');
       setRaw('stop_loss.technical_stop_enabled', 'stop_loss', 'technical_stop_enabled');
-      // 타임스톱 (§5.5 2단 체크)
-      setRaw('time_stop.enabled', 'time_stop', 'enabled');
-      setNum('time_stop.evaluation_minutes', 'time_stop', 'evaluation_minutes');
-      setNum('time_stop.min_profit_pct', 'time_stop', 'min_profit_pct');
-      setRaw('time_stop.action', 'time_stop', 'action');
-      setNum('time_stop.first_check_minutes', 'time_stop', 'first_check_minutes');
-      setRaw('time_stop.first_check_action', 'time_stop', 'first_check_action');
-      setNum('time_stop.flat_box_pct', 'time_stop', 'flat_box_pct');
+      // 타임스톱(시간 기반 매도)은 제거되었다(§5.5) — time_stop 키는 더 이상 노출하지 않는다.
       out.tunable = t;
     } catch (e) {}
     // 오늘 저널 토픽 요약
@@ -2300,6 +2293,73 @@ const server = http.createServer(async (req, res) => {
         if (!data) { reply({ ok: false, reason: '적용 결과 파싱 실패: ' + (err.trim().slice(-200) || out.trim().slice(-200) || '출력 없음') }); return; }
         reply(data);
       });
+    });
+    return;
+  }
+
+  // ── 상담 중 자연어 → 전략 자동 반영 (💬 상담 채팅, paper 전용) ──
+  // 사용자가 "신호 조건 4개로 바꿔줘"처럼 말하면 규칙 파서가 화이트리스트 키 변경을
+  // 추출해 즉시 strategy_params.yaml 수정 + 재읽기 검증 + git 커밋. LLM 협조 없이도
+  // 결정적으로 적용된다(요구: "반영할까요?" 묻지 말고 무조건 적용). 하드리밋/live는 거부 사유 반환.
+  // scripts/consult_apply.py --text "<문장>" → {ok, applied[], failed[], hard_limit, warning}.
+  if (url === '/api/agent/consult/apply-text' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      let text = '';
+      try { const o = JSON.parse(body || '{}'); text = String(o.text || '').trim(); } catch (e) {}
+      const reply = (obj) => {
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...CORS });
+        res.end(JSON.stringify(obj));
+      };
+      if (!text) { reply({ ok: false, reason: '문장이 비었어요.' }); return; }
+      console.log(`[consult/apply-text] ${new Date().toISOString()} 요청 수신 — text="${text}"`);
+      const script = path.join(AGENT_DIR, 'scripts', 'consult_apply.py');
+      let out = '', err = '', child;
+      try {
+        // 한글 문장은 argv 로 넘기면 Windows 코드페이지에서 깨질 수 있어 stdin(UTF-8)으로 전달.
+        child = spawn(btPython(), [script, '--stdin'], { cwd: AGENT_DIR, env: { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' }, windowsHide: true });
+      } catch (e) { reply({ ok: false, reason: '적용기 실행 실패: ' + e.message }); return; }
+      child.stdout.on('data', d => { out += d; });
+      child.stderr.on('data', d => { err += d; });
+      child.on('error', e => reply({ ok: false, reason: '적용기 오류: ' + e.message }));
+      child.on('close', () => {
+        const line = out.trim().split('\n').filter(s => s.trim().startsWith('{')).pop();
+        let data = null; if (line) { try { data = JSON.parse(line); } catch (e) {} }
+        if (!data) {
+          console.log(`[consult/apply-text] 적용 결과 파싱 실패 — ${(err.trim().slice(-200) || out.trim().slice(-200) || '출력 없음')}`);
+          reply({ ok: false, reason: '적용 결과 파싱 실패: ' + (err.trim().slice(-200) || out.trim().slice(-200) || '출력 없음') }); return;
+        }
+        const _ap = (data.applied || []).map(a => `${a.key} ${a.from}→${a.to}${a.commit ? ' ('+a.commit+')' : ''}`);
+        console.log(`[consult/apply-text] 결과 — applied=${_ap.length ? _ap.join(', ') : '없음'} failed=${(data.failed || []).length}${data.message ? ' | ' + data.message : ''}`);
+        reply(data);
+      });
+      try { child.stdin.write(JSON.stringify({ text })); child.stdin.end(); } catch (e) {}
+    });
+    return;
+  }
+
+  // ── ⚙️ 매매 설정 현재값/안전범위 조회 (기능 탭 패널, 인증 불필요) ──
+  // scripts/strategy_settings.py --get → strategy_params.yaml 현재값 + 가드레일 + 모드(잠금).
+  // 저장은 기존 /api/agent/consult/apply-param (consult_apply.py → StrategyEditor) 재사용.
+  if (url.split('?')[0] === '/api/agent/strategy/settings' && req.method === 'GET') {
+    const reply = (obj) => {
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...CORS });
+      res.end(JSON.stringify(obj));
+    };
+    const script = path.join(AGENT_DIR, 'scripts', 'strategy_settings.py');
+    let out = '', err = '', child;
+    try {
+      child = spawn(btPython(), [script, '--get'], { cwd: AGENT_DIR, env: { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' }, windowsHide: true });
+    } catch (e) { reply({ ok: false, reason: '설정 조회 실행 실패: ' + e.message }); return; }
+    child.stdout.on('data', d => { out += d; });
+    child.stderr.on('data', d => { err += d; });
+    child.on('error', e => reply({ ok: false, reason: '설정 조회 오류: ' + e.message }));
+    child.on('close', () => {
+      const line = out.trim().split('\n').filter(s => s.trim().startsWith('{')).pop();
+      let data = null; if (line) { try { data = JSON.parse(line); } catch (e) {} }
+      if (!data) { reply({ ok: false, reason: '설정 파싱 실패: ' + (err.trim().slice(-200) || out.trim().slice(-200) || '출력 없음') }); return; }
+      reply(data);
     });
     return;
   }
