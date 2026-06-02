@@ -5,4 +5,5 @@ config.js
 cfg.json
 config.js
 buildinfo.json
+kis_token_cache.json
 .claude/

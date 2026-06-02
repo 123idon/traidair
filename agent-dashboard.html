@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ai-agent 실시간 현황 · TraidAIr</title>
+<style>
+  :root {
+    --bg:#0b0e14; --panel:#141925; --panel2:#1b2230; --line:#252d3d;
+    --txt:#e6e9ef; --mut:#8b94a7; --acc:#4da3ff;
+    --green:#27c08a; --red:#ff5d6c; --yellow:#f5c451; --black:#b06bff; --grey:#5b6577;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--txt);
+    font-family:"Segoe UI",system-ui,"Malgun Gothic",sans-serif; }
+  header { display:flex; align-items:center; gap:14px; padding:14px 20px;
+    border-bottom:1px solid var(--line); background:var(--panel); position:sticky; top:0; z-index:5; }
+  header h1 { font-size:17px; margin:0; font-weight:600; }
+  .pill { font-size:12px; padding:3px 10px; border-radius:999px; font-weight:600; }
+  .pill.paper { background:#13344d; color:#7cc4ff; }
+  .pill.live  { background:#4d1320; color:#ff8c97; }
+  .pill.unknown { background:#2a2f3c; color:var(--mut); }
+  .dot { width:9px; height:9px; border-radius:50%; display:inline-block; margin-right:6px; }
+  .dot.on { background:var(--green); box-shadow:0 0 8px var(--green); }
+  .dot.off { background:var(--grey); }
+  .spacer { flex:1; }
+  .muted { color:var(--mut); font-size:12px; }
+  main { padding:18px 20px; max-width:1100px; margin:0 auto; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px 16px; }
+  .card .label { font-size:12px; color:var(--mut); margin-bottom:6px; }
+  .card .value { font-size:22px; font-weight:700; }
+  .value.pos { color:var(--green); } .value.neg { color:var(--red); }
+  .grade { display:inline-block; padding:2px 12px; border-radius:8px; font-weight:700; }
+  .grade.GREEN{background:#10301f;color:var(--green);} .grade.YELLOW{background:#3a3210;color:var(--yellow);}
+  .grade.RED{background:#3a1419;color:var(--red);} .grade.BLACK{background:#2a1840;color:var(--black);}
+  .grade.NONE{background:#222936;color:var(--mut);}
+  .section { margin-top:22px; }
+  .section h2 { font-size:13px; color:var(--mut); text-transform:uppercase; letter-spacing:.5px; margin:0 0 10px; }
+  .twocol { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  @media (max-width:760px){ .twocol{ grid-template-columns:1fr; } }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th,td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); }
+  th { color:var(--mut); font-weight:600; font-size:11px; }
+  .feed { background:var(--panel); border:1px solid var(--line); border-radius:12px;
+    max-height:420px; overflow-y:auto; }
+  .feed .row { display:flex; gap:10px; padding:7px 12px; border-bottom:1px solid var(--line); font-size:12.5px; }
+  .feed .row:last-child { border-bottom:0; }
+  .feed .t { color:var(--mut); min-width:60px; font-variant-numeric:tabular-nums; }
+  .tag { font-size:10.5px; padding:1px 7px; border-radius:6px; font-weight:700; min-width:96px; text-align:center; }
+  .tag.screen{background:#1c2740;color:#8fb6ff;} .tag.entry{background:#10301f;color:var(--green);}
+  .tag.exit{background:#3a2410;color:#ffb066;} .tag.approve{background:#10301f;color:var(--green);}
+  .tag.reject{background:#3a1419;color:var(--red);} .tag.order{background:#1c2740;color:#8fb6ff;}
+  .tag.fail{background:#3a1419;color:var(--red);} .tag.market{background:#222936;color:var(--mut);}
+  .tag.meta{background:#2a1840;color:var(--black);} .tag.proposal{background:#3a3210;color:var(--yellow);}
+  .tag.other{background:#222936;color:var(--mut);}
+  .kill { padding:2px 10px; border-radius:8px; font-weight:700; }
+  .kill.armed{ background:#10301f; color:var(--green);} .kill.fired{ background:#3a1419; color:var(--red);}
+  .empty { color:var(--mut); padding:14px; font-size:13px; }
+  .findings { font-size:12px; color:var(--yellow); margin-top:6px; }
+  .err { color:var(--red); }
+</style>
+</head>
+<body>
+<header>
+  <h1>🤖 ai-agent 실시간 현황</h1>
+  <span id="modePill" class="pill unknown">mode: …</span>
+  <span class="muted"><span id="onlineDot" class="dot off"></span><span id="onlineTxt">대기</span></span>
+  <div class="spacer"></div>
+  <span class="muted" id="updated">—</span>
+</header>
+
+<main>
+  <div class="grid" id="cards">
+    <div class="card"><div class="label">모드</div><div class="value" id="cMode">—</div></div>
+    <div class="card"><div class="label">Kill Switch</div><div class="value"><span id="cKill" class="kill armed">—</span></div></div>
+    <div class="card"><div class="label">시장 등급</div><div class="value"><span id="cMarket" class="grade NONE">—</span></div></div>
+    <div class="card"><div class="label">오늘 매매</div><div class="value" id="cTrades">0</div></div>
+    <div class="card"><div class="label">승률</div><div class="value" id="cWin">0%</div></div>
+    <div class="card"><div class="label">누적 손익(합)</div><div class="value" id="cPnl">0.00%</div></div>
+  </div>
+
+  <div class="section twocol">
+    <div>
+      <h2>보유 포지션 (추정)</h2>
+      <div class="card"><table><thead><tr><th>종목</th><th>수량</th></tr></thead>
+        <tbody id="posBody"><tr><td colspan="2" class="empty">없음</td></tr></tbody></table></div>
+
+      <h2 style="margin-top:18px">오늘 활동 집계</h2>
+      <div class="card"><table><tbody id="countBody"><tr><td class="empty">데이터 없음</td></tr></tbody></table></div>
+
+      <h2 style="margin-top:18px">메타부 관찰 / 제안</h2>
+      <div class="card" id="metaCard"><div class="empty">관찰 리포트 없음</div></div>
+    </div>
+
+    <div>
+      <h2>실시간 이벤트 피드</h2>
+      <div class="feed" id="feed"><div class="empty">이벤트 대기 중…</div></div>
+    </div>
+  </div>
+
+  <p class="muted" id="src" style="margin-top:18px"></p>
+</main>
+
+<script>
+const TAG = {
+  'screening.candidates':['screen','SCREEN'], 'signal.entry':['entry','ENTRY'],
+  'signal.exit':['exit','EXIT'], 'risk.decision.approved':['approve','APPROVE'],
+  'risk.decision.rejected':['reject','REJECT'], 'order.event':['order','ORDER'],
+  'order.failed':['fail','FAIL'], 'market.state':['market','MARKET'],
+  'meta.observation':['meta','META'], 'learning.proposal':['proposal','PROPOSAL'],
+};
+const TOPIC_LABEL = {
+  'screening.candidates':'스크리닝 후보','signal.entry':'진입 신호','signal.exit':'청산',
+  'risk.decision.approved':'리스크 승인','risk.decision.rejected':'리스크 거절',
+  'order.event':'주문 체결','order.failed':'주문 실패','market.state':'시장 상태',
+  'meta.observation':'메타 관찰','meta.claude_call':'Claude 호출','learning.proposal':'제안',
+};
+const esc = s => String(s==null?'':s).replace(/[&<>]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const hm = ts => { try { const d=new Date(ts); return isNaN(d)? (String(ts).slice(11,16)||'') : d.toTimeString().slice(0,8); } catch(e){ return ''; } };
+const pct = v => (v*100).toFixed(2)+'%';
+
+async function tick() {
+  let s;
+  try {
+    const r = await fetch('/api/agent/status', {cache:'no-store'});
+    s = await r.json();
+  } catch (e) {
+    document.getElementById('updated').innerHTML = '<span class="err">연결 실패 — traidair 확인</span>';
+    return;
+  }
+  // 헤더
+  const mp = document.getElementById('modePill');
+  mp.className = 'pill ' + (s.mode==='paper'?'paper':s.mode==='live'?'live':'unknown');
+  mp.textContent = 'mode: ' + (s.mode||'?');
+  document.getElementById('onlineDot').className = 'dot ' + (s.online?'on':'off');
+  document.getElementById('onlineTxt').textContent = s.online ? '가동 중' : '오늘 기록 없음';
+  document.getElementById('updated').textContent = '업데이트 ' + new Date(s.updatedAt).toTimeString().slice(0,8);
+
+  // 카드
+  document.getElementById('cMode').textContent = (s.mode||'—').toUpperCase();
+  const kill = document.getElementById('cKill');
+  kill.className = 'kill ' + (s.killed?'fired':'armed');
+  kill.textContent = s.killed ? 'FIRED (정지)' : '정상';
+  const mk = document.getElementById('cMarket');
+  const grade = (s.market && s.market.grade) || 'NONE';
+  mk.className = 'grade ' + grade; mk.textContent = grade;
+  document.getElementById('cTrades').textContent = s.trades || 0;
+  document.getElementById('cWin').textContent = ((s.winRate||0)*100).toFixed(0) + '%';
+  const pnl = document.getElementById('cPnl');
+  pnl.textContent = (s.totalPnlPct>=0?'+':'') + pct(s.totalPnlPct||0);
+  pnl.className = 'value ' + ((s.totalPnlPct||0)>=0?'pos':'neg');
+
+  // 포지션
+  const pb = document.getElementById('posBody');
+  if (s.openPositions && s.openPositions.length) {
+    pb.innerHTML = s.openPositions.map(p=>`<tr><td>${esc(p.code)}</td><td>${esc(p.qty)}</td></tr>`).join('');
+  } else { pb.innerHTML = '<tr><td colspan="2" class="empty">없음</td></tr>'; }
+
+  // 집계
+  const cb = document.getElementById('countBody');
+  const ent = Object.entries(s.counts||{});
+  cb.innerHTML = ent.length ? ent.map(([k,v])=>`<tr><td>${esc(TOPIC_LABEL[k]||k)}</td><td style="text-align:right">${v}</td></tr>`).join('')
+    : '<tr><td class="empty">데이터 없음</td></tr>';
+
+  // 메타
+  const mc = document.getElementById('metaCard');
+  let html = '';
+  if (s.observation && s.observation.performance) {
+    const pf = s.observation.performance;
+    html += `<table><tbody>
+      <tr><td>거래 수</td><td style="text-align:right">${pf.trades||0}</td></tr>
+      <tr><td>승률</td><td style="text-align:right">${pf.win_rate!=null?(pf.win_rate*100).toFixed(0)+'%':'—'}</td></tr>
+      <tr><td>손익비(PF)</td><td style="text-align:right">${pf.profit_factor!=null?Number(pf.profit_factor).toFixed(2):'—'}</td></tr>
+      <tr><td>Claude 호출</td><td style="text-align:right">${s.observation.tokenCalls||0}</td></tr>
+      <tr><td>토큰 낭비 탐지</td><td style="text-align:right">${s.observation.wasteFindings||0}건</td></tr>
+    </tbody></table>`;
+  } else { html += '<div class="empty">관찰 리포트 없음</div>'; }
+  if (s.proposals && s.proposals.length) {
+    html += '<div class="findings">📝 대기 제안 ' + s.proposals.length + '건: '
+      + s.proposals.map(p=>esc((p.kind||'')+' '+(p.id||''))).join(', ') + '</div>';
+  }
+  mc.innerHTML = html;
+
+  // 피드
+  const feed = document.getElementById('feed');
+  if (s.recent && s.recent.length) {
+    feed.innerHTML = s.recent.map(r=>{
+      const t = TAG[r.topic] || ['other', (r.topic||'?').toUpperCase()];
+      return `<div class="row"><span class="t">${hm(r.ts)}</span>`
+        + `<span class="tag ${t[0]}">${t[1]}</span>`
+        + `<span>${esc(r.summary||'')}</span></div>`;
+    }).join('');
+  } else { feed.innerHTML = '<div class="empty">이벤트 대기 중…</div>'; }
+
+  document.getElementById('src').textContent = '데이터 소스: ' + (s.agentDir||'') + '  ·  ' + (s.date||'');
+}
+
+tick();
+setInterval(tick, 3000);
+</script>
+</body>
+</html>
