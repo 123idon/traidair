@@ -4614,6 +4614,34 @@ function drawChart(){
 }
 // pctx(연습/외부 컨텍스트)가 없으면 기존 HTS 전역 경로로 100% 동일 동작.
 // pctx = {canvasId, cs, all, viewStart, viewCount, prevCount, inds, overlays}
+// ── 거래량 눈금 스케일(연습모드 전용 pctx.volTicks) ───────────────────────────
+// 실제 최대 거래량(rawMax)에 맞춰 "예쁜" 상한·눈금단위를 자동 선택한다. 1/2/5 × 10^k
+// 스텝 중 눈금이 4~6개가 되는 가장 작은 단위를 고르고 → 상한 = ceil(max/step)*step.
+// 방어: 비유한값/0/빈배열이면 안전 폴백(이전 `Math.max(...vls)||1` → rawMax=1 → vMax 가
+// 정확히 100,000 에 고정되던 "10만 캡" 버그를 원천 제거). 순수함수 → node 단위테스트 대상.
+function _volScale(rawMax){
+  const m=Number(rawMax);
+  if(!(m>0)||!isFinite(m)) return {vMax:1, step:0, ticks:[]};   // 거래량 없음/이상치 → 눈금 없음
+  const mult=[1,2,5];
+  const pow0=Math.pow(10, Math.floor(Math.log10(m/5)));         // 5눈금 목표 근방 자릿수
+  let step=0;
+  for(let p=pow0; p<=pow0*1e6 && !step; p*=10){
+    for(const u of mult){ const s=u*p; if(Math.ceil(m/s)<=6){ step=s; break; } }
+  }
+  if(!(step>0)) step=Math.pow(10, Math.ceil(Math.log10(m)));    // 극단 폴백
+  const vMax=Math.ceil(m/step)*step;
+  const ticks=[];
+  for(let v=step; v<=vMax+step*1e-6; v+=step) ticks.push(Math.round(v));
+  return {vMax, step, ticks};
+}
+// 거래량 라벨: 억/만 단위로 읽기 쉽게. 5,000,000→"500만", 30,000,000→"3,000만", 1.2억 등.
+function _fmtVol(v){
+  v=Math.round(Number(v)||0);
+  if(v>=1e8){ const e=v/1e8; return (Number.isInteger(e)?e:Math.round(e*10)/10).toLocaleString()+'억'; }
+  if(v>=1e4){ const w=v/1e4; return (Number.isInteger(w)?w:Math.round(w*10)/10).toLocaleString()+'만'; }
+  return v.toLocaleString();
+}
+
 function _drawChartInner(pctx){
   const canvas=document.getElementById(pctx ? pctx.canvasId : "mainChart");
   if(!canvas)return;
@@ -4776,36 +4804,38 @@ function _drawChartInner(pctx){
   // 거래량
   if(volH>0){
     const vY0=PT+mainH+PB+2;
-    const rawMax=Math.max(...vls)||1;
-    // 연습모드(pctx.volTicks)면 상한을 10만 단위 ceiling 으로 맞춰 눈금이 패널 안에 정렬되게 한다.
-    // pctx 없는 HTS 기본 경로는 _volTicks=false → vMax=rawMax → 기존 거래량 패널과 100% 동일(눈금 없음).
+    const vBot=vY0+volH-4;
+    // pctx.volTicks(연습모드)면 실제 최대치에 맞춘 예쁜 상한·눈금을 그린다.
+    // pctx 없는 HTS 기본 경로는 _volTicks=false → vMax=rawMax, 눈금 없음 → 기존과 100% 동일.
     const _volTicks=!!(pctx&&pctx.volTicks);
-    const _VSTEP=100000;       // 10만 주 기준 눈금
-    let vStep=_VSTEP;
-    if(_volTicks){ while(Math.ceil(rawMax/vStep)>6) vStep+=_VSTEP; }  // 눈금 6개 이하(항상 10만 배수)
-    const vMax=_volTicks ? Math.max(vStep, Math.ceil(rawMax/vStep)*vStep) : rawMax;
+    // rawMax: 유한 양수만 집계(이전 `Math.max(...vls)||1` 은 비유한값/빈배열이면 1 로 붕괴 →
+    // vMax 가 정확히 100,000 에 고정되는 "10만 캡" 버그였다 — 더 이상 발생하지 않음).
+    let rawMax=0;
+    for(const c of cs){ const v=+c.v; if(isFinite(v)&&v>rawMax) rawMax=v; }
+    const _sc=_volTicks ? _volScale(rawMax) : null;
+    const vMax=_volTicks ? Math.max(_sc.vMax, rawMax, 1) : (rawMax||1);
     ctx.fillStyle='rgba(0,0,0,.04)';ctx.fillRect(PL,vY0,cw,volH-4);
-    const _pvc=_PREV;
-    cs.forEach((c,i)=>{
-      const x=toX(i),bh=Math.max(1,(c.v/vMax)*(volH-4));
-      const isPrevV=_pvc>0&&(_VS+i)<_pvc;
-      const up=c.c>=c.o;
-      ctx.fillStyle=isPrevV?(up?'rgba(220,38,38,.18)':'rgba(37,99,235,.18)'):(up?'rgba(220,38,38,.45)':'rgba(37,99,235,.45)');
-      ctx.fillRect(x-bw/2,vY0+volH-4-bh,bw,bh);
-    });
-    // ── 거래량 눈금(연습모드 전용) — 10만 단위 가로선 + 우측 "○만" 레이블(막대가 몇 주인지 읽기) ──
-    if(_volTicks){
-      const vBot=vY0+volH-4;
+    // 눈금 가로선 + 라벨(막대보다 먼저 → 반투명 막대 위로 비쳐 보이게)
+    if(_volTicks && _sc.ticks.length){
       ctx.save();
-      ctx.strokeStyle='rgba(0,0,0,.08)';ctx.lineWidth=1;
-      ctx.fillStyle='#8c9db5';ctx.font='8px "JetBrains Mono",monospace';ctx.textAlign='left';
-      for(let v=vStep; v<=vMax+1; v+=vStep){
+      ctx.strokeStyle='rgba(100,116,139,.32)';ctx.lineWidth=1;   // 잘 보이는 회색(이전 .08 → 거의 안 보였음)
+      ctx.fillStyle='#64748b';ctx.font='8px "JetBrains Mono",monospace';ctx.textAlign='left';
+      for(const v of _sc.ticks){
         const y=vBot-(v/vMax)*(volH-4);
         ctx.beginPath();ctx.moveTo(PL,y);ctx.lineTo(W-PR,y);ctx.stroke();
-        ctx.fillText(Math.round(v/10000)+'만', W-PR+4, y+3);
+        ctx.fillText(_fmtVol(v), W-PR+4, y+3);   // 우측 여백(PR=72)에 표시 → 잘리지 않음
       }
       ctx.restore();
     }
+    const _pvc=_PREV;
+    cs.forEach((c,i)=>{
+      const x=toX(i), v=Math.max(0,+c.v||0);
+      const bh=Math.max(1,Math.min(volH-4,(v/vMax)*(volH-4)));   // vMax 정렬 + 상한 클램프(천장 안 잘림)
+      const isPrevV=_pvc>0&&(_VS+i)<_pvc;
+      const up=c.c>=c.o;
+      ctx.fillStyle=isPrevV?(up?'rgba(220,38,38,.18)':'rgba(37,99,235,.18)'):(up?'rgba(220,38,38,.45)':'rgba(37,99,235,.45)');
+      ctx.fillRect(x-bw/2,vBot-bh,bw,bh);
+    });
   }
 
   // ── 스크롤바 ────────────────────────────────────
