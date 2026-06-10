@@ -2364,6 +2364,47 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ── 🎯 연습모드 분봉 공급 (과거 날짜 매매 연습, 1단계 재생/차트, 인증 불필요) ──
+  // scripts/practice_candles.py → data/candles/{date}.parquet 의 1분봉을 JSON 으로 중계.
+  //   GET /api/practice/candles?list=1            → 날짜(243)·종목(44) 목록
+  //   GET /api/practice/candles?date=&symbol=     → 그 날 그 종목의 하루치 1분봉
+  if (url.split('?')[0] === '/api/practice/candles' && req.method === 'GET') {
+    const reply = (obj) => {
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...CORS });
+      res.end(JSON.stringify(obj));
+    };
+    const wantList = query.get('list');
+    const wantDaily = query.get('daily');   // 저장된 1분봉 → 일봉 합성(참고용 큰 그림)
+    const date = (query.get('date') || '').replace(/[^0-9]/g, '');
+    const symbol = (query.get('symbol') || '').trim();
+    const script = path.join(AGENT_DIR, 'scripts', 'practice_candles.py');
+    let argv;
+    if (wantList) {
+      argv = [script, '--list'];
+    } else if (wantDaily && /^[0-9]{6}$/.test(symbol)) {
+      argv = [script, '--daily', '--symbol', symbol];
+    } else if (date && /^[0-9]{6}$/.test(symbol)) {
+      argv = [script, '--date', date, '--symbol', symbol];
+    } else {
+      reply({ ok: false, error: 'list=1 또는 daily=1+symbol(6자리) 또는 date+symbol(6자리) 필요' });
+      return;
+    }
+    let out = '', err = '', child;
+    try {
+      child = spawn(btPython(), argv, { cwd: AGENT_DIR, env: { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' }, windowsHide: true });
+    } catch (e) { reply({ ok: false, error: '연습 데이터 실행 실패: ' + e.message }); return; }
+    child.stdout.on('data', d => { out += d; });
+    child.stderr.on('data', d => { err += d; });
+    child.on('error', e => reply({ ok: false, error: '연습 데이터 오류: ' + e.message }));
+    child.on('close', () => {
+      const line = out.trim().split('\n').filter(s => s.trim().startsWith('{')).pop();
+      let data = null; if (line) { try { data = JSON.parse(line); } catch (e) {} }
+      if (!data) { reply({ ok: false, error: '연습 데이터 파싱 실패: ' + (err.trim().slice(-200) || out.trim().slice(-200) || '출력 없음') }); return; }
+      reply(data);
+    });
+    return;
+  }
+
   // ── 전체 팀 회의 기록 조회 (💬 상담 → 다음 상담 시작 시 지난 회의 참고, 인증 불필요) ──
   // data/memory/team_meeting_log.json 의 최근 N건을 그대로 돌려준다.
   if (url.split('?')[0] === '/api/agent/consult/meeting/log' && req.method === 'GET') {

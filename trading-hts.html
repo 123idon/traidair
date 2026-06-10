@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#ffffff">
-<meta name="build-ts" content="1780132578227">
+<meta name="build-ts" content="1780411917477">
 <title>TraidAIr HTS</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 
@@ -669,6 +669,7 @@ canvas{image-rendering:pixelated;}
     <button class="tab" id="tab-backtest" onclick="goPage('backtest',this)">🎬 백테스트</button>
     <button class="tab" id="tab-agentmon" onclick="goPage('agentmon',this)">🧠 에이전트</button>
     <button class="tab" id="tab-consult" onclick="goPage('consult',this)">💬 상담</button>
+    <button class="tab" id="tab-practice" onclick="goPage('practice',this)">🎯 연습모드</button>
     <a class="tab" id="tab-agent" href="/agent" target="_blank" rel="noopener" style="text-decoration:none;">🤖 ai-agent</a>
   </div>
   <div class="srch-wrap">
@@ -1066,7 +1067,7 @@ canvas{image-rendering:pixelated;}
         <span style="font-size:8px;color:var(--tm);font-family:var(--mono);" id="analysisTk">종목선택시</span>
         <div style="margin-left:auto;display:flex;align-items:center;gap:3px;">
           <span id="goNogoTag" style="font-size:8px;padding:1px 6px;border-radius:3px;font-weight:700;font-family:var(--mono);background:var(--bg);">-</span>
-          <button onclick="runFullAnalysis()" style="padding:1px 7px;border-radius:4px;border:none;background:var(--b);color:#fff;font-size:8px;cursor:pointer;font-weight:600;">🔍분석</button>
+          <button onclick="runFullAnalysis(true)" style="padding:1px 7px;border-radius:4px;border:none;background:var(--b);color:#fff;font-size:8px;cursor:pointer;font-weight:600;">🔍분석</button>
           <!-- 돌발악재 즉각청산 버튼 (Phase 9-6) -->
           <button onclick="emergencySell()" style="padding:1px 7px;border-radius:4px;border:none;background:var(--r);color:#fff;font-size:8px;cursor:pointer;font-weight:700;" title="돌발 악재 즉각 전량 청산 (Phase 9-6)">🚨긴급청산</button>
         </div>
@@ -1836,6 +1837,89 @@ canvas{image-rendering:pixelated;}
   </div>
 </div>
 
+<!-- ── 🎯 연습모드 페이지 (과거 날짜 매매 연습 시뮬레이터 — 1단계: 재생 엔진 + 차트) ── -->
+<div class="page" id="page-practice" style="overflow:auto;">
+  <div style="max-width:1100px;margin:0 auto;padding:16px;width:100%;box-sizing:border-box;">
+    <h2 style="font-size:18px;font-weight:800;margin:0 0 4px;">🎯 연습모드 <span style="font-size:11px;font-weight:600;color:var(--ts);">과거 날짜를 그날인 것처럼 한 봉씩 재생합니다 (매매는 다음 단계)</span></h2>
+    <div style="font-size:11px;color:var(--ts);margin-bottom:14px;">데이터 범위: <b id="prcRange">…</b> · 종목 <b id="prcSymCount">…</b> · 1분봉 저장(3·5분봉은 합성)</div>
+
+    <!-- 선택 바 -->
+    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:12px;">
+      <div>
+        <div style="font-size:10px;color:var(--ts);margin-bottom:3px;">날짜</div>
+        <select id="prcDate" class="prc-sel" onchange="prcSelColor(this);prcLoad()" style="min-width:140px;"></select>
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--ts);margin-bottom:3px;">종목</div>
+        <select id="prcSymbol" class="prc-sel" onchange="prcSelColor(this);prcLoad()" style="min-width:180px;"></select>
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--ts);margin-bottom:3px;">봉 단위</div>
+        <div id="prcTfBtns" style="display:flex;gap:4px;">
+          <button class="prc-tf on" data-tf="1" onclick="prcSetTf(1)">1분</button>
+          <button class="prc-tf" data-tf="3" onclick="prcSetTf(3)">3분</button>
+          <button class="prc-tf" data-tf="5" onclick="prcSetTf(5)">5분</button>
+          <button class="prc-tf" data-tf="D" onclick="prcSetTf('D')" title="저장된 1분봉을 날짜별로 묶은 일봉 — 전체 기간 추세를 한 화면에(참고용, 재생 없음)">일봉</button>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--ts);margin-bottom:3px;">캔들 두께</div>
+        <div id="prcThickBtns" style="display:flex;gap:4px;align-items:center;touch-action:manipulation;">
+          <button class="prc-th" data-th="0.6" onclick="prcSetBarThickness(0.6)" title="캔들·거래량 막대를 가늘게">가늘게</button>
+          <button class="prc-th on" data-th="1" onclick="prcSetBarThickness(1)" title="기본 두께">보통</button>
+          <button class="prc-th" data-th="1.8" onclick="prcSetBarThickness(1.8)" title="캔들·거래량 막대를 굵게">굵게</button>
+          <input id="prcThickInput" class="prc-thin" type="number" inputmode="decimal" min="0.2" max="3" step="0.1" value="1"
+                 onchange="prcThickInputApply(this)" title="두께 배율 직접 입력 (0.2~3.0)" aria-label="캔들 두께 배율">
+        </div>
+      </div>
+      <button onclick="prcLoad()" style="padding:7px 12px;border-radius:8px;border:none;background:var(--b,#3b82f6);color:#fff;font-size:12px;font-weight:700;cursor:pointer;">↻ 불러오기</button>
+    </div>
+
+    <!-- 차트 -->
+    <div style="position:relative;background:var(--card,#0f1115);border:1px solid var(--bd,#2a2d35);border-radius:12px;padding:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
+        <div id="prcChartTitle" style="font-size:13px;font-weight:800;">종목을 선택하세요</div>
+        <div id="prcPriceInfo" style="font-size:12px;color:var(--ts);font-variant-numeric:tabular-nums;"></div>
+      </div>
+      <!-- 메인 HTS 차트엔진(_drawChartInner) 재사용 — 자체 캔버스(prcMainChart) -->
+      <div class="chart-main" id="prcChartWrap" style="height:420px;border-radius:8px;overflow:hidden;">
+        <canvas id="prcMainChart"></canvas>
+      </div>
+      <!-- 2·3단계용 보조지표 슬롯 (지금은 숨김) -->
+      <div class="subc hide" id="prcRsiSub"><div class="slbl">RSI(14)</div><canvas id="prcRsiCanvas"></canvas></div>
+      <div class="subc hide" id="prcMacdSub"><div class="slbl">MACD(12,26,9)</div><canvas id="prcMacdCanvas"></canvas></div>
+      <div id="prcEmpty" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--ts);font-size:13px;">날짜와 종목을 고르면 차트가 표시됩니다.</div>
+    </div>
+
+    <!-- 재생 컨트롤 (일봉 모드에서는 숨김 — 일봉은 재생용이 아닌 참고용) -->
+    <div id="prcPlayControls" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px;">
+      <button id="prcPlayBtn" onclick="prcTogglePlay()" style="padding:8px 16px;border-radius:9px;border:none;background:var(--b,#3b82f6);color:#fff;font-size:13px;font-weight:800;cursor:pointer;">▶ 재생</button>
+      <button onclick="prcStep()" title="다음 봉 (한 칸 = 현재 봉단위만큼 전진)" style="padding:8px 16px;border-radius:9px;border:1px solid var(--bd,#2a2d35);background:var(--card,#16181d);color:var(--tp,#191f28);font-size:14px;font-weight:800;cursor:pointer;">→ 다음 봉</button>
+      <div style="display:flex;gap:4px;align-items:center;margin-left:6px;">
+        <span style="font-size:10px;color:var(--ts);">속도</span>
+        <button class="prc-spd on" data-spd="1" onclick="prcSetSpeed(1)">1×</button>
+        <button class="prc-spd" data-spd="2" onclick="prcSetSpeed(2)">2×</button>
+        <button class="prc-spd" data-spd="5" onclick="prcSetSpeed(5)">5×</button>
+      </div>
+      <button onclick="prcReset()" style="padding:8px 12px;border-radius:9px;border:1px solid var(--bd,#2a2d35);background:var(--card,#16181d);color:var(--tp,#191f28);font-size:12px;font-weight:700;cursor:pointer;">⏮ 처음으로</button>
+      <div id="prcProgress" style="margin-left:auto;font-size:11px;color:var(--ts);font-variant-numeric:tabular-nums;"></div>
+    </div>
+  </div>
+</div>
+<style>
+  .prc-tf,.prc-spd,.prc-th{padding:6px 11px;border-radius:8px;border:1px solid var(--bd,#2a2d35);background:var(--card,#16181d);color:var(--ts,#9aa);font-size:12px;font-weight:700;cursor:pointer;touch-action:manipulation;}
+  .prc-tf.on,.prc-spd.on,.prc-th.on{background:var(--b,#3b82f6);color:#fff;border-color:var(--b,#3b82f6);}
+  /* 캔들 두께 직접 입력칸: 글씨 진하게(--tp)·잘 보이게(이전 흐림 문제 방지) */
+  .prc-thin{width:54px;padding:6px 8px;border-radius:8px;border:1px solid var(--bd,#2a2d35);background:var(--pan,#fff);color:var(--tp,#191f28);font-size:12px;font-weight:800;text-align:center;-moz-appearance:textfield;}
+  .prc-thin:focus{outline:none;border-color:var(--b,#3b82f6);}
+  /* 날짜·종목 선택칸: 선택된 실제 값은 진하게(--tp), 미선택 안내는 회색(--tm) — placeholder/선택값 시각 구분 */
+  .prc-sel{padding:7px 10px;border-radius:8px;border:1px solid var(--br,#e5e8eb);background:var(--pan,#fff);color:var(--tp,#191f28);font-size:12px;font-weight:700;cursor:pointer;}
+  .prc-sel:focus{outline:none;border-color:var(--b,#3b82f6);}
+  .prc-sel.placeholder{color:var(--tm,#b0b8c1);font-weight:500;}
+  .prc-sel option{color:var(--tp,#191f28);font-weight:600;}
+  .prc-sel option[value=""]{color:var(--tm,#b0b8c1);}
+</style>
+
 <!-- ── 기능 목록 페이지 ── -->
 <div class="page" id="page-features">
   <div class="stats-page" style="max-width:960px;">
@@ -2387,7 +2471,7 @@ canvas{image-rendering:pixelated;}
 <div id="agentTeamPanel" style="position:fixed;left:14px;bottom:14px;width:312px;z-index:9000;
      background:#fff;border:1px solid #e5e8eb;border-radius:18px;box-shadow:0 8px 28px rgba(0,0,0,.14);
      font-family:'Noto Sans KR',sans-serif;overflow:hidden;">
-  <div style="display:flex;align-items:center;gap:7px;padding:11px 14px;background:linear-gradient(90deg,#eef4ff,#f9fafb);border-bottom:1px solid #eef1f4;cursor:pointer;"
+  <div id="agentTeamHeader" style="display:flex;align-items:center;gap:7px;padding:11px 14px;background:linear-gradient(90deg,#eef4ff,#f9fafb);border-bottom:1px solid #eef1f4;cursor:grab;touch-action:none;"
        onclick="(function(b){b.style.display=b.style.display==='none'?'':'none';})(document.getElementById('agentTeamBody'))">
     <span style="font-size:14px;font-weight:800;color:#191f28;">🤖 에이전트 팀</span>
     <span id="agentTeamRun" style="font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;background:#f1f3f5;color:#8b95a1;">대기</span>
@@ -2403,6 +2487,60 @@ canvas{image-rendering:pixelated;}
     </div>
   </div>
 </div>
+<script>
+// 🤖 에이전트 팀 패널 드래그 이동 (마우스 + 펜/터치, pointer 이벤트) — UI 동작만 추가, 기능 불변.
+// 헤더를 잡고 끌면 화면 어디든 이동. 살짝만 움직이면 클릭(접기 토글) 유지, 끌면 이동.
+(function(){
+  var panel=document.getElementById('agentTeamPanel');
+  var header=document.getElementById('agentTeamHeader');
+  if(!panel||!header) return;
+  var dragging=false, moved=false, sx=0, sy=0, ox=0, oy=0;
+  var MOVE_THRESH=4; // px — 이만큼 넘게 움직이면 드래그로 간주
+  function clamp(v,min,max){return v<min?min:(v>max?max:v);}
+  header.addEventListener('pointerdown',function(e){
+    if(e.button!=null && e.button!==0) return; // 좌클릭/펜/터치만
+    var r=panel.getBoundingClientRect();
+    // 기본 위치는 left+bottom 기준 → 드래그 시작 시 left+top 절대좌표로 고정
+    panel.style.top=r.top+'px';
+    panel.style.left=r.left+'px';
+    panel.style.bottom='auto';
+    dragging=true; moved=false;
+    sx=e.clientX; sy=e.clientY; ox=r.left; oy=r.top;
+    header.style.cursor='grabbing';
+    try{header.setPointerCapture(e.pointerId);}catch(_){}
+  });
+  header.addEventListener('pointermove',function(e){
+    if(!dragging) return;
+    var dx=e.clientX-sx, dy=e.clientY-sy;
+    if(!moved && (Math.abs(dx)>MOVE_THRESH||Math.abs(dy)>MOVE_THRESH)) moved=true;
+    if(!moved) return;
+    var r=panel.getBoundingClientRect();
+    panel.style.left=clamp(ox+dx,0,Math.max(0,window.innerWidth-r.width))+'px';
+    panel.style.top =clamp(oy+dy,0,Math.max(0,window.innerHeight-r.height))+'px';
+  });
+  function end(e){
+    if(!dragging) return;
+    dragging=false;
+    header.style.cursor='grab';
+    try{header.releasePointerCapture(e.pointerId);}catch(_){}
+    if(moved){
+      // 드래그였으면 직후 클릭(접기 토글) 1회 억제 — document 캡처로 인라인 onclick보다 먼저 차단
+      var kill=function(ev){ev.stopPropagation();ev.preventDefault();document.removeEventListener('click',kill,true);};
+      document.addEventListener('click',kill,true);
+      setTimeout(function(){document.removeEventListener('click',kill,true);},300);
+    }
+  }
+  header.addEventListener('pointerup',end);
+  header.addEventListener('pointercancel',end);
+  // 창 크기 변경 시 패널이 화면 밖이면 되돌리기
+  window.addEventListener('resize',function(){
+    if(!panel.style.top) return; // 아직 옮긴 적 없으면 기본 위치 유지
+    var r=panel.getBoundingClientRect();
+    panel.style.left=clamp(r.left,0,Math.max(0,window.innerWidth-r.width))+'px';
+    panel.style.top =clamp(r.top,0,Math.max(0,window.innerHeight-r.height))+'px';
+  });
+})();
+</script>
 <script>
 // 토스 스타일 8부서 에이전트 현황. agent-monitor.html 과 같은 데이터/말투를 메인화면에 압축 표시.
 (function(){
@@ -4474,32 +4612,42 @@ function _cvCs(){
 function drawChart(){
   try{ _drawChartInner(); }catch(e){ console.error('drawChart 에러:', e); }
 }
-function _drawChartInner(){
-  const canvas=document.getElementById("mainChart");
+// pctx(연습/외부 컨텍스트)가 없으면 기존 HTS 전역 경로로 100% 동일 동작.
+// pctx = {canvasId, cs, all, viewStart, viewCount, prevCount, inds, overlays}
+function _drawChartInner(pctx){
+  const canvas=document.getElementById(pctx ? pctx.canvasId : "mainChart");
   if(!canvas)return;
   // 부모 div(.chart-main)의 실제 크기로 canvas 설정
   const parent=canvas.parentElement;
   const W=parent?Math.round(parent.getBoundingClientRect().width)||parent.offsetWidth||600:600;
   const H=parent?Math.round(parent.getBoundingClientRect().height)||parent.offsetHeight||400:400;
   if(W<20||H<20){
-    requestAnimationFrame(()=>drawChart());
+    requestAnimationFrame(()=>{ pctx?_drawChartInner(pctx):drawChart(); });
     return;
   }
   if(canvas.width!==W){canvas.width=W;}
   if(canvas.height!==H){canvas.height=H;}
   const ctx=canvas.getContext("2d");
 
-  const cs=_cvCs();
-  // 디버그: cinfo에 실제 상태 표시
-  const ci=document.getElementById('cinfo');
-  if(ci&&cs.length){const _lc=cs[Math.min(sim.idx,cs.length-1)]||cs[cs.length-1];if(_lc)ci.textContent=`O${fW(_lc.o)} H${fW(_lc.h)} L${fW(_lc.l)} C${fW(_lc.c)} V${fW(_lc.v)}`;}
+  const cs = pctx ? pctx.cs : _cvCs();
+  // 외부(연습) 컨텍스트 vs 기존 HTS 전역 — pctx 없으면 아래 값들이 전역과 동일.
+  const _IND  = pctx ? (pctx.inds||inds) : inds;
+  const _VS   = pctx ? (pctx.viewStart||0) : chartViewStart;
+  const _VC   = pctx ? (pctx.viewCount||cs.length) : chartViewCount;
+  const _PREV = pctx ? (pctx.prevCount||0) : (_kisChartMeta?._prevCount||0);
+  const _OV   = pctx ? !!pctx.overlays : true;   // 마커/십자선/스크롤바/RSI·MACD
+  // 디버그: cinfo에 실제 상태 표시 (HTS 전용)
+  if(!pctx){
+    const ci=document.getElementById('cinfo');
+    if(ci&&cs.length){const _lc=cs[Math.min(sim.idx,cs.length-1)]||cs[cs.length-1];if(_lc)ci.textContent=`O${fW(_lc.o)} H${fW(_lc.h)} L${fW(_lc.l)} C${fW(_lc.c)} V${fW(_lc.v)}`;}
+  }
   if(!cs.length){ctx.clearRect(0,0,W,H);return;}
   const cls=cs.map(c=>c.c),vls=cs.map(c=>c.v);
 
   // 패딩
   const PR=72,PL=4,PT=8,PB=22;
   const SB=12; // 스크롤바 높이
-  const volH=inds.vol?Math.floor(H*0.20):0;
+  const volH=_IND.vol?Math.floor(H*0.20):0;
   const mainH=H-PT-PB-volH-SB;
   const cw=W-PL-PR;
 
@@ -4511,11 +4659,14 @@ function _drawChartInner(){
   const yR=yMax-yMin||1;
 
   // 슬롯 수(줌). 사용가능 봉 < 슬롯이면 좌측 정렬 + 우측 여백 → 봉이 누적돼도 캔들 폭 일정.
-  const _slots=Math.max(cs.length,Math.round(chartViewCount)||cs.length);
-  _chartSlots=_slots;
+  const _slots=Math.max(cs.length,Math.round(_VC)||cs.length);
+  if(!pctx) _chartSlots=_slots;
   const toX=i=>PL+(i+0.5)*(cw/_slots);
   const toY=v=>PT+mainH*(1-(v-yMin)/yR);
-  const bw=Math.max(1.5,Math.min(10,cw/_slots*0.55));
+  // 캔들 두께: 기본 = 슬롯폭 대비 0.55. 연습모드는 pctx.barScale 로 사용자가 두께 조절(가늘게/보통/굵게).
+  // pctx 없는 HTS 기본 경로는 barScale 미주입 → 1.0 → 기존 두께와 100% 동일.
+  const _barScale=(pctx&&pctx.barScale)?pctx.barScale:1;
+  const bw=Math.max(1.5,Math.min(10,cw/_slots*0.55*_barScale));
 
   // 배경
   ctx.clearRect(0,0,W,H);
@@ -4534,7 +4685,7 @@ function _drawChartInner(){
   }
 
   // 볼린저밴드
-  if(inds.bb){
+  if(_IND.bb){
     const{upper,lower}=calcBB(cls,20,2);
     ctx.strokeStyle='rgba(139,92,246,.45)';ctx.lineWidth=1;ctx.setLineDash([4,3]);
     for(const arr of[upper,lower]){
@@ -4547,7 +4698,7 @@ function _drawChartInner(){
   }
 
   // VWAP
-  if(inds.vwap){
+  if(_IND.vwap){
     const vw=calcVWAP(cs);
     ctx.strokeStyle='#06b6d4';ctx.lineWidth=1.5;ctx.setLineDash([5,3]);
     ctx.beginPath();
@@ -4557,7 +4708,7 @@ function _drawChartInner(){
   }
 
   // 이동평균선
-  if(inds.ma){
+  if(_IND.ma){
     [['MA5','#f59e0b',5],['MA20','#10b981',20],['MA60','#ef4444',60]].forEach(([,col,n])=>{
       const ma=calcMA(cls,n);
       ctx.strokeStyle=col;ctx.lineWidth=1.5;
@@ -4569,12 +4720,12 @@ function _drawChartInner(){
   }
 
   // 캔들 (전일 봉은 흐리게 — 당일과 시각적으로 구분)
-  const _prevCntC=_kisChartMeta?._prevCount||0;
+  const _prevCntC=_PREV;
   cs.forEach((c,i)=>{
     const x=toX(i),yO=toY(c.o),yC=toY(c.c),yH=toY(c.h),yL=toY(c.l);
     const up=c.c>=c.o,col=up?'#dc2626':'#2563eb';
     const top=Math.min(yO,yC),ht=Math.max(1,Math.abs(yO-yC));
-    const isPrev=_prevCntC>0&&(chartViewStart+i)<_prevCntC;
+    const isPrev=_prevCntC>0&&(_VS+i)<_prevCntC;
     ctx.save();
     if(isPrev)ctx.globalAlpha=0.38;        // 전일 분봉 = 흐리게
     ctx.strokeStyle=col;ctx.lineWidth=1;
@@ -4585,7 +4736,7 @@ function _drawChartInner(){
   });
 
   // ── ai-agent 매수/매도 마커 (백테스트 연동, §17.6) ──
-  try{ _drawAgentMarkers(ctx,cs,toX,toY,bw,PT,mainH); }catch(_e){}
+  if(_OV){ try{ _drawAgentMarkers(ctx,cs,toX,toY,bw,PT,mainH); }catch(_e){} }
 
   // X축 레이블
   ctx.fillStyle='#8c9db5';ctx.font='8px "JetBrains Mono",monospace';ctx.textAlign='center';
@@ -4593,11 +4744,11 @@ function _drawChartInner(){
   cs.forEach((c,i)=>{if(i%step===0)ctx.fillText(c.t,toX(i),PT+mainH+14);});
 
   // ── 전일/당일 구분선 (실제 KIS 데이터일 때) ──
-  const _prevCnt = _kisChartMeta?._prevCount || 0;
+  const _prevCnt = _PREV;
   if(_prevCnt > 0 && _prevCnt < cs.length){
     // 뷰포트 내 전일 마지막 봉 인덱스 계산
     const absIdx = _prevCnt - 1; // candles 전체에서의 인덱스
-    const viewIdx = absIdx - chartViewStart; // 현재 뷰에서의 인덱스
+    const viewIdx = absIdx - _VS; // 현재 뷰에서의 인덱스
     if(viewIdx >= 0 && viewIdx < cs.length){
       const lx = toX(viewIdx) + (cw/_slots)/2; // 봉과 봉 사이
       ctx.save();
@@ -4625,33 +4776,55 @@ function _drawChartInner(){
   // 거래량
   if(volH>0){
     const vY0=PT+mainH+PB+2;
-    const vMax=Math.max(...vls)||1;
+    const rawMax=Math.max(...vls)||1;
+    // 연습모드(pctx.volTicks)면 상한을 10만 단위 ceiling 으로 맞춰 눈금이 패널 안에 정렬되게 한다.
+    // pctx 없는 HTS 기본 경로는 _volTicks=false → vMax=rawMax → 기존 거래량 패널과 100% 동일(눈금 없음).
+    const _volTicks=!!(pctx&&pctx.volTicks);
+    const _VSTEP=100000;       // 10만 주 기준 눈금
+    let vStep=_VSTEP;
+    if(_volTicks){ while(Math.ceil(rawMax/vStep)>6) vStep+=_VSTEP; }  // 눈금 6개 이하(항상 10만 배수)
+    const vMax=_volTicks ? Math.max(vStep, Math.ceil(rawMax/vStep)*vStep) : rawMax;
     ctx.fillStyle='rgba(0,0,0,.04)';ctx.fillRect(PL,vY0,cw,volH-4);
-    const _pvc=_kisChartMeta?._prevCount||0;
+    const _pvc=_PREV;
     cs.forEach((c,i)=>{
       const x=toX(i),bh=Math.max(1,(c.v/vMax)*(volH-4));
-      const isPrevV=_pvc>0&&(chartViewStart+i)<_pvc;
+      const isPrevV=_pvc>0&&(_VS+i)<_pvc;
       const up=c.c>=c.o;
       ctx.fillStyle=isPrevV?(up?'rgba(220,38,38,.18)':'rgba(37,99,235,.18)'):(up?'rgba(220,38,38,.45)':'rgba(37,99,235,.45)');
       ctx.fillRect(x-bw/2,vY0+volH-4-bh,bw,bh);
     });
+    // ── 거래량 눈금(연습모드 전용) — 10만 단위 가로선 + 우측 "○만" 레이블(막대가 몇 주인지 읽기) ──
+    if(_volTicks){
+      const vBot=vY0+volH-4;
+      ctx.save();
+      ctx.strokeStyle='rgba(0,0,0,.08)';ctx.lineWidth=1;
+      ctx.fillStyle='#8c9db5';ctx.font='8px "JetBrains Mono",monospace';ctx.textAlign='left';
+      for(let v=vStep; v<=vMax+1; v+=vStep){
+        const y=vBot-(v/vMax)*(volH-4);
+        ctx.beginPath();ctx.moveTo(PL,y);ctx.lineTo(W-PR,y);ctx.stroke();
+        ctx.fillText(Math.round(v/10000)+'만', W-PR+4, y+3);
+      }
+      ctx.restore();
+    }
   }
 
   // ── 스크롤바 ────────────────────────────────────
-  const all=_cvAll();
-  if(all.length>chartViewCount){
-    const sbY=H-SB;
-    // roundRect 미지원 브라우저 대비 fillRect 사용
-    ctx.fillStyle='rgba(0,0,0,.08)';
-    ctx.fillRect(PL,sbY+1,cw,SB-2);
-    const tw=Math.max(20,cw*(chartViewCount/all.length));
-    const tx=PL+cw*(chartViewStart/all.length);
-    ctx.fillStyle='rgba(0,0,0,.3)';
-    ctx.fillRect(tx,sbY+1,tw,SB-2);
+  if(_OV){
+    const all=_cvAll();
+    if(all.length>chartViewCount){
+      const sbY=H-SB;
+      // roundRect 미지원 브라우저 대비 fillRect 사용
+      ctx.fillStyle='rgba(0,0,0,.08)';
+      ctx.fillRect(PL,sbY+1,cw,SB-2);
+      const tw=Math.max(20,cw*(chartViewCount/all.length));
+      const tx=PL+cw*(chartViewStart/all.length);
+      ctx.fillStyle='rgba(0,0,0,.3)';
+      ctx.fillRect(tx,sbY+1,tw,SB-2);
+    }
   }
 
   // 십자선
-  if(canvas._cx!=null){
+  if(_OV&&canvas._cx!=null){
     ctx.strokeStyle='rgba(107,118,132,.5)';ctx.lineWidth=1;ctx.setLineDash([4,4]);
     ctx.beginPath();ctx.moveTo(canvas._cx,PT);ctx.lineTo(canvas._cx,PT+mainH);ctx.stroke();
     ctx.beginPath();ctx.moveTo(PL,canvas._cy);ctx.lineTo(W-PR,canvas._cy);ctx.stroke();
@@ -4671,12 +4844,15 @@ function _drawChartInner(){
   }
 
   // RSI/MACD 서브차트
-  _drawRSI(cs,cls);
-  _drawMACD(cs,cls);
+  if(_OV){
+    _drawRSI(cs,cls);
+    _drawMACD(cs,cls);
+  }
 
-  mChart={_ok:true};
+  if(!pctx) mChart={_ok:true};
 
   // ── 실제 매수/매도 체결 마커 (화살표만, 텍스트 없음) ──
+  if(_OV){
   try{
     var _trades=(mock.trades||[]).filter(function(t){
       return t.tk===activeTk&&t.date===sim.date&&(t.side==='buy'||t.side==='sell');
@@ -4712,6 +4888,7 @@ function _drawChartInner(){
   }catch(_me){}
   // AI 타점 오버레이
   drawSignalOverlay();
+  } // if(_OV) 마커/오버레이
 }
 
 function _drawRSI(cs,cls){
@@ -8609,7 +8786,7 @@ let analysisRunning=false;
 let analysisCache={};
 var _tradeContext={};
 window._pendingSellReason='';
-async function runFullAnalysis(){
+async function runFullAnalysis(userInitiated){
   try{
   const _cacheKey='analysis_'+activeTk+'_'+sim.idx;
   const _cached=_getCachedAnalysis(_cacheKey);
@@ -8634,9 +8811,11 @@ async function runFullAnalysis(){
   document.getElementById("goNogoTag").textContent="-";
   document.getElementById("goNogoTag").style.cssText="font-size:9px;padding:1px 6px;border-radius:3px;font-weight:700;font-family:var(--mono);";
 
-  // Claude API 키 없으면 로컬 분석만
+  // Claude API 키 없으면 로컬 분석만.
+  // [1] 자동 호출(userInitiated 아님: 페이지 로드·종목전환)은 Claude를 부르지 않고
+  //     로컬 분석만 한다 → AI 호출은 사용자가 🔍분석 버튼을 누를 때로 미룬다.
   const hasClaudeKey = !!(kisConfig.claudeKey && kisConfig.claudeKey.startsWith('sk-ant-'));
-  if(!hasClaudeKey){
+  if(!hasClaudeKey || !userInitiated){
     // 로컬 분석으로 대체
     const tech=await detectTechnique(cs, stk);
     const lc2=getCurrentCandle()||cs[cs.length-1];
@@ -9227,17 +9406,23 @@ function resetUsage(){
 }
 
 // Claude API 래퍼 — 모든 fetch("/api/claude") 호출을 이것으로 교체
-async function callClaude(payload, feature){
+async function callClaude(payload, feature, opts){
   feature = feature || 'AI 기타';
+  // [1] silent=자동/백그라운드 호출(페이지 로드·종목전환·연습모드 봉넘김 등).
+  //     이 경우 키가 없거나 401이어도 빨간 경고 띠를 띄우지 않고 조용히 폴백한다.
+  //     실제 사용자가 AI 기능(상담/회의/조언/🔍분석 등)을 쓸 때만 경고를 띄운다.
+  const silent = !!(opts && opts.silent);
   const res = await fetch("/api/claude", {
     method:"POST",
     headers:{"Content-Type":"application/json"},
     body: JSON.stringify(payload)
   });
   const data = await res.json();
-  // API 키 만료/오류 감지
-  if(data.error){ checkApiKeyExpiry(JSON.stringify(data.error)); }
-  if(res.status === 401 || res.status === 403){ checkApiKeyExpiry('401 Unauthorized'); }
+  // API 키 만료/오류 감지 — AI 기능을 "실제로 사용할 때"만 (silent=false)
+  if(!silent){
+    if(data.error){ checkApiKeyExpiry(JSON.stringify(data.error)); }
+    if(res.status === 401 || res.status === 403){ checkApiKeyExpiry('401 Unauthorized'); }
+  }
   const usage = data.usage || {};
   const inTok = usage.input_tokens || estimateTokens(JSON.stringify(payload));
   const outTok = usage.output_tokens || estimateTokens(data.content?.[0]?.text || '');
@@ -10818,6 +11003,8 @@ function goPage(p,el){
       if(typeof consInit==='function') consInit();
       if(typeof notionStatusLoad==='function') notionStatusLoad();
       if(typeof consMeetingHistoryLoad==='function') consMeetingHistoryLoad();
+    } else if(p==='practice'){
+      if(typeof prcInit==='function') prcInit();
     }
   }catch(_e){ console.warn('goPage 렌더:', _e.message); }
   // ── 날짜 동기화 ──
@@ -11494,7 +11681,7 @@ async function runIdxAIPrediction(){
     const data=await callClaude({
       model:'claude-sonnet-4-5',max_tokens:80,
       messages:[{role:'user',content:`지금 시장 초단기(5~15분) 방향 예측. RSI:${rsi} 거래량:${vol}배 현재가:${fW(lc.c)}. JSON만: {"dir":"상승예상"또는"하락예상"또는"횡보","confidence":75}`}]
-    },'지수예측');
+    },'지수예측',{silent:true});
     const text=data.content?.[0]?.text||'';
     const p=robustJsonParse(text);
     if(!p.dir) return;
@@ -12066,6 +12253,13 @@ function collectMarketCtx(){
       const r = await fetch('/api/version', {cache:'no-store'});
       const d = await r.json();
       if(d && d.buildTs && String(d.buildTs) !== String(myBuildTs)){
+        // 무한 새로고침 가드: 같은 목표 버전으로 이미 한 번 새로고침했다면 다시 하지 않는다.
+        // (embedded <meta build-ts> 와 buildinfo.json(/api/version) 값이 어긋나면 영구
+        //  reload 루프에 빠져 어떤 탭에 있든 곧바로 HTS 기본 화면으로 튕기던 버그 방지.)
+        let tried = '';
+        try{ tried = sessionStorage.getItem('htsReloadTo')||''; }catch(_e){}
+        if(tried === String(d.buildTs)) return;
+        try{ sessionStorage.setItem('htsReloadTo', String(d.buildTs)); }catch(_e){}
         reloaded = true;
         console.log('🔄 새 버전 감지, 새로고침합니다.', d.buildTs, '!=', myBuildTs);
         // ?_v= 쿼리 추가해서 강제 새 응답
@@ -14904,6 +15098,251 @@ function consScrollEnd(){ const b=document.getElementById('consChatBody'); if(b)
 function consEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 // 안전 마크다운: **굵게** + 줄바꿈만
 function consFmt(s){ return consEsc(s).replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>').replace(/\n/g,'<br>'); }
+
+// ════════════════════════════════════════════════════════════════════════
+// 🎯 연습모드 (과거 날짜 매매 연습 시뮬레이터) — 1단계: 재생 엔진 + 차트
+//   · data/candles 의 1분봉을 /api/practice/candles 로 받아 한 봉씩 재생.
+//   · 룩어헤드 차단: 현재 커서(n1) 이전 1분봉만 노출, 미래 봉은 합성·렌더 어디에도 안 들어감.
+//   · 3·5분봉은 1분봉을 묶어 합성(시가=첫봉시가/고가=max/저가=min/종가=막봉종가/거래량=합).
+//   · 기존 HTS 차트(sim/genCandles/initChart)와 완전 분리 — 자체 PRC 네임스페이스/캔버스.
+// ════════════════════════════════════════════════════════════════════════
+const PRC = {
+  loaded:false, dates:[], symbols:[],
+  date:null, symbol:null, name:'',
+  raw:[],            // 그날 1분봉 전체(시간 오름차순) — 룩어헤드는 n1 으로 제어
+  tf:1,              // 봉 단위(1/3/5분, 또는 'D'=일봉 참고용)
+  n1:0,              // 노출된 1분봉 개수(=현재 시점). raw[0..n1-1] 만 사용
+  speed:1, playing:false, timer:null,
+  daily:[],          // 일봉(저장된 1분봉을 날짜별 합성, 전체 기간) — 'D' 모드 전용
+  dailySymbol:null,  // daily 가 합성된 종목코드(캐시 키)
+  barScale:1,        // 캔들 두께 배율(가늘게 0.6 / 보통 1 / 굵게 1.8) — 연습모드 전용, 엔진 pctx.barScale 로 전달
+};
+
+async function prcInit(){
+  if(PRC.loaded) { prcResizeCanvas(); prcRender(); return; }
+  try{
+    const r = await fetch('/api/practice/candles?list=1',{cache:'no-store'});
+    const d = await r.json();
+    if(!d.ok){ prcSetEmpty('목록을 불러오지 못했어요: '+(d.error||'')); return; }
+    PRC.dates = d.dates||[]; PRC.symbols = d.symbols||[];
+    PRC.loaded = true;
+    const rng = (d.dateRange||[]);
+    const fmtD = s => s&&s.length===8 ? `${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}` : s;
+    const rangeEl=document.getElementById('prcRange'); if(rangeEl) rangeEl.textContent = `${fmtD(rng[0])} ~ ${fmtD(rng[1])} (${d.dateCount||PRC.dates.length}거래일)`;
+    const scEl=document.getElementById('prcSymCount'); if(scEl) scEl.textContent = `${d.symbolCount||PRC.symbols.length}종목`;
+    // 날짜 select (최신이 위로) — 맨 위에 회색 안내(placeholder) option, 실제 날짜는 진하게.
+    //   데이터가 있으면 브라우저가 첫 실제 날짜를 자동 선택(기존 자동 불러오기 유지) → 진한 색 표시.
+    const dsel=document.getElementById('prcDate');
+    if(dsel){ dsel.innerHTML = '<option value="" disabled>날짜 선택</option>' + PRC.dates.slice().reverse().map(x=>`<option value="${x}">${fmtD(x)}</option>`).join(''); prcSelColor(dsel); }
+    // 종목 select
+    const ssel=document.getElementById('prcSymbol');
+    if(ssel){ ssel.innerHTML = '<option value="" disabled>종목 선택</option>' + PRC.symbols.map(s=>`<option value="${s.code}">${prcEsc(s.name)} (${s.code})</option>`).join(''); prcSelColor(ssel); }
+    prcResizeCanvas();
+    prcLoad();
+  }catch(e){ prcSetEmpty('연습 데이터 로드 오류: '+e.message); }
+}
+
+function prcSetEmpty(msg){
+  const el=document.getElementById('prcEmpty');
+  if(el){ el.style.display='flex'; el.textContent=msg; }
+}
+function prcEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+// 선택칸 색: 실제 값이 선택돼 있으면 진하게(--tp), 미선택(빈 값)이면 회색 안내 톤
+function prcSelColor(sel){ if(sel) sel.classList.toggle('placeholder', !sel.value); }
+
+async function prcLoad(){
+  prcStop();
+  const dsel=document.getElementById('prcDate'), ssel=document.getElementById('prcSymbol');
+  if(!dsel||!ssel||!dsel.value||!ssel.value) return;
+  PRC.date = dsel.value; PRC.symbol = ssel.value;
+  PRC.name = (PRC.symbols.find(s=>s.code===PRC.symbol)||{}).name || PRC.symbol;
+  if(PRC.tf==='D'){ prcLoadDaily(); return; }   // 일봉 모드: 전체 기간 일봉 다시 합성(종목 바뀌면 갱신)
+  prcSetEmpty('불러오는 중…');
+  try{
+    const r = await fetch(`/api/practice/candles?date=${PRC.date}&symbol=${PRC.symbol}`,{cache:'no-store'});
+    const d = await r.json();
+    if(!d.ok || !(d.candles||[]).length){ PRC.raw=[]; prcSetEmpty('이 날짜·종목 데이터가 없어요'+(d.error?(' ('+d.error+')'):'')); prcRender(); return; }
+    PRC.raw = d.candles;
+    PRC.n1 = 1;   // 처음엔 09:00 한 봉만
+    const el=document.getElementById('prcEmpty'); if(el) el.style.display='none';
+    prcResizeCanvas();
+    prcRender();
+  }catch(e){ prcSetEmpty('차트 로드 오류: '+e.message); }
+}
+
+// 1분봉 raw[0..n1-1] 를 tf 분봉으로 합성(시장개장 기준 버킷 정렬)
+function prcAggregate(){
+  const src = PRC.raw.slice(0, PRC.n1), tf=PRC.tf, out=[];
+  for(let i=0;i<src.length;i+=tf){
+    const grp = src.slice(i, i+tf);
+    if(!grp.length) break;
+    out.push({
+      t: grp[0].t,
+      o: grp[0].o,
+      h: Math.max(...grp.map(x=>x.h)),
+      l: Math.min(...grp.map(x=>x.l)),
+      c: grp[grp.length-1].c,
+      v: grp.reduce((s,x)=>s+(x.v||0),0),
+      partial: grp.length<tf,   // 아직 채워지는 중인 마지막 봉
+    });
+  }
+  return out;
+}
+
+function prcSetTf(tf){
+  PRC.tf=tf;
+  document.querySelectorAll('#prcTfBtns .prc-tf').forEach(b=>b.classList.toggle('on', b.dataset.tf===String(tf)));
+  const daily=(tf==='D');
+  prcSetDailyMode(daily);
+  if(daily){ prcStop(); prcLoadDaily(); }   // 일봉: 재생 멈추고 전체 기간 합성·표시
+  else { prcRender(); }                      // 1·3·5분: 시점(n1) 유지하고 다시 그림(재생 모드)
+}
+// 일봉 모드면 재생 컨트롤 숨김(참고용), 1·3·5분이면 다시 표시
+function prcSetDailyMode(on){
+  const c=document.getElementById('prcPlayControls');
+  if(c) c.style.display = on ? 'none' : 'flex';
+}
+// 저장된 1분봉 → 일봉 합성(서버에서 날짜별 묶음, KIS/추가데이터 없음). 종목 단위 캐시.
+async function prcLoadDaily(){
+  const ssel=document.getElementById('prcSymbol');
+  const sym = ssel && ssel.value;
+  if(!sym){ prcSetEmpty('종목을 먼저 선택하세요'); return; }
+  PRC.name=(PRC.symbols.find(s=>s.code===sym)||{}).name || sym;
+  if(PRC.dailySymbol===sym && PRC.daily.length){   // 이미 합성된 종목 — 재요청 없이 즉시
+    const el=document.getElementById('prcEmpty'); if(el) el.style.display='none';
+    prcResizeCanvas(); prcRender(); return;
+  }
+  prcSetEmpty('일봉 합성 중…');
+  try{
+    const r = await fetch(`/api/practice/candles?daily=1&symbol=${sym}`,{cache:'no-store'});
+    const d = await r.json();
+    if(!d.ok || !(d.candles||[]).length){ PRC.daily=[]; PRC.dailySymbol=null; prcSetEmpty('일봉 데이터가 없어요'+(d.error?(' ('+d.error+')'):'')); prcRender(); return; }
+    PRC.daily=d.candles; PRC.dailySymbol=sym;
+    const el=document.getElementById('prcEmpty'); if(el) el.style.display='none';
+    prcResizeCanvas(); prcRender();
+  }catch(e){ prcSetEmpty('일봉 로드 오류: '+e.message); }
+}
+function prcSetSpeed(s){
+  PRC.speed=s;
+  document.querySelectorAll('.prc-spd').forEach(b=>b.classList.toggle('on', +b.dataset.spd===s));
+  if(PRC.playing){ prcStop(true); prcStart(); }   // 재생 중 속도 즉시 반영
+}
+// 캔들 두께 조절(연습모드 전용). HTS 기본 차트엔 영향 없음(pctx.barScale 만 바뀜).
+// 안전범위 0.2~3.0 강제 — 0/음수/빈값/문자는 무효(null), 범위 밖 양수는 가까운 경계로 보정.
+const PRC_BAR_MIN=0.2, PRC_BAR_MAX=3.0;
+function prcClampBarScale(v){
+  const n=parseFloat(v);
+  if(!isFinite(n)||n<=0) return null;                 // 빈값/문자/0/음수 → 무효(무시)
+  return Math.min(PRC_BAR_MAX, Math.max(PRC_BAR_MIN, n)); // 차트 안 깨지는 범위로 보정
+}
+// 입력칸·프리셋 버튼 활성표시를 현재 PRC.barScale 로 동기화(value 프로그램 설정은 onchange 미발화).
+function prcSyncThickUI(){
+  const inp=document.getElementById('prcThickInput');
+  if(inp) inp.value=String(PRC.barScale);
+  document.querySelectorAll('#prcThickBtns .prc-th').forEach(b=>b.classList.toggle('on', +b.dataset.th===PRC.barScale));
+}
+// 프리셋 버튼(가늘게/보통/굵게) — 입력칸에도 값 채우고 적용. 펜/터치 onclick.
+function prcSetBarThickness(scale){
+  const c=prcClampBarScale(scale); if(c==null) return;
+  PRC.barScale=c; prcSyncThickUI(); prcRender();
+}
+// 숫자 직접 입력칸 — 유효하면 clamp 후 적용, 무효면 현재값으로 되돌려 차트 보호.
+function prcThickInputApply(el){
+  const c=prcClampBarScale(el.value);
+  if(c==null){ el.value=String(PRC.barScale); return; }  // 무효 입력 → 무시(현재 두께 유지)
+  PRC.barScale=c; prcSyncThickUI(); prcRender();          // 보정된 실제 적용값을 입력칸에 반영
+}
+
+// 한 칸 = 현재 봉단위(tf)만큼 1분봉 전진
+function prcStep(){
+  if(!PRC.raw.length) return false;
+  if(PRC.n1>=PRC.raw.length){ return false; }
+  PRC.n1 = Math.min(PRC.raw.length, PRC.n1 + PRC.tf);
+  prcRender();
+  return PRC.n1<PRC.raw.length;
+}
+
+function prcStart(){
+  if(!PRC.raw.length) return;
+  if(PRC.n1>=PRC.raw.length){ PRC.n1=1; }   // 끝에서 재생 누르면 처음부터
+  PRC.playing=true; prcSyncPlayBtn();
+  const baseMs=600;   // 1× 기준 한 봉 간격
+  PRC.timer = setInterval(()=>{
+    const more = prcStep();
+    if(!more){ prcStop(); }
+  }, Math.max(60, baseMs/PRC.speed));
+}
+function prcStop(silent){
+  if(PRC.timer){ clearInterval(PRC.timer); PRC.timer=null; }
+  PRC.playing=false; if(!silent) prcSyncPlayBtn();
+}
+function prcTogglePlay(){ if(PRC.playing) prcStop(); else prcStart(); }
+function prcSyncPlayBtn(){
+  const b=document.getElementById('prcPlayBtn');
+  if(b){ b.textContent = PRC.playing ? '⏸ 일시정지' : '▶ 재생'; }
+}
+function prcReset(){ prcStop(); if(PRC.raw.length){ PRC.n1=1; prcRender(); } }
+
+// 리사이즈는 메인 엔진(_drawChartInner)이 매 렌더마다 부모 크기로 자동 처리하므로
+// 여기서는 다시 그리기만 트리거한다(호출부 호환을 위해 함수명 유지).
+function prcResizeCanvas(){ /* 엔진이 자체 리사이즈 — no-op */ }
+
+function prcRender(){
+  const daily=(PRC.tf==='D');
+  const fmtYmd = s => (String(s).length===8 ? String(s).slice(0,4)+'-'+String(s).slice(4,6)+'-'+String(s).slice(6,8) : String(s));
+
+  // 제목
+  const title=document.getElementById('prcChartTitle');
+  if(title) title.textContent = PRC.symbol
+    ? (daily
+        ? `${PRC.name} (${PRC.symbol}) · 일봉 · 전체 ${PRC.daily.length}거래일 (참고용)`
+        : `${PRC.name} (${PRC.symbol}) · ${PRC.date?PRC.date.slice(0,4)+'-'+PRC.date.slice(4,6)+'-'+PRC.date.slice(6,8):''} · ${PRC.tf}분봉`)
+    : '종목을 선택하세요';
+
+  // 봉 구성 — 룩어헤드 차단: 분봉은 raw[0..n1-1]만 합성(prcAggregate), 일봉은 전체.
+  // 엔진(_drawChartInner)이 받는 형식 {t,o,h,l,c,v} 으로 맞춘다(일봉 t 는 보기 좋게 변환).
+  const bars = daily
+    ? PRC.daily.map(b=>({t:fmtYmd(b.t), o:b.o, h:b.h, l:b.l, c:b.c, v:b.v}))
+    : prcAggregate();
+
+  // 진행/가격 정보(연습 전용 표시 — 엔진과 무관)
+  const prog=document.getElementById('prcProgress');
+  if(prog){
+    if(daily) prog.textContent = PRC.daily.length ? `전체 ${PRC.daily.length}거래일 일봉 · 참고용(재생 없음)` : '';
+    else { const cur = PRC.raw[PRC.n1-1]; prog.textContent = PRC.raw.length ? `현재 ${cur?cur.t:'--:--'} · ${PRC.n1}/${PRC.raw.length}분` : ''; }
+  }
+  const pinfo=document.getElementById('prcPriceInfo');
+  if(pinfo){
+    if(bars.length){ const b=bars[bars.length-1]; const up=b.c>=b.o;
+      pinfo.innerHTML = `<span style="color:${up?'#ef4444':'#3b82f6'}">종가 ${b.c.toLocaleString()} · 고 ${b.h.toLocaleString()} · 저 ${b.l.toLocaleString()} · 량 ${b.v.toLocaleString()}</span>`;
+    } else pinfo.textContent='';
+  }
+
+  // 캔들 폭 일정성: 분봉은 정규장 풀세션 슬롯(09:00~15:30)을 예약 → 재생해도 폭이 안 흔들리고
+  // 미래 시간만큼 우측이 비어 있다가 한 칸씩 채워진다(HTS 백테스트와 동일한 느낌).
+  const sess = daily
+    ? bars.length
+    : (typeof _agentSessionSlots==='function' ? _agentSessionSlots(PRC.tf) : bars.length);
+  const slots = Math.max(bars.length, sess||bars.length, 1);
+
+  // ── 메인 HTS 차트엔진 재사용(방식 B) — 연습 컨텍스트만 주입 ──
+  if(typeof _drawChartInner==='function'){
+    _drawChartInner({
+      canvasId:'prcMainChart',
+      cs: bars,
+      all: bars,
+      viewStart: 0,
+      viewCount: slots,
+      prevCount: 0,            // 연습은 단일 거래일(전일/당일 구분 없음)
+      barScale: PRC.barScale,  // 캔들 두께(연습모드 사용자 조절) — HTS 기본 차트엔 미주입
+      volTicks: true,          // 거래량 10만 단위 눈금(연습모드 전용) — HTS 기본 패널엔 미주입
+      inds: {vol:true, ma:false, rsi:false, macd:false, bb:false, vwap:false},  // 1단계: 거래량만
+      overlays: false,         // 마커/십자선/스크롤바/RSI·MACD 끔(2·3단계에서)
+    });
+  }
+}
+
+window.addEventListener('resize', ()=>{ if(document.getElementById('page-practice')&&document.getElementById('page-practice').classList.contains('on')){ prcResizeCanvas(); prcRender(); } });
 </script>
 
 <!-- 동적 참조 요소 -->
