@@ -1847,7 +1847,7 @@ canvas{image-rendering:pixelated;}
     <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:12px;">
       <div>
         <div style="font-size:10px;color:var(--ts);margin-bottom:3px;">날짜</div>
-        <select id="prcDate" class="prc-sel" onchange="prcSelColor(this);prcLoad()" style="min-width:140px;"></select>
+        <select id="prcDate" class="prc-sel" onchange="prcSelColor(this);prcLoadPrep();prcLoad()" style="min-width:140px;"></select>
       </div>
       <div>
         <div style="font-size:10px;color:var(--ts);margin-bottom:3px;">종목</div>
@@ -1881,6 +1881,22 @@ canvas{image-rendering:pixelated;}
         </div>
       </div>
       <button onclick="prcLoad()" style="padding:7px 12px;border-radius:8px;border:none;background:var(--b,#3b82f6);color:#fff;font-size:12px;font-weight:700;cursor:pointer;">↻ 불러오기</button>
+    </div>
+
+    <!-- ── 📋 장전 후보 (종목 선정) — 선택일 D 의 직전 거래일 D-1 기준만. 당일 데이터 미사용(룩어헤드 차단) ── -->
+    <div id="prcPrep" style="margin-bottom:14px;border:1px solid var(--bd,#2a2d35);border-radius:12px;padding:12px 14px;background:var(--card,#0f1115);">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+        <span style="font-size:14px;font-weight:800;">📋 장전 후보</span>
+        <span style="font-size:11px;font-weight:600;color:var(--ts);">전일(D-1) 기준 "오늘 뭘 살까" — 당일 결과는 안 봅니다</span>
+      </div>
+      <!-- 전일 시황 바 -->
+      <div id="prcPrepMarket" style="margin-bottom:10px;"></div>
+      <!-- 섹터별 자금 -->
+      <div class="prc-prep-h">💰 섹터별 자금 <span>전일 거래대금 합계 순</span></div>
+      <div id="prcPrepSectors" style="margin-bottom:12px;"></div>
+      <!-- 종목 후보 표 -->
+      <div class="prc-prep-h">📊 종목 후보 <span>전일 거래대금 순 · 행을 클릭하면 그 종목 연습 차트로</span></div>
+      <div id="prcPrepTable"></div>
     </div>
 
     <!-- 차트 -->
@@ -1927,6 +1943,22 @@ canvas{image-rendering:pixelated;}
   .prc-thin:focus{outline:none;border-color:var(--b,#3b82f6);}
   /* 날짜·종목 선택칸: 선택된 실제 값은 진하게(--tp), 미선택 안내는 회색(--tm) — placeholder/선택값 시각 구분 */
   .prc-sel{padding:7px 10px;border-radius:8px;border:1px solid var(--br,#e5e8eb);background:var(--pan,#fff);color:var(--tp,#191f28);font-size:12px;font-weight:700;cursor:pointer;}
+  /* 📋 장전 후보 패널 */
+  .prc-prep-h{font-size:12px;font-weight:800;color:var(--tp,#191f28);margin:0 0 6px;}
+  .prc-prep-h span{font-size:10px;font-weight:600;color:var(--ts,#9aa);margin-left:6px;}
+  .prc-mk{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:8px;border:1px solid var(--bd,#2a2d35);background:var(--pan,#16181d);font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;}
+  .prc-mk b{font-weight:800;color:var(--ts,#9aa);font-size:11px;}
+  .prc-sec-row{display:flex;align-items:center;gap:8px;padding:3px 0;font-size:12px;}
+  .prc-sec-rank{width:18px;text-align:center;color:var(--ts,#9aa);font-weight:800;font-size:11px;flex:none;}
+  .prc-sec-name{width:84px;font-weight:700;flex:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .prc-sec-bar{flex:1;height:10px;border-radius:5px;background:var(--bd,#2a2d35);overflow:hidden;min-width:60px;}
+  .prc-sec-bar>span{display:block;height:100%;background:linear-gradient(90deg,#3b82f6,#60a5fa);border-radius:5px;}
+  .prc-sec-amt{width:120px;text-align:right;font-weight:800;font-variant-numeric:tabular-nums;flex:none;white-space:nowrap;}
+  table.prc-prep-tbl{width:100%;border-collapse:collapse;font-size:12px;}
+  table.prc-prep-tbl th{position:sticky;top:0;background:var(--pan,#16181d);color:var(--ts,#9aa);font-weight:700;font-size:11px;padding:7px 8px;text-align:right;border-bottom:1px solid var(--bd,#2a2d35);z-index:1;}
+  table.prc-prep-tbl td{padding:7px 8px;text-align:right;border-bottom:1px solid var(--bd,#2a2d35);white-space:nowrap;}
+  table.prc-prep-tbl tbody tr{cursor:pointer;}
+  table.prc-prep-tbl tbody tr:hover{background:rgba(59,130,246,.10);}
   .prc-sel:focus{outline:none;border-color:var(--b,#3b82f6);}
   .prc-sel.placeholder{color:var(--tm,#b0b8c1);font-weight:500;}
   .prc-sel option{color:var(--tp,#191f28);font-weight:600;}
@@ -15224,6 +15256,7 @@ async function prcInit(){
     const ssel=document.getElementById('prcSymbol');
     if(ssel){ ssel.innerHTML = '<option value="" disabled>종목 선택</option>' + PRC.symbols.map(s=>`<option value="${s.code}">${prcEsc(s.name)} (${s.code})</option>`).join(''); prcSelColor(ssel); }
     prcResizeCanvas();
+    prcLoadPrep();   // 장전 후보(종목 선정) — 선택된 날짜의 전일 기준
     prcLoad();
   }catch(e){ prcSetEmpty('연습 데이터 로드 오류: '+e.message); }
 }
@@ -15255,6 +15288,74 @@ async function prcLoad(){
     prcResizeCanvas();
     prcRender();
   }catch(e){ prcSetEmpty('차트 로드 오류: '+e.message); }
+}
+
+// ── 📋 장전 후보 (종목 선정) — 선택일 D 의 직전 거래일 D-1 기준만. 당일 데이터 미사용(룩어헤드 차단) ──
+//   /api/practice/candles?prep=1&date=D → 전일 거래대금 순위·등락률·섹터 + 섹터별 자금 + 전일 시황.
+//   행 클릭 → 종목 선택칸에 반영 + prcLoad() 로 그 종목 연습 차트 표시(선택→타점 연습 흐름).
+function prcFmtPct(p){ if(p==null||isNaN(p)) return '—'; return (p>0?'+':'')+Number(p).toFixed(2)+'%'; }
+function prcPctColor(p){ if(p==null||isNaN(p)) return 'var(--ts,#9aa)'; return p>0?'#ef4444':(p<0?'#3b82f6':'var(--ts,#9aa)'); } // 한국식: 상승 빨강/하락 파랑
+function prcFmtDate(s){ return (s&&s.length===8)?`${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}`:s; }
+
+async function prcLoadPrep(){
+  const dsel=document.getElementById('prcDate');
+  const mEl=document.getElementById('prcPrepMarket'), secEl=document.getElementById('prcPrepSectors'), tblEl=document.getElementById('prcPrepTable');
+  if(!dsel||!dsel.value){ if(tblEl) tblEl.innerHTML='<div style="padding:12px;color:var(--ts);font-size:12px;">날짜를 먼저 선택하세요</div>'; return; }
+  const date=dsel.value;
+  if(mEl) mEl.innerHTML=''; if(secEl) secEl.innerHTML='';
+  if(tblEl) tblEl.innerHTML='<div style="padding:12px;color:var(--ts);font-size:12px;">전일 후보 불러오는 중…</div>';
+  try{
+    const r=await fetch(`/api/practice/candles?prep=1&date=${date}`,{cache:'no-store'});
+    const d=await r.json();
+    if(!d.ok){ if(tblEl) tblEl.innerHTML='<div style="padding:12px;color:var(--ts);font-size:12px;">'+prcEsc(d.error||'후보를 불러오지 못했어요')+'</div>'; return; }
+    prcRenderPrepMarket(d);
+    prcRenderPrepSectors(d.sectors||[]);
+    prcRenderPrepTable(d.rows||[]);
+  }catch(e){ if(tblEl) tblEl.innerHTML='<div style="padding:12px;color:var(--ts);font-size:12px;">후보 로드 오류: '+prcEsc(e.message)+'</div>'; }
+}
+
+function prcRenderPrepMarket(d){
+  const el=document.getElementById('prcPrepMarket'); if(!el) return;
+  const m=d.market;
+  const item=(o,lbl)=> o ? `<span class="prc-mk"><b>${lbl}</b> ${o.close!=null?Number(o.close).toLocaleString():'—'} <span style="color:${prcPctColor(o.changePct)};font-weight:800;">${prcFmtPct(o.changePct)}</span></span>` : '';
+  let chips = m ? (item(m.nasdaq,'나스닥')+item(m.kospi,'코스피')+item(m.kosdaq,'코스닥'))
+               : '<span style="color:var(--ts);font-size:11px;">전일 시황 데이터 없음 (data/market_context)</span>';
+  el.innerHTML = `<div style="font-size:11px;color:var(--ts);margin-bottom:6px;">🌐 전일 시황 · 후보 기준일 <b>${prcFmtDate(d.prevDate)}</b> (선택일 ${prcFmtDate(d.date)}의 직전 거래일) — <b style="color:#10b981;">당일 데이터 미사용</b></div><div style="display:flex;gap:8px;flex-wrap:wrap;">${chips}</div>`;
+}
+
+function prcRenderPrepSectors(secs){
+  const el=document.getElementById('prcPrepSectors'); if(!el) return;
+  if(!secs.length){ el.innerHTML='<div style="color:var(--ts);font-size:12px;">섹터 데이터 없음</div>'; return; }
+  const max=secs[0].amt||1;
+  el.innerHTML = secs.map((s,i)=>{
+    const w=Math.max(4,Math.round((s.amt/max)*100));
+    return `<div class="prc-sec-row"><span class="prc-sec-rank">${i+1}</span><span class="prc-sec-name" title="${prcEsc(s.sector)}">${prcEsc(s.sector)}</span><span class="prc-sec-bar"><span style="width:${w}%"></span></span><span class="prc-sec-amt">${Number(s.amtEok||0).toLocaleString()}억<span style="color:var(--ts);font-weight:600;font-size:11px;"> · ${s.count}</span></span></div>`;
+  }).join('');
+}
+
+function prcRenderPrepTable(rows){
+  const el=document.getElementById('prcPrepTable'); if(!el) return;
+  if(!rows.length){ el.innerHTML='<div style="padding:12px;color:var(--ts);font-size:12px;">후보 종목이 없어요</div>'; return; }
+  const head=`<thead><tr><th style="text-align:center;">#</th><th style="text-align:left;">종목</th><th style="text-align:left;">섹터</th><th>전일 거래대금</th><th>거래량</th><th>등락률(D-1)</th></tr></thead>`;
+  const body=rows.map((r,i)=>`<tr onclick="prcPickCandidate('${r.code}')" title="클릭 → ${prcEsc(r.name)} 연습 차트">`
+    +`<td style="text-align:center;color:var(--ts);font-weight:700;">${i+1}</td>`
+    +`<td style="text-align:left;font-weight:700;">${prcEsc(r.name)} <span style="color:var(--ts);font-weight:600;font-size:11px;">${r.code}</span></td>`
+    +`<td style="text-align:left;">${prcEsc(r.sector||'—')}</td>`
+    +`<td>${Number(r.amtEok||0).toLocaleString()}억</td>`
+    +`<td style="color:var(--ts);">${Number(r.vol||0).toLocaleString()}</td>`
+    +`<td style="color:${prcPctColor(r.changePct)};font-weight:800;">${prcFmtPct(r.changePct)}</td>`
+    +`</tr>`).join('');
+  el.innerHTML=`<div style="overflow:auto;max-height:360px;border:1px solid var(--bd,#2a2d35);border-radius:10px;"><table class="prc-prep-tbl">${head}<tbody>${body}</tbody></table></div>`;
+}
+
+// 후보 클릭 → 종목 선택칸 반영 + 그 종목 연습 차트 로드(선택→타점 연습 흐름)
+function prcPickCandidate(code){
+  const ssel=document.getElementById('prcSymbol');
+  if(ssel){ ssel.value=code; prcSelColor(ssel); }
+  PRC.symbol=code;
+  prcLoad();
+  const ch=document.getElementById('prcChartWrap');
+  if(ch) ch.scrollIntoView({behavior:'smooth', block:'center'});
 }
 
 // 1분봉 raw[0..n1-1] 를 tf 분봉으로 합성(시장개장 기준 버킷 정렬)
