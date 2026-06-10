@@ -23,7 +23,7 @@ function ok(c, m) { if (c) pass++; else { fail++; console.error('  ✖ FAIL: ' +
 
 // ── [A] 새 포인터 함수들이 구문상 유효한가 (DOM 없이 파싱만) ──
 console.log('[A] 새 함수 구문 파싱');
-for (const fn of ['_prcTipMove','_prcTipBind','_prcTipHide','_prcOverlayClear','_prcTipEls','_fmtTipTime']) {
+for (const fn of ['_prcTipMove','_prcBind','_prcTipHide','_prcOverlayClear','_prcTipEls','_fmtTipTime']) {
   try { new Function('return ' + extractFn(html, fn)); ok(true, fn); }
   catch (e) { ok(false, `${fn} 구문오류: ${e.message}`); }
 }

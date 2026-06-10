@@ -1872,6 +1872,14 @@ canvas{image-rendering:pixelated;}
                  onchange="prcThickInputApply(this)" title="두께 배율 직접 입력 (0.2~3.0)" aria-label="캔들 두께 배율">
         </div>
       </div>
+      <div>
+        <div style="font-size:10px;color:var(--ts);margin-bottom:3px;">이동평균선</div>
+        <div id="prcMaBtns" style="display:flex;gap:4px;align-items:center;touch-action:manipulation;">
+          <button class="prc-ma" data-ma="5"  style="--mac:#f59e0b" onclick="prcToggleMa(5)"  title="5 이동평균(현재 시점까지 봉으로만 계산)">MA5</button>
+          <button class="prc-ma" data-ma="20" style="--mac:#10b981" onclick="prcToggleMa(20)" title="20 이동평균">MA20</button>
+          <button class="prc-ma" data-ma="60" style="--mac:#ef4444" onclick="prcToggleMa(60)" title="60 이동평균">MA60</button>
+        </div>
+      </div>
       <button onclick="prcLoad()" style="padding:7px 12px;border-radius:8px;border:none;background:var(--b,#3b82f6);color:#fff;font-size:12px;font-weight:700;cursor:pointer;">↻ 불러오기</button>
     </div>
 
@@ -1912,6 +1920,8 @@ canvas{image-rendering:pixelated;}
 <style>
   .prc-tf,.prc-spd,.prc-th{padding:6px 11px;border-radius:8px;border:1px solid var(--bd,#2a2d35);background:var(--card,#16181d);color:var(--ts,#9aa);font-size:12px;font-weight:700;cursor:pointer;touch-action:manipulation;}
   .prc-tf.on,.prc-spd.on,.prc-th.on{background:var(--b,#3b82f6);color:#fff;border-color:var(--b,#3b82f6);}
+  .prc-ma{padding:6px 11px;border-radius:8px;border:1px solid var(--bd,#2a2d35);background:var(--card,#16181d);color:var(--ts,#9aa);font-size:12px;font-weight:800;cursor:pointer;touch-action:manipulation;}
+  .prc-ma.on{background:var(--mac,#3b82f6);color:#fff;border-color:var(--mac,#3b82f6);}
   /* 캔들 두께 직접 입력칸: 글씨 진하게(--tp)·잘 보이게(이전 흐림 문제 방지) */
   .prc-thin{width:54px;padding:6px 8px;border-radius:8px;border:1px solid var(--bd,#2a2d35);background:var(--pan,#fff);color:var(--tp,#191f28);font-size:12px;font-weight:800;text-align:center;-moz-appearance:textfield;}
   .prc-thin:focus{outline:none;border-color:var(--b,#3b82f6);}
@@ -4751,8 +4761,12 @@ function _drawChartInner(pctx){
 
   // 이동평균선
   if(_IND.ma){
+    const _maSel=(pctx&&pctx.maPeriods)?pctx.maPeriods:null;   // 연습모드: 선택된 기간만(HTS는 null → 5/20/60 전체)
     [['MA5','#f59e0b',5],['MA20','#10b981',20],['MA60','#ef4444',60]].forEach(([,col,n])=>{
-      const ma=calcMA(cls,n);
+      if(_maSel && _maSel.indexOf(n)<0) return;                // 연습모드에서 꺼진 기간은 건너뜀
+      // 연습모드는 줌/팬 시 윈도우 좌측 MA 끊김을 막으려 전체 봉으로 계산해 윈도우에 맞춘 maData 를 쓴다
+      // (전체=현재 시점까지의 실제 봉뿐 → 룩어헤드 없음). HTS(maData 없음)는 기존대로 보이는 봉으로 계산.
+      const ma=(pctx&&pctx.maData&&pctx.maData[n])?pctx.maData[n]:calcMA(cls,n);
       ctx.strokeStyle=col;ctx.lineWidth=1.5;
       ctx.beginPath();
       ma.forEach((v,i)=>{if(v==null)return;
@@ -15175,12 +15189,19 @@ const PRC = {
   loaded:false, dates:[], symbols:[],
   date:null, symbol:null, name:'',
   raw:[],            // 그날 1분봉 전체(시간 오름차순) — 룩어헤드는 n1 으로 제어
+  prevCloses:[],     // 직전 거래일 1분봉 종가(시간순) — MA 워밍업용(화면 미표시, 전일=과거라 룩어헤드 아님)
   tf:1,              // 봉 단위(1/3/5분, 또는 'D'=일봉 참고용)
   n1:0,              // 노출된 1분봉 개수(=현재 시점). raw[0..n1-1] 만 사용
   speed:1, playing:false, timer:null,
   daily:[],          // 일봉(저장된 1분봉을 날짜별 합성, 전체 기간) — 'D' 모드 전용
   dailySymbol:null,  // daily 가 합성된 종목코드(캐시 키)
   barScale:1,        // 캔들 두께 배율(가늘게 0.6 / 보통 1 / 굵게 1.8) — 연습모드 전용, 엔진 pctx.barScale 로 전달
+  ma:[5,20,60],      // 표시할 이동평균 기간(연습 전용 토글) — 엔진 pctx.maPeriods 로 전달, 빈 배열=MA 끔
+  vCount:0,          // 줌: 보이는 슬롯 수(0=전체보기). >0 이면 확대 — 연습 전용(HTS 전역 chartViewCount 와 무관)
+  vStart:0,          // 줌 윈도우 좌측 슬롯 인덱스(팬)
+  follow:true,       // 최신 봉 추종(줌 상태에서 다음 봉 넘겨도 최신이 보이게)
+  _fullSlots:0,      // 마지막 렌더의 전체 슬롯 수(핸들러 줌/팬 계산용)
+  _barCount:0,       // 마지막 렌더의 실제 봉 수(추종/팬 한계 계산용)
 };
 
 async function prcInit(){
@@ -15228,6 +15249,7 @@ async function prcLoad(){
     const d = await r.json();
     if(!d.ok || !(d.candles||[]).length){ PRC.raw=[]; prcSetEmpty('이 날짜·종목 데이터가 없어요'+(d.error?(' ('+d.error+')'):'')); prcRender(); return; }
     PRC.raw = d.candles;
+    PRC.prevCloses = Array.isArray(d.prevCloses) ? d.prevCloses : [];   // 직전 거래일 종가(MA 워밍업용)
     PRC.n1 = 1;   // 처음엔 09:00 한 봉만
     const el=document.getElementById('prcEmpty'); if(el) el.style.display='none';
     prcResizeCanvas();
@@ -15388,24 +15410,49 @@ function prcRender(){
   const sess = daily
     ? bars.length
     : (typeof _agentSessionSlots==='function' ? _agentSessionSlots(PRC.tf) : bars.length);
-  const slots = Math.max(bars.length, sess||bars.length, 1);
+  const fullSlots = Math.max(bars.length, sess||bars.length, 1);
+  PRC._fullSlots = fullSlots; PRC._barCount = bars.length;
+
+  // ── 줌/팬 윈도우(연습 전용) — 보이는 슬롯 수 vCount, 좌측 vStart. 0=전체보기 ──
+  let vCount = (PRC.vCount>0) ? Math.min(Math.max(10, Math.round(PRC.vCount)), fullSlots) : fullSlots;
+  let vStart;
+  if(vCount>=fullSlots){ vCount=fullSlots; vStart=0; PRC.follow=true; }      // 전체보기
+  else if(PRC.follow){ vStart=Math.max(0, bars.length - vCount); }           // 최신 봉 추종
+  else { vStart=Math.max(0, Math.min(Math.round(PRC.vStart)||0, fullSlots-vCount)); }
+  PRC.vCount=(vCount>=fullSlots?0:vCount); PRC.vStart=vStart;
+  // 윈도우에 드는 실제 봉만 잘라 전달 → 미래 봉은 애초에 bars 에 없어 룩어헤드 유지(줌/팬 무관)
+  const winBars = bars.slice(vStart, vStart + vCount);
+
+  // 이동평균: 직전 거래일 종가(전일=과거) + 당일 종가(0..n1)로 계산 → 09:00 첫 봉부터 MA 가 이어진다.
+  // 전체로 계산 후 당일 윈도우 구간만 슬라이스 → 줌해도 좌측 안 끊김. 미래(n1 이후)는 bars 에 없어 룩어헤드 없음.
+  let maData=null;
+  if(Array.isArray(PRC.ma) && PRC.ma.length && winBars.length){
+    const prevC = daily ? [] : _prcPrevCloses();          // 일봉 모드는 이미 전체 기간이라 전일 불필요
+    const pn = prevC.length;
+    const closesAll = prevC.concat(bars.map(c=>+c.c));     // 전일 + 당일(prcAggregate 가 이미 n1 까지만 합성)
+    maData={};
+    for(const n of PRC.ma) maData[n]=calcMA(closesAll,n).slice(pn+vStart, pn+vStart+winBars.length);
+  }
 
   // ── 메인 HTS 차트엔진 재사용(방식 B) — 연습 컨텍스트만 주입 ──
   if(typeof _drawChartInner==='function'){
     _drawChartInner({
       canvasId:'prcMainChart',
-      cs: bars,
-      all: bars,
+      cs: winBars,
+      all: winBars,
       viewStart: 0,
-      viewCount: slots,
+      viewCount: vCount,       // 줌 레벨(보이는 슬롯 수) → 캔들 폭 = cw/vCount (확대=적은 슬롯=굵은 봉)
       prevCount: 0,            // 연습은 단일 거래일(전일/당일 구분 없음)
       barScale: PRC.barScale,  // 캔들 두께(연습모드 사용자 조절) — HTS 기본 차트엔 미주입
-      volTicks: true,          // 거래량 10만 단위 눈금(연습모드 전용) — HTS 기본 패널엔 미주입
-      inds: {vol:true, ma:false, rsi:false, macd:false, bb:false, vwap:false},  // 1단계: 거래량만
+      volTicks: true,          // 거래량 눈금(연습모드 전용) — HTS 기본 패널엔 미주입
+      inds: {vol:true, ma:(PRC.ma&&PRC.ma.length>0), rsi:false, macd:false, bb:false, vwap:false},  // 거래량 + 이동평균
+      maPeriods: PRC.ma,       // 표시할 MA 기간(연습 전용)
+      maData: maData,          // 전체 봉(현재 시점까지)으로 계산해 윈도우에 맞춘 MA → 줌 좌측 안 끊김·룩어헤드 없음
       overlays: false,         // 마커/십자선/스크롤바/RSI·MACD 끔(2·3단계에서)
     });
   }
-  _prcTipBind();                 // 포인터 툴팁/십자선 핸들러(1회만 바인딩)
+  _prcBind();                    // 포인터(툴팁/십자선/팬/핀치) + 휠줌 핸들러(1회만 바인딩)
+  _prcSyncMaUI();                // MA 토글 버튼 활성표시 동기화
   _prcOverlayClear();            // 재생/재렌더로 봉이 바뀌면 이전 십자선 잔상 제거
 }
 
@@ -15419,16 +15466,128 @@ function _prcOverlayClear(){
   if(ov){ const c=ov.getContext('2d'); if(c) c.clearRect(0,0,ov.width,ov.height); }
 }
 function _prcTipHide(){ _prcOverlayClear(); const t=document.getElementById('prcTip'); if(t) t.style.display='none'; }
-function _prcTipBind(){
+// ── 이동평균선 토글(연습 전용) ──────────────────────────────────────────────
+function prcToggleMa(n){
+  if(!Array.isArray(PRC.ma)) PRC.ma=[];
+  const i=PRC.ma.indexOf(n);
+  if(i>=0) PRC.ma.splice(i,1); else PRC.ma.push(n);
+  PRC.ma.sort((a,b)=>a-b);
+  _prcSyncMaUI(); prcRender();
+}
+function _prcSyncMaUI(){
+  const sel=Array.isArray(PRC.ma)?PRC.ma:[];
+  document.querySelectorAll('#prcMaBtns .prc-ma').forEach(b=>b.classList.toggle('on', sel.indexOf(+b.dataset.ma)>=0));
+}
+// 전일 1분봉 종가를 현재 봉단위(tf)로 집계 → 당일 bars 와 같은 granularity 로 MA 계산되게(각 tf그룹 종가).
+function _prcPrevCloses(){
+  const raw=Array.isArray(PRC.prevCloses)?PRC.prevCloses:[];
+  const tf=(PRC.tf==='D')?1:(+PRC.tf||1);
+  if(tf<=1 || raw.length===0) return raw.slice();
+  const out=[];
+  for(let i=0;i<raw.length;i+=tf){ const g=raw.slice(i,i+tf); out.push(g[g.length-1]); }
+  return out;
+}
+// 이벤트 → 메인캔버스 로컬 좌표(px,py=디바이스px / rx,ry=CSS px)
+function _prcLocal(e){
+  const m=document.getElementById('prcMainChart'); if(!m) return null;
+  const r=m.getBoundingClientRect();
+  const sx=m.width/(r.width||1), sy=m.height/(r.height||1);
+  return {px:(e.clientX-r.left)*sx, py:(e.clientY-r.top)*sy, rect:r, m};
+}
+// 줌 적용(anchorPx 아래 슬롯을 고정한 채 확대/축소). nc>=전체면 전체보기 복귀.
+function _prcSetZoom(nc, anchorPx){
+  const m=document.getElementById('prcMainChart'); const g=m&&m._pg; if(!g) return;
+  const fullSlots=PRC._fullSlots||1, barCount=PRC._barCount||fullSlots;
+  const curCount=PRC.vCount>0?PRC.vCount:fullSlots, curStart=PRC.vStart||0;
+  const PL=g.PL, cw=g.cw;
+  nc=Math.max(10, Math.min(Math.round(nc), fullSlots));
+  if(nc>=fullSlots){ PRC.vCount=0; PRC.vStart=0; PRC.follow=true; prcRender(); return; }  // 전체보기
+  const anchorSlot=curStart+(anchorPx-PL)/(cw/curCount);                  // 커서 아래 절대 슬롯
+  let nStart=Math.round(anchorSlot-(anchorPx-PL)/(cw/nc));
+  nStart=Math.max(0, Math.min(nStart, Math.max(0, fullSlots-nc)));
+  PRC.vCount=nc; PRC.vStart=nStart;
+  PRC.follow=(nStart+nc >= barCount);                                     // 우측 끝까지 보면 추종 유지
+  prcRender();
+}
+function _prcZoomAt(anchorPx, factor){
+  const cur=PRC.vCount>0?PRC.vCount:(PRC._fullSlots||1);
+  _prcSetZoom(cur*factor, anchorPx);
+}
+// 연습모드 포인터/휠 인터랙션 — 툴팁·십자선 + 휠줌 + 드래그팬 + 두손가락 핀치줌. prcChartWrap 에만 바인딩(HTS 무영향).
+function _prcBind(){
   const wrap=document.getElementById('prcChartWrap');
-  if(!wrap || wrap._tipBound) return;
-  wrap._tipBound=true;
-  const move=e=>_prcTipMove(e);
-  wrap.addEventListener('pointermove', move);     // 마우스 hover + 펜/터치 누른 채 이동
-  wrap.addEventListener('pointerdown', move);     // 펜/터치 탭 즉시 표시
-  wrap.addEventListener('pointerleave', _prcTipHide);
-  wrap.addEventListener('pointerup', _prcTipHide);
-  wrap.addEventListener('pointercancel', _prcTipHide);
+  if(!wrap || wrap._prcBound) return;
+  wrap._prcBound=true;
+  const ptrs=new Map();       // pointerId → {x,y}(디바이스px)
+  let pan=null;               // {downX,downY,baseStart,moved}
+  let pinch=null;             // {startDist,startCount,midPx}
+
+  wrap.addEventListener('wheel', e=>{                       // 휠줌(커서 기준)
+    const lc=_prcLocal(e); if(!lc) return;
+    e.preventDefault();
+    _prcZoomAt(lc.px, e.deltaY>0 ? 1.2 : 1/1.2);            // 아래=축소 / 위=확대
+  }, {passive:false});
+
+  wrap.addEventListener('pointerdown', e=>{
+    const lc=_prcLocal(e); if(!lc) return;
+    try{ wrap.setPointerCapture(e.pointerId); }catch(_){}
+    ptrs.set(e.pointerId,{x:lc.px,y:lc.py});
+    if(ptrs.size===2){                                       // 핀치 시작
+      _prcTipHide(); pan=null;
+      const p=[...ptrs.values()];
+      pinch={ startDist:Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y)||1,
+              startCount:(PRC.vCount>0?PRC.vCount:(PRC._fullSlots||1)),
+              midPx:(p[0].x+p[1].x)/2 };
+    } else if(ptrs.size===1){
+      pan={downX:lc.px, downY:lc.py, baseStart:PRC.vStart||0, moved:false};
+      _prcTipMove(e);                                        // 탭/누름 즉시 툴팁
+    }
+  });
+
+  wrap.addEventListener('pointermove', e=>{
+    const lc=_prcLocal(e); if(!lc) return;
+    if(ptrs.has(e.pointerId)) ptrs.set(e.pointerId,{x:lc.px,y:lc.py});
+    if(pinch && ptrs.size>=2){                               // 핀치 줌
+      const p=[...ptrs.values()];
+      const dist=Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y)||1;
+      _prcSetZoom(pinch.startCount*(pinch.startDist/dist), pinch.midPx);  // 벌리면 dist↑→count↓=확대
+      return;
+    }
+    if(pan && ptrs.has(e.pointerId)){
+      const dx=lc.px-pan.downX, dy=lc.py-pan.downY;
+      if(!pan.moved && Math.hypot(dx,dy)>8) pan.moved=true;
+      if(pan.moved){                                         // 드래그 팬
+        _prcTipHide();
+        const g=lc.m._pg; if(!g) return;
+        const slotPx=g.cw/Math.max(g.slots,1);
+        const shift=Math.round(-dx/slotPx);
+        const fullSlots=PRC._fullSlots||1, vCount=PRC.vCount>0?PRC.vCount:fullSlots;
+        PRC.follow=false;
+        PRC.vStart=Math.max(0, Math.min(pan.baseStart+shift, Math.max(0,fullSlots-vCount)));
+        prcRender();
+        return;
+      }
+      _prcTipMove(e);                                        // 아직 안 움직임 → 스크럽 툴팁
+      return;
+    }
+    _prcTipMove(e);                                          // 버튼 없이 hover(마우스/펜)
+  });
+
+  const end=e=>{
+    try{ wrap.releasePointerCapture(e.pointerId); }catch(_){}
+    ptrs.delete(e.pointerId);
+    if(ptrs.size<2) pinch=null;
+    if(ptrs.size===0){
+      if(pan && pan.moved){                                  // 팬 끝 — 우측 끝까지 왔으면 추종 재개
+        const fullSlots=PRC._fullSlots||1, vCount=PRC.vCount>0?PRC.vCount:fullSlots;
+        if(PRC.vStart+vCount >= (PRC._barCount||fullSlots)) PRC.follow=true;
+      }
+      pan=null; _prcTipHide();
+    }
+  };
+  wrap.addEventListener('pointerup', end);
+  wrap.addEventListener('pointercancel', end);
+  wrap.addEventListener('pointerleave', e=>{ if(ptrs.size===0) _prcTipHide(); });
 }
 function _fmtTipTime(t){
   const s=String(t==null?'':t);
