@@ -4641,6 +4641,17 @@ function _fmtVol(v){
   if(v>=1e4){ const w=v/1e4; return (Number.isInteger(w)?w:Math.round(w*10)/10).toLocaleString()+'만'; }
   return v.toLocaleString();
 }
+// 시간축 레이블 포맷(연습모드): 분봉 "09:00"·전체타임스탬프→"HH:MM", 일봉 날짜→"MM/DD". 순수함수.
+function _fmtAxisTime(t){
+  const s=String(t==null?'':t);
+  const hm=s.match(/(\d{1,2}):(\d{2})/);                         // "09:00", "2026-06-04 09:00:00"
+  if(hm) return hm[1].padStart(2,'0')+':'+hm[2];
+  if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return s.slice(5).replace('-','/');   // 일봉 "2026-06-04"→"06/04"
+  if(/^\d{8}$/.test(s)) return s.slice(4,6)+'/'+s.slice(6,8);             // "20260604"→"06/04"
+  const d=s.replace(/\D/g,'');
+  if(d.length>=4 && !s.includes('-')) return d.slice(0,2)+':'+d.slice(2,4); // "0900"→"09:00"
+  return s.length>5 ? s.slice(-5) : s;
+}
 
 function _drawChartInner(pctx){
   const canvas=document.getElementById(pctx ? pctx.canvasId : "mainChart");
@@ -4766,10 +4777,23 @@ function _drawChartInner(pctx){
   // ── ai-agent 매수/매도 마커 (백테스트 연동, §17.6) ──
   if(_OV){ try{ _drawAgentMarkers(ctx,cs,toX,toY,bw,PT,mainH); }catch(_e){} }
 
-  // X축 레이블
+  // X축 레이블 — 연습모드(pctx)는 슬롯 픽셀폭 기반으로 솎아내고 HH:MM/날짜로 포맷(겹침 방지).
+  //   봉수/줌이 바뀌어도 toX 간격(cw/_slots)에 맞춰 표시 개수를 정하므로 항상 안 겹친다.
+  //   HTS 기본 경로(pctx 없음)는 기존 동작 그대로 유지(무영향).
   ctx.fillStyle='#8c9db5';ctx.font='8px "JetBrains Mono",monospace';ctx.textAlign='center';
-  const step=Math.max(1,Math.floor(cs.length/8));
-  cs.forEach((c,i)=>{if(i%step===0)ctx.fillText(c.t,toX(i),PT+mainH+14);});
+  const _yAxisLab=PT+mainH+14;
+  if(pctx){
+    const _slotPx=cw/Math.max(_slots,1);
+    const _everyN=Math.max(1,Math.ceil(46/Math.max(_slotPx,0.001)));  // "HH:MM"(~30px)+여백 만큼 간격 확보
+    for(let i=0;i<cs.length;i+=_everyN){
+      const x=toX(i);
+      if(x<PL-1||x>W-PR+1) continue;            // 패널 밖 슬롯은 생략
+      ctx.fillText(_fmtAxisTime(cs[i].t),x,_yAxisLab);
+    }
+  } else {
+    const step=Math.max(1,Math.floor(cs.length/8));
+    cs.forEach((c,i)=>{if(i%step===0)ctx.fillText(c.t,toX(i),_yAxisLab);});
+  }
 
   // ── 전일/당일 구분선 (실제 KIS 데이터일 때) ──
   const _prevCnt = _PREV;
