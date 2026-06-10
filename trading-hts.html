@@ -1884,6 +1884,9 @@ canvas{image-rendering:pixelated;}
       <!-- 메인 HTS 차트엔진(_drawChartInner) 재사용 — 자체 캔버스(prcMainChart) -->
       <div class="chart-main" id="prcChartWrap" style="height:420px;border-radius:8px;overflow:hidden;">
         <canvas id="prcMainChart"></canvas>
+        <!-- 툴팁/십자선용 오버레이(이벤트 통과) + 수치 툴팁 — 연습모드 전용 -->
+        <canvas id="prcOverlay" style="pointer-events:none;"></canvas>
+        <div id="prcTip" style="position:absolute;display:none;pointer-events:none;z-index:20;background:rgba(25,31,40,.94);color:#fff;font-size:11px;line-height:1.45;padding:6px 9px;border-radius:7px;box-shadow:0 4px 14px rgba(0,0,0,.25);font-variant-numeric:tabular-nums;white-space:nowrap;"></div>
       </div>
       <!-- 2·3단계용 보조지표 슬롯 (지금은 숨김) -->
       <div class="subc hide" id="prcRsiSub"><div class="slbl">RSI(14)</div><canvas id="prcRsiCanvas"></canvas></div>
@@ -4943,6 +4946,14 @@ function _drawChartInner(pctx){
   // AI 타점 오버레이
   drawSignalOverlay();
   } // if(_OV) 마커/오버레이
+
+  // 연습모드(pctx) 포인터 툴팁/십자선용 — 마지막 렌더 기하 + 봉 노출(HTS 기본 경로는 미설정 → 무영향)
+  if(pctx){
+    const _vY0=PT+mainH+PB+2;
+    canvas._pg={ PL, PR, W, cw, PT, mainH, slots:_slots,
+      top:PT, bottom:(volH>0 ? _vY0+volH-4 : PT+mainH),
+      yMin, yMax, yR, n:cs.length, bars:cs };
+  }
 }
 
 function _drawRSI(cs,cls){
@@ -15394,6 +15405,84 @@ function prcRender(){
       overlays: false,         // 마커/십자선/스크롤바/RSI·MACD 끔(2·3단계에서)
     });
   }
+  _prcTipBind();                 // 포인터 툴팁/십자선 핸들러(1회만 바인딩)
+  _prcOverlayClear();            // 재생/재렌더로 봉이 바뀌면 이전 십자선 잔상 제거
+}
+
+// ── 연습모드 툴팁 + 십자선 (pctx 전용, HTS 기본 차트 무영향) ──────────────────
+function _prcTipEls(){
+  return { wrap:document.getElementById('prcChartWrap'), main:document.getElementById('prcMainChart'),
+           ov:document.getElementById('prcOverlay'), tip:document.getElementById('prcTip') };
+}
+function _prcOverlayClear(){
+  const ov=document.getElementById('prcOverlay');
+  if(ov){ const c=ov.getContext('2d'); if(c) c.clearRect(0,0,ov.width,ov.height); }
+}
+function _prcTipHide(){ _prcOverlayClear(); const t=document.getElementById('prcTip'); if(t) t.style.display='none'; }
+function _prcTipBind(){
+  const wrap=document.getElementById('prcChartWrap');
+  if(!wrap || wrap._tipBound) return;
+  wrap._tipBound=true;
+  const move=e=>_prcTipMove(e);
+  wrap.addEventListener('pointermove', move);     // 마우스 hover + 펜/터치 누른 채 이동
+  wrap.addEventListener('pointerdown', move);     // 펜/터치 탭 즉시 표시
+  wrap.addEventListener('pointerleave', _prcTipHide);
+  wrap.addEventListener('pointerup', _prcTipHide);
+  wrap.addEventListener('pointercancel', _prcTipHide);
+}
+function _fmtTipTime(t){
+  const s=String(t==null?'':t);
+  if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;                 // 일봉: 날짜 그대로
+  const hm=s.match(/(\d{1,2}):(\d{2})/); if(hm) return hm[1].padStart(2,'0')+':'+hm[2];
+  return s;
+}
+function _prcTipMove(e){
+  const {main,ov,tip}=_prcTipEls();
+  if(!main||!ov||!tip) return;
+  const g=main._pg;
+  if(!g||!g.n){ _prcTipHide(); return; }
+  if(ov.width!==main.width) ov.width=main.width;             // 오버레이를 메인캔버스와 동일 픽셀크기로
+  if(ov.height!==main.height) ov.height=main.height;
+  const rect=main.getBoundingClientRect();
+  const sx=main.width/(rect.width||1), sy=main.height/(rect.height||1);
+  const px=(e.clientX-rect.left)*sx, py=(e.clientY-rect.top)*sy;
+  const slotPx=g.cw/Math.max(g.slots,1);
+  const rawI=Math.round((px-g.PL)/slotPx-0.5);
+  // 데이터 밖/미래봉(룩어헤드: bars 엔 현재 n1 이전만 존재)/패널 밖이면 숨김
+  if(rawI<0||rawI>=g.n||px<g.PL-2||px>g.W-g.PR+2||py<g.top-2||py>g.bottom+2){ _prcTipHide(); return; }
+  const b=g.bars[rawI];
+  const cx=g.PL+(rawI+0.5)*slotPx;
+  // 십자선(오버레이에만 — 메인 차트 재렌더 없음)
+  const c=ov.getContext('2d');
+  c.clearRect(0,0,ov.width,ov.height);
+  c.strokeStyle='rgba(107,118,132,.65)';c.lineWidth=1;c.setLineDash([4,4]);
+  c.beginPath();c.moveTo(cx,g.top);c.lineTo(cx,g.bottom);c.stroke();          // 세로(봉 중심 스냅)
+  c.beginPath();c.moveTo(g.PL,py);c.lineTo(g.W-g.PR,py);c.stroke();           // 가로(커서)
+  c.setLineDash([]);
+  // 툴팁 내용 — 시각/OHLC/거래량/등락(직전 봉 종가 대비)
+  const prev=rawI>0?g.bars[rawI-1]:null;
+  const base=prev?+prev.c:+b.o;
+  const chg=base?((+b.c-base)/base*100):0;
+  const cCol=(+b.c>=+b.o)?'#ef4444':'#3b82f6';
+  const chgCol=chg>=0?'#ef4444':'#3b82f6';
+  tip.innerHTML=
+    `<div style="font-weight:800;margin-bottom:3px;">${_fmtTipTime(b.t)}</div>`+
+    `<div style="display:grid;grid-template-columns:auto auto;gap:1px 12px;">`+
+      `<span style="opacity:.7">시가</span><b style="text-align:right">${(+b.o).toLocaleString()}</b>`+
+      `<span style="opacity:.7">고가</span><b style="text-align:right">${(+b.h).toLocaleString()}</b>`+
+      `<span style="opacity:.7">저가</span><b style="text-align:right">${(+b.l).toLocaleString()}</b>`+
+      `<span style="opacity:.7">종가</span><b style="text-align:right;color:${cCol}">${(+b.c).toLocaleString()}</b>`+
+      `<span style="opacity:.7">거래량</span><b style="text-align:right">${_fmtVol(b.v)}</b>`+
+      `<span style="opacity:.7">등락</span><b style="text-align:right;color:${chgCol}">${chg>=0?'+':''}${chg.toFixed(2)}%</b>`+
+    `</div>`;
+  tip.style.display='block';
+  // 위치(커서 기준 CSS px, 패널 밖으로 안 나가게)
+  const tw=tip.offsetWidth, th=tip.offsetHeight, rx=e.clientX-rect.left, ry=e.clientY-rect.top;
+  let lx=rx+14, ly=ry+14;
+  if(lx+tw>rect.width) lx=rx-tw-14;
+  if(ly+th>rect.height) ly=ry-th-14;
+  tip.style.left=Math.max(2,lx)+'px';
+  tip.style.top=Math.max(2,ly)+'px';
 }
 
 window.addEventListener('resize', ()=>{ if(document.getElementById('page-practice')&&document.getElementById('page-practice').classList.contains('on')){ prcResizeCanvas(); prcRender(); } });
