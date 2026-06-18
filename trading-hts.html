@@ -1875,17 +1875,17 @@ canvas{image-rendering:pixelated;}
       <div>
         <div style="font-size:10px;color:var(--ts);margin-bottom:3px;">이동평균선</div>
         <div id="prcMaBtns" style="display:flex;gap:4px;align-items:center;touch-action:manipulation;">
-          <button class="prc-ma" data-ma="5"  style="--mac:#f59e0b" onclick="prcToggleMa(5)"  title="5 이동평균(현재 시점까지 봉으로만 계산)">MA5</button>
-          <button class="prc-ma" data-ma="20" style="--mac:#10b981" onclick="prcToggleMa(20)" title="20 이동평균">MA20</button>
-          <button class="prc-ma" data-ma="60" style="--mac:#ef4444" onclick="prcToggleMa(60)" title="60 이동평균">MA60</button>
+          <button class="prc-ma" data-ma="5"  data-tip="ma" style="--mac:#f59e0b" onclick="prcToggleMa(5)">MA5</button>
+          <button class="prc-ma" data-ma="20" data-tip="ma" style="--mac:#10b981" onclick="prcToggleMa(20)">MA20</button>
+          <button class="prc-ma" data-ma="60" data-tip="ma" style="--mac:#ef4444" onclick="prcToggleMa(60)">MA60</button>
         </div>
       </div>
       <div>
         <div style="font-size:10px;color:var(--ts);margin-bottom:3px;">보조지표</div>
         <div id="prcSubBtns" style="display:flex;gap:4px;align-items:center;touch-action:manipulation;">
-          <button class="prc-ma" data-sub="rsi"  style="--mac:#a78bfa" onclick="prcToggleSub('rsi')"  title="RSI(14) 서브차트 — 현재 시점까지 봉으로만 계산(전일 연결)">RSI</button>
-          <button class="prc-ma" data-sub="macd" style="--mac:#3b82f6" onclick="prcToggleSub('macd')" title="MACD(12,26,9) 서브차트 — 현재 시점까지 봉으로만 계산(전일 연결)">MACD</button>
-          <button class="prc-ma" data-sub="vwap" style="--mac:#06b6d4" onclick="prcToggleSub('vwap')" title="VWAP 거래량가중평균가 — 당일 09:00부터 누적(전일 연결 불필요)">VWAP</button>
+          <button class="prc-ma" data-sub="rsi"  data-tip="rsi"  style="--mac:#a78bfa" onclick="prcToggleSub('rsi')">RSI</button>
+          <button class="prc-ma" data-sub="macd" data-tip="macd" style="--mac:#3b82f6" onclick="prcToggleSub('macd')">MACD</button>
+          <button class="prc-ma" data-sub="vwap" data-tip="vwap" style="--mac:#06b6d4" onclick="prcToggleSub('vwap')">VWAP</button>
         </div>
       </div>
       <button onclick="prcLoad()" style="padding:7px 12px;border-radius:8px;border:none;background:var(--b,#3b82f6);color:#fff;font-size:12px;font-weight:700;cursor:pointer;">↻ 불러오기</button>
@@ -1923,8 +1923,9 @@ canvas{image-rendering:pixelated;}
       <!-- 2·3단계용 보조지표 슬롯 (지금은 숨김) -->
       <div class="subc hide" id="prcRsiSub"><div class="slbl">RSI(14)</div><canvas id="prcRsiCanvas"></canvas></div>
       <div class="subc hide" id="prcMacdSub"><div class="slbl">MACD(12,26,9)</div><canvas id="prcMacdCanvas"></canvas></div>
-      <div id="prcEmpty" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--ts);font-size:13px;">날짜와 종목을 고르면 차트가 표시됩니다.</div>
-    </div>
+      <div id="prcEmpty" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--ts);font-size:13px;">날짜와 종목을 고르면 차트가 표시됩니다.</div></div>
+    <!-- 보조지표 용어 설명 툴팁 (연습 전용, position:fixed → 차트 overflow 영향 없음) -->
+    <div id="prcIndTip" style="position:fixed;display:none;z-index:1000;max-width:300px;background:rgba(25,31,40,.96);color:#fff;font-size:11px;line-height:1.5;padding:7px 10px;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.32);pointer-events:none;white-space:normal;"></div>
 
     <!-- 재생 컨트롤 (일봉 모드에서는 숨김 — 일봉은 재생용이 아닌 참고용) -->
     <div id="prcPlayControls" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px;">
@@ -15599,6 +15600,7 @@ function prcRender(){
     });
   }
   _prcBind();                    // 포인터(툴팁/십자선/팬/핀치) + 휠줌 핸들러(1회만 바인딩)
+  _prcBindIndTips();             // 보조지표 용어 설명 툴팁 핸들러(1회만 바인딩)
   _prcSyncMaUI();                // MA 토글 버튼 활성표시 동기화
   _prcOverlayClear();            // 재생/재렌더로 봉이 바뀌면 이전 십자선 잔상 제거
 }
@@ -15634,6 +15636,48 @@ function prcToggleSub(kind){
 }
 function _prcSyncSubUI(){
   document.querySelectorAll('#prcSubBtns .prc-ma').forEach(b=>b.classList.toggle('on', !!PRC[b.dataset.sub]));
+}
+// ── 보조지표 용어 설명 툴팁 (연습 전용, #prcMaBtns/#prcSubBtns 버튼 한정 → HTS 무영향) ──
+// 문구는 노션 커리큘럼(Phase 5-1 RSI · 5-2 MACD · 5-6 VWAP · 4-2 MA) 정의와 일치.
+const PRC_IND_TIPS = {
+  rsi:  'RSI(14) · 모멘텀 지표(0~100). 70↑ 과매수 · 30↓ 과매도, 50선 위=상승 우세, 60 돌파=상승 모멘텀 가속.',
+  macd: 'MACD(12,26,9) · 12·26일 EMA 차이. 골든/데드크로스로 추세 전환, 히스토그램(MACD−시그널)으로 모멘텀의 힘(후행 지표).',
+  vwap: 'VWAP · 당일 거래량가중 평균체결가. 위=매수 우위(평균 매수자 수익)·아래=매도 우위, 매일 09:00 초기화되는 기관 기준선.',
+  ma:   'MA(5/20/60) · 그 기간 평균 매수단가. 정배열(5>20>60)=상승 추세, 20MA=생명선(눌림목 지지·이탈 시 손절 기준).',
+};
+let _prcIndTipBound=false, _prcIndTipTimer=null;
+function _prcShowIndTip(btn){
+  const tip=document.getElementById('prcIndTip'); if(!tip||!btn) return;
+  const txt=PRC_IND_TIPS[btn.dataset.tip]; if(!txt) return;
+  tip.textContent=txt; tip.style.display='block';
+  const r=btn.getBoundingClientRect(), tw=tip.offsetWidth, th=tip.offsetHeight;
+  const left=Math.max(6, Math.min(r.left+r.width/2-tw/2, window.innerWidth-tw-6));
+  let top=r.top-th-8; if(top<6) top=r.bottom+8;          // 위 공간 없으면 버튼 아래로
+  tip.style.left=left+'px'; tip.style.top=top+'px';
+}
+function _prcHideIndTip(){
+  const t=document.getElementById('prcIndTip'); if(t) t.style.display='none';
+  if(_prcIndTipTimer){ clearTimeout(_prcIndTipTimer); _prcIndTipTimer=null; }
+}
+function _prcBindIndTips(){
+  if(_prcIndTipBound) return;
+  const btns=document.querySelectorAll('#prcMaBtns [data-tip], #prcSubBtns [data-tip]');
+  if(!btns.length) return;                                // DOM 아직 없음 → 다음 렌더에서 재시도
+  _prcIndTipBound=true;
+  btns.forEach(btn=>{
+    btn.addEventListener('mouseenter',()=>_prcShowIndTip(btn));    // 마우스 hover
+    btn.addEventListener('mouseleave',_prcHideIndTip);             // 버튼 벗어나면 사라짐
+    btn.addEventListener('pointerdown',e=>{                        // 펜/터치: 누르면 표시(잠깐 후 자동 사라짐)
+      if(e.pointerType==='touch'||e.pointerType==='pen'){
+        _prcShowIndTip(btn);
+        if(_prcIndTipTimer) clearTimeout(_prcIndTipTimer);
+        _prcIndTipTimer=setTimeout(_prcHideIndTip,2800);
+      }
+    });
+  });
+  // 차트/버튼 밖을 누르거나 스크롤하면 사라지게(연습 툴팁만 숨김 → HTS 무영향)
+  document.addEventListener('pointerdown',e=>{ if(!(e.target.closest&&e.target.closest('#prcMaBtns [data-tip], #prcSubBtns [data-tip]'))) _prcHideIndTip(); }, true);
+  window.addEventListener('scroll',_prcHideIndTip, true);
 }
 // 전일 1분봉 종가를 현재 봉단위(tf)로 집계 → 당일 bars 와 같은 granularity 로 MA 계산되게(각 tf그룹 종가).
 function _prcPrevCloses(){

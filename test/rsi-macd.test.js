@@ -194,5 +194,30 @@ ok(html.includes('vwapData: vwapData'), 'pctx 로 VWAP 데이터 전달');
 ok(html.includes('vwap:false,'), 'PRC 에 vwap 초기 off 상태');
 ok(html.includes('onclick="prcToggleSub(\'vwap\')"'), 'VWAP 토글 버튼 onclick');
 
+// ════════════ 보조지표 용어 설명 툴팁 ════════════
+console.log('[T] 용어 설명 툴팁');
+// 토글 버튼에 data-tip 부착 + 네이티브 title 제거(커스텀 툴팁과 중복 방지)
+ok(html.includes('data-sub="rsi"  data-tip="rsi"') || /data-sub="rsi"\s+data-tip="rsi"/.test(html), 'RSI 버튼 data-tip="rsi"');
+ok(/data-sub="macd"\s+data-tip="macd"/.test(html), 'MACD 버튼 data-tip="macd"');
+ok(/data-sub="vwap"\s+data-tip="vwap"/.test(html), 'VWAP 버튼 data-tip="vwap"');
+ok(/data-ma="5"\s+data-tip="ma"/.test(html) && /data-ma="20"\s+data-tip="ma"/.test(html) && /data-ma="60"\s+data-tip="ma"/.test(html), 'MA5/20/60 버튼 data-tip="ma"');
+ok(!/data-sub="rsi"[^>]*\btitle=/.test(html) && !/data-ma="5"[^>]*\btitle=/.test(html), '토글 버튼 네이티브 title 제거(커스텀 툴팁만)');
+// 툴팁 엘리먼트 + 핸들러
+ok(html.includes('id="prcIndTip"'), '용어 툴팁 엘리먼트 존재');
+ok(html.includes('function _prcShowIndTip(') && html.includes('function _prcHideIndTip(') && html.includes('function _prcBindIndTips('), '툴팁 show/hide/bind 함수 존재');
+ok(html.includes('_prcBindIndTips();'), 'prcRender 에서 툴팁 핸들러 바인딩 호출');
+// hover + 펜/터치 + 벗어나면 숨김
+ok(html.includes("addEventListener('mouseenter'") && html.includes("addEventListener('mouseleave',_prcHideIndTip)"), 'hover(mouseenter/leave) 바인딩');
+ok(html.includes("e.pointerType==='touch'||e.pointerType==='pen'"), '펜/터치(pointerdown) 표시');
+ok(html.includes("window.addEventListener('scroll',_prcHideIndTip"), '스크롤/밖 클릭 시 숨김');
+// HTS 무영향: 핸들러가 연습 컨테이너(#prcMaBtns/#prcSubBtns)에만 바인딩
+ok(html.includes("querySelectorAll('#prcMaBtns [data-tip], #prcSubBtns [data-tip]')"), '연습 버튼에만 바인딩(HTS 무영향)');
+// 노션 커리큘럼 정의와 문구 일치(핵심 키워드)
+const TIPS = (function () { const m2 = html.match(/const PRC_IND_TIPS\s*=\s*\{[\s\S]*?\};/); return m2 ? m2[0] : ''; })();
+ok(/RSI\(14\)[\s\S]*?70[\s\S]*?과매수[\s\S]*?30[\s\S]*?과매도[\s\S]*?50[\s\S]*?60/.test(TIPS), 'RSI 문구: 70 과매수·30 과매도·50선·60 돌파 (Phase 5-1)');
+ok(/MACD\(12,26,9\)[\s\S]*?EMA[\s\S]*?골든\/데드크로스[\s\S]*?히스토그램/.test(TIPS), 'MACD 문구: EMA·골든/데드크로스·히스토그램 (Phase 5-2)');
+ok(/VWAP[\s\S]*?거래량가중[\s\S]*?매수 우위[\s\S]*?매도 우위[\s\S]*?09:00 초기화/.test(TIPS), 'VWAP 문구: 거래량가중·매수/매도 우위·09:00 초기화 (Phase 5-6)');
+ok(/MA\(5\/20\/60\)[\s\S]*?평균 매수단가[\s\S]*?정배열[\s\S]*?20MA=생명선/.test(TIPS), 'MA 문구: 평균 매수단가·정배열·20MA 생명선 (Phase 4-2)');
+
 console.log(`\n결과: ${pass} pass / ${fail} fail`);
 process.exit(fail ? 1 : 0);
