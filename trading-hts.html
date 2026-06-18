@@ -1885,6 +1885,7 @@ canvas{image-rendering:pixelated;}
         <div id="prcSubBtns" style="display:flex;gap:4px;align-items:center;touch-action:manipulation;">
           <button class="prc-ma" data-sub="rsi"  style="--mac:#a78bfa" onclick="prcToggleSub('rsi')"  title="RSI(14) 서브차트 — 현재 시점까지 봉으로만 계산(전일 연결)">RSI</button>
           <button class="prc-ma" data-sub="macd" style="--mac:#3b82f6" onclick="prcToggleSub('macd')" title="MACD(12,26,9) 서브차트 — 현재 시점까지 봉으로만 계산(전일 연결)">MACD</button>
+          <button class="prc-ma" data-sub="vwap" style="--mac:#06b6d4" onclick="prcToggleSub('vwap')" title="VWAP 거래량가중평균가 — 당일 09:00부터 누적(전일 연결 불필요)">VWAP</button>
         </div>
       </div>
       <button onclick="prcLoad()" style="padding:7px 12px;border-radius:8px;border:none;background:var(--b,#3b82f6);color:#fff;font-size:12px;font-weight:700;cursor:pointer;">↻ 불러오기</button>
@@ -4790,7 +4791,9 @@ function _drawChartInner(pctx){
 
   // VWAP
   if(_IND.vwap){
-    const vw=calcVWAP(cs);
+    // 연습모드(pctx): 당일 전체(09:00~현재 n1) 누적으로 계산해 윈도우에 맞춘 vwapData → 줌/팬해도
+    // 누적 기준이 09:00 으로 일관되고 룩어헤드 없음. HTS(vwapData 없음)는 기존대로 보이는 봉 누적.
+    const vw=(pctx&&pctx.vwapData)?pctx.vwapData:calcVWAP(cs);
     ctx.strokeStyle='#06b6d4';ctx.lineWidth=1.5;ctx.setLineDash([5,3]);
     ctx.beginPath();
     vw.forEach((v,i)=>{if(v==null)return;
@@ -15257,6 +15260,7 @@ const PRC = {
   ma:[5,20,60],      // 표시할 이동평균 기간(연습 전용 토글) — 엔진 pctx.maPeriods 로 전달, 빈 배열=MA 끔
   rsi:false,         // RSI(14) 서브차트 on/off (연습 전용) — 엔진 pctx.rsiOn 으로 전달
   macd:false,        // MACD(12,26,9) 서브차트 on/off (연습 전용) — 엔진 pctx.macdOn 으로 전달
+  vwap:false,        // VWAP 메인 오버레이 on/off (연습 전용) — 엔진 inds.vwap + pctx.vwapData 로 전달
   vCount:0,          // 줌: 보이는 슬롯 수(0=전체보기). >0 이면 확대 — 연습 전용(HTS 전역 chartViewCount 와 무관)
   vStart:0,          // 줌 윈도우 좌측 슬롯 인덱스(팬)
   follow:true,       // 최신 봉 추종(줌 상태에서 다음 봉 넘겨도 최신이 보이게)
@@ -15555,7 +15559,7 @@ function prcRender(){
   // 보조지표(MA/RSI/MACD): 직전 거래일 종가(전일=과거) + 당일 종가(0..n1)로 계산 → 09:00 첫 봉부터 이어진다.
   // 전체로 계산 후 당일 윈도우 구간만 슬라이스 → 줌해도 좌측 안 끊김. 미래(n1 이후)는 bars 에 없어 룩어헤드 없음.
   // RSI(14)·MACD(26) 는 앞 봉이 있어야 시작되므로 MA 와 똑같이 전일 분봉으로 워밍업한다.
-  let maData=null, rsiData=null, macdData=null;
+  let maData=null, rsiData=null, macdData=null, vwapData=null;
   if(winBars.length){
     const prevC = daily ? [] : _prcPrevCloses();          // 일봉 모드는 이미 전체 기간이라 전일 불필요
     const pn = prevC.length;
@@ -15567,6 +15571,8 @@ function prcRender(){
     // RSI/MACD 도 MA 와 똑같이 (전일+당일) 전체로 계산 후 당일 윈도우만 슬라이스 → 09:00부터 이어지고 룩어헤드 없음
     if(PRC.rsi) rsiData=calcRSI(closesAll,14).slice(pn+vStart, pn+vStart+winBars.length);
     if(PRC.macd){ const{ml,sig}=calcMACD(closesAll); macdData={ml:ml.slice(pn+vStart, pn+vStart+winBars.length), sig:sig.slice(pn+vStart, pn+vStart+winBars.length)}; }
+    // VWAP: 당일 누적이라 전일연결 불필요(09:00 시작이 정상). 당일 전체(bars=0..n1, 미래봉 없음)로 누적 후 윈도우만 슬라이스 → 룩어헤드 없음.
+    if(PRC.vwap) vwapData=calcVWAP(bars).slice(vStart, vStart+winBars.length);
   }
 
   // ── 메인 HTS 차트엔진 재사용(방식 B) — 연습 컨텍스트만 주입 ──
@@ -15580,7 +15586,7 @@ function prcRender(){
       prevCount: 0,            // 연습은 단일 거래일(전일/당일 구분 없음)
       barScale: PRC.barScale,  // 캔들 두께(연습모드 사용자 조절) — HTS 기본 차트엔 미주입
       volTicks: true,          // 거래량 눈금(연습모드 전용) — HTS 기본 패널엔 미주입
-      inds: {vol:true, ma:(PRC.ma&&PRC.ma.length>0), rsi:false, macd:false, bb:false, vwap:false},  // 거래량 + 이동평균
+      inds: {vol:true, ma:(PRC.ma&&PRC.ma.length>0), rsi:false, macd:false, bb:false, vwap:!!PRC.vwap},  // 거래량 + 이동평균 + VWAP(오버레이)
       maPeriods: PRC.ma,       // 표시할 MA 기간(연습 전용)
       maData: maData,          // 전체 봉(현재 시점까지)으로 계산해 윈도우에 맞춘 MA → 줌 좌측 안 끊김·룩어헤드 없음
       overlays: false,         // 마커/십자선/스크롤바 끔(2·3단계에서). RSI/MACD 는 아래 pctx 필드로 따로 그림
@@ -15588,6 +15594,7 @@ function prcRender(){
       macdOn: !!PRC.macd,      // MACD(12,26,9) 서브차트 on/off (연습 전용) → _drawMACD(cs,cls,pctx)
       rsiData: rsiData,        // 전일연결+윈도우 슬라이스 RSI (룩어헤드 없음)
       macdData: macdData,      // 전일연결+윈도우 슬라이스 MACD {ml,sig}
+      vwapData: vwapData,      // 당일 누적(09:00~n1)+윈도우 슬라이스 VWAP (룩어헤드 없음)
       slots: vCount,           // 메인차트 슬롯 분모와 동일(_slots=max(winBars.length,vCount)=vCount) → 서브차트 X축 정렬 일치
     });
   }
@@ -15621,7 +15628,7 @@ function _prcSyncMaUI(){
 }
 // ── 보조지표(RSI/MACD) 토글(연습 전용) — 펜/터치 onclick. HTS 무영향(PRC.rsi/macd 만 바뀜) ──
 function prcToggleSub(kind){
-  if(kind!=='rsi'&&kind!=='macd') return;
+  if(kind!=='rsi'&&kind!=='macd'&&kind!=='vwap') return;
   PRC[kind]=!PRC[kind];
   _prcSyncSubUI(); prcRender();
 }
