@@ -1880,6 +1880,13 @@ canvas{image-rendering:pixelated;}
           <button class="prc-ma" data-ma="60" style="--mac:#ef4444" onclick="prcToggleMa(60)" title="60 이동평균">MA60</button>
         </div>
       </div>
+      <div>
+        <div style="font-size:10px;color:var(--ts);margin-bottom:3px;">보조지표</div>
+        <div id="prcSubBtns" style="display:flex;gap:4px;align-items:center;touch-action:manipulation;">
+          <button class="prc-ma" data-sub="rsi"  style="--mac:#a78bfa" onclick="prcToggleSub('rsi')"  title="RSI(14) 서브차트 — 현재 시점까지 봉으로만 계산(전일 연결)">RSI</button>
+          <button class="prc-ma" data-sub="macd" style="--mac:#3b82f6" onclick="prcToggleSub('macd')" title="MACD(12,26,9) 서브차트 — 현재 시점까지 봉으로만 계산(전일 연결)">MACD</button>
+        </div>
+      </div>
       <button onclick="prcLoad()" style="padding:7px 12px;border-radius:8px;border:none;background:var(--b,#3b82f6);color:#fff;font-size:12px;font-weight:700;cursor:pointer;">↻ 불러오기</button>
     </div>
 
@@ -4948,8 +4955,11 @@ function _drawChartInner(pctx){
 
   // RSI/MACD 서브차트
   if(_OV){
-    _drawRSI(cs,cls);
+    _drawRSI(cs,cls);          // HTS 기본 경로(전역 inds + 보이는 봉)
     _drawMACD(cs,cls);
+  } else if(pctx){
+    _drawRSI(cs,cls,pctx);     // 연습모드: pctx 토글/전일연결 데이터로 자체 슬롯에 그림(HTS 무영향)
+    _drawMACD(cs,cls,pctx);
   }
 
   if(!pctx) mChart={_ok:true};
@@ -5002,21 +5012,29 @@ function _drawChartInner(pctx){
   }
 }
 
-function _drawRSI(cs,cls){
-  const el=document.getElementById('rsiSub'),cv=document.getElementById('rsiCanvas');
-  if(!inds.rsi){if(el)el.classList.add('hide');return;}
+function _drawRSI(cs,cls,pctx){
+  // pctx 없으면 기존 HTS 전역 경로(rsiSub/rsiCanvas + inds.rsi + 보이는 봉 cls)로 100% 동일 동작.
+  // pctx 있으면 연습모드 슬롯(prcRsiSub/prcRsiCanvas) + 토글(pctx.rsiOn) + 전일연결 데이터(pctx.rsiData) 사용.
+  const el=document.getElementById(pctx?(pctx.rsiSubId||'prcRsiSub'):'rsiSub');
+  const cv=document.getElementById(pctx?(pctx.rsiCanvasId||'prcRsiCanvas'):'rsiCanvas');
+  const _on=pctx?!!pctx.rsiOn:!!inds.rsi;
+  if(!_on){if(el)el.classList.add('hide');return;}
   if(!el||!cv)return; el.classList.remove('hide');
-  const r=cv.getBoundingClientRect();
-  const W=Math.round(r.width)||cv.offsetWidth||600;
-  const H=Math.round(r.height)||cv.offsetHeight||60;
+  // 크기 측정: 연습(pctx)은 부모 .subc 슬롯을 실측(메인차트 _drawChartInner 과 동일 방식 → 풀폭·슬롯높이).
+  // <canvas>는 intrinsic 300x150 replaced 요소라 inset:0 만으론 안 늘어나므로 부모를 재야 한다.
+  // HTS 기본 경로(pctx 없음)는 기존처럼 canvas 자체를 실측 → 동작 100% 동일(무영향).
+  const _measEl=(pctx&&el)?el:cv;
+  const r=_measEl.getBoundingClientRect();
+  const W=Math.round(r.width)||_measEl.offsetWidth||600;
+  const H=Math.round(r.height)||_measEl.offsetHeight||(pctx?52:60);
   if(W<10||H<10)return;
   if(cv.width!==W||cv.height!==H){cv.width=W;cv.height=H;}
   const ctx=cv.getContext('2d');
   ctx.clearRect(0,0,W,H);
   ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);
-  const rsi=calcRSI(cls,14);
+  const rsi=(pctx&&pctx.rsiData)?pctx.rsiData:calcRSI(cls,14);
   const PL=4,PR=54,PT=2,PB=2,cw=W-PL-PR,ch=H-PT-PB;
-  const _den=_chartSlots||cs.length;
+  const _den=pctx?(pctx.slots||cs.length):(_chartSlots||cs.length);
   const toX=i=>PL+(i+0.5)*(cw/_den);
   const toY=v=>PT+ch*(1-v/100);
   [[70,'rgba(220,38,38,.2)'],[50,'rgba(0,0,0,.08)'],[30,'rgba(37,99,235,.2)']].forEach(([v,c])=>{
@@ -5031,19 +5049,27 @@ function _drawRSI(cs,cls){
   ctx.stroke();
 }
 
-function _drawMACD(cs,cls){
-  const el=document.getElementById('macdSub'),cv=document.getElementById('macdCanvas');
-  if(!inds.macd){if(el)el.classList.add('hide');return;}
+function _drawMACD(cs,cls,pctx){
+  // pctx 없으면 기존 HTS 전역 경로(macdSub/macdCanvas + inds.macd + 보이는 봉 cls)로 100% 동일 동작.
+  // pctx 있으면 연습모드 슬롯(prcMacdSub/prcMacdCanvas) + 토글(pctx.macdOn) + 전일연결 데이터(pctx.macdData) 사용.
+  const el=document.getElementById(pctx?(pctx.macdSubId||'prcMacdSub'):'macdSub');
+  const cv=document.getElementById(pctx?(pctx.macdCanvasId||'prcMacdCanvas'):'macdCanvas');
+  const _on=pctx?!!pctx.macdOn:!!inds.macd;
+  if(!_on){if(el)el.classList.add('hide');return;}
   if(!el||!cv)return; el.classList.remove('hide');
-  const r=cv.getBoundingClientRect();
-  const W=Math.round(r.width)||cv.offsetWidth||600;
-  const H=Math.round(r.height)||cv.offsetHeight||60;
+  // 크기 측정: 연습(pctx)은 부모 .subc 슬롯을 실측(메인차트 _drawChartInner 과 동일 방식 → 풀폭·슬롯높이).
+  // <canvas>는 intrinsic 300x150 replaced 요소라 inset:0 만으론 안 늘어나므로 부모를 재야 한다.
+  // HTS 기본 경로(pctx 없음)는 기존처럼 canvas 자체를 실측 → 동작 100% 동일(무영향).
+  const _measEl=(pctx&&el)?el:cv;
+  const r=_measEl.getBoundingClientRect();
+  const W=Math.round(r.width)||_measEl.offsetWidth||600;
+  const H=Math.round(r.height)||_measEl.offsetHeight||(pctx?52:60);
   if(W<10||H<10)return;
   if(cv.width!==W||cv.height!==H){cv.width=W;cv.height=H;}
   const ctx=cv.getContext('2d');
   ctx.clearRect(0,0,W,H);
   ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);
-  const{ml,sig}=calcMACD(cls);
+  const{ml,sig}=(pctx&&pctx.macdData)?pctx.macdData:calcMACD(cls);
   const all=[...ml,...sig].filter(v=>v!=null);
   if(!all.length)return;
   let vMin=Math.min(...all),vMax=Math.max(...all);
@@ -5051,7 +5077,7 @@ function _drawMACD(cs,cls){
   vMin-=vP;vMax+=vP;
   const vR=vMax-vMin||1;
   const PL=4,PR=54,PT=2,PB=2,cw=W-PL-PR,ch=H-PT-PB;
-  const _den=_chartSlots||cs.length;
+  const _den=pctx?(pctx.slots||cs.length):(_chartSlots||cs.length);
   const toX=i=>PL+(i+0.5)*(cw/_den);
   const toY=v=>PT+ch*(1-(v-vMin)/vR);
   // 0선
@@ -15229,6 +15255,8 @@ const PRC = {
   dailySymbol:null,  // daily 가 합성된 종목코드(캐시 키)
   barScale:1,        // 캔들 두께 배율(가늘게 0.6 / 보통 1 / 굵게 1.8) — 연습모드 전용, 엔진 pctx.barScale 로 전달
   ma:[5,20,60],      // 표시할 이동평균 기간(연습 전용 토글) — 엔진 pctx.maPeriods 로 전달, 빈 배열=MA 끔
+  rsi:false,         // RSI(14) 서브차트 on/off (연습 전용) — 엔진 pctx.rsiOn 으로 전달
+  macd:false,        // MACD(12,26,9) 서브차트 on/off (연습 전용) — 엔진 pctx.macdOn 으로 전달
   vCount:0,          // 줌: 보이는 슬롯 수(0=전체보기). >0 이면 확대 — 연습 전용(HTS 전역 chartViewCount 와 무관)
   vStart:0,          // 줌 윈도우 좌측 슬롯 인덱스(팬)
   follow:true,       // 최신 봉 추종(줌 상태에서 다음 봉 넘겨도 최신이 보이게)
@@ -15524,15 +15552,21 @@ function prcRender(){
   // 윈도우에 드는 실제 봉만 잘라 전달 → 미래 봉은 애초에 bars 에 없어 룩어헤드 유지(줌/팬 무관)
   const winBars = bars.slice(vStart, vStart + vCount);
 
-  // 이동평균: 직전 거래일 종가(전일=과거) + 당일 종가(0..n1)로 계산 → 09:00 첫 봉부터 MA 가 이어진다.
+  // 보조지표(MA/RSI/MACD): 직전 거래일 종가(전일=과거) + 당일 종가(0..n1)로 계산 → 09:00 첫 봉부터 이어진다.
   // 전체로 계산 후 당일 윈도우 구간만 슬라이스 → 줌해도 좌측 안 끊김. 미래(n1 이후)는 bars 에 없어 룩어헤드 없음.
-  let maData=null;
-  if(Array.isArray(PRC.ma) && PRC.ma.length && winBars.length){
+  // RSI(14)·MACD(26) 는 앞 봉이 있어야 시작되므로 MA 와 똑같이 전일 분봉으로 워밍업한다.
+  let maData=null, rsiData=null, macdData=null;
+  if(winBars.length){
     const prevC = daily ? [] : _prcPrevCloses();          // 일봉 모드는 이미 전체 기간이라 전일 불필요
     const pn = prevC.length;
     const closesAll = prevC.concat(bars.map(c=>+c.c));     // 전일 + 당일(prcAggregate 가 이미 n1 까지만 합성)
-    maData={};
-    for(const n of PRC.ma) maData[n]=calcMA(closesAll,n).slice(pn+vStart, pn+vStart+winBars.length);
+    if(Array.isArray(PRC.ma) && PRC.ma.length){
+      maData={};
+      for(const n of PRC.ma) maData[n]=calcMA(closesAll,n).slice(pn+vStart, pn+vStart+winBars.length);
+    }
+    // RSI/MACD 도 MA 와 똑같이 (전일+당일) 전체로 계산 후 당일 윈도우만 슬라이스 → 09:00부터 이어지고 룩어헤드 없음
+    if(PRC.rsi) rsiData=calcRSI(closesAll,14).slice(pn+vStart, pn+vStart+winBars.length);
+    if(PRC.macd){ const{ml,sig}=calcMACD(closesAll); macdData={ml:ml.slice(pn+vStart, pn+vStart+winBars.length), sig:sig.slice(pn+vStart, pn+vStart+winBars.length)}; }
   }
 
   // ── 메인 HTS 차트엔진 재사용(방식 B) — 연습 컨텍스트만 주입 ──
@@ -15549,7 +15583,12 @@ function prcRender(){
       inds: {vol:true, ma:(PRC.ma&&PRC.ma.length>0), rsi:false, macd:false, bb:false, vwap:false},  // 거래량 + 이동평균
       maPeriods: PRC.ma,       // 표시할 MA 기간(연습 전용)
       maData: maData,          // 전체 봉(현재 시점까지)으로 계산해 윈도우에 맞춘 MA → 줌 좌측 안 끊김·룩어헤드 없음
-      overlays: false,         // 마커/십자선/스크롤바/RSI·MACD 끔(2·3단계에서)
+      overlays: false,         // 마커/십자선/스크롤바 끔(2·3단계에서). RSI/MACD 는 아래 pctx 필드로 따로 그림
+      rsiOn: !!PRC.rsi,        // RSI(14) 서브차트 on/off (연습 전용) → _drawRSI(cs,cls,pctx)
+      macdOn: !!PRC.macd,      // MACD(12,26,9) 서브차트 on/off (연습 전용) → _drawMACD(cs,cls,pctx)
+      rsiData: rsiData,        // 전일연결+윈도우 슬라이스 RSI (룩어헤드 없음)
+      macdData: macdData,      // 전일연결+윈도우 슬라이스 MACD {ml,sig}
+      slots: vCount,           // 메인차트 슬롯 분모와 동일(_slots=max(winBars.length,vCount)=vCount) → 서브차트 X축 정렬 일치
     });
   }
   _prcBind();                    // 포인터(툴팁/십자선/팬/핀치) + 휠줌 핸들러(1회만 바인딩)
@@ -15578,6 +15617,16 @@ function prcToggleMa(n){
 function _prcSyncMaUI(){
   const sel=Array.isArray(PRC.ma)?PRC.ma:[];
   document.querySelectorAll('#prcMaBtns .prc-ma').forEach(b=>b.classList.toggle('on', sel.indexOf(+b.dataset.ma)>=0));
+  _prcSyncSubUI();
+}
+// ── 보조지표(RSI/MACD) 토글(연습 전용) — 펜/터치 onclick. HTS 무영향(PRC.rsi/macd 만 바뀜) ──
+function prcToggleSub(kind){
+  if(kind!=='rsi'&&kind!=='macd') return;
+  PRC[kind]=!PRC[kind];
+  _prcSyncSubUI(); prcRender();
+}
+function _prcSyncSubUI(){
+  document.querySelectorAll('#prcSubBtns .prc-ma').forEach(b=>b.classList.toggle('on', !!PRC[b.dataset.sub]));
 }
 // 전일 1분봉 종가를 현재 봉단위(tf)로 집계 → 당일 bars 와 같은 granularity 로 MA 계산되게(각 tf그룹 종가).
 function _prcPrevCloses(){
