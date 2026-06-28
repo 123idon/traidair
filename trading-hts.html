@@ -8487,66 +8487,80 @@ async function _runScreeningAsync(){
       }
       return;
     }
+        // ── 로컬 룰 기반 최종 진입 판단 (API 없이) ──
     try{
       var lc2=best.lc;
-      var stopPr=Math.round(lc2.c*(1-autoState.cfg.stop/100));
+      var _stopPct=autoState.cfg.stop||3;
+      var stopPr=Math.round(lc2.c*(1-_stopPct/100));
       var t1Pr=Math.round(lc2.c*(1+autoState.cfg.t1/100));
-      var rr=((t1Pr-lc2.c)/(lc2.c-stopPr)).toFixed(2);
-      var _mkt = typeof collectMarketCtx==='function' ? collectMarketCtx() : '';
-      var _si = (window._sectorInfo||{})[best.tk];
-      var _sectorLine = _si ? `강세섹터 ${_si.rank}위 ${_si.sector} — ${_si.reason||''}` : '';
-      var _shortLine = (_si && (_si.short_ratio || _si.short_trend)) ? `공매도 잔고 ${_si.short_ratio||'-'} / 추세 ${_si.short_trend||'-'}` : '';
-      var _newsItems = (typeof window._newsItems!=='undefined' && Array.isArray(_newsItems)) ? _newsItems.slice(0,3).map(n=>'• '+(n.title||n)).join('\n') : '';
-      var _learn = typeof getLearningContext==='function' ? getLearningContext(10) : '';
-      // 진화+ 중: 강의 컨텍스트 제외 (시뮬 데이터에 무의미, 토큰 절감)
-      var _lec = _evolveRunning ? '' : (typeof getLectureContext==='function' ? getLectureContext(2500) : '');
-      var prompt='단타 트레이딩 멘토. 자동매매 최종 진입 여부.\n\n'+
-        '⚠️ 절대 원칙: 아래 강의 매매 원칙은 100% 따라야 한다. 강의에 어긋나는 진입은 \"PASS\". 의심스러우면 PASS.\n'+
-        '눌림목: 상승추세(20MA↑)+5MA/20MA지지+거래량감소후회복.\n'+
-        '돌파: 20봉 신고가+거래량 150%↑. 갭상승: 갭업 후 양봉 확정. 첫봉: 시초 6봉 내 양봉+거래량.\n'+
-        '대장첫숨: 이슈/재료 동반 필수 + 대장주 장대양봉 후 첫 음봉 → 비중 1/3.\n\n'+
-        _lec +
-        _learn +
-        '【종목】 '+best.stk.nm+'('+best.tk+') '+best.stk.sec+'\n'+
-        '【시간】 '+(sim.date||'')+' '+(best.lc.t||'')+'\n'+
-        '【기술적】 가격 '+fW(lc2.c)+'원 | RSI '+best.lrsi+' | 거래량 평균x'+best.volR.toFixed(1)+'\n'+
-        '【조건】 '+best.tags.join(' · ')+'\n'+
-        (_sectorLine ? '【수급/섹터】 '+_sectorLine+'\n' : '')+
-        (_shortLine ? '【공매도】 '+_shortLine+'\n' : '')+
-        (_newsItems ? '【최근 공시】\n'+_newsItems+'\n' : '')+
-        (_mkt && _mkt!=='데이터없음' ? '【시황】\n'+_mkt+'\n' : '')+
-        '【리스크】 손절 '+fW(stopPr)+' | 목표 '+fW(t1Pr)+' | R/R 1:'+rr+'\n\n'+
-        '🚨 학습 노트에 해당하는 상황이면 반드시 PASS. 학습 노트 위반 시 confidence를 30 이하로.\n'+
-        'JSON만: {"decision":"BUY"또는"PASS","confidence":0-100,"reason":"왜 매수/관망인지 2줄","learning_applied":"반영한 학습 항목 또는 해당없음","factors":"근거한 데이터 3가지","risk":"리스크1줄","waitFor":"PASS시조건"}';
-      // Claude 호출에 8초 timeout — 응답 안 오면 cancel하고 진입 PASS
-      var _ctrl = new AbortController();
-      var _to = setTimeout(()=>_ctrl.abort(), 8000);
-      var res=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},signal:_ctrl.signal,
-        body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:300,messages:[{role:'user',content:prompt}]})});
-      clearTimeout(_to);
-      var data=await res.json();
-      var text=(data.content&&data.content[0]&&data.content[0].text)||'{}';
-      var m=text.match(/\{[\s\S]*\}/);
-      var ai=m?robustJsonParse(text):{};
-      window._aiDecisionCache[_cacheKey]={decision:ai.decision||'PASS',confidence:ai.confidence||0,ts:Date.now()};
-      if(ai.decision==='BUY'&&ai.confidence>=65){
-        var _factorsTxt = ai.factors ? ('근거: '+ai.factors+'\n') : '';
-        addDecisionLog('['+best.stk.nm+'] ✅ AI매수 (신뢰도'+ai.confidence+'%)',ai.reason+(ai.factors?(' | '+ai.factors):''),'Phase8통과');
-        addMsg('ai','🤖 AI자동매수\n\n종목: '+best.stk.nm+' '+fW(lc2.c)+'원\n신뢰도: '+ai.confidence+'%\n\n✅ '+ai.reason+'\n'+_factorsTxt+'⚠ '+ai.risk+'\n\n손절: '+fW(stopPr)+' | 목표: '+fW(t1Pr)+' | R/R 1:'+rr);
-        updAdvBoxes('✅ 매수결정 — '+best.stk.nm,'신뢰도 '+ai.confidence+'%\n'+ai.reason+(ai.factors?('\n근거: '+ai.factors):''));
-        window._lastLearningApplied = ai.learning_applied || '';
-        var _bestTech2 = best.tags.indexOf('대장첫숨')!==-1?'대장첫숨':'';
-        await execAutoBuy(lc2.c, best.stk, best.score, _bestTech2);
-      }else{
-        var _factorsTxt2 = ai.factors ? (' | '+ai.factors) : '';
-        addDecisionLog('['+best.stk.nm+'] ⏸ AI관망',(ai.reason||'조건미충족')+_factorsTxt2,'2단계차단');
-        updAdvBoxes('⏸ AI관망 — '+best.stk.nm,(ai.reason||'조건미충족')+(ai.factors?('\n근거: '+ai.factors):'')+'\n기다릴것: '+(ai.waitFor||'추세확인'));
+      var rrNum=lc2.c-stopPr>0?(t1Pr-lc2.c)/(lc2.c-stopPr):0;
+      var rr=rrNum.toFixed(2);
+
+      // R/R 최소 조건
+      if(rrNum < autoState.cfg.rr){
+        addDecisionLog('['+best.stk.nm+'] PASS','R/R '+rr+' < 최소 '+autoState.cfg.rr,'2단계차단');
+        updAdvBoxes('PASS — '+best.stk.nm,'R/R '+rr+' 미달');
+        return;
       }
+
+      // 최소 점수 조건
+      var _minS=best.tags.indexOf('대장첫숨')!==-1?5:best.tags.indexOf('확정시그널')!==-1?4:5;
+      if(best.score<_minS){
+        addDecisionLog('['+best.stk.nm+'] PASS','점수 '+best.score+'/'+_minS,'2단계차단');
+        updAdvBoxes('PASS — '+best.stk.nm,'점수 '+best.score+'점 부족');
+        return;
+      }
+
+      // 기술적 조건 검증
+      var _fails=[];
+      if(best.lma5>0&&best.lma20>0&&best.lma5<best.lma20*0.97) _fails.push('MA역배열');
+      if(best.lrsi>=75) _fails.push('RSI과매수('+best.lrsi+')');
+      if(best.volR<1.0) _fails.push('거래량부족');
+      if((best.tags.indexOf('눌림목')!==-1||best.tags.indexOf('돌파')!==-1)&&lc2.c<lc2.o) _fails.push('음봉불가');
+      if(_fails.length>=2){
+        addDecisionLog('['+best.stk.nm+'] PASS',_fails.join(' · '),'2단계차단');
+        updAdvBoxes('PASS — '+best.stk.nm,_fails.join(' · '));
+        return;
+      }
+
+      // 공매도 위험 차단
+      var _si2=(window._sectorInfo||{})[best.tk];
+      if(_si2){
+        var _sr=parseFloat((_si2.short_ratio||'').replace('%',''));
+        if(!isNaN(_sr)&&_sr>=5){
+          addDecisionLog('['+best.stk.nm+'] PASS','공매도잔고 '+_sr+'%','2단계차단');
+          return;
+        }
+        if(_si2.short_trend==='증가'&&best.score<7){
+          addDecisionLog('['+best.stk.nm+'] PASS','공매도증가+점수부족','2단계차단');
+          return;
+        }
+      }
+
+      // 당일 2회 이상 손절 종목 차단
+      var _todayLoss=(mock.trades||[]).filter(function(t){
+        return t.tk===best.tk&&t.date===sim.date&&t.side==='sell'&&(t.pnl||0)<0;
+      });
+      if(_todayLoss.length>=2){
+        addDecisionLog('['+best.stk.nm+'] PASS','오늘 2회 손절 — 재진입 금지','Phase11');
+        return;
+      }
+
+      // 최종 BUY 결정
+      var _conf=Math.min(95,40+best.score*5-_fails.length*5);
+      var _bTech=best.tags.indexOf('대장첫숨')!==-1?'대장첫숨':'';
+      addDecisionLog('['+best.stk.nm+'] ✅ 매수결정',
+        '점수 '+best.score+'점 | R/R 1:'+rr+' | 신뢰도 '+_conf+'%',
+        'Phase8통과');
+      updAdvBoxes('✅ 매수 — '+best.stk.nm,
+        '점수 '+best.score+'점 | R/R 1:'+rr+'\n'+best.tags.join(' · '));
+      if(best.entryCond) recordPattern('buy',best.detTech,best.entryCond,0);
+      await execAutoBuy(lc2.c,best.stk,best.score,_bTech);
+
     }catch(_e2){
-      addDecisionLog('['+best.stk.nm+'] AI분석실패',_e2.message,'관망');
-      updAdvBoxes('⚠ AI오류 — 관망',_e2.message);
-    }
-  }else if(autoState.level===2){
+      addDecisionLog('['+best.stk.nm+'] 판단오류',_e2.message,'관망');
+      updAdvBoxes('⚠ 오류 — 관망',_e2.message);
+    }}else if(autoState.level===2){
     var lc3=best.lc;
     var stopPr2=Math.round(lc3.c*(1-autoState.cfg.stop/100));
     var t1Pr2=Math.round(lc3.c*(1+autoState.cfg.t1/100));
