@@ -1924,6 +1924,8 @@ canvas{image-rendering:pixelated;}
       <div class="subc hide" id="prcRsiSub"><div class="slbl">RSI(14)</div><canvas id="prcRsiCanvas"></canvas></div>
       <div class="subc hide" id="prcMacdSub"><div class="slbl">MACD(12,26,9)</div><canvas id="prcMacdCanvas"></canvas></div>
       <div id="prcEmpty" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--ts);font-size:13px;">날짜와 종목을 고르면 차트가 표시됩니다.</div></div>
+    <!-- ── 📊 선택 종목 공매도·수급 추이 (연습 전용 pctx · D 직전 N거래일 · 당일/미래 미사용, 룩어헤드 차단) ── -->
+    <div id="prcKrxTrend" style="margin-top:12px;"></div>
     <!-- 보조지표 용어 설명 툴팁 (연습 전용, position:fixed → 차트 overflow 영향 없음) -->
     <div id="prcIndTip" style="position:fixed;display:none;z-index:1000;max-width:300px;background:rgba(25,31,40,.96);color:#fff;font-size:11px;line-height:1.5;padding:7px 10px;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.32);pointer-events:none;white-space:normal;"></div>
 
@@ -15322,6 +15324,7 @@ async function prcLoad(){
   if(!dsel||!ssel||!dsel.value||!ssel.value) return;
   PRC.date = dsel.value; PRC.symbol = ssel.value;
   PRC.name = (PRC.symbols.find(s=>s.code===PRC.symbol)||{}).name || PRC.symbol;
+  prcLoadKrxTrend();   // 📊 선택 종목 수급·공매도 추이(D 직전 N거래일, 룩어헤드 차단) — 봉단위 무관
   if(PRC.tf==='D'){ prcLoadDaily(); return; }   // 일봉 모드: 전체 기간 일봉 다시 합성(종목 바뀌면 갱신)
   prcSetEmpty('불러오는 중…');
   try{
@@ -15380,10 +15383,24 @@ function prcRenderPrepSectors(secs){
   }).join('');
 }
 
+// ── 전일(D-1) 공매도·수급 칼럼 포맷터 (data/krx_daily) ──
+// 순매수(억): +면 빨강 강조(매수세)·-면 파랑(매도세)·없으면 — (한국식 색).
+function prcFmtEok(v){ if(v==null||isNaN(v)) return '—'; const n=Number(v); return (n>0?'+':'')+Math.round(n).toLocaleString()+'억'; }
+function prcFlowColor(v){ if(v==null||isNaN(v)) return 'var(--ts,#9aa)'; return v>0?'#ef4444':(v<0?'#3b82f6':'var(--ts,#9aa)'); }
+// 공매도 비중(%): 5% 이상이면 주의(주황 ⚠), 없으면 —.
+function prcShortCell(v){
+  if(v==null||isNaN(v)) return '<td style="color:var(--ts,#9aa);">—</td>';
+  const n=Number(v), warn=n>=5;
+  const col=warn?'#f59e0b':'var(--tp,#191f28)';
+  return `<td style="color:${col};font-weight:${warn?'800':'600'};" title="${warn?'공매도 비중 높음 — 주의':'전일 공매도 거래량 비중'}">${n.toFixed(2)}%${warn?' ⚠':''}</td>`;
+}
+function prcFlowCell(v){ return `<td style="color:${prcFlowColor(v)};font-weight:800;">${prcFmtEok(v)}</td>`; }
+
 function prcRenderPrepTable(rows){
   const el=document.getElementById('prcPrepTable'); if(!el) return;
   if(!rows.length){ el.innerHTML='<div style="padding:12px;color:var(--ts);font-size:12px;">후보 종목이 없어요</div>'; return; }
-  const head=`<thead><tr><th style="text-align:center;">#</th><th style="text-align:left;">종목</th><th style="text-align:left;">섹터</th><th>전일 거래대금</th><th>거래량</th><th>등락률(D-1)</th></tr></thead>`;
+  const head=`<thead><tr><th style="text-align:center;">#</th><th style="text-align:left;">종목</th><th style="text-align:left;">섹터</th><th>전일 거래대금</th><th>거래량</th><th>등락률(D-1)</th>`
+    +`<th title="전일 공매도 거래량 비중 (5%↑ 주의)">공매도%</th><th title="전일 외국인 순매수 거래대금">외국인</th><th title="전일 기관 순매수 거래대금">기관</th></tr></thead>`;
   const body=rows.map((r,i)=>`<tr onclick="prcPickCandidate('${r.code}')" title="클릭 → ${prcEsc(r.name)} 연습 차트">`
     +`<td style="text-align:center;color:var(--ts);font-weight:700;">${i+1}</td>`
     +`<td style="text-align:left;font-weight:700;">${prcEsc(r.name)} <span style="color:var(--ts);font-weight:600;font-size:11px;">${r.code}</span></td>`
@@ -15391,8 +15408,71 @@ function prcRenderPrepTable(rows){
     +`<td>${Number(r.amtEok||0).toLocaleString()}억</td>`
     +`<td style="color:var(--ts);">${Number(r.vol||0).toLocaleString()}</td>`
     +`<td style="color:${prcPctColor(r.changePct)};font-weight:800;">${prcFmtPct(r.changePct)}</td>`
+    +prcShortCell(r.shortRatio)
+    +prcFlowCell(r.foreignEok)
+    +prcFlowCell(r.instEok)
     +`</tr>`).join('');
   el.innerHTML=`<div style="overflow:auto;max-height:360px;border:1px solid var(--bd,#2a2d35);border-radius:10px;"><table class="prc-prep-tbl">${head}<tbody>${body}</tbody></table></div>`;
+}
+
+// ── 📊 선택 종목 공매도·수급 추이 (연습 전용 pctx) — 선택일 D 직전 N거래일(D 미포함, 룩어헤드 차단) ──
+//   /api/practice/candles?trend=1&date=D&symbol=CODE&lookback=10 → days[] + 연속일(streaks) + 공매도 추세.
+//   외인/기관 +빨강(순매수)/-파랑(순매도), 공매도 비중 5%↑·상승 시 주의색. 데이터 없는 날은 — 빈칸.
+function prcKrxStreakText(s,label){
+  if(!s||!s.days||!s.dir) return '';
+  const buy=s.dir>0, col=buy?'#ef4444':'#3b82f6';
+  return `<span style="color:${col};font-weight:800;">${label} ${s.days}일 연속 ${buy?'순매수':'순매도'}</span>`;
+}
+function prcShortTrendText(t){
+  if(!t) return '';
+  const up=t.dir==='up', down=t.dir==='down';
+  const col=up?'#f59e0b':(down?'#10b981':'var(--ts,#9aa)');
+  const word=up?'늘어남 ⚠':(down?'줄어듦':'비슷');
+  return `<span style="color:${col};font-weight:800;">공매도 비중 ${word} (${Number(t.first).toFixed(2)}% → ${Number(t.last).toFixed(2)}%)</span>`;
+}
+async function prcLoadKrxTrend(){
+  const el=document.getElementById('prcKrxTrend'); if(!el) return;
+  const dsel=document.getElementById('prcDate'), ssel=document.getElementById('prcSymbol');
+  const date=dsel&&dsel.value, sym=ssel&&ssel.value;
+  if(!date||!sym){ el.innerHTML=''; return; }
+  el.innerHTML='<div style="padding:10px;color:var(--ts);font-size:12px;">수급·공매도 추이 불러오는 중…</div>';
+  try{
+    const r=await fetch(`/api/practice/candles?trend=1&date=${date}&symbol=${sym}&lookback=10`,{cache:'no-store'});
+    const d=await r.json();
+    if(!d.ok){ el.innerHTML='<div style="padding:10px;color:var(--ts);font-size:12px;">'+prcEsc(d.error||'추이 데이터 없음')+'</div>'; return; }
+    prcRenderKrxTrend(d);
+  }catch(e){ el.innerHTML='<div style="padding:10px;color:var(--ts);font-size:12px;">추이 로드 오류: '+prcEsc(e.message)+'</div>'; }
+}
+function prcRenderKrxTrend(d){
+  const el=document.getElementById('prcKrxTrend'); if(!el) return;
+  const days=d.days||[];
+  if(!days.length){ el.innerHTML='<div style="border:1px solid var(--bd,#2a2d35);border-radius:12px;padding:12px 14px;background:var(--card,#0f1115);color:var(--ts);font-size:12px;">직전 거래일 수급·공매도 데이터가 없어요</div>'; return; }
+  const maxFlow=Math.max(1,...days.map(x=>Math.abs(x.foreignEok||0)),...days.map(x=>Math.abs(x.instEok||0)));
+  const bar=(v)=>{
+    if(v==null||isNaN(v)) return '<span style="color:var(--ts,#9aa);">—</span>';
+    const w=Math.max(2,Math.round(Math.abs(v)/maxFlow*100)), col=prcFlowColor(v);
+    return `<span style="display:inline-flex;align-items:center;gap:6px;justify-content:flex-end;"><span style="color:${col};font-weight:800;">${prcFmtEok(v)}</span><span style="display:inline-block;width:46px;height:8px;border-radius:4px;background:var(--bd,#2a2d35);overflow:hidden;vertical-align:middle;"><span style="display:block;height:100%;width:${w}%;background:${col};margin-left:${v<0?'auto':'0'};"></span></span></span>`;
+  };
+  const shortCell=(v)=>{
+    if(v==null||isNaN(v)) return '<span style="color:var(--ts,#9aa);">—</span>';
+    const n=Number(v), warn=n>=5;
+    return `<span style="color:${warn?'#f59e0b':'var(--tp,#191f28)'};font-weight:${warn?'800':'600'};">${n.toFixed(2)}%${warn?' ⚠':''}</span>`;
+  };
+  const body=days.map((x,i)=>{
+    const last=i===days.length-1;  // 가장 최근(D 직전) 일자 강조
+    return `<tr style="${last?'background:rgba(59,130,246,.10);':''}"><td style="text-align:left;color:var(--ts);font-weight:${last?'800':'600'};">${prcFmtDate(x.date).slice(5)}</td>`
+      +`<td style="text-align:right;">${bar(x.foreignEok)}</td>`
+      +`<td style="text-align:right;">${bar(x.instEok)}</td>`
+      +`<td style="text-align:right;">${shortCell(x.shortRatio)}</td></tr>`;
+  }).join('');
+  const summ=[prcKrxStreakText(d.streaks&&d.streaks.foreign,'외인'),
+              prcKrxStreakText(d.streaks&&d.streaks.inst,'기관'),
+              prcShortTrendText(d.shortTrend)].filter(Boolean).join(' &nbsp;·&nbsp; ');
+  el.innerHTML=`<div style="border:1px solid var(--bd,#2a2d35);border-radius:12px;padding:12px 14px;background:var(--card,#0f1115);">`
+    +`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;"><span style="font-size:13px;font-weight:800;">📊 수급·공매도 추이</span>`
+    +`<span style="font-size:11px;color:var(--ts);">${prcEsc(d.symbol)} · ${prcFmtDate(d.date)} 직전 ${days.length}거래일 · <b style="color:#10b981;">당일·미래 미사용</b></span></div>`
+    +(summ?`<div style="font-size:12px;margin-bottom:8px;">${summ}</div>`:'')
+    +`<div style="overflow:auto;max-height:240px;border:1px solid var(--bd,#2a2d35);border-radius:10px;"><table class="prc-prep-tbl"><thead><tr><th style="text-align:left;">날짜</th><th>외국인 순매수</th><th>기관 순매수</th><th>공매도%</th></tr></thead><tbody>${body}</tbody></table></div></div>`;
 }
 
 // 후보 클릭 → 종목 선택칸 반영 + 그 종목 연습 차트 로드(선택→타점 연습 흐름)

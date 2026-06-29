@@ -2376,20 +2376,25 @@ const server = http.createServer(async (req, res) => {
     const wantList = query.get('list');
     const wantDaily = query.get('daily');   // 저장된 1분봉 → 일봉 합성(참고용 큰 그림)
     const wantPrep = query.get('prep');      // 장전 후보(종목 선정) — 선택일 D 의 전일(D-1) 기준
+    const wantTrend = query.get('trend');    // 선택 종목 공매도·수급 추이 — D 직전 N거래일(D 미포함)
     const date = (query.get('date') || '').replace(/[^0-9]/g, '');
     const symbol = (query.get('symbol') || '').trim();
+    const lookback = (query.get('lookback') || '').replace(/[^0-9]/g, '');
     const script = path.join(AGENT_DIR, 'scripts', 'practice_candles.py');
     let argv;
     if (wantList) {
       argv = [script, '--list'];
     } else if (wantPrep && /^[0-9]{8}$/.test(date)) {
       argv = [script, '--prep', '--date', date];
+    } else if (wantTrend && /^[0-9]{8}$/.test(date) && /^[0-9]{6}$/.test(symbol)) {
+      argv = [script, '--krxtrend', '--date', date, '--symbol', symbol];
+      if (/^[0-9]{1,2}$/.test(lookback)) argv.push('--lookback', lookback);
     } else if (wantDaily && /^[0-9]{6}$/.test(symbol)) {
       argv = [script, '--daily', '--symbol', symbol];
     } else if (date && /^[0-9]{6}$/.test(symbol)) {
       argv = [script, '--date', date, '--symbol', symbol];
     } else {
-      reply({ ok: false, error: 'list=1 또는 prep=1+date(8자리) 또는 daily=1+symbol(6자리) 또는 date+symbol(6자리) 필요' });
+      reply({ ok: false, error: 'list=1 또는 prep=1+date(8자리) 또는 trend=1+date+symbol 또는 daily=1+symbol(6자리) 또는 date+symbol(6자리) 필요' });
       return;
     }
     let out = '', err = '', child;
