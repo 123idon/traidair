@@ -1910,6 +1910,7 @@ canvas{image-rendering:pixelated;}
           <button class="prc-ma" data-sub="rsi"  data-tip="rsi"  style="--mac:#a78bfa" onclick="prcToggleSub('rsi')">RSI</button>
           <button class="prc-ma" data-sub="macd" data-tip="macd" style="--mac:#3b82f6" onclick="prcToggleSub('macd')">MACD</button>
           <button class="prc-ma" data-sub="vwap" data-tip="vwap" style="--mac:#06b6d4" onclick="prcToggleSub('vwap')">VWAP</button>
+          <button class="prc-ma" data-sub="bb" data-tip="bb" style="--mac:#8b5cf6" onclick="prcToggleSub('bb')">볼린저</button>
         </div>
         <span class="vsep"></span>
         <span style="font-size:9px;color:var(--tm);font-family:var(--mono);">두께</span>
@@ -4920,15 +4921,24 @@ function _drawChartInner(pctx){
 
   // 볼린저밴드
   if(_IND.bb){
-    const{upper,lower}=calcBB(cls,20,2);
+    // 연습모드(pctx.bbData): 전일연결+윈도우 슬라이스 {upper,lower,mid} → 09:00부터 이어지고 룩어헤드 없음.
+    // HTS(bbData 없음)는 기존대로 보이는 봉으로 즉석 계산(mid 없음) → HTS 시각 100% 동일.
+    const _bb=(pctx&&pctx.bbData)?pctx.bbData:(()=>{const{upper,lower}=calcBB(cls,20,2);return{upper,lower,mid:null};})();
     ctx.strokeStyle='rgba(139,92,246,.45)';ctx.lineWidth=1;ctx.setLineDash([4,3]);
-    for(const arr of[upper,lower]){
+    for(const arr of[_bb.upper,_bb.lower]){
       ctx.beginPath();
       arr.forEach((v,i)=>{if(v==null)return;
         (i===0||arr[i-1]==null)?ctx.moveTo(toX(i),toY(v)):ctx.lineTo(toX(i),toY(v));});
       ctx.stroke();
     }
     ctx.setLineDash([]);
+    if(_bb.mid){   // 중심선(MA20) — 연습모드 전용(HTS 는 mid 없음 → 미표시, 기존과 동일)
+      ctx.strokeStyle='rgba(139,92,246,.30)';ctx.lineWidth=1;
+      ctx.beginPath();
+      _bb.mid.forEach((v,i)=>{if(v==null)return;
+        (i===0||_bb.mid[i-1]==null)?ctx.moveTo(toX(i),toY(v)):ctx.lineTo(toX(i),toY(v));});
+      ctx.stroke();
+    }
   }
 
   // VWAP
@@ -15417,6 +15427,7 @@ const PRC = {
   rsi:false,         // RSI(14) 서브차트 on/off (연습 전용) — 엔진 pctx.rsiOn 으로 전달
   macd:false,        // MACD(12,26,9) 서브차트 on/off (연습 전용) — 엔진 pctx.macdOn 으로 전달
   vwap:false,        // VWAP 메인 오버레이 on/off (연습 전용) — 엔진 inds.vwap + pctx.vwapData 로 전달
+  bb:false,          // 볼린저밴드(20,2σ) 메인 오버레이 on/off (연습 전용) — 엔진 inds.bb + pctx.bbData 로 전달
   vCount:0,          // 줌: 보이는 슬롯 수(0=전체보기). >0 이면 확대 — 연습 전용(HTS 전역 chartViewCount 와 무관)
   vStart:0,          // 줌 윈도우 좌측 슬롯 인덱스(팬)
   follow:true,       // 최신 봉 추종(줌 상태에서 다음 봉 넘겨도 최신이 보이게)
@@ -15890,7 +15901,7 @@ function prcRender(){
   // 보조지표(MA/RSI/MACD): 직전 거래일 종가(전일=과거) + 당일 종가(0..n1)로 계산 → 09:00 첫 봉부터 이어진다.
   // 전체로 계산 후 당일 윈도우 구간만 슬라이스 → 줌해도 좌측 안 끊김. 미래(n1 이후)는 bars 에 없어 룩어헤드 없음.
   // RSI(14)·MACD(26) 는 앞 봉이 있어야 시작되므로 MA 와 똑같이 전일 분봉으로 워밍업한다.
-  let maData=null, rsiData=null, macdData=null, vwapData=null;
+  let maData=null, rsiData=null, macdData=null, vwapData=null, bbData=null;
   if(winBars.length){
     const prevC = daily ? [] : _prcPrevCloses();          // 일봉 모드는 이미 전체 기간이라 전일 불필요
     const pn = prevC.length;
@@ -15898,6 +15909,12 @@ function prcRender(){
     if(Array.isArray(PRC.ma) && PRC.ma.length){
       maData={};
       for(const n of PRC.ma) maData[n]=calcMA(closesAll,n).slice(pn+vStart, pn+vStart+winBars.length);
+    }
+    // 볼린저밴드(20,2σ): MA 와 똑같이 (전일+당일) 전체로 계산 → 09:00 부터 이어지고(20봉 워밍업) 윈도우만 슬라이스 → 줌 좌측 안 끊김·룩어헤드 없음
+    if(PRC.bb){
+      const{upper,lower}=calcBB(closesAll,20,2); const mid=calcMA(closesAll,20);
+      const sl=a=>a.slice(pn+vStart, pn+vStart+winBars.length);
+      bbData={upper:sl(upper), lower:sl(lower), mid:sl(mid)};
     }
     // RSI/MACD 도 MA 와 똑같이 (전일+당일) 전체로 계산 후 당일 윈도우만 슬라이스 → 09:00부터 이어지고 룩어헤드 없음
     if(PRC.rsi) rsiData=calcRSI(closesAll,14).slice(pn+vStart, pn+vStart+winBars.length);
@@ -15917,9 +15934,10 @@ function prcRender(){
       prevCount: 0,            // 연습은 단일 거래일(전일/당일 구분 없음)
       barScale: PRC.barScale,  // 캔들 두께(연습모드 사용자 조절) — HTS 기본 차트엔 미주입
       volTicks: true,          // 거래량 눈금(연습모드 전용) — HTS 기본 패널엔 미주입
-      inds: {vol:true, ma:(PRC.ma&&PRC.ma.length>0), rsi:false, macd:false, bb:false, vwap:!!PRC.vwap},  // 거래량 + 이동평균 + VWAP(오버레이)
+      inds: {vol:true, ma:(PRC.ma&&PRC.ma.length>0), rsi:false, macd:false, bb:!!PRC.bb, vwap:!!PRC.vwap},  // 거래량 + 이동평균 + 볼린저 + VWAP(오버레이)
       maPeriods: PRC.ma,       // 표시할 MA 기간(연습 전용)
       maData: maData,          // 전체 봉(현재 시점까지)으로 계산해 윈도우에 맞춘 MA → 줌 좌측 안 끊김·룩어헤드 없음
+      bbData: bbData,          // 볼린저밴드(20,2σ) {upper,lower,mid} — 전일연결+윈도우 슬라이스 (룩어헤드 없음)
       overlays: false,         // 마커/십자선/스크롤바 끔(2·3단계에서). RSI/MACD 는 아래 pctx 필드로 따로 그림
       rsiOn: !!PRC.rsi,        // RSI(14) 서브차트 on/off (연습 전용) → _drawRSI(cs,cls,pctx)
       macdOn: !!PRC.macd,      // MACD(12,26,9) 서브차트 on/off (연습 전용) → _drawMACD(cs,cls,pctx)
@@ -15961,7 +15979,7 @@ function _prcSyncMaUI(){
 }
 // ── 보조지표(RSI/MACD) 토글(연습 전용) — 펜/터치 onclick. HTS 무영향(PRC.rsi/macd 만 바뀜) ──
 function prcToggleSub(kind){
-  if(kind!=='rsi'&&kind!=='macd'&&kind!=='vwap') return;
+  if(kind!=='rsi'&&kind!=='macd'&&kind!=='vwap'&&kind!=='bb') return;
   PRC[kind]=!PRC[kind];
   _prcSyncSubUI(); prcRender();
 }
@@ -15975,6 +15993,7 @@ const PRC_IND_TIPS = {
   macd: 'MACD(12,26,9) · 12·26일 EMA 차이. 골든/데드크로스로 추세 전환, 히스토그램(MACD−시그널)으로 모멘텀의 힘(후행 지표).',
   vwap: 'VWAP · 당일 거래량가중 평균체결가. 위=매수 우위(평균 매수자 수익)·아래=매도 우위, 매일 09:00 초기화되는 기관 기준선.',
   ma:   'MA(5/20/60) · 그 기간 평균 매수단가. 정배열(5>20>60)=상승 추세, 20MA=생명선(눌림목 지지·이탈 시 손절 기준).',
+  bb:   '볼린저밴드(20,2σ) · 중심선=20MA, 상·하단=±2표준편차. 밴드 수축=변동성 축소(돌파 임박), 상단 접촉=과열·하단 접촉=과매도, 밴드 확장=추세 진행.',
 };
 let _prcIndTipBound=false, _prcIndTipTimer=null;
 function _prcShowIndTip(btn){
