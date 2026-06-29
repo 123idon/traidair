@@ -2086,6 +2086,33 @@ canvas{image-rendering:pixelated;}
   /* mock-bar 컴팩트 버튼(연습 전용) */
   .prc-mb-btn{padding:5px 11px;border-radius:8px;border:1px solid var(--bd,#2a2d35);background:var(--card,#16181d);color:var(--tp,#191f28);font-size:12px;font-weight:700;cursor:pointer;touch-action:manipulation;flex-shrink:0;}
   .prc-mb-btn.play{background:var(--b,#3b82f6);color:#fff;border-color:var(--b,#3b82f6);}
+
+  /* ════════ 연습 전용 반응형 (.prc-hts 만 — 실전 .hts 미디어쿼리 무관) ════════ */
+  /* 중간 폭(노트북/큰 태블릿 ~1280): col3·col4 를 약간 줄여 차트 폭 우선 확보 */
+  @media (max-width:1280px){
+    .prc-hts{grid-template-columns:230px 1fr 180px 210px;}
+  }
+  /* 좁은 폭(태블릿/폴드 펼침/세로 모니터 ≤1100): 4분할 해제 → 세로로 쌓기(차트 우선) */
+  @media (max-width:1100px){
+    .prc-hts{display:flex;flex-direction:column;height:auto;min-height:0;overflow:visible;border-radius:12px;}
+    .prc-hts>*{grid-column:auto!important;grid-row:auto!important;}   /* 그리드 배치 해제 */
+    /* 순서: 차트 → 재생 → 종목선택·후보 → 분석탭 → 주문(비활성) — 차트 우선 */
+    .prc-cp{order:1;height:58vh;min-height:380px;border-right:none;border-bottom:1px solid var(--br);}
+    .prc-mock-bar{order:2;border-right:none;border-bottom:1px solid var(--br);}
+    .prc-lp{order:3;border-right:none;border-bottom:1px solid var(--br);max-height:none;}
+    .prc-lp-body{max-height:420px;}                                  /* 후보표 너무 길면 내부 스크롤 */
+    .prc-rp{order:4;height:auto;max-height:480px;border-right:none;border-bottom:1px solid var(--br);}
+    .prc-brp{order:5;border-left:none;border-bottom:1px solid var(--br);}
+    .prc-airow{display:none;}                                        /* 비활성 안내(저가치)는 좁은 화면에서 숨김 */
+  }
+  /* 아주 좁은 폭(폰/폴드 닫힘 ≤560): 차트 높이 더 낮추고 여백 축소 — 펜/터치 조작 유지 */
+  @media (max-width:560px){
+    .prc-cp{height:48vh;min-height:300px;}
+    .prc-cp-head{gap:4px;row-gap:3px;padding:5px 7px;}
+    .prc-mock-bar{gap:5px;padding:6px 7px;}
+    .prc-lp-body{max-height:340px;}
+    .prc-rp{max-height:420px;}
+  }
 </style>
 
 <!-- ── 기능 목록 페이지 ── -->
