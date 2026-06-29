@@ -1965,6 +1965,7 @@ canvas{image-rendering:pixelated;}
         <div class="prc-rpt on" data-tab="flow" onclick="prcCol3Tab('flow')" title="전일까지 외인·기관 수급 + 공매도 추이">수급/공매도</div>
         <div class="prc-rpt" data-tab="ind" onclick="prcCol3Tab('ind')" title="현재 재생 시점까지의 RSI·MACD·VWAP">지표</div>
         <div class="prc-rpt" data-tab="info" onclick="prcCol3Tab('info')" title="섹터·전일 등락률·시황">종목정보</div>
+        <div class="prc-rpt" data-tab="tf" onclick="prcCol3Tab('tf')" title="일봉·60분·5분 3단계 타임프레임 정렬 (Phase 8)">정렬</div>
       </div>
       <!-- 탭1 수급/공매도 (기본) — col1 에서 이동해 온 prcKrxTrend -->
       <div class="prc-rpb on" id="prcTabFlow">
@@ -1977,6 +1978,17 @@ canvas{image-rendering:pixelated;}
       <!-- 탭3 종목정보 — 전일(D-1) 맥락, 당일 미사용 -->
       <div class="prc-rpb" id="prcTabInfo">
         <div id="prcStockInfo"><div class="prc-i-empty">종목을 선택하세요</div></div>
+      </div>
+      <!-- 탭4 정렬 — 일/60분/5분 3단계 타임프레임 (현재 n1 까지, 룩어헤드 없음) -->
+      <div class="prc-rpb" id="prcTabTf">
+        <div class="prc-tf-head">🔭 3단계 타임프레임 정렬 <span>큰 추세(일봉)→중간(60분)→타점(5분)</span></div>
+        <div class="prc-tf-mini-lbl">📅 일봉 <span id="prcTfDailyInfo">—</span></div>
+        <div class="prc-tf-mini"><canvas id="prcTfDaily"></canvas></div>
+        <div class="prc-tf-mini-lbl">🕐 60분봉 <span id="prcTf60Info">—</span></div>
+        <div class="prc-tf-mini"><canvas id="prcTf60"></canvas></div>
+        <div class="prc-tf-mini-lbl">⏱ 5분봉 <span id="prcTf5Info">—</span></div>
+        <div class="prc-tf-mini"><canvas id="prcTf5"></canvas></div>
+        <div class="prc-tf-note">세 타임프레임이 <b>같은 방향</b>으로 정렬될 때(예: 일봉↑·60분↑·5분 눌림목 후 반등) 진입 신뢰도가 높아요. 모두 현재 재생 시점까지만 표시(일봉은 당일 진행분, 미래 미사용).</div>
       </div>
     </div>
 
@@ -2124,6 +2136,14 @@ canvas{image-rendering:pixelated;}
   .prc-rr-empty,.prc-rr-warn{font-size:11px;color:var(--tm,#b0b8c1);text-align:center;padding:12px 6px;line-height:1.6;}
   .prc-rr-warn{color:#f59e0b;font-weight:700;}
   .prc-rr-note{font-size:10px;color:var(--ts,#8b95a1);line-height:1.6;padding:2px 2px 8px;}
+  /* col3 정렬 탭: 3단계 타임프레임 미니 차트 */
+  .prc-tf-head{font-size:11px;font-weight:800;color:var(--tp,#191f28);margin-bottom:4px;}
+  .prc-tf-head span{display:block;font-size:9px;font-weight:600;color:var(--ts,#8b95a1);margin-top:1px;}
+  .prc-tf-mini-lbl{display:flex;align-items:baseline;justify-content:space-between;font-size:10px;font-weight:800;color:var(--tp,#191f28);margin:8px 2px 3px;}
+  .prc-tf-mini-lbl span{font-family:var(--mono);font-weight:700;color:var(--ts,#8b95a1);font-size:9px;}
+  .prc-tf-mini{position:relative;height:108px;border:1px solid var(--bd,#2a2d35);border-radius:8px;overflow:hidden;background:var(--pan);}
+  .prc-tf-mini canvas{position:absolute;top:0;left:0;}
+  .prc-tf-note{font-size:10px;color:var(--ts,#8b95a1);line-height:1.6;padding:8px 2px 2px;}
   /* mock-bar 컴팩트 버튼(연습 전용) */
   .prc-mb-btn{padding:5px 11px;border-radius:8px;border:1px solid var(--bd,#2a2d35);background:var(--card,#16181d);color:var(--tp,#191f28);font-size:12px;font-weight:700;cursor:pointer;touch-action:manipulation;flex-shrink:0;}
   .prc-mb-btn.play{background:var(--b,#3b82f6);color:#fff;border-color:var(--b,#3b82f6);}
@@ -15539,6 +15559,7 @@ async function prcLoad(){
   PRC.name = (PRC.symbols.find(s=>s.code===PRC.symbol)||{}).name || PRC.symbol;
   prcLoadKrxTrend();   // 📊 선택 종목 수급·공매도 추이(D 직전 N거래일, 룩어헤드 차단) — 봉단위 무관 (col3 탭1)
   if(PRC.col3tab==='info') prcRenderStockInfo();   // col3 종목정보 탭 갱신
+  if(PRC.col3tab==='tf') prcEnsureDaily().then(()=>{ if(PRC.col3tab==='tf') prcRenderTFView(); });   // col3 정렬 탭: 종목 바뀌면 일봉 재로드
   if(PRC.tf==='D'){ prcLoadDaily(); return; }   // 일봉 모드: 전체 기간 일봉 다시 합성(종목 바뀌면 갱신)
   prcSetEmpty('불러오는 중…');
   try{
@@ -15694,7 +15715,7 @@ function prcRenderKrxTrend(d){
 // ════════ col3 분석 패널 탭 (실전 호가창 자리) ════════
 //   flow=수급/공매도(prcKrxTrend) · ind=지표(현재 재생시점 RSI/MACD/VWAP) · info=종목정보(D-1 맥락)
 //   룩어헤드: 지표는 n1 까지(prcAggregate)·수급/정보는 D-1 이전만.
-const PRC_TAB_BODY={flow:'prcTabFlow',ind:'prcTabInd',info:'prcTabInfo'};
+const PRC_TAB_BODY={flow:'prcTabFlow',ind:'prcTabInd',info:'prcTabInfo',tf:'prcTabTf'};
 function prcCol3Tab(tab){
   if(!PRC_TAB_BODY[tab]) return;
   PRC.col3tab=tab;
@@ -15702,6 +15723,7 @@ function prcCol3Tab(tab){
   document.querySelectorAll('#page-practice .prc-rpb').forEach(b=>b.classList.toggle('on', b.id===PRC_TAB_BODY[tab]));
   if(tab==='ind') prcRenderIndicators();
   else if(tab==='info') prcRenderStockInfo();
+  else if(tab==='tf'){ prcRenderTFView(); prcEnsureDaily().then(()=>{ if(PRC.col3tab==='tf') prcRenderTFView(); }); }   // 일봉 데이터 로드 후 재그림
   // flow 는 prcLoadKrxTrend 가 이미 채움(종목/날짜 변경 시 갱신)
 }
 
@@ -15781,6 +15803,61 @@ function prcRenderStockInfo(){
   html+=`<div class="prc-i-card"><div class="prc-i-ttl">🌐 전일 시황</div>`
        +(chips?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;">${chips}</div>`:`<div class="prc-i-empty" style="padding:6px;">시황 데이터 없음</div>`)+`</div>`;
   el.innerHTML=html;
+}
+
+// ════════ col3 정렬 탭: 3단계 타임프레임 정렬 (노션 Phase 8 STEP4) ════════
+// 저장된 1분봉 raw[0..n1] 만으로 5분·60분 합성 + 일봉(이전 완성일 + 당일 진행분). 미래 봉 절대 미사용(룩어헤드 없음).
+// 임의 분(g) 합성: 장 시작 기준 인덱스 버킷(prcAggregate 와 동일 규칙).
+function prcAggN(raw, n1, g){
+  const src=raw.slice(0, n1), out=[];
+  for(let i=0;i<src.length;i+=g){
+    const grp=src.slice(i, i+g); if(!grp.length) break;
+    out.push({t:grp[0].t, o:+grp[0].o, h:Math.max(...grp.map(x=>+x.h)), l:Math.min(...grp.map(x=>+x.l)),
+              c:+grp[grp.length-1].c, v:grp.reduce((s,x)=>s+(+x.v||0),0)});
+  }
+  return out;
+}
+// 일봉 데이터(전 기간) 캐시 확보 — 'D' 모드와 동일 소스 공유(PRC.daily/PRC.dailySymbol). UI 부작용 없음.
+async function prcEnsureDaily(){
+  if(!PRC.symbol) return [];
+  if(PRC.dailySymbol===PRC.symbol && PRC.daily.length) return PRC.daily;
+  try{
+    const r=await fetch(`/api/practice/candles?daily=1&symbol=${PRC.symbol}`,{cache:'no-store'});
+    const d=await r.json();
+    if(d.ok && (d.candles||[]).length){ PRC.daily=d.candles; PRC.dailySymbol=PRC.symbol; }
+  }catch(e){}
+  return PRC.daily;
+}
+// 3타임프레임 미니차트 그리기(엔진 _drawChartInner 재사용, pctx 경유 → HTS 무영향). 탭이 보일 때만.
+function prcRenderTFView(){
+  const body=document.getElementById('prcTabTf');
+  if(!body || body.offsetParent===null) return;   // 탭 숨김 상태면 그리지 않음(rAF 루프/낭비 방지)
+  const setInfo=(id,txt)=>{ const e=document.getElementById(id); if(e) e.textContent=txt; };
+  if(!PRC.symbol){ ['prcTfDailyInfo','prcTf60Info','prcTf5Info'].forEach(i=>setInfo(i,'종목 선택')); return; }
+  // 5분·60분: raw[0..n1] 합성 (미래 봉 없음)
+  const tf5=prcAggN(PRC.raw, PRC.n1, 5);
+  const tf60=prcAggN(PRC.raw, PRC.n1, 60);
+  // 일봉: 이전 완성일(<선택일, 과거) + 당일 진행분(raw[0..n1]) — 당일 완성봉/미래일 미사용(룩어헤드 없음)
+  const src=PRC.raw.slice(0, PRC.n1);
+  const today = src.length ? {t:PRC.date, o:+src[0].o, h:Math.max(...src.map(x=>+x.h)), l:Math.min(...src.map(x=>+x.l)),
+                              c:+src[src.length-1].c, v:src.reduce((s,x)=>s+(+x.v||0),0)} : null;
+  const prior=(Array.isArray(PRC.daily)?PRC.daily:[])
+    .filter(b=>String(b.t)<String(PRC.date))   // 선택일 이전 완성일만(미래일·당일 완성봉 제외)
+    .slice(-40).map(b=>({t:b.t, o:+b.o, h:+b.h, l:+b.l, c:+b.c, v:+b.v}));
+  const tfD = today ? prior.concat([today]) : prior;
+  const draw=(canvasId,bars)=>{
+    if(typeof _drawChartInner!=='function') return;
+    if(!bars.length){ const c=document.getElementById(canvasId); if(c){ const x=c.getContext('2d'); x&&x.clearRect(0,0,c.width,c.height);} return; }
+    _drawChartInner({ canvasId, cs:bars, all:bars, viewStart:0, viewCount:bars.length, prevCount:0,
+                      inds:{vol:false, ma:true, rsi:false, macd:false, bb:false, vwap:false}, maPeriods:[20],
+                      overlays:false, slots:bars.length, barScale:1 });
+  };
+  draw('prcTfDaily', tfD); draw('prcTf60', tf60); draw('prcTf5', tf5);
+  const trend=bars=>{ if(bars.length<2) return ''; const a=+bars[bars.length-1].c, b=+bars[Math.max(0,bars.length-Math.min(5,bars.length))].c;
+    return a>b?'▲상승':(a<b?'▼하락':'─보합'); };
+  setInfo('prcTfDailyInfo', tfD.length?`${tfD.length}봉(당일 진행) ${trend(tfD)}`:'데이터 없음');
+  setInfo('prcTf60Info', tf60.length?`${tf60.length}봉 ${trend(tf60)}`:'데이터 없음');
+  setInfo('prcTf5Info', tf5.length?`${tf5.length}봉 ${trend(tf5)}`:'데이터 없음');
 }
 
 // ════════ 지지·저항 자동 계산 (노션 Phase 4) ════════
@@ -16091,6 +16168,7 @@ function prcRender(){
   _prcSyncMaUI();                // MA 토글 버튼 활성표시 동기화
   _prcOverlayClear();            // 재생/재렌더로 봉이 바뀌면 이전 십자선 잔상 제거
   if(PRC.col3tab==='ind') prcRenderIndicators();   // col3 지표 탭: 재생 시점(n1)까지로 실시간 갱신 (룩어헤드 없음)
+  else if(PRC.col3tab==='tf') prcRenderTFView();    // col3 정렬 탭: 3타임프레임 미니차트 재생 시점까지 갱신 (룩어헤드 없음)
 }
 
 // ── 연습모드 툴팁 + 십자선 (pctx 전용, HTS 기본 차트 무영향) ──────────────────
