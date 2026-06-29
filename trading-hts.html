@@ -1848,9 +1848,9 @@ canvas{image-rendering:pixelated;}
   <!-- ════════ 연습 전용 4분할 골격 (.prc-hts · 실전 .hts 무수정) ════════ -->
   <div class="prc-hts">
 
-    <!-- ① col1: 종목 선택 (실전 관심종목 자리 — 관심종목/후보 재배치는 다음 단계) -->
+    <!-- ① col1: 종목 선택 + 종목 선정 정보(장전후보·수급) — 실전 col1(관심종목/강세섹터) 자리 -->
     <div class="prc-lp">
-      <div class="prc-lp-hd">📋 종목 선택</div>
+      <div class="prc-lp-hd">📋 종목 선택 · 선정 정보</div>
       <div class="prc-lp-sec">
         <div class="prc-lp-lbl">날짜</div>
         <select id="prcDate" class="prc-sel" onchange="prcSelColor(this);prcLoadPrep();prcLoad()" style="width:100%;box-sizing:border-box;"></select>
@@ -1862,10 +1862,25 @@ canvas{image-rendering:pixelated;}
       <div class="prc-lp-sec">
         <button onclick="prcLoad()" style="width:100%;padding:7px;border-radius:8px;border:none;background:var(--b,#3b82f6);color:#fff;font-size:12px;font-weight:700;cursor:pointer;">↻ 불러오기</button>
       </div>
-      <div class="prc-ph">
-        <div class="prc-ph-ico">⭐</div>
-        <div class="prc-ph-t">관심종목 · 후보</div>
-        <div class="prc-ph-s">아래 <b>📋 장전 후보</b> 패널 사용<br>다음 단계에서 이 자리로 이동</div>
+      <!-- 세로로 길면 col1 내부 스크롤 -->
+      <div class="prc-lp-body">
+        <!-- ── 📋 장전 후보 (종목 선정) — 선택일 D 의 직전 거래일 D-1 기준만. 당일 데이터 미사용(룩어헤드 차단) ── -->
+        <div id="prcPrep" style="margin-bottom:10px;border:1px solid var(--bd,#2a2d35);border-radius:10px;padding:10px;background:var(--card,#0f1115);">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-wrap:wrap;">
+            <span style="font-size:13px;font-weight:800;">📋 장전 후보</span>
+            <span style="font-size:10px;font-weight:600;color:var(--ts);">전일(D-1) 기준 · 당일 미사용</span>
+          </div>
+          <!-- 전일 시황 바 -->
+          <div id="prcPrepMarket" style="margin-bottom:10px;"></div>
+          <!-- 섹터별 자금 -->
+          <div class="prc-prep-h">💰 섹터별 자금 <span>전일 거래대금 합계 순</span></div>
+          <div id="prcPrepSectors" style="margin-bottom:12px;"></div>
+          <!-- 종목 후보 표 (행 클릭 → 그 종목 연습 차트) -->
+          <div class="prc-prep-h">📊 종목 후보 <span>전일 거래대금 순 · 클릭→차트</span></div>
+          <div id="prcPrepTable"></div>
+        </div>
+        <!-- ── 📊 선택 종목 공매도·수급 추이 (연습 전용 pctx · D 직전 N거래일 · 당일/미래 미사용, 룩어헤드 차단) ── -->
+        <div id="prcKrxTrend"></div>
       </div>
     </div>
 
@@ -1965,26 +1980,6 @@ canvas{image-rendering:pixelated;}
 
   </div><!-- /prc-hts -->
 
-  <!-- 장전 후보 + 공매도·수급 추이 (그리드 아래 · 다음 단계에서 col1/col3 으로 이동) -->
-  <div style="max-width:1100px;margin:14px auto 0;padding:0 16px 16px;width:100%;box-sizing:border-box;">
-    <!-- ── 📋 장전 후보 (종목 선정) — 선택일 D 의 직전 거래일 D-1 기준만. 당일 데이터 미사용(룩어헤드 차단) ── -->
-    <div id="prcPrep" style="margin-bottom:14px;border:1px solid var(--bd,#2a2d35);border-radius:12px;padding:12px 14px;background:var(--card,#0f1115);">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-        <span style="font-size:14px;font-weight:800;">📋 장전 후보</span>
-        <span style="font-size:11px;font-weight:600;color:var(--ts);">전일(D-1) 기준 "오늘 뭘 살까" — 당일 결과는 안 봅니다</span>
-      </div>
-      <!-- 전일 시황 바 -->
-      <div id="prcPrepMarket" style="margin-bottom:10px;"></div>
-      <!-- 섹터별 자금 -->
-      <div class="prc-prep-h">💰 섹터별 자금 <span>전일 거래대금 합계 순</span></div>
-      <div id="prcPrepSectors" style="margin-bottom:12px;"></div>
-      <!-- 종목 후보 표 -->
-      <div class="prc-prep-h">📊 종목 후보 <span>전일 거래대금 순 · 행을 클릭하면 그 종목 연습 차트로</span></div>
-      <div id="prcPrepTable"></div>
-    </div>
-    <!-- ── 📊 선택 종목 공매도·수급 추이 (연습 전용 pctx · D 직전 N거래일 · 당일/미래 미사용, 룩어헤드 차단) ── -->
-    <div id="prcKrxTrend"></div>
-  </div>
   <!-- 보조지표 용어 설명 툴팁 (연습 전용, position:fixed → 차트 overflow 영향 없음) -->
   <div id="prcIndTip" style="position:fixed;display:none;z-index:1000;max-width:300px;background:rgba(25,31,40,.96);color:#fff;font-size:11px;line-height:1.5;padding:7px 10px;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.32);pointer-events:none;white-space:normal;"></div>
 </div>
@@ -2024,7 +2019,8 @@ canvas{image-rendering:pixelated;}
      아래는 전부 prc- 접두사 신설 클래스(실전 CSS 무영향). */
   .prc-hts{
     display:grid;
-    grid-template-columns:180px 1fr 200px 260px;
+    /* 연습 col1 은 종목선정 정보(장전후보+수급)를 담아 실전(180px)보다 약간 넓게 — prc 전용, 실전 .hts 무관 */
+    grid-template-columns:260px 1fr 200px 260px;
     grid-template-rows:minmax(0,1fr) 82px 64px;
     height:78vh; min-height:560px;
     overflow:hidden; position:relative; background:var(--bg);
@@ -2052,6 +2048,8 @@ canvas{image-rendering:pixelated;}
   .prc-lp-hd{padding:9px 10px;border-bottom:1px solid var(--br);font-size:11px;font-weight:800;color:var(--tp,#191f28);flex-shrink:0;}
   .prc-lp-sec{padding:8px 10px;border-bottom:1px solid var(--br);flex-shrink:0;}
   .prc-lp-lbl{font-size:10px;color:var(--ts,#8b95a1);margin-bottom:4px;}
+  /* col1 하단 스크롤 영역: 장전후보+수급 (세로로 길면 내부 스크롤) */
+  .prc-lp-body{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:8px;}
   /* mock-bar 컴팩트 버튼(연습 전용) */
   .prc-mb-btn{padding:5px 11px;border-radius:8px;border:1px solid var(--bd,#2a2d35);background:var(--card,#16181d);color:var(--tp,#191f28);font-size:12px;font-weight:700;cursor:pointer;touch-action:manipulation;flex-shrink:0;}
   .prc-mb-btn.play{background:var(--b,#3b82f6);color:#fff;border-color:var(--b,#3b82f6);}
