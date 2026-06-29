@@ -1911,6 +1911,7 @@ canvas{image-rendering:pixelated;}
           <button class="prc-ma" data-sub="macd" data-tip="macd" style="--mac:#3b82f6" onclick="prcToggleSub('macd')">MACD</button>
           <button class="prc-ma" data-sub="vwap" data-tip="vwap" style="--mac:#06b6d4" onclick="prcToggleSub('vwap')">VWAP</button>
           <button class="prc-ma" data-sub="bb" data-tip="bb" style="--mac:#8b5cf6" onclick="prcToggleSub('bb')">볼린저</button>
+          <button class="prc-ma" data-sub="sr" data-tip="sr" style="--mac:#f43f5e" onclick="prcToggleSub('sr')">지지/저항</button>
         </div>
         <span class="vsep"></span>
         <span style="font-size:9px;color:var(--tm);font-family:var(--mono);">두께</span>
@@ -1979,15 +1980,34 @@ canvas{image-rendering:pixelated;}
       </div>
     </div>
 
-    <!-- ④ col4: 주문·보유·AI 자리 — 매매 기능 추후 추가 예정 (자리 잡아둠, 비활성) -->
+    <!-- ④ col4: 주문 자리 — R/R 손익비 계산기(매매 계획 도구). 매매 버튼은 추후 -->
     <div class="prc-brp">
-      <div class="prc-ph-hd">주문 · 보유 · AI <span class="dim">· 비활성</span></div>
-      <div class="prc-ph">
-        <div class="prc-ph-box">
-          <div class="prc-ph-ico">💰</div>
-          <div class="prc-ph-t">매매 기능은 추후 추가 예정</div>
-          <div class="prc-ph-s">지금은 차트 읽기·타이밍 연습 단계<br>이 자리에 <b>매매 버튼</b>이 들어올 예정이에요</div>
+      <div class="prc-ph-hd">R/R 손익비 계산 <span class="dim">· 매매 계획</span></div>
+      <div class="prc-rr">
+        <div class="prc-rr-card">
+          <div class="prc-rr-ttl">📐 손익비(R/R) 계산기</div>
+          <div class="prc-rr-row">
+            <span class="prc-rr-k">진입가</span>
+            <span class="prc-rr-in">
+              <input id="rrEntry" type="number" inputmode="decimal" placeholder="0" oninput="prcCalcRR()" aria-label="진입가">
+              <button class="prc-rr-cur" onclick="prcRRfillCur()" title="현재 차트가를 진입가로">현재가</button>
+            </span>
+          </div>
+          <div class="prc-rr-row">
+            <span class="prc-rr-k">손절가</span>
+            <span class="prc-rr-in"><input id="rrStop" type="number" inputmode="decimal" placeholder="진입가보다 낮게" oninput="prcCalcRR()" aria-label="손절가"></span>
+          </div>
+          <div class="prc-rr-row">
+            <span class="prc-rr-k">목표가</span>
+            <span class="prc-rr-in"><input id="rrTarget" type="number" inputmode="decimal" placeholder="진입가보다 높게" oninput="prcCalcRR()" aria-label="목표가"></span>
+          </div>
+          <div id="rrResult" class="prc-rr-res"><div class="prc-rr-empty">진입가·손절가·목표가를<br>입력하면 손익비가 계산돼요</div></div>
         </div>
+        <div class="prc-rr-note">
+          <b>R/R(손익비)</b> = (목표가−진입가) ÷ (진입가−손절가).<br>
+          "한 번 위험 대비 몇 배 먹나"를 뜻해요. <b style="color:#10b981;">2:1 이상이면 양호</b> — 승률이 절반 이하여도 길게 보면 수익이 남습니다(Phase 8 핵심: 손절은 짧게·익절은 길게).
+        </div>
+        <div class="prc-ph-s" style="text-align:center;padding:6px;border-top:1px solid var(--br);">🛒 매매 버튼은 추후 추가 예정</div>
       </div>
     </div>
 
@@ -2084,6 +2104,26 @@ canvas{image-rendering:pixelated;}
   .prc-i-k{color:var(--ts,#8b95a1);font-weight:600;}
   .prc-i-v{font-family:var(--mono);font-weight:800;color:var(--tp,#191f28);}
   .prc-i-badge{display:inline-block;padding:1px 8px;border-radius:999px;font-size:10px;font-weight:800;}
+  /* col4 R/R 손익비 계산기 (연습 전용) */
+  .prc-rr{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:8px;}
+  .prc-rr-card{border:1px solid var(--bd,#2a2d35);border-radius:10px;padding:9px 10px;margin-bottom:8px;background:var(--card,#0f1115);}
+  .prc-rr-ttl{font-size:12px;font-weight:800;color:var(--tp,#191f28);margin-bottom:8px;}
+  .prc-rr-row{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:6px;}
+  .prc-rr-k{font-size:11px;color:var(--ts,#8b95a1);font-weight:700;flex-shrink:0;width:42px;}
+  .prc-rr-in{display:flex;gap:4px;flex:1;min-width:0;}
+  .prc-rr input{flex:1;min-width:0;width:100%;box-sizing:border-box;background:var(--pan,#fff);border:1px solid var(--br,#e5e8eb);border-radius:7px;color:var(--tp,#191f28);font-family:var(--mono);font-size:12px;font-weight:700;padding:6px 8px;outline:none;text-align:right;-moz-appearance:textfield;}
+  .prc-rr input:focus{border-color:var(--b,#3b82f6);}
+  .prc-rr-cur{flex-shrink:0;padding:6px 8px;border-radius:7px;border:1px solid var(--b,#3b82f6);background:rgba(59,130,246,.08);color:var(--b,#3b82f6);font-size:10px;font-weight:800;cursor:pointer;touch-action:manipulation;white-space:nowrap;}
+  .prc-rr-res{margin-top:8px;}
+  .prc-rr-big{font-family:var(--mono);font-size:20px;font-weight:800;display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;}
+  .prc-rr-badge{display:inline-block;padding:2px 9px;border-radius:999px;font-size:10px;font-weight:800;}
+  .prc-rr-badge.good{color:#10b981;background:rgba(16,185,129,.12);}
+  .prc-rr-badge.bad{color:#f59e0b;background:rgba(245,158,11,.12);}
+  .prc-rr-line{display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--br);font-size:12px;color:var(--ts,#8b95a1);}
+  .prc-rr-line span:last-child{font-family:var(--mono);}
+  .prc-rr-empty,.prc-rr-warn{font-size:11px;color:var(--tm,#b0b8c1);text-align:center;padding:12px 6px;line-height:1.6;}
+  .prc-rr-warn{color:#f59e0b;font-weight:700;}
+  .prc-rr-note{font-size:10px;color:var(--ts,#8b95a1);line-height:1.6;padding:2px 2px 8px;}
   /* mock-bar 컴팩트 버튼(연습 전용) */
   .prc-mb-btn{padding:5px 11px;border-radius:8px;border:1px solid var(--bd,#2a2d35);background:var(--card,#16181d);color:var(--tp,#191f28);font-size:12px;font-weight:700;cursor:pointer;touch-action:manipulation;flex-shrink:0;}
   .prc-mb-btn.play{background:var(--b,#3b82f6);color:#fff;border-color:var(--b,#3b82f6);}
@@ -4984,6 +5024,26 @@ function _drawChartInner(pctx){
     ctx.fillStyle=col;ctx.fillRect(x-bw/2,top,bw,ht);
     ctx.restore();
   });
+
+  // ── 지지·저항 자동선 (연습모드 pctx.srLevels) — 현재 n1 까지 봉으로 계산(룩어헤드 없음).
+  //    HTS(srLevels 없음)는 미표시 → 기존과 100% 동일(무영향). 저항=로즈/지지=스카이, 점선+라벨. ──
+  if(pctx && Array.isArray(pctx.srLevels)){
+    ctx.save();
+    pctx.srLevels.forEach(lv=>{
+      if(!lv || lv.price==null) return;
+      const y=toY(lv.price);
+      if(y < PT-1 || y > PT+mainH+1) return;            // 가시 가격범위 밖 레벨은 스킵
+      const isRes=lv.type==='resistance', col=isRes?'#f43f5e':'#0ea5e9';
+      ctx.strokeStyle=col; ctx.lineWidth=1.2; ctx.setLineDash([6,4]);
+      ctx.beginPath(); ctx.moveTo(PL,y); ctx.lineTo(W-PR,y); ctx.stroke(); ctx.setLineDash([]);
+      const label=(isRes?'저항 ':'지지 ')+Math.round(lv.price).toLocaleString()+((lv.touches>1)?(' '+lv.touches+'터치'):'');
+      ctx.font='9px "JetBrains Mono",monospace'; ctx.textAlign='left';
+      const tw=ctx.measureText(label).width;
+      ctx.globalAlpha=0.92; ctx.fillStyle=col; ctx.fillRect(PL+3, y-12, tw+8, 13);
+      ctx.globalAlpha=1; ctx.fillStyle='#fff'; ctx.fillText(label, PL+7, y-2);
+    });
+    ctx.restore();
+  }
 
   // ── ai-agent 매수/매도 마커 (백테스트 연동, §17.6) ──
   if(_OV){ try{ _drawAgentMarkers(ctx,cs,toX,toY,bw,PT,mainH); }catch(_e){} }
@@ -15428,6 +15488,7 @@ const PRC = {
   macd:false,        // MACD(12,26,9) 서브차트 on/off (연습 전용) — 엔진 pctx.macdOn 으로 전달
   vwap:false,        // VWAP 메인 오버레이 on/off (연습 전용) — 엔진 inds.vwap + pctx.vwapData 로 전달
   bb:false,          // 볼린저밴드(20,2σ) 메인 오버레이 on/off (연습 전용) — 엔진 inds.bb + pctx.bbData 로 전달
+  sr:false,          // 지지·저항 자동선 on/off (연습 전용) — 엔진 pctx.srLevels 로 전달(현재 n1 까지 계산, 룩어헤드 없음)
   vCount:0,          // 줌: 보이는 슬롯 수(0=전체보기). >0 이면 확대 — 연습 전용(HTS 전역 chartViewCount 와 무관)
   vStart:0,          // 줌 윈도우 좌측 슬롯 인덱스(팬)
   follow:true,       // 최신 봉 추종(줌 상태에서 다음 봉 넘겨도 최신이 보이게)
@@ -15722,6 +15783,80 @@ function prcRenderStockInfo(){
   el.innerHTML=html;
 }
 
+// ════════ 지지·저항 자동 계산 (노션 Phase 4) ════════
+//   bars = 현재 시점(0..n1)까지 봉만 → 미래 봉 절대 미사용(룩어헤드 없음).
+//   스윙 피벗(±2봉) 고점=저항후보 / 저점=지지후보 + 당일 고가/저가, 0.4% 이내 묶어 터치수 카운트.
+//   현재가 위 저항 최대 2 + 아래 지지 최대 2 (터치수 → 근접 순). 너무 많지 않게 총 ≤4개.
+function prcCalcSR(bars){
+  const n=bars.length; if(n<12) return [];
+  const k=2;                                          // 스윙 윈도우 ±2봉(모두 ≤ 현재 시점)
+  const hi=[], lo=[];
+  for(let i=k;i<=n-1-k;i++){
+    const h=+bars[i].h, l=+bars[i].l; let isH=true, isL=true;
+    for(let j=i-k;j<=i+k;j++){ if(j===i) continue; if(+bars[j].h>=h) isH=false; if(+bars[j].l<=l) isL=false; }
+    if(isH) hi.push(h);
+    if(isL) lo.push(l);
+  }
+  hi.push(Math.max(...bars.map(b=>+b.h)));             // 당일 고가
+  lo.push(Math.min(...bars.map(b=>+b.l)));             // 당일 저가
+  const price=+bars[n-1].c, tol=Math.max(1, price*0.004);   // 0.4% 이내는 같은 레벨로 클러스터
+  const cluster=arr=>{
+    arr=arr.slice().sort((a,b)=>a-b); const out=[];
+    for(const v of arr){ const last=out[out.length-1];
+      if(last && Math.abs(v-(last.sum/last.cnt))<=tol){ last.sum+=v; last.cnt++; }
+      else out.push({sum:v,cnt:1}); }
+    return out.map(c=>({price:c.sum/c.cnt, touches:c.cnt}));
+  };
+  const rank=arr=>arr.sort((x,y)=> y.touches-x.touches || Math.abs(x.price-price)-Math.abs(y.price-price));
+  const res=rank(cluster(hi).filter(c=>c.price>price*1.0005)).slice(0,2).map(c=>({price:c.price,touches:c.touches,type:'resistance'}));
+  const sup=rank(cluster(lo).filter(c=>c.price<price*0.9995)).slice(0,2).map(c=>({price:c.price,touches:c.touches,type:'support'}));
+  return res.concat(sup);
+}
+
+// ════════ col4 R/R 손익비 계산기 (노션 Phase 8) ════════
+// 현재 재생 시점의 차트가(마지막 노출 봉 종가) — 룩어헤드 없음(미래 봉 미사용).
+function prcCurrentPrice(){
+  if(!PRC.symbol) return null;
+  if(PRC.tf==='D') return PRC.daily.length ? +PRC.daily[PRC.daily.length-1].c : null;
+  const bars=(typeof prcAggregate==='function')?prcAggregate():[];
+  return bars.length ? +bars[bars.length-1].c : null;
+}
+// "현재가" 버튼 → 진입가에 현재 차트가 자동 입력(차트 연동)
+function prcRRfillCur(){
+  const p=prcCurrentPrice();
+  const e=document.getElementById('rrEntry');
+  if(p==null){ if(e){ e.placeholder='종목을 먼저 선택'; } return; }
+  if(e){ e.value=Math.round(p); prcCalcRR(); }
+}
+// 진입/손절/목표 → R/R 비율·수익/손실%·수수료 반영 (cfg 의 매수/매도 수수료+거래세 재사용)
+function prcCalcRR(){
+  const el=document.getElementById('rrResult'); if(!el) return;
+  const entry=parseFloat((document.getElementById('rrEntry')||{}).value);
+  const stop =parseFloat((document.getElementById('rrStop')||{}).value);
+  const target=parseFloat((document.getElementById('rrTarget')||{}).value);
+  if(!isFinite(entry)||!isFinite(stop)||!isFinite(target)){
+    el.innerHTML='<div class="prc-rr-empty">진입가·손절가·목표가를<br>입력하면 손익비가 계산돼요</div>'; return;
+  }
+  const risk=entry-stop, reward=target-entry;
+  if(entry<=0){ el.innerHTML='<div class="prc-rr-warn">⚠ 진입가를 확인하세요</div>'; return; }
+  if(risk<=0){ el.innerHTML='<div class="prc-rr-warn">⚠ 손절가는 진입가보다 낮아야 해요 (매수 기준)</div>'; return; }
+  if(reward<=0){ el.innerHTML='<div class="prc-rr-warn">⚠ 목표가는 진입가보다 높아야 해요 (매수 기준)</div>'; return; }
+  const lossPct=(stop-entry)/entry*100, profitPct=(target-entry)/entry*100;
+  // 왕복 비용(%) = 매수수수료 + 매도수수료 + 거래세 (cfg 없으면 기본값)
+  const c=(typeof cfg==='object'&&cfg)?cfg:{};
+  const cost=(+c.bf||0.015)+(+c.sf||0.015)+(+c.tx||0.18);
+  const rr=reward/risk;
+  const netRr=(profitPct-cost)/(Math.abs(lossPct)+cost);
+  const good=rr>=2;
+  const badge=good?'<span class="prc-rr-badge good">양호 (2:1 ↑)</span>':'<span class="prc-rr-badge bad">주의 (2:1 미만)</span>';
+  el.innerHTML=
+    `<div class="prc-rr-big" style="color:${good?'#10b981':'#f59e0b'};">${rr.toFixed(2)} : 1 ${badge}</div>`
+   +`<div class="prc-rr-line"><span>목표 도달 수익</span><span style="color:#ef4444;font-weight:800;">+${profitPct.toFixed(2)}%</span></div>`
+   +`<div class="prc-rr-line"><span>손절 시 손실</span><span style="color:#3b82f6;font-weight:800;">${lossPct.toFixed(2)}%</span></div>`
+   +`<div class="prc-rr-line"><span>수수료·세금(왕복)</span><span>${cost.toFixed(2)}%</span></div>`
+   +`<div class="prc-rr-line" style="border-bottom:none;"><span>수수료 반영 R/R</span><span style="font-weight:800;color:${netRr>=2?'#10b981':'var(--tp,#191f28)'};">${netRr>0?netRr.toFixed(2)+' : 1':'—'}</span></div>`;
+}
+
 // 후보 클릭 → 종목 선택칸 반영 + 그 종목 연습 차트 로드(선택→타점 연습 흐름)
 function prcPickCandidate(code){
   const ssel=document.getElementById('prcSymbol');
@@ -15922,6 +16057,9 @@ function prcRender(){
     // VWAP: 당일 누적이라 전일연결 불필요(09:00 시작이 정상). 당일 전체(bars=0..n1, 미래봉 없음)로 누적 후 윈도우만 슬라이스 → 룩어헤드 없음.
     if(PRC.vwap) vwapData=calcVWAP(bars).slice(vStart, vStart+winBars.length);
   }
+  // 지지·저항: 현재 시점(bars=0..n1, 미래봉 없음)으로 계산 → 절대 가격 레벨(윈도우 슬라이스 불필요, 엔진이 가시범위 클램프)
+  let srLevels=null;
+  if(PRC.sr && bars.length) srLevels=prcCalcSR(bars);
 
   // ── 메인 HTS 차트엔진 재사용(방식 B) — 연습 컨텍스트만 주입 ──
   if(typeof _drawChartInner==='function'){
@@ -15938,6 +16076,7 @@ function prcRender(){
       maPeriods: PRC.ma,       // 표시할 MA 기간(연습 전용)
       maData: maData,          // 전체 봉(현재 시점까지)으로 계산해 윈도우에 맞춘 MA → 줌 좌측 안 끊김·룩어헤드 없음
       bbData: bbData,          // 볼린저밴드(20,2σ) {upper,lower,mid} — 전일연결+윈도우 슬라이스 (룩어헤드 없음)
+      srLevels: srLevels,      // 지지·저항 자동선 [{price,type,touches}] — 현재 n1 까지 계산 (룩어헤드 없음)
       overlays: false,         // 마커/십자선/스크롤바 끔(2·3단계에서). RSI/MACD 는 아래 pctx 필드로 따로 그림
       rsiOn: !!PRC.rsi,        // RSI(14) 서브차트 on/off (연습 전용) → _drawRSI(cs,cls,pctx)
       macdOn: !!PRC.macd,      // MACD(12,26,9) 서브차트 on/off (연습 전용) → _drawMACD(cs,cls,pctx)
@@ -15979,7 +16118,7 @@ function _prcSyncMaUI(){
 }
 // ── 보조지표(RSI/MACD) 토글(연습 전용) — 펜/터치 onclick. HTS 무영향(PRC.rsi/macd 만 바뀜) ──
 function prcToggleSub(kind){
-  if(kind!=='rsi'&&kind!=='macd'&&kind!=='vwap'&&kind!=='bb') return;
+  if(kind!=='rsi'&&kind!=='macd'&&kind!=='vwap'&&kind!=='bb'&&kind!=='sr') return;
   PRC[kind]=!PRC[kind];
   _prcSyncSubUI(); prcRender();
 }
@@ -15994,6 +16133,7 @@ const PRC_IND_TIPS = {
   vwap: 'VWAP · 당일 거래량가중 평균체결가. 위=매수 우위(평균 매수자 수익)·아래=매도 우위, 매일 09:00 초기화되는 기관 기준선.',
   ma:   'MA(5/20/60) · 그 기간 평균 매수단가. 정배열(5>20>60)=상승 추세, 20MA=생명선(눌림목 지지·이탈 시 손절 기준).',
   bb:   '볼린저밴드(20,2σ) · 중심선=20MA, 상·하단=±2표준편차. 밴드 수축=변동성 축소(돌파 임박), 상단 접촉=과열·하단 접촉=과매도, 밴드 확장=추세 진행.',
+  sr:   '지지·저항 · 지지(파랑)=떨어지다 자주 멈춘 바닥(매수세)·저항(빨강)=오르다 막힌 천장(매도세). 여러 번 부딪힌(터치) 레벨일수록 강함, 돌파 시 역할 뒤바뀜(저항→지지). Phase 4: 손절·목표를 이 레벨로 잡는다.',
 };
 let _prcIndTipBound=false, _prcIndTipTimer=null;
 function _prcShowIndTip(btn){
