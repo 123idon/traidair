@@ -1937,11 +1937,11 @@ canvas{image-rendering:pixelated;}
       </div>
     </div>
 
-    <!-- ② col2 row2: AI 종합분석 자리 (다음 단계) -->
+    <!-- ② col2 row2: AI 종합분석 자리 (매매 단계에서 활성화) -->
     <div class="prc-airow">
-      <span class="prc-ph-ico" style="font-size:15px;">🧠</span>
+      <span class="prc-ph-ico" style="font-size:15px;opacity:.5;">🧠</span>
       <span class="prc-ph-t" style="margin-left:8px;">AI 종합분석</span>
-      <span class="prc-ph-s" style="margin-left:6px;">— 다음 단계에서 활성화 (매매기법·타점·실시간 체크)</span>
+      <span class="prc-ph-s" style="margin-left:6px;">🔒 매매 단계에서 활성화 — 매매기법·진입/청산 타점·실시간 체크</span>
     </div>
 
     <!-- ② col2 row3: 재생 컨트롤 (실전 mock-bar 모양 · 일봉 모드에서는 prcSetDailyMode 가 숨김) -->
@@ -1958,23 +1958,27 @@ canvas{image-rendering:pixelated;}
       <div id="prcProgress" style="margin-left:auto;font-size:11px;color:var(--ts);font-variant-numeric:tabular-nums;"></div>
     </div>
 
-    <!-- ③ col3: 호가창·체결 자리 — 과거 호가/체결 데이터 없음 (비활성) -->
+    <!-- ③ col3: 호가창·체결 자리 — 과거 호가 데이터 없음(실시간 전용), 비활성 -->
     <div class="prc-rp">
-      <div class="prc-ph-hd">호가창 · 체결</div>
+      <div class="prc-ph-hd">호가창 · 체결 <span class="dim">· 비활성</span></div>
       <div class="prc-ph">
-        <div class="prc-ph-ico">📊</div>
-        <div class="prc-ph-t">데이터 없음</div>
-        <div class="prc-ph-s">과거 호가 10단·체결강도·체결창은<br>분봉 재생 데이터에 없어요<br>(연습은 분봉 차트 기반)</div>
+        <div class="prc-ph-box">
+          <div class="prc-ph-ico">📋</div>
+          <div class="prc-ph-t">과거 호가 데이터 없음</div>
+          <div class="prc-ph-s">호가 10단·체결강도·체결창은<br><b>실시간 전용</b>이라 과거 재생엔 없어요<br>(연습은 분봉 차트로 타이밍 연습)</div>
+        </div>
       </div>
     </div>
 
-    <!-- ④ col4: 주문·보유·AI 자리 — 매매는 다음 단계 (비활성) -->
+    <!-- ④ col4: 주문·보유·AI 자리 — 매매 기능 추후 추가 예정 (자리 잡아둠, 비활성) -->
     <div class="prc-brp">
-      <div class="prc-ph-hd">주문 · 보유 · AI</div>
+      <div class="prc-ph-hd">주문 · 보유 · AI <span class="dim">· 비활성</span></div>
       <div class="prc-ph">
-        <div class="prc-ph-ico">🛒</div>
-        <div class="prc-ph-t">매매는 다음 단계</div>
-        <div class="prc-ph-s">지금은 차트 읽기·타이밍 연습<br>주문/AI 조언은 추후 활성화</div>
+        <div class="prc-ph-box">
+          <div class="prc-ph-ico">💰</div>
+          <div class="prc-ph-t">매매 기능은 추후 추가 예정</div>
+          <div class="prc-ph-s">지금은 차트 읽기·타이밍 연습 단계<br>이 자리에 <b>매매 버튼</b>이 들어올 예정이에요</div>
+        </div>
       </div>
     </div>
 
@@ -2050,6 +2054,12 @@ canvas{image-rendering:pixelated;}
   .prc-lp-lbl{font-size:10px;color:var(--ts,#8b95a1);margin-bottom:4px;}
   /* col1 하단 스크롤 영역: 장전후보+수급 (세로로 길면 내부 스크롤) */
   .prc-lp-body{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:8px;}
+  /* 비활성 자리(호가/주문 등 추후 활성) — 점선 박스로 "자리 잡아둠" 느낌 */
+  .prc-ph-box{border:1.5px dashed var(--br,#e5e8eb);border-radius:12px;padding:18px 16px;display:flex;flex-direction:column;align-items:center;gap:7px;max-width:92%;background:rgba(148,163,184,.04);}
+  .prc-ph-hd .dim{color:var(--tm,#b0b8c1);font-weight:600;font-size:9px;margin-left:5px;}
+  .prc-rp,.prc-brp{opacity:.92;}
+  /* 🤖 에이전트 팀 전역 위젯: 연습모드 탭에서는 col1 을 가리므로 숨김(다른 탭은 그대로) */
+  body:has(#page-practice.on) #agentTeamPanel{display:none!important;}
   /* mock-bar 컴팩트 버튼(연습 전용) */
   .prc-mb-btn{padding:5px 11px;border-radius:8px;border:1px solid var(--bd,#2a2d35);background:var(--card,#16181d);color:var(--tp,#191f28);font-size:12px;font-weight:700;cursor:pointer;touch-action:manipulation;flex-shrink:0;}
   .prc-mb-btn.play{background:var(--b,#3b82f6);color:#fff;border-color:var(--b,#3b82f6);}
