@@ -1879,8 +1879,7 @@ canvas{image-rendering:pixelated;}
           <div class="prc-prep-h">📊 종목 후보 <span>전일 거래대금 순 · 클릭→차트</span></div>
           <div id="prcPrepTable"></div>
         </div>
-        <!-- ── 📊 선택 종목 공매도·수급 추이 (연습 전용 pctx · D 직전 N거래일 · 당일/미래 미사용, 룩어헤드 차단) ── -->
-        <div id="prcKrxTrend"></div>
+        <!-- 공매도·수급 추이(prcKrxTrend)는 col3 "수급/공매도" 탭으로 이동 → col1 은 장전후보(종목 선정)에 집중 -->
       </div>
     </div>
 
@@ -1958,15 +1957,24 @@ canvas{image-rendering:pixelated;}
       <div id="prcProgress" style="margin-left:auto;font-size:11px;color:var(--ts);font-variant-numeric:tabular-nums;"></div>
     </div>
 
-    <!-- ③ col3: 호가창·체결 자리 — 과거 호가 데이터 없음(실시간 전용), 비활성 -->
+    <!-- ③ col3: 분석 패널 탭 (실전 호가창 자리) — 호가/체결은 과거 데이터 없어 가치있는 연습 데이터로 대체 -->
     <div class="prc-rp">
-      <div class="prc-ph-hd">호가창 · 체결 <span class="dim">· 비활성</span></div>
-      <div class="prc-ph">
-        <div class="prc-ph-box">
-          <div class="prc-ph-ico">📋</div>
-          <div class="prc-ph-t">과거 호가 데이터 없음</div>
-          <div class="prc-ph-s">호가 10단·체결강도·체결창은<br><b>실시간 전용</b>이라 과거 재생엔 없어요<br>(연습은 분봉 차트로 타이밍 연습)</div>
-        </div>
+      <div class="prc-rp-tabs">
+        <div class="prc-rpt on" data-tab="flow" onclick="prcCol3Tab('flow')" title="전일까지 외인·기관 수급 + 공매도 추이">수급/공매도</div>
+        <div class="prc-rpt" data-tab="ind" onclick="prcCol3Tab('ind')" title="현재 재생 시점까지의 RSI·MACD·VWAP">지표</div>
+        <div class="prc-rpt" data-tab="info" onclick="prcCol3Tab('info')" title="섹터·전일 등락률·시황">종목정보</div>
+      </div>
+      <!-- 탭1 수급/공매도 (기본) — col1 에서 이동해 온 prcKrxTrend -->
+      <div class="prc-rpb on" id="prcTabFlow">
+        <div id="prcKrxTrend"></div>
+      </div>
+      <!-- 탭2 지표 — 재생 시점(n1)까지로 계산, 룩어헤드 없음 -->
+      <div class="prc-rpb" id="prcTabInd">
+        <div id="prcIndSummary"><div class="prc-i-empty">종목을 선택하세요</div></div>
+      </div>
+      <!-- 탭3 종목정보 — 전일(D-1) 맥락, 당일 미사용 -->
+      <div class="prc-rpb" id="prcTabInfo">
+        <div id="prcStockInfo"><div class="prc-i-empty">종목을 선택하세요</div></div>
       </div>
     </div>
 
@@ -2060,6 +2068,21 @@ canvas{image-rendering:pixelated;}
   .prc-rp,.prc-brp{opacity:.92;}
   /* 🤖 에이전트 팀 전역 위젯: 연습모드 탭에서는 col1 을 가리므로 숨김(다른 탭은 그대로) */
   body:has(#page-practice.on) #agentTeamPanel{display:none!important;}
+  /* col3 분석 패널 탭 (실전 호가창 자리) */
+  .prc-rp-tabs{display:flex;border-bottom:1px solid var(--br);flex-shrink:0;}
+  .prc-rpt{flex:1;padding:7px 2px;text-align:center;font-size:10px;cursor:pointer;color:var(--ts,#8b95a1);border-bottom:2px solid transparent;transition:all .12s;font-weight:600;touch-action:manipulation;white-space:nowrap;}
+  .prc-rpt.on{color:var(--b,#3b82f6);border-bottom-color:var(--b,#3b82f6);font-weight:800;}
+  .prc-rpb{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;display:none;padding:8px;}
+  .prc-rpb.on{display:block;}
+  .prc-i-empty{padding:16px 12px;color:var(--tm,#b0b8c1);font-size:12px;text-align:center;line-height:1.6;}
+  .prc-i-note{font-size:10px;color:var(--ts,#8b95a1);margin-bottom:8px;line-height:1.5;}
+  .prc-i-card{border:1px solid var(--bd,#2a2d35);border-radius:10px;padding:8px 10px;margin-bottom:8px;background:var(--card,#0f1115);}
+  .prc-i-ttl{font-size:11px;font-weight:800;color:var(--tp,#191f28);margin-bottom:4px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+  .prc-i-big{font-family:var(--mono);font-size:22px;font-weight:800;letter-spacing:-.02em;}
+  .prc-i-row{display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--br);font-size:12px;}
+  .prc-i-k{color:var(--ts,#8b95a1);font-weight:600;}
+  .prc-i-v{font-family:var(--mono);font-weight:800;color:var(--tp,#191f28);}
+  .prc-i-badge{display:inline-block;padding:1px 8px;border-radius:999px;font-size:10px;font-weight:800;}
   /* mock-bar 컴팩트 버튼(연습 전용) */
   .prc-mb-btn{padding:5px 11px;border-radius:8px;border:1px solid var(--bd,#2a2d35);background:var(--card,#16181d);color:var(--tp,#191f28);font-size:12px;font-weight:700;cursor:pointer;touch-action:manipulation;flex-shrink:0;}
   .prc-mb-btn.play{background:var(--b,#3b82f6);color:#fff;border-color:var(--b,#3b82f6);}
@@ -15372,6 +15395,8 @@ const PRC = {
   follow:true,       // 최신 봉 추종(줌 상태에서 다음 봉 넘겨도 최신이 보이게)
   _fullSlots:0,      // 마지막 렌더의 전체 슬롯 수(핸들러 줌/팬 계산용)
   _barCount:0,       // 마지막 렌더의 실제 봉 수(추종/팬 한계 계산용)
+  col3tab:'flow',    // col3 분석 패널 탭(flow=수급/공매도 · ind=지표 · info=종목정보), 기본 수급
+  prep:null,         // 장전후보 응답 캐시(rows/market/sectors) — 종목정보 탭용(전일=과거, 룩어헤드 아님)
 };
 
 async function prcInit(){
@@ -15413,7 +15438,8 @@ async function prcLoad(){
   if(!dsel||!ssel||!dsel.value||!ssel.value) return;
   PRC.date = dsel.value; PRC.symbol = ssel.value;
   PRC.name = (PRC.symbols.find(s=>s.code===PRC.symbol)||{}).name || PRC.symbol;
-  prcLoadKrxTrend();   // 📊 선택 종목 수급·공매도 추이(D 직전 N거래일, 룩어헤드 차단) — 봉단위 무관
+  prcLoadKrxTrend();   // 📊 선택 종목 수급·공매도 추이(D 직전 N거래일, 룩어헤드 차단) — 봉단위 무관 (col3 탭1)
+  if(PRC.col3tab==='info') prcRenderStockInfo();   // col3 종목정보 탭 갱신
   if(PRC.tf==='D'){ prcLoadDaily(); return; }   // 일봉 모드: 전체 기간 일봉 다시 합성(종목 바뀌면 갱신)
   prcSetEmpty('불러오는 중…');
   try{
@@ -15447,9 +15473,11 @@ async function prcLoadPrep(){
     const r=await fetch(`/api/practice/candles?prep=1&date=${date}`,{cache:'no-store'});
     const d=await r.json();
     if(!d.ok){ if(tblEl) tblEl.innerHTML='<div style="padding:12px;color:var(--ts);font-size:12px;">'+prcEsc(d.error||'후보를 불러오지 못했어요')+'</div>'; return; }
+    PRC.prep=d;   // 종목정보 탭(col3)용 캐시 — 전일(D-1) 기준이라 룩어헤드 없음
     prcRenderPrepMarket(d);
     prcRenderPrepSectors(d.sectors||[]);
     prcRenderPrepTable(d.rows||[]);
+    if(PRC.col3tab==='info') prcRenderStockInfo();   // 종목정보 탭 열려 있으면 갱신
   }catch(e){ if(tblEl) tblEl.innerHTML='<div style="padding:12px;color:var(--ts);font-size:12px;">후보 로드 오류: '+prcEsc(e.message)+'</div>'; }
 }
 
@@ -15562,6 +15590,98 @@ function prcRenderKrxTrend(d){
     +`<span style="font-size:11px;color:var(--ts);">${prcEsc(d.symbol)} · ${prcFmtDate(d.date)} 직전 ${days.length}거래일 · <b style="color:#10b981;">당일·미래 미사용</b></span></div>`
     +(summ?`<div style="font-size:12px;margin-bottom:8px;">${summ}</div>`:'')
     +`<div style="overflow:auto;max-height:240px;border:1px solid var(--bd,#2a2d35);border-radius:10px;"><table class="prc-prep-tbl"><thead><tr><th style="text-align:left;">날짜</th><th>외국인 순매수</th><th>기관 순매수</th><th>공매도%</th></tr></thead><tbody>${body}</tbody></table></div></div>`;
+}
+
+// ════════ col3 분석 패널 탭 (실전 호가창 자리) ════════
+//   flow=수급/공매도(prcKrxTrend) · ind=지표(현재 재생시점 RSI/MACD/VWAP) · info=종목정보(D-1 맥락)
+//   룩어헤드: 지표는 n1 까지(prcAggregate)·수급/정보는 D-1 이전만.
+const PRC_TAB_BODY={flow:'prcTabFlow',ind:'prcTabInd',info:'prcTabInfo'};
+function prcCol3Tab(tab){
+  if(!PRC_TAB_BODY[tab]) return;
+  PRC.col3tab=tab;
+  document.querySelectorAll('#page-practice .prc-rpt').forEach(b=>b.classList.toggle('on', b.dataset.tab===tab));
+  document.querySelectorAll('#page-practice .prc-rpb').forEach(b=>b.classList.toggle('on', b.id===PRC_TAB_BODY[tab]));
+  if(tab==='ind') prcRenderIndicators();
+  else if(tab==='info') prcRenderStockInfo();
+  // flow 는 prcLoadKrxTrend 가 이미 채움(종목/날짜 변경 시 갱신)
+}
+
+// ── 탭2 "지표": 현재 재생 시점(n1)까지의 RSI(14)/MACD(12,26,9)/VWAP 현재값 + 상태 ──
+function prcRenderIndicators(){
+  const el=document.getElementById('prcIndSummary'); if(!el) return;
+  if(!PRC.symbol){ el.innerHTML='<div class="prc-i-empty">종목을 선택하세요</div>'; return; }
+  if(PRC.tf==='D'){ el.innerHTML='<div class="prc-i-empty">일봉(참고용) 모드에서는<br>분봉 지표 요약을 제공하지 않아요</div>'; return; }
+  const bars=prcAggregate();   // raw[0..n1] 합성 → 미래 봉 없음(룩어헤드 차단)
+  if(!bars.length){ el.innerHTML='<div class="prc-i-empty">데이터가 없어요</div>'; return; }
+  const prevC=_prcPrevCloses();
+  const closesAll=prevC.concat(bars.map(c=>+c.c));   // 전일(과거)+당일(n1까지)
+  const num=v=>(v==null||isNaN(v))?null:+v;
+  const rsiArr=calcRSI(closesAll,14); const rsi=num(rsiArr[rsiArr.length-1]);
+  const {ml,sig}=calcMACD(closesAll); const mL=num(ml[ml.length-1]), mS=num(sig[sig.length-1]);
+  const hist=(mL!=null&&mS!=null)?(mL-mS):null;
+  const vArr=calcVWAP(bars); const vwap=num(vArr[vArr.length-1]);
+  const price=num(bars[bars.length-1].c);
+  const cur=PRC.raw[PRC.n1-1];
+  const fmt=(v,d=2)=>v==null?'—':Number(v).toLocaleString(undefined,{minimumFractionDigits:d,maximumFractionDigits:d});
+  const fmt0=v=>v==null?'—':Math.round(v).toLocaleString();
+  const badge=(txt,col,bg)=>`<span class="prc-i-badge" style="color:${col};background:${bg};">${txt}</span>`;
+  // RSI 상태
+  let rsiB;
+  if(rsi==null) rsiB=badge('계산중','var(--tm)','rgba(148,163,184,.12)');
+  else if(rsi>=70) rsiB=badge('과매수','#ef4444','rgba(239,68,68,.12)');
+  else if(rsi<=30) rsiB=badge('과매도','#3b82f6','rgba(59,130,246,.12)');
+  else rsiB=badge('중립','#10b981','rgba(16,185,129,.12)');
+  // MACD 상태(히스토그램 부호)
+  let macdB;
+  if(hist==null) macdB=badge('계산중','var(--tm)','rgba(148,163,184,.12)');
+  else if(hist>0) macdB=badge('매수우위(골든권)','#ef4444','rgba(239,68,68,.12)');
+  else macdB=badge('매도우위(데드권)','#3b82f6','rgba(59,130,246,.12)');
+  // VWAP 대비 현재가
+  let vwapB='';
+  if(vwap!=null&&price!=null){
+    const up=price>=vwap;
+    vwapB=badge(up?'VWAP 위(강세)':'VWAP 아래(약세)', up?'#ef4444':'#3b82f6', up?'rgba(239,68,68,.12)':'rgba(59,130,246,.12)');
+  }
+  el.innerHTML=
+    `<div class="prc-i-note">기준 시점 <b>${cur?cur.t:'--:--'}</b> · ${PRC.n1}/${PRC.raw.length}분 (${PRC.tf}분봉) · <b style="color:#10b981;">미래 미사용</b></div>`
+   +`<div class="prc-i-card"><div class="prc-i-ttl">RSI(14) ${rsiB}</div><div class="prc-i-big" style="color:${rsi==null?'var(--tm)':(rsi>=70?'#ef4444':rsi<=30?'#3b82f6':'var(--tp,#191f28)')};">${fmt(rsi,1)}</div></div>`
+   +`<div class="prc-i-card"><div class="prc-i-ttl">MACD(12,26,9) ${macdB}</div>`
+     +`<div class="prc-i-row"><span class="prc-i-k">MACD</span><span class="prc-i-v">${fmt(mL)}</span></div>`
+     +`<div class="prc-i-row"><span class="prc-i-k">Signal</span><span class="prc-i-v">${fmt(mS)}</span></div>`
+     +`<div class="prc-i-row" style="border-bottom:none;"><span class="prc-i-k">히스토그램</span><span class="prc-i-v" style="color:${hist==null?'var(--tm)':(hist>0?'#ef4444':'#3b82f6')};">${fmt(hist)}</span></div></div>`
+   +`<div class="prc-i-card"><div class="prc-i-ttl">VWAP ${vwapB}</div>`
+     +`<div class="prc-i-row"><span class="prc-i-k">VWAP</span><span class="prc-i-v">${fmt0(vwap)}</span></div>`
+     +`<div class="prc-i-row" style="border-bottom:none;"><span class="prc-i-k">현재가</span><span class="prc-i-v">${fmt0(price)}</span></div></div>`;
+}
+
+// ── 탭3 "종목정보": 섹터·전일(D-1) 등락률·수급·전일 시황 (장전후보 캐시=과거, 룩어헤드 없음) ──
+function prcRenderStockInfo(){
+  const el=document.getElementById('prcStockInfo'); if(!el) return;
+  if(!PRC.symbol){ el.innerHTML='<div class="prc-i-empty">종목을 선택하세요</div>'; return; }
+  const p=PRC.prep||{};
+  const row=(Array.isArray(p.rows)?p.rows:[]).find(r=>r.code===PRC.symbol)||null;
+  const m=p.market;
+  const fmtEok=v=>(v==null||isNaN(v))?'—':(Number(v)>0?'+':'')+Math.round(Number(v)).toLocaleString()+'억';
+  const flowCol=v=>(v==null||isNaN(v))?'var(--ts,#9aa)':(v>0?'#ef4444':v<0?'#3b82f6':'var(--ts)');
+  const rowR=(k,v,col)=>`<div class="prc-i-row"><span class="prc-i-k">${k}</span><span class="prc-i-v"${col?` style="color:${col};"`:''}>${v}</span></div>`;
+  const mkItem=(o,lbl)=> o ? `<span class="prc-mk"><b>${lbl}</b> ${o.close!=null?Number(o.close).toLocaleString():'—'} <span style="color:${prcPctColor(o.changePct)};font-weight:800;">${prcFmtPct(o.changePct)}</span></span>` : '';
+  let html=`<div class="prc-i-note"><b>${prcEsc(PRC.name||PRC.symbol)}</b> ${prcEsc(PRC.symbol)} · 전일(D-1) 맥락 · <b style="color:#10b981;">당일 미사용</b></div>`;
+  html+=`<div class="prc-i-card">`;
+  if(row){
+    html+=rowR('섹터', prcEsc(row.sector||'—'));
+    html+=rowR('전일 등락률(D-1)', prcFmtPct(row.changePct), prcPctColor(row.changePct));
+    html+=rowR('전일 거래대금', Number(row.amtEok||0).toLocaleString()+'억');
+    html+=rowR('전일 공매도 비중', (row.shortRatio==null||isNaN(row.shortRatio))?'—':Number(row.shortRatio).toFixed(2)+'%', (row.shortRatio>=5?'#f59e0b':''));
+    html+=rowR('전일 외국인 순매수', fmtEok(row.foreignEok), flowCol(row.foreignEok));
+    html+=`<div class="prc-i-row" style="border-bottom:none;"><span class="prc-i-k">전일 기관 순매수</span><span class="prc-i-v" style="color:${flowCol(row.instEok)};">${fmtEok(row.instEok)}</span></div>`;
+  } else {
+    html+=`<div class="prc-i-empty" style="padding:8px;">후보 목록 밖 종목이라<br>섹터·수급 정보가 없어요</div>`;
+  }
+  html+=`</div>`;
+  const chips=m?(mkItem(m.nasdaq,'나스닥')+mkItem(m.kospi,'코스피')+mkItem(m.kosdaq,'코스닥')):'';
+  html+=`<div class="prc-i-card"><div class="prc-i-ttl">🌐 전일 시황</div>`
+       +(chips?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;">${chips}</div>`:`<div class="prc-i-empty" style="padding:6px;">시황 데이터 없음</div>`)+`</div>`;
+  el.innerHTML=html;
 }
 
 // 후보 클릭 → 종목 선택칸 반영 + 그 종목 연습 차트 로드(선택→타점 연습 흐름)
@@ -15786,6 +15906,7 @@ function prcRender(){
   _prcBindIndTips();             // 보조지표 용어 설명 툴팁 핸들러(1회만 바인딩)
   _prcSyncMaUI();                // MA 토글 버튼 활성표시 동기화
   _prcOverlayClear();            // 재생/재렌더로 봉이 바뀌면 이전 십자선 잔상 제거
+  if(PRC.col3tab==='ind') prcRenderIndicators();   // col3 지표 탭: 재생 시점(n1)까지로 실시간 갱신 (룩어헤드 없음)
 }
 
 // ── 연습모드 툴팁 + 십자선 (pctx 전용, HTS 기본 차트 무영향) ──────────────────
