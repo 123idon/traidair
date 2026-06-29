@@ -1912,6 +1912,7 @@ canvas{image-rendering:pixelated;}
           <button class="prc-ma" data-sub="vwap" data-tip="vwap" style="--mac:#06b6d4" onclick="prcToggleSub('vwap')">VWAP</button>
           <button class="prc-ma" data-sub="bb" data-tip="bb" style="--mac:#8b5cf6" onclick="prcToggleSub('bb')">볼린저</button>
           <button class="prc-ma" data-sub="sr" data-tip="sr" style="--mac:#f43f5e" onclick="prcToggleSub('sr')">지지/저항</button>
+          <button class="prc-ma" data-sub="pat" data-tip="pat" style="--mac:#eab308" onclick="prcToggleSub('pat')">패턴</button>
         </div>
         <span class="vsep"></span>
         <span style="font-size:9px;color:var(--tm);font-family:var(--mono);">두께</span>
@@ -5061,6 +5062,21 @@ function _drawChartInner(pctx){
       const tw=ctx.measureText(label).width;
       ctx.globalAlpha=0.92; ctx.fillStyle=col; ctx.fillRect(PL+3, y-12, tw+8, 13);
       ctx.globalAlpha=1; ctx.fillStyle='#fff'; ctx.fillText(label, PL+7, y-2);
+    });
+    ctx.restore();
+  }
+
+  // ── 캔들패턴 자동마커 (연습모드 pctx.patterns) — 현재 n1 까지 봉에서만 인식(룩어헤드 없음).
+  //    HTS(patterns 없음)는 미표시 → 기존과 100% 동일(무영향). 강세=캔들 아래·약세=캔들 위에 이모지. ──
+  if(pctx && Array.isArray(pctx.patterns)){
+    ctx.save();
+    ctx.textAlign='center'; ctx.font='11px sans-serif';
+    pctx.patterns.forEach(p=>{
+      if(!p || p.idx==null || p.idx<0 || p.idx>=cs.length) return;
+      const c=cs[p.idx], x=toX(p.idx); let y;
+      if(p.dir==='down'){ y=toY(+c.h)-4; if(y<PT+9) y=PT+9; }       // 약세=캔들 위
+      else { y=toY(+c.l)+13; if(y>PT+mainH-2) y=PT+mainH-2; }       // 강세=캔들 아래
+      ctx.fillText(p.emoji||'•', x, y);
     });
     ctx.restore();
   }
@@ -15509,6 +15525,8 @@ const PRC = {
   vwap:false,        // VWAP 메인 오버레이 on/off (연습 전용) — 엔진 inds.vwap + pctx.vwapData 로 전달
   bb:false,          // 볼린저밴드(20,2σ) 메인 오버레이 on/off (연습 전용) — 엔진 inds.bb + pctx.bbData 로 전달
   sr:false,          // 지지·저항 자동선 on/off (연습 전용) — 엔진 pctx.srLevels 로 전달(현재 n1 까지 계산, 룩어헤드 없음)
+  pat:false,         // 캔들패턴 자동마커 on/off (연습 전용, 기본 꺼짐) — 엔진 pctx.patterns 로 전달(현재 n1 까지, 룩어헤드 없음)
+  _patternByIdx:{},  // 윈도우 인덱스→패턴 {emoji,label,type} (툴팁 hover 설명용, 매 렌더 갱신)
   vCount:0,          // 줌: 보이는 슬롯 수(0=전체보기). >0 이면 확대 — 연습 전용(HTS 전역 chartViewCount 와 무관)
   vStart:0,          // 줌 윈도우 좌측 슬롯 인덱스(팬)
   follow:true,       // 최신 봉 추종(줌 상태에서 다음 봉 넘겨도 최신이 보이게)
@@ -15890,6 +15908,33 @@ function prcCalcSR(bars){
   return res.concat(sup);
 }
 
+// ════════ 캔들패턴 자동 인식 (노션 Phase 4, 6패턴) ════════
+//   bars = 현재 시점(0..n1)까지 봉만 → 미래 봉 절대 미사용(룩어헤드 없음).
+//   강세(아래 표시): 망치🔨·상승장악🟢·장대양봉🔺 / 약세(위 표시): 유성☄·하락장악🔴·장대음봉🔻.
+//   명확한 것만(엄격 임계) — dir: 'up'(캔들 아래) / 'down'(캔들 위). idx=bars 내 절대 인덱스.
+function prcDetectPatterns(bars){
+  const out=[]; const n=bars.length;
+  for(let i=0;i<n;i++){
+    const c=bars[i]; const o=+c.o, h=+c.h, l=+c.l, cl=+c.c;
+    const range=h-l; if(!(range>0)) continue;
+    const body=Math.abs(cl-o), bodyR=body/range, up=cl>=o;
+    const upperW=h-Math.max(o,cl), lowerW=Math.min(o,cl)-l;
+    const p=(i>0)?bars[i-1]:null;
+    // 장대양봉 / 장대음봉 (몸통 70%↑)
+    if(up && bodyR>=0.7 && lowerW<body*0.3){ out.push({idx:i,type:'longBull',emoji:'🔺',label:'장대양봉',dir:'up'}); continue; }
+    if(!up && bodyR>=0.7 && upperW<body*0.3){ out.push({idx:i,type:'longBear',emoji:'🔻',label:'장대음봉',dir:'down'}); continue; }
+    // 망치형 / 유성형 (작은 몸통 + 한쪽 긴 꼬리 2배↑)
+    if(body>0 && bodyR<0.4 && lowerW>=body*2 && upperW<=body*0.6){ out.push({idx:i,type:'hammer',emoji:'🔨',label:'망치형',dir:'up'}); continue; }
+    if(body>0 && bodyR<0.4 && upperW>=body*2 && lowerW<=body*0.6){ out.push({idx:i,type:'star',emoji:'☄',label:'유성형',dir:'down'}); continue; }
+    // 상승장악형 / 하락장악형 (직전 몸통을 현재 몸통이 완전히 감쌈)
+    if(p){ const po=+p.o, pc=+p.c;
+      if(pc<po && up && cl>=po && o<=pc){ out.push({idx:i,type:'bullEngulf',emoji:'🟢',label:'상승장악형',dir:'up'}); continue; }
+      if(pc>po && !up && cl<=po && o>=pc){ out.push({idx:i,type:'bearEngulf',emoji:'🔴',label:'하락장악형',dir:'down'}); continue; }
+    }
+  }
+  return out;
+}
+
 // ════════ col4 R/R 손익비 계산기 (노션 Phase 8) ════════
 // 현재 재생 시점의 차트가(마지막 노출 봉 종가) — 룩어헤드 없음(미래 봉 미사용).
 function prcCurrentPrice(){
@@ -16137,6 +16182,15 @@ function prcRender(){
   // 지지·저항: 현재 시점(bars=0..n1, 미래봉 없음)으로 계산 → 절대 가격 레벨(윈도우 슬라이스 불필요, 엔진이 가시범위 클램프)
   let srLevels=null;
   if(PRC.sr && bars.length) srLevels=prcCalcSR(bars);
+  // 캔들패턴: bars(0..n1)에서 인식(미래봉 없음) → 윈도우 인덱스로 매핑(엔진 cs=winBars 와 정렬). 너무 많으면 최근 것만.
+  let patterns=null; PRC._patternByIdx={};
+  if(PRC.pat && winBars.length){
+    const inWin=[];
+    for(const pt of prcDetectPatterns(bars)){ const wi=pt.idx - vStart; if(wi>=0 && wi<winBars.length) inWin.push({idx:wi, emoji:pt.emoji, dir:pt.dir, label:pt.label, type:pt.type}); }
+    const capped=inWin.slice(-14);   // 마커 과다 방지(최근 14개)
+    patterns=capped.map(p=>({idx:p.idx, emoji:p.emoji, dir:p.dir}));
+    for(const p of capped) PRC._patternByIdx[p.idx]={emoji:p.emoji, label:p.label, type:p.type};
+  }
 
   // ── 메인 HTS 차트엔진 재사용(방식 B) — 연습 컨텍스트만 주입 ──
   if(typeof _drawChartInner==='function'){
@@ -16154,6 +16208,7 @@ function prcRender(){
       maData: maData,          // 전체 봉(현재 시점까지)으로 계산해 윈도우에 맞춘 MA → 줌 좌측 안 끊김·룩어헤드 없음
       bbData: bbData,          // 볼린저밴드(20,2σ) {upper,lower,mid} — 전일연결+윈도우 슬라이스 (룩어헤드 없음)
       srLevels: srLevels,      // 지지·저항 자동선 [{price,type,touches}] — 현재 n1 까지 계산 (룩어헤드 없음)
+      patterns: patterns,      // 캔들패턴 마커 [{idx,emoji,dir}] — 현재 n1 까지 인식 (룩어헤드 없음)
       overlays: false,         // 마커/십자선/스크롤바 끔(2·3단계에서). RSI/MACD 는 아래 pctx 필드로 따로 그림
       rsiOn: !!PRC.rsi,        // RSI(14) 서브차트 on/off (연습 전용) → _drawRSI(cs,cls,pctx)
       macdOn: !!PRC.macd,      // MACD(12,26,9) 서브차트 on/off (연습 전용) → _drawMACD(cs,cls,pctx)
@@ -16196,7 +16251,7 @@ function _prcSyncMaUI(){
 }
 // ── 보조지표(RSI/MACD) 토글(연습 전용) — 펜/터치 onclick. HTS 무영향(PRC.rsi/macd 만 바뀜) ──
 function prcToggleSub(kind){
-  if(kind!=='rsi'&&kind!=='macd'&&kind!=='vwap'&&kind!=='bb'&&kind!=='sr') return;
+  if(kind!=='rsi'&&kind!=='macd'&&kind!=='vwap'&&kind!=='bb'&&kind!=='sr'&&kind!=='pat') return;
   PRC[kind]=!PRC[kind];
   _prcSyncSubUI(); prcRender();
 }
@@ -16212,6 +16267,16 @@ const PRC_IND_TIPS = {
   ma:   'MA(5/20/60) · 그 기간 평균 매수단가. 정배열(5>20>60)=상승 추세, 20MA=생명선(눌림목 지지·이탈 시 손절 기준).',
   bb:   '볼린저밴드(20,2σ) · 중심선=20MA, 상·하단=±2표준편차. 밴드 수축=변동성 축소(돌파 임박), 상단 접촉=과열·하단 접촉=과매도, 밴드 확장=추세 진행.',
   sr:   '지지·저항 · 지지(파랑)=떨어지다 자주 멈춘 바닥(매수세)·저항(빨강)=오르다 막힌 천장(매도세). 여러 번 부딪힌(터치) 레벨일수록 강함, 돌파 시 역할 뒤바뀜(저항→지지). Phase 4: 손절·목표를 이 레벨로 잡는다.',
+  pat:  '캔들패턴 자동표시 · 망치🔨/유성☄/장악형🟢🔴/장대양·음봉을 자동 인식해 마커로 표시. 기본 꺼짐(직접 찾는 연습용), 켜면 확인용. 캔들(마커)에 마우스 올리면 패턴 설명. Phase 4.',
+};
+// ── 캔들패턴별 설명(마커 hover, Phase 4 정의) ──
+const PRC_PAT_TIPS = {
+  hammer:     '망치형 · 작은 몸통 + 아래꼬리가 몸통의 2배↑. 바닥권에서 매도세를 매수세가 되받음 → 상승 반전 신호(확인 봉 필요).',
+  star:       '유성형 · 작은 몸통 + 윗꼬리가 몸통의 2배↑. 고점권에서 매수세가 매도세에 눌림 → 하락 반전 신호.',
+  bullEngulf: '상승장악형 · 직전 음봉을 현재 양봉이 완전히 감쌈. 매수세로 전환되는 강세 신호.',
+  bearEngulf: '하락장악형 · 직전 양봉을 현재 음봉이 완전히 감쌈. 매도세로 전환되는 약세 신호.',
+  longBull:   '장대양봉 · 몸통이 전체 범위의 70%↑인 큰 양봉. 강한 매수세(추세 동력).',
+  longBear:   '장대음봉 · 몸통이 전체 범위의 70%↑인 큰 음봉. 강한 매도세(추세 동력).',
 };
 let _prcIndTipBound=false, _prcIndTipTimer=null;
 function _prcShowIndTip(btn){
@@ -16403,6 +16468,12 @@ function _prcTipMove(e){
       `<span style="opacity:.7">거래량</span><b style="text-align:right">${_fmtVol(b.v)}</b>`+
       `<span style="opacity:.7">등락</span><b style="text-align:right;color:${chgCol}">${chg>=0?'+':''}${chg.toFixed(2)}%</b>`+
     `</div>`;
+  // 캔들패턴 마커 hover 설명(이 봉에 패턴이 있으면 추가) — Phase 4
+  const _pat = (PRC.pat && PRC._patternByIdx) ? PRC._patternByIdx[rawI] : null;
+  if(_pat){
+    tip.innerHTML += `<div style="margin-top:4px;padding-top:3px;border-top:1px solid rgba(255,255,255,.22);">`
+      + `${_pat.emoji} <b>${_pat.label}</b><br><span style="opacity:.85;font-size:10px;white-space:normal;display:inline-block;max-width:200px;line-height:1.4;">${(PRC_PAT_TIPS&&PRC_PAT_TIPS[_pat.type])||''}</span></div>`;
+  }
   tip.style.display='block';
   // 위치(커서 기준 CSS px, 패널 밖으로 안 나가게)
   const tw=tip.offsetWidth, th=tip.offsetHeight, rx=e.clientX-rect.left, ry=e.clientY-rect.top;
