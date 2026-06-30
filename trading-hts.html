@@ -1909,6 +1909,7 @@ canvas{image-rendering:pixelated;}
         <div id="prcSubBtns" style="display:flex;gap:4px;align-items:center;touch-action:manipulation;">
           <button class="prc-ma" data-sub="rsi"  data-tip="rsi"  style="--mac:#a78bfa" onclick="prcToggleSub('rsi')">RSI</button>
           <button class="prc-ma" data-sub="macd" data-tip="macd" style="--mac:#3b82f6" onclick="prcToggleSub('macd')">MACD</button>
+          <button class="prc-ma" data-sub="obv" data-tip="obv" style="--mac:#10b981" onclick="prcToggleSub('obv')">OBV</button>
           <button class="prc-ma" data-sub="vwap" data-tip="vwap" style="--mac:#06b6d4" onclick="prcToggleSub('vwap')">VWAP</button>
           <button class="prc-ma" data-sub="bb" data-tip="bb" style="--mac:#8b5cf6" onclick="prcToggleSub('bb')">볼린저</button>
           <button class="prc-ma" data-sub="sr" data-tip="sr" style="--mac:#f43f5e" onclick="prcToggleSub('sr')">지지/저항</button>
@@ -1936,6 +1937,7 @@ canvas{image-rendering:pixelated;}
         <!-- 2·3단계용 보조지표 슬롯 (지금은 숨김) -->
         <div class="subc hide" id="prcRsiSub"><div class="slbl">RSI(14)</div><canvas id="prcRsiCanvas"></canvas></div>
         <div class="subc hide" id="prcMacdSub"><div class="slbl">MACD(12,26,9)</div><canvas id="prcMacdCanvas"></canvas></div>
+        <div class="subc hide" id="prcObvSub"><div class="slbl">OBV</div><canvas id="prcObvCanvas"></canvas></div>
       </div>
     </div>
 
@@ -3263,6 +3265,9 @@ function calcRSI(d,n){const r=[];for(let i=0;i<d.length;i++){if(i<n){r.push(null
 function calcMACD(d){const ema=(d,n)=>{const k=2/(n+1);let e=d[0];return d.map(v=>{e=v*k+e*(1-k);return e;});};const e12=ema(d,12),e26=ema(d,26);const ml=d.map((_,i)=>e12[i]-e26[i]);return{ml,sig:ema(ml,9)};}
 
 function calcVWAP(cs){let pv=0,tv=0;return cs.map(c=>{pv+=((c.h+c.l+c.c)/3)*c.v;tv+=c.v;return Math.round(pv/tv)});}
+// OBV(On-Balance Volume): 종가 상승 봉의 거래량은 가산, 하락 봉은 차감하는 누적 거래량 방향 지표.
+// 첫 봉은 기준점 0. cs(=0..n1)만 받아 누적하므로 룩어헤드 없음(미래 봉 미포함).
+function calcOBV(cs){let o=0;return cs.map((c,i)=>{if(i>0){if(c.c>cs[i-1].c)o+=c.v;else if(c.c<cs[i-1].c)o-=c.v;}return o;});}
 
 function _roundTick(p){
   if(p>=500000)return Math.round(p/1000)*1000;
@@ -5211,6 +5216,7 @@ function _drawChartInner(pctx){
   } else if(pctx){
     _drawRSI(cs,cls,pctx);     // 연습모드: pctx 토글/전일연결 데이터로 자체 슬롯에 그림(HTS 무영향)
     _drawMACD(cs,cls,pctx);
+    _drawOBV(cs,cls,pctx);     // 연습 전용 OBV(거래량 방향성) — HTS 기본 경로엔 없음
   }
 
   if(!pctx) mChart={_ok:true};
@@ -5341,6 +5347,52 @@ function _drawMACD(cs,cls,pctx){
     arr.forEach((v,i)=>{if(v==null)return;(i===0||arr[i-1]==null)?ctx.moveTo(toX(i),toY(v)):ctx.lineTo(toX(i),toY(v));});
     ctx.stroke();
   });
+}
+
+// OBV 서브차트 — 연습 전용(pctx 필수). HTS 기본 경로엔 OBV 가 없어 pctx 없으면 즉시 반환(HTS 무영향).
+// pctx.obvOn 토글 + pctx.obvData(현재 n1 까지 누적, 윈도우 슬라이스 → 룩어헤드 없음) 사용.
+function _drawOBV(cs,cls,pctx){
+  if(!pctx) return;
+  const el=document.getElementById(pctx.obvSubId||'prcObvSub');
+  const cv=document.getElementById(pctx.obvCanvasId||'prcObvCanvas');
+  const _on=!!pctx.obvOn;
+  if(!_on){if(el)el.classList.add('hide');return;}
+  if(!el||!cv)return; el.classList.remove('hide');
+  // 크기 측정: 부모 .subc 슬롯 실측(RSI/MACD 와 동일 방식 → 풀폭·슬롯높이).
+  const _measEl=el;
+  const r=_measEl.getBoundingClientRect();
+  const W=Math.round(r.width)||_measEl.offsetWidth||600;
+  const H=Math.round(r.height)||_measEl.offsetHeight||52;
+  if(W<10||H<10)return;
+  if(cv.width!==W||cv.height!==H){cv.width=W;cv.height=H;}
+  const ctx=cv.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);
+  const obv=pctx.obvData||[];
+  const all=obv.filter(v=>v!=null);
+  if(!all.length)return;
+  let vMin=Math.min(...all),vMax=Math.max(...all);
+  const vP=(vMax-vMin)*0.1||1;
+  vMin-=vP;vMax+=vP;
+  const vR=vMax-vMin||1;
+  const PL=4,PR=54,PT=2,PB=2,cw=W-PL-PR,ch=H-PT-PB;
+  const _den=pctx.slots||cs.length;
+  const toX=i=>PL+(i+0.5)*(cw/_den);
+  const toY=v=>PT+ch*(1-(v-vMin)/vR);
+  // 0선(기준점) — 0이 보이는 범위 안일 때만
+  if(vMin<0&&vMax>0){
+    ctx.strokeStyle='rgba(0,0,0,.1)';ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(PL,toY(0));ctx.lineTo(W-PR,toY(0));ctx.stroke();
+  }
+  // 우측 끝 OBV 값 라벨(만/억 단위 축약)
+  const last=all[all.length-1];
+  const fmt=v=>{const a=Math.abs(v);if(a>=1e8)return(v/1e8).toFixed(1)+'억';if(a>=1e4)return Math.round(v/1e4)+'만';return''+Math.round(v);};
+  ctx.fillStyle='#8c9db5';ctx.font='8px "JetBrains Mono",monospace';ctx.textAlign='left';
+  ctx.fillText(fmt(last),W-PR+4,PT+10);
+  ctx.strokeStyle='#10b981';ctx.lineWidth=1.5;
+  ctx.beginPath();
+  obv.forEach((v,i)=>{if(v==null)return;(i===0||obv[i-1]==null)?ctx.moveTo(toX(i),toY(v)):ctx.lineTo(toX(i),toY(v));});
+  ctx.stroke();
 }
 
 // ── initChart (호환성 유지) ──
@@ -15522,6 +15574,7 @@ const PRC = {
   ma:[5,20,60],      // 표시할 이동평균 기간(연습 전용 토글) — 엔진 pctx.maPeriods 로 전달, 빈 배열=MA 끔
   rsi:false,         // RSI(14) 서브차트 on/off (연습 전용) — 엔진 pctx.rsiOn 으로 전달
   macd:false,        // MACD(12,26,9) 서브차트 on/off (연습 전용) — 엔진 pctx.macdOn 으로 전달
+  obv:false,         // OBV 서브차트 on/off (연습 전용, 기본 꺼짐) — 엔진 pctx.obvOn 으로 전달. 거래량 방향성(상승일 +vol/하락일 -vol 누적)
   vwap:false,        // VWAP 메인 오버레이 on/off (연습 전용) — 엔진 inds.vwap + pctx.vwapData 로 전달
   bb:false,          // 볼린저밴드(20,2σ) 메인 오버레이 on/off (연습 전용) — 엔진 inds.bb + pctx.bbData 로 전달
   sr:false,          // 지지·저항 자동선 on/off (연습 전용) — 엔진 pctx.srLevels 로 전달(현재 n1 까지 계산, 룩어헤드 없음)
@@ -16158,7 +16211,7 @@ function prcRender(){
   // 보조지표(MA/RSI/MACD): 직전 거래일 종가(전일=과거) + 당일 종가(0..n1)로 계산 → 09:00 첫 봉부터 이어진다.
   // 전체로 계산 후 당일 윈도우 구간만 슬라이스 → 줌해도 좌측 안 끊김. 미래(n1 이후)는 bars 에 없어 룩어헤드 없음.
   // RSI(14)·MACD(26) 는 앞 봉이 있어야 시작되므로 MA 와 똑같이 전일 분봉으로 워밍업한다.
-  let maData=null, rsiData=null, macdData=null, vwapData=null, bbData=null;
+  let maData=null, rsiData=null, macdData=null, vwapData=null, bbData=null, obvData=null;
   if(winBars.length){
     const prevC = daily ? [] : _prcPrevCloses();          // 일봉 모드는 이미 전체 기간이라 전일 불필요
     const pn = prevC.length;
@@ -16178,6 +16231,8 @@ function prcRender(){
     if(PRC.macd){ const{ml,sig}=calcMACD(closesAll); macdData={ml:ml.slice(pn+vStart, pn+vStart+winBars.length), sig:sig.slice(pn+vStart, pn+vStart+winBars.length)}; }
     // VWAP: 당일 누적이라 전일연결 불필요(09:00 시작이 정상). 당일 전체(bars=0..n1, 미래봉 없음)로 누적 후 윈도우만 슬라이스 → 룩어헤드 없음.
     if(PRC.vwap) vwapData=calcVWAP(bars).slice(vStart, vStart+winBars.length);
+    // OBV: 당일 거래량 방향 누적(VWAP 처럼 전일연결 불필요, 09:00 기준점 0 시작). 당일 전체(bars=0..n1, 미래봉 없음)로 누적 후 윈도우만 슬라이스 → 룩어헤드 없음.
+    if(PRC.obv) obvData=calcOBV(bars).slice(vStart, vStart+winBars.length);
   }
   // 지지·저항: 현재 시점(bars=0..n1, 미래봉 없음)으로 계산 → 절대 가격 레벨(윈도우 슬라이스 불필요, 엔진이 가시범위 클램프)
   let srLevels=null;
@@ -16214,6 +16269,8 @@ function prcRender(){
       macdOn: !!PRC.macd,      // MACD(12,26,9) 서브차트 on/off (연습 전용) → _drawMACD(cs,cls,pctx)
       rsiData: rsiData,        // 전일연결+윈도우 슬라이스 RSI (룩어헤드 없음)
       macdData: macdData,      // 전일연결+윈도우 슬라이스 MACD {ml,sig}
+      obvOn: !!PRC.obv,        // OBV 서브차트 on/off (연습 전용) → _drawOBV(cs,cls,pctx)
+      obvData: obvData,        // 당일 누적(09:00~n1)+윈도우 슬라이스 OBV (룩어헤드 없음)
       vwapData: vwapData,      // 당일 누적(09:00~n1)+윈도우 슬라이스 VWAP (룩어헤드 없음)
       slots: vCount,           // 메인차트 슬롯 분모와 동일(_slots=max(winBars.length,vCount)=vCount) → 서브차트 X축 정렬 일치
     });
@@ -16251,7 +16308,7 @@ function _prcSyncMaUI(){
 }
 // ── 보조지표(RSI/MACD) 토글(연습 전용) — 펜/터치 onclick. HTS 무영향(PRC.rsi/macd 만 바뀜) ──
 function prcToggleSub(kind){
-  if(kind!=='rsi'&&kind!=='macd'&&kind!=='vwap'&&kind!=='bb'&&kind!=='sr'&&kind!=='pat') return;
+  if(kind!=='rsi'&&kind!=='macd'&&kind!=='obv'&&kind!=='vwap'&&kind!=='bb'&&kind!=='sr'&&kind!=='pat') return;
   PRC[kind]=!PRC[kind];
   _prcSyncSubUI(); prcRender();
 }
@@ -16263,6 +16320,7 @@ function _prcSyncSubUI(){
 const PRC_IND_TIPS = {
   rsi:  'RSI(14) · 모멘텀 지표(0~100). 70↑ 과매수 · 30↓ 과매도, 50선 위=상승 우세, 60 돌파=상승 모멘텀 가속.',
   macd: 'MACD(12,26,9) · 12·26일 EMA 차이. 골든/데드크로스로 추세 전환, 히스토그램(MACD−시그널)으로 모멘텀의 힘(후행 지표).',
+  obv: 'OBV(누적 거래량) · 종가 오른 봉의 거래량은 더하고 내린 봉은 빼서 누적 → 거래량의 방향(매집/분산). 수급(KRX)은 일별이라 장중 거래량 흐름을 보는 보조 렌즈. 가격은 오르는데 OBV 안 오르면(약세 다이버전스) 상승 동력 약함, 가격 횡보·하락에도 OBV 상승(강세 다이버전스)이면 매집 신호. 절대값보다 방향·기울기가 중요.',
   vwap: 'VWAP · 당일 거래량가중 평균체결가. 위=매수 우위(평균 매수자 수익)·아래=매도 우위, 매일 09:00 초기화되는 기관 기준선.',
   ma:   'MA(5/20/60) · 그 기간 평균 매수단가. 정배열(5>20>60)=상승 추세, 20MA=생명선(눌림목 지지·이탈 시 손절 기준).',
   bb:   '볼린저밴드(20,2σ) · 중심선=20MA, 상·하단=±2표준편차. 밴드 수축=변동성 축소(돌파 임박), 상단 접촉=과열·하단 접촉=과매도, 밴드 확장=추세 진행.',
