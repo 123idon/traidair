@@ -2031,6 +2031,19 @@ canvas{image-rendering:pixelated;}
           <div class="prc-tr-hd2">📦 보유 현황</div>
           <div id="prcTrHold"><div class="prc-tr-empty">보유 종목이 없습니다</div></div>
           <div id="prcTrTotal" class="prc-tr-total"></div>
+          <!-- ══ ②단계: 손익 상세 (이 세션 · 메모리 전용) ══ -->
+          <div class="prc-tr-hd2">📊 손익 상세 <span class="prc-tr-lbl" style="font-weight:600;">이 세션</span></div>
+          <div id="prcTrPnl" class="prc-tr-pnl"></div>
+        </div>
+        <!-- ══ ②단계: 리스크 경고 (기준 수정 가능 · 경고만, 매매 안 막음) ══ -->
+        <div class="prc-tr-card prc-risk-card">
+          <div class="prc-risk-hd">⚠️ 리스크 경고 <span class="prc-tr-lbl" style="font-weight:600;">기준 수정 가능 · 경고만(매매 안 막음)</span></div>
+          <div class="prc-risk-thr">
+            <label class="prc-risk-lab">종목손절 -<input id="prcRiskStop" class="prc-risk-in" type="text" inputmode="decimal" value="3" aria-label="종목당 손절 기준(%)" oninput="prcRiskUpdate()">%</label>
+            <label class="prc-risk-lab">일일한도 -<input id="prcRiskDaily" class="prc-risk-in" type="text" inputmode="decimal" value="2" aria-label="일일 손실 한도(총자산 대비 %)" oninput="prcRiskUpdate()">%</label>
+            <label class="prc-risk-lab">1회비중 <input id="prcRiskWeight" class="prc-risk-in" type="text" inputmode="decimal" value="20" aria-label="1회 매수 비중 한도(총자산 대비 %)" oninput="prcRiskUpdate()">%</label>
+          </div>
+          <div id="prcRiskWarn" class="prc-risk-warn"></div>
         </div>
         <div class="prc-rr-card">
           <div class="prc-rr-ttl">📐 손익비(R/R) 계산기</div>
@@ -2224,6 +2237,20 @@ canvas{image-rendering:pixelated;}
   .prc-tr-bs.all{background:#3b82f6;color:#fff;border-color:#3b82f6;}
   .prc-tr-total{font-size:11px;color:var(--ts,#8b95a1);text-align:right;padding-top:7px;margin-top:3px;border-top:1px solid var(--br);font-variant-numeric:tabular-nums;}
   .prc-tr-total b{color:var(--tp,#191f28);font-weight:800;font-family:var(--mono);}
+  /* ②단계: 손익 상세 */
+  .prc-tr-pnl{font-size:11px;font-variant-numeric:tabular-nums;}
+  .prc-tr-pl-row{display:flex;align-items:center;justify-content:space-between;padding:3px 0;color:var(--ts,#8b95a1);}
+  .prc-tr-pl-row b{font-family:var(--mono);font-weight:800;}
+  .prc-tr-pl-row.tot{border-top:1px dashed var(--br);margin-top:2px;padding-top:5px;font-weight:800;color:var(--tp,#191f28);}
+  /* ②단계: 리스크 경고 카드 */
+  .prc-risk-hd{font-size:11px;font-weight:800;color:var(--tp,#191f28);margin-bottom:7px;}
+  .prc-risk-thr{display:flex;flex-wrap:wrap;gap:5px 8px;margin-bottom:8px;}
+  .prc-risk-lab{display:inline-flex;align-items:center;gap:2px;font-size:10px;font-weight:700;color:var(--ts,#8b95a1);}
+  .prc-risk-in{width:38px;text-align:right;background:var(--pan,#fff);border:1px solid var(--br,#e5e8eb);border-radius:6px;color:var(--tp,#191f28);font-family:var(--mono);font-size:11px;font-weight:800;padding:4px 5px;outline:none;touch-action:manipulation;}
+  .prc-risk-in:focus{border-color:var(--b,#3b82f6);}
+  .prc-risk-warn{display:flex;flex-direction:column;gap:4px;}
+  .prc-risk-item{font-size:10px;font-weight:800;color:#b91c1c;background:rgba(239,68,68,.10);border:1px solid rgba(239,68,68,.28);border-radius:7px;padding:6px 8px;line-height:1.4;}
+  .prc-risk-ok{font-size:10px;color:#10b981;font-weight:700;text-align:center;padding:5px;}
   /* col3 정렬 탭: 3단계 타임프레임 미니 차트 */
   .prc-tf-head{font-size:11px;font-weight:800;color:var(--tp,#191f28);margin-bottom:4px;}
   .prc-tf-head span{display:block;font-size:9px;font-weight:600;color:var(--ts,#8b95a1);margin-top:1px;}
@@ -16139,7 +16166,10 @@ function prcCalcRR(){
 const PRC_TR = {
   cashInit: 5000000,    // 가상 자금 기본 500만원 (설정 가능)
   cash: 5000000,        // 현재 현금 잔고
-  pos: {},              // code -> {name, qty, avg, last}  — 분할매수 시 avg(평단) 재계산
+  pos: {},              // code -> {name, qty, avg, last, costBasis}  — 분할매수 시 avg(평단) 재계산, costBasis=매수원가(수수료 포함)
+  realized: 0,          // ②단계: 실현손익 누적(매도 완료분, 수수료·세금 후) — 이 세션 메모리 전용
+  lastBuy: null,        // ②단계: 직전 1회 매수 비중 정보 {pct, over, amount} — 리스크 경고용
+  risk: { stopPct:3, dailyPct:2, weightPct:20 },  // ②단계 리스크 기준(사용자 수정 가능): 종목 -3% / 일일 -2% / 1회 20%
 };
 // 숫자 입력칸(type=text inputmode=numeric) — 펜/터치/IME 에서도 안정적으로 입력되도록 숫자만 남긴다.
 //   (기존 type=number 는 좁은 폭+스피너로 펜/터치 탭 영역이 작아 입력이 안 되던 버그의 원인)
@@ -16188,14 +16218,22 @@ function prcTradeBuy(){
   const f=prcTrFees();
   const gross=price*qty, fee=Math.round(gross*f.buy), total=gross+fee;
   if(total>PRC_TR.cash+1e-6){ prcTrFlash(`잔고 부족 · 필요 ${prcWon(total)}원 / 보유 ${prcWon(PRC_TR.cash)}원`, true); return; }
+  // ②단계: 1회 매수 비중(총자산 대비) 경고용 계산 — 매매는 막지 않는다(초과해도 체결).
+  let equityBefore=PRC_TR.cash;
+  for(const c in PRC_TR.pos){ const pp=PRC_TR.pos[c]; equityBefore += (pp.last||pp.avg)*pp.qty; }
+  const weightPct = equityBefore>0 ? (total/equityBefore*100) : 0;
+  PRC_TR.lastBuy = { pct:weightPct, over: weightPct > PRC_TR.risk.weightPct, amount:total };
   PRC_TR.cash-=total;
-  const p=PRC_TR.pos[PRC.symbol]||{name:PRC.name, qty:0, avg:0, last:price};
+  const p=PRC_TR.pos[PRC.symbol]||{name:PRC.name, qty:0, avg:0, last:price, costBasis:0};
   const nq=p.qty+qty;
   p.avg=Math.round((p.avg*p.qty + price*qty)/nq);          // 평단(순수 가격 가중평균, 분할매수 자동 재계산)
+  p.costBasis=(p.costBasis||0)+total;                      // 매수원가(수수료 포함) 누적 → 손익 계산 기준
   p.qty=nq; p.name=PRC.name||PRC.symbol; p.last=(isFinite(cur)&&cur>0)?cur:price;
   PRC_TR.pos[PRC.symbol]=p;
   const qEl=document.getElementById('prcTrQty'); if(qEl) qEl.value='';
-  prcTrFlash(`✅ 매수 체결 · ${prcWon(qty)}주 @${prcWon(price)}원 (수수료 ${prcWon(fee)}원)`);
+  let msg=`✅ 매수 체결 · ${prcWon(qty)}주 @${prcWon(price)}원 (수수료 ${prcWon(fee)}원)`;
+  if(PRC_TR.lastBuy.over) msg += ` · ⚖ 1회 비중 ${weightPct.toFixed(1)}% 초과`;
+  prcTrFlash(msg, PRC_TR.lastBuy.over);
   prcTradeSync();
 }
 // 매도 — code 종목 qtyArg 주(null=전량). 체결가: 현재 차트 종목이면 재생 시점가, 아니면 마지막 기록가(둘 다 과거/현재 → 룩어헤드 없음).
@@ -16211,9 +16249,13 @@ function prcTradeSell(code, qtyArg){
   qty=Math.min(qty, p.qty);
   const f=prcTrFees();
   const gross=price*qty, fee=Math.round(gross*f.sell), tax=Math.round(gross*f.tax), net=gross-fee-tax;
+  // ②단계: 실현손익 = 매도 순수령액(net) - 매도분 매수원가(비례 배분, 수수료 포함)
+  const cb=(p.costBasis!=null)?p.costBasis:(p.avg*p.qty);
+  const costRemoved = p.qty>0 ? cb*(qty/p.qty) : 0;
+  PRC_TR.realized += (net - costRemoved);
   PRC_TR.cash+=net;
   p.qty-=qty;
-  if(p.qty<=0){ delete PRC_TR.pos[code]; } else { p.last=price; }
+  if(p.qty<=0){ delete PRC_TR.pos[code]; } else { p.last=price; p.costBasis = cb - costRemoved; }
   prcTrFlash(`✅ 매도 체결 · ${prcWon(qty)}주 @${prcWon(price)}원 (수수료+세금 ${prcWon(fee+tax)}원)`);
   prcTradeSync();
 }
@@ -16229,15 +16271,23 @@ function prcTradeSetCash(){
   const el=document.getElementById('prcTrCashInput');
   const n=Math.round(parseFloat(String((el&&el.value)||'').replace(/[,\s]/g,'')));
   if(!isFinite(n)||n<=0){ prcTrFlash('올바른 가상 자금(원)을 입력하세요', true); return; }
-  PRC_TR.cashInit=n; PRC_TR.cash=n; PRC_TR.pos={};
+  PRC_TR.cashInit=n; PRC_TR.cash=n; PRC_TR.pos={}; PRC_TR.realized=0; PRC_TR.lastBuy=null;
   if(el) el.value='';
-  prcTrFlash(`가상 자금을 ${prcWon(n)}원으로 설정했어요 (보유 초기화)`);
+  prcTrFlash(`가상 자금을 ${prcWon(n)}원으로 설정했어요 (보유·손익 초기화)`);
   prcTradeSync();
 }
-// 🔄 리셋 — 잔고를 초기 자금으로, 보유 전량 청산(메모리만 초기화)
+// 🔄 리셋 — 잔고를 초기 자금으로, 보유 전량 청산 + 손익 초기화(메모리만 초기화)
 function prcTradeReset(){
-  PRC_TR.cash=PRC_TR.cashInit; PRC_TR.pos={};
+  PRC_TR.cash=PRC_TR.cashInit; PRC_TR.pos={}; PRC_TR.realized=0; PRC_TR.lastBuy=null;
   prcTrFlash(`초기화 완료 · 잔고 ${prcWon(PRC_TR.cashInit)}원`);
+  prcTradeSync();
+}
+// ②단계: 리스크 기준값(종목 손절 / 일일 한도 / 1회 비중) 입력 반영 — 사용자 수정 가능
+function prcRiskUpdate(){
+  const g=(id,def)=>{ const el=document.getElementById(id); const v=parseFloat(String((el&&el.value)||'').replace(/[^0-9.]/g,'')); return (isFinite(v)&&v>0)?v:def; };
+  PRC_TR.risk.stopPct=g('prcRiskStop',3);
+  PRC_TR.risk.dailyPct=g('prcRiskDaily',2);
+  PRC_TR.risk.weightPct=g('prcRiskWeight',20);
   prcTradeSync();
 }
 // 매 재생/렌더/종목변경마다 호출 — 잔고·현재가·보유 평가금액 갱신(현재 차트 종목만 실시간가로 평가)
@@ -16250,12 +16300,13 @@ function prcTradeSync(){
   const pin=document.getElementById('prcTrPrice'); if(pin) pin.placeholder=(isFinite(cur)&&cur>0)?prcWon(cur):'현재가';
   const box=document.getElementById('prcTrHold');
   const codes=Object.keys(PRC_TR.pos);
-  let totalEval=0;
+  let totalEval=0, totalCost=0;
   if(!codes.length){ if(box) box.innerHTML='<div class="prc-tr-empty">보유 종목이 없습니다</div>'; }
   else if(box){
     box.innerHTML=codes.map(code=>{
       const p=PRC_TR.pos[code];
       const ev=Math.round((p.last||p.avg)*p.qty); totalEval+=ev;
+      totalCost += (p.costBasis!=null)?p.costBasis:(p.avg*p.qty);   // 매수원가(수수료 포함) 합 → 평가손익 계산
       const pnl=((p.last||p.avg)-p.avg)*p.qty, pnlPct=p.avg?(((p.last||p.avg)-p.avg)/p.avg*100):0;
       const isCur=(code===PRC.symbol);
       const col=pnl>0?'#ef4444':(pnl<0?'#3b82f6':'var(--ts,#8b95a1)');
@@ -16275,11 +16326,32 @@ function prcTradeSync(){
       +`</div>`;
     }).join('');
   }
+  const total=PRC_TR.cash+totalEval;                 // 총 평가자산 = 현금 + 보유 평가
   const teEl=document.getElementById('prcTrTotal');
-  if(teEl){
-    const total=PRC_TR.cash+totalEval, pl=total-PRC_TR.cashInit;
-    const col=pl>0?'#ef4444':(pl<0?'#3b82f6':'var(--ts,#8b95a1)');
-    teEl.innerHTML=`총 평가자산 <b>${prcWon(total)}</b>원 · <span style="color:${col};font-weight:800;">${pl>=0?'+':''}${prcWon(pl)}원</span>`;
+  if(teEl){ teEl.innerHTML=`총 평가자산 <b>${prcWon(total)}</b>원`; }
+  // ── ②단계: 손익 상세 (이 세션) ──
+  const realized=PRC_TR.realized||0;                 // 실현손익(매도완료분, 수수료·세금 후)
+  const unrealized=totalEval-totalCost;              // 평가손익(보유분: 현재평가 - 매수원가(수수료 포함))
+  const totalPnl=realized+unrealized;                // 총손익 = 실현 + 평가 (= 총평가자산 - 초기자금)
+  const pnlPct=PRC_TR.cashInit?(totalPnl/PRC_TR.cashInit*100):0;
+  const kc=v=>(v>0?'#ef4444':(v<0?'#3b82f6':'var(--ts,#8b95a1)'));      // 한국식: +빨강 / -파랑
+  const sgn=v=>(v>=0?'+':'')+prcWon(v);
+  const plEl=document.getElementById('prcTrPnl');
+  if(plEl){
+    plEl.innerHTML=
+       `<div class="prc-tr-pl-row"><span>실현손익</span><b style="color:${kc(realized)};">${sgn(realized)}원</b></div>`
+      +`<div class="prc-tr-pl-row"><span>평가손익</span><b style="color:${kc(unrealized)};">${sgn(unrealized)}원</b></div>`
+      +`<div class="prc-tr-pl-row tot"><span>총손익</span><b style="color:${kc(totalPnl)};">${sgn(totalPnl)}원 (${pnlPct>=0?'+':''}${pnlPct.toFixed(2)}%)</b></div>`;
+  }
+  // ── ②단계: 리스크 경고 (경고만 · 매매는 막지 않음) ──
+  const wEl=document.getElementById('prcRiskWarn');
+  if(wEl){
+    const rk=PRC_TR.risk, warns=[];
+    if(pnlPct <= -rk.dailyPct) warns.push(`🚨 일일 손실 ${pnlPct.toFixed(2)}% — 한도(-${rk.dailyPct}%) 도달, 매매 중단 권고 (총자산 대비)`);
+    codes.forEach(code=>{ const p=PRC_TR.pos[code]; const pct=p.avg?(((p.last||p.avg)-p.avg)/p.avg*100):0;
+      if(pct <= -rk.stopPct) warns.push(`📉 ${prcEsc(p.name)} ${pct.toFixed(2)}% — 손절 기준(-${rk.stopPct}%) 도달`); });
+    if(PRC_TR.lastBuy && PRC_TR.lastBuy.over) warns.push(`⚖ 직전 1회 매수 비중 ${PRC_TR.lastBuy.pct.toFixed(1)}% — 기준(${rk.weightPct}%) 초과`);
+    wEl.innerHTML = warns.length ? warns.map(w=>`<div class="prc-risk-item">${w}</div>`).join('') : '<div class="prc-risk-ok">✅ 경고 없음</div>';
   }
 }
 
