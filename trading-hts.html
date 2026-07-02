@@ -2045,6 +2045,19 @@ canvas{image-rendering:pixelated;}
           </div>
           <div id="prcRiskWarn" class="prc-risk-warn"></div>
         </div>
+        <!-- ══ ③단계: 성과기록 + 매매일지 (이 세션 · 메모리 전용 · 내보내기로 저장) ══ -->
+        <div class="prc-tr-card prc-perf-card">
+          <div class="prc-risk-hd">📒 성과 &amp; 매매일지 <span class="prc-tr-lbl" style="font-weight:600;">이 세션 · 메모리(내보내기로 저장)</span></div>
+          <div id="prcPerfSummary" class="prc-perf-sum"><div class="prc-tr-empty">완료된 매매가 없습니다 (매도하면 기록돼요)</div></div>
+          <div class="prc-perf-sub">🧾 매매 내역 (완료)</div>
+          <div id="prcTradeLog" class="prc-tradelog"><div class="prc-tr-empty">기록 없음</div></div>
+          <div class="prc-jrn-btns">
+            <button class="prc-jrn-btn" onclick="prcJournalShow()">📓 일지 정리</button>
+            <button class="prc-jrn-btn" onclick="prcJournalCopy()">📋 복사</button>
+            <button class="prc-jrn-btn" onclick="prcJournalExport()">⬇ 내보내기</button>
+          </div>
+          <textarea id="prcJournalOut" class="prc-jrn-out" readonly placeholder="‘📓 일지 정리’를 누르면 장전 시황체크·매매내역·성과·잘한점/잘못한점·개선점으로 정리됩니다. (복사/내보내기로 저장)"></textarea>
+        </div>
         <div class="prc-rr-card">
           <div class="prc-rr-ttl">📐 손익비(R/R) 계산기</div>
           <div class="prc-rr-row">
@@ -2251,6 +2264,23 @@ canvas{image-rendering:pixelated;}
   .prc-risk-warn{display:flex;flex-direction:column;gap:4px;}
   .prc-risk-item{font-size:10px;font-weight:800;color:#b91c1c;background:rgba(239,68,68,.10);border:1px solid rgba(239,68,68,.28);border-radius:7px;padding:6px 8px;line-height:1.4;}
   .prc-risk-ok{font-size:10px;color:#10b981;font-weight:700;text-align:center;padding:5px;}
+  /* ③단계: 성과기록 + 매매일지 */
+  .prc-perf-sum{font-size:11px;font-variant-numeric:tabular-nums;margin-bottom:8px;}
+  .prc-perf-row{display:grid;grid-template-columns:auto 1fr auto 1fr;gap:2px 6px;align-items:center;padding:3px 0;color:var(--ts,#8b95a1);}
+  .prc-perf-row b{font-family:var(--mono);font-weight:800;color:var(--tp,#191f28);text-align:right;}
+  .prc-perf-row.tot{grid-template-columns:auto 1fr;border-top:1px dashed var(--br);margin-top:2px;padding-top:5px;}
+  .prc-perf-sub{font-size:10px;font-weight:800;color:var(--tp,#191f28);margin:6px 0 5px;padding-top:6px;border-top:1px solid var(--br);}
+  .prc-tradelog{display:flex;flex-direction:column;gap:4px;max-height:170px;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+  .prc-tl-row{border:1px solid var(--bd,#2a2d35);border-radius:7px;padding:5px 7px;}
+  .prc-tl-top{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--tp,#191f28);}
+  .prc-tl-idx{color:var(--ts,#8b95a1);font-weight:800;font-size:10px;min-width:14px;text-align:center;flex:none;}
+  .prc-tl-t{color:var(--ts,#8b95a1);font-weight:600;font-size:10px;margin-left:auto;}
+  .prc-tl-meta{display:flex;flex-wrap:wrap;gap:2px 8px;margin-top:3px;font-size:10px;color:var(--ts,#8b95a1);font-variant-numeric:tabular-nums;}
+  .prc-tl-meta b{font-family:var(--mono);font-weight:800;color:var(--tp,#191f28);}
+  .prc-jrn-btns{display:flex;gap:5px;margin:9px 0 6px;}
+  .prc-jrn-btn{flex:1;padding:8px 4px;border-radius:7px;border:1px solid var(--b,#3b82f6);background:rgba(59,130,246,.08);color:var(--b,#3b82f6);font-size:11px;font-weight:800;cursor:pointer;touch-action:manipulation;white-space:nowrap;}
+  .prc-jrn-out{width:100%;box-sizing:border-box;min-height:150px;resize:vertical;background:var(--pan,#fff);border:1px solid var(--br,#e5e8eb);border-radius:8px;color:var(--tp,#191f28);font-family:var(--mono);font-size:10.5px;line-height:1.5;padding:8px;outline:none;white-space:pre;overflow:auto;}
+  .prc-jrn-out:focus{border-color:var(--b,#3b82f6);}
   /* col3 정렬 탭: 3단계 타임프레임 미니 차트 */
   .prc-tf-head{font-size:11px;font-weight:800;color:var(--tp,#191f28);margin-bottom:4px;}
   .prc-tf-head span{display:block;font-size:9px;font-weight:600;color:var(--ts,#8b95a1);margin-top:1px;}
@@ -16170,6 +16200,8 @@ const PRC_TR = {
   realized: 0,          // ②단계: 실현손익 누적(매도 완료분, 수수료·세금 후) — 이 세션 메모리 전용
   lastBuy: null,        // ②단계: 직전 1회 매수 비중 정보 {pct, over, amount} — 리스크 경고용
   risk: { stopPct:3, dailyPct:2, weightPct:20 },  // ②단계 리스크 기준(사용자 수정 가능): 종목 -3% / 일일 -2% / 1회 20%
+  trades: [],           // ③단계: 완료된 매매(매도) 기록 [{ts,date,code,name,entry,exit,qty,pnl,fee,pnlPct}] — 세션 메모리 전용(내보내기로 저장)
+  everWeightOver: false,// ③단계: 세션 중 1회 비중 초과 매수가 있었는지(일지 복기용)
 };
 // 숫자 입력칸(type=text inputmode=numeric) — 펜/터치/IME 에서도 안정적으로 입력되도록 숫자만 남긴다.
 //   (기존 type=number 는 좁은 폭+스피너로 펜/터치 탭 영역이 작아 입력이 안 되던 버그의 원인)
@@ -16223,6 +16255,7 @@ function prcTradeBuy(){
   for(const c in PRC_TR.pos){ const pp=PRC_TR.pos[c]; equityBefore += (pp.last||pp.avg)*pp.qty; }
   const weightPct = equityBefore>0 ? (total/equityBefore*100) : 0;
   PRC_TR.lastBuy = { pct:weightPct, over: weightPct > PRC_TR.risk.weightPct, amount:total };
+  if(PRC_TR.lastBuy.over) PRC_TR.everWeightOver=true;   // ③단계: 일지 복기용
   PRC_TR.cash-=total;
   const p=PRC_TR.pos[PRC.symbol]||{name:PRC.name, qty:0, avg:0, last:price, costBasis:0};
   const nq=p.qty+qty;
@@ -16252,11 +16285,19 @@ function prcTradeSell(code, qtyArg){
   // ②단계: 실현손익 = 매도 순수령액(net) - 매도분 매수원가(비례 배분, 수수료 포함)
   const cb=(p.costBasis!=null)?p.costBasis:(p.avg*p.qty);
   const costRemoved = p.qty>0 ? cb*(qty/p.qty) : 0;
+  const tradePnl = Math.round(net - costRemoved);
   PRC_TR.realized += (net - costRemoved);
+  // ③단계: 완료 매매 기록(종목/진입가/청산가/수량/손익/수수료 — 왕복 수수료: 매도분 배분 매수수수료 + 매도수수료+세금)
+  const buyFeePortion = Math.max(0, Math.round(costRemoved - p.avg*qty));   // 매도분에 배분된 매수 수수료(근사)
+  PRC_TR.trades.push({
+    ts:(PRC.raw[PRC.n1-1]||{}).t || '', date:PRC.date, code, name:p.name,
+    entry:p.avg, exit:price, qty, pnl:tradePnl, fee:(fee+tax+buyFeePortion),
+    pnlPct: costRemoved>0 ? ((net-costRemoved)/costRemoved*100) : 0,
+  });
   PRC_TR.cash+=net;
   p.qty-=qty;
   if(p.qty<=0){ delete PRC_TR.pos[code]; } else { p.last=price; p.costBasis = cb - costRemoved; }
-  prcTrFlash(`✅ 매도 체결 · ${prcWon(qty)}주 @${prcWon(price)}원 (수수료+세금 ${prcWon(fee+tax)}원)`);
+  prcTrFlash(`✅ 매도 체결 · ${prcWon(qty)}주 @${prcWon(price)}원 · 손익 ${tradePnl>=0?'+':''}${prcWon(tradePnl)}원 (수수료+세금 ${prcWon(fee+tax)}원)`);
   prcTradeSync();
 }
 // 보유 행의 수량 입력칸을 읽어 일부 매도
@@ -16271,15 +16312,16 @@ function prcTradeSetCash(){
   const el=document.getElementById('prcTrCashInput');
   const n=Math.round(parseFloat(String((el&&el.value)||'').replace(/[,\s]/g,'')));
   if(!isFinite(n)||n<=0){ prcTrFlash('올바른 가상 자금(원)을 입력하세요', true); return; }
-  PRC_TR.cashInit=n; PRC_TR.cash=n; PRC_TR.pos={}; PRC_TR.realized=0; PRC_TR.lastBuy=null;
+  PRC_TR.cashInit=n; PRC_TR.cash=n; PRC_TR.pos={}; PRC_TR.realized=0; PRC_TR.lastBuy=null; PRC_TR.trades=[]; PRC_TR.everWeightOver=false;
   if(el) el.value='';
-  prcTrFlash(`가상 자금을 ${prcWon(n)}원으로 설정했어요 (보유·손익 초기화)`);
+  prcTrFlash(`가상 자금을 ${prcWon(n)}원으로 설정했어요 (보유·손익·기록 초기화)`);
   prcTradeSync();
 }
 // 🔄 리셋 — 잔고를 초기 자금으로, 보유 전량 청산 + 손익 초기화(메모리만 초기화)
 function prcTradeReset(){
-  PRC_TR.cash=PRC_TR.cashInit; PRC_TR.pos={}; PRC_TR.realized=0; PRC_TR.lastBuy=null;
-  prcTrFlash(`초기화 완료 · 잔고 ${prcWon(PRC_TR.cashInit)}원`);
+  PRC_TR.cash=PRC_TR.cashInit; PRC_TR.pos={}; PRC_TR.realized=0; PRC_TR.lastBuy=null; PRC_TR.trades=[]; PRC_TR.everWeightOver=false;
+  const jo=document.getElementById('prcJournalOut'); if(jo) jo.value='';
+  prcTrFlash(`초기화 완료 · 잔고 ${prcWon(PRC_TR.cashInit)}원 (기록·일지 초기화)`);
   prcTradeSync();
 }
 // ②단계: 리스크 기준값(종목 손절 / 일일 한도 / 1회 비중) 입력 반영 — 사용자 수정 가능
@@ -16353,6 +16395,159 @@ function prcTradeSync(){
     if(PRC_TR.lastBuy && PRC_TR.lastBuy.over) warns.push(`⚖ 직전 1회 매수 비중 ${PRC_TR.lastBuy.pct.toFixed(1)}% — 기준(${rk.weightPct}%) 초과`);
     wEl.innerHTML = warns.length ? warns.map(w=>`<div class="prc-risk-item">${w}</div>`).join('') : '<div class="prc-risk-ok">✅ 경고 없음</div>';
   }
+  // ── ③단계: 성과 요약 + 매매 내역 ──
+  prcRenderPerf();
+}
+
+// ③단계: 성과 통계 계산(완료 매매 기준) — 총횟수/승률/평균수익률/최대수익·손실/손익비
+function prcPerfStats(){
+  const ts=PRC_TR.trades||[], n=ts.length;
+  const wins=ts.filter(t=>t.pnl>0), losses=ts.filter(t=>t.pnl<0);
+  const winRate=n?wins.length/n*100:0;
+  const avgPct=n?ts.reduce((s,t)=>s+(t.pnlPct||0),0)/n:0;
+  const pnls=ts.map(t=>t.pnl);
+  const maxProfit=n?Math.max(...pnls):0, maxLoss=n?Math.min(...pnls):0;
+  const avgWin=wins.length?wins.reduce((s,t)=>s+t.pnl,0)/wins.length:0;
+  const avgLoss=losses.length?Math.abs(losses.reduce((s,t)=>s+t.pnl,0)/losses.length):0;
+  const payoff=avgLoss>0?(avgWin/avgLoss):null;   // null=손실 매매 없음
+  const realizedSum=ts.reduce((s,t)=>s+t.pnl,0);
+  return {n, wins:wins.length, losses:losses.length, winRate, avgPct, maxProfit, maxLoss, payoff, realizedSum};
+}
+// ③단계: 성과 요약 + 매매 내역 리스트 렌더
+function prcRenderPerf(){
+  const st=prcPerfStats();
+  const kc=v=>(v>0?'#ef4444':(v<0?'#3b82f6':'var(--ts,#8b95a1)'));
+  const sgn=v=>(v>=0?'+':'')+prcWon(v);
+  const sumEl=document.getElementById('prcPerfSummary');
+  if(sumEl){
+    if(!st.n){ sumEl.innerHTML='<div class="prc-tr-empty">완료된 매매가 없습니다 (매도하면 기록돼요)</div>'; }
+    else{
+      const payoff = st.payoff==null ? '—(손실없음)' : st.payoff.toFixed(2);
+      sumEl.innerHTML=
+         `<div class="prc-perf-row"><span>총 매매</span><b>${st.n}회</b><span>승률</span><b>${st.winRate.toFixed(0)}% <span style="color:var(--ts);font-weight:600;">(승 ${st.wins}/패 ${st.losses})</span></b></div>`
+        +`<div class="prc-perf-row"><span>평균 수익률</span><b style="color:${kc(st.avgPct)};">${st.avgPct>=0?'+':''}${st.avgPct.toFixed(2)}%</b><span>손익비</span><b>${payoff}</b></div>`
+        +`<div class="prc-perf-row"><span>최대 수익</span><b style="color:${kc(st.maxProfit)};">${sgn(st.maxProfit)}원</b><span>최대 손실</span><b style="color:${kc(st.maxLoss)};">${sgn(st.maxLoss)}원</b></div>`
+        +`<div class="prc-perf-row tot"><span>실현손익 합계</span><b style="color:${kc(st.realizedSum)};">${sgn(st.realizedSum)}원</b></div>`;
+    }
+  }
+  const logEl=document.getElementById('prcTradeLog');
+  if(logEl){
+    const ts=PRC_TR.trades||[];
+    if(!ts.length){ logEl.innerHTML='<div class="prc-tr-empty">기록 없음</div>'; }
+    else{
+      logEl.innerHTML=ts.map((t,i)=>{
+        const col=t.pnl>0?'#ef4444':(t.pnl<0?'#3b82f6':'var(--ts,#8b95a1)');
+        return `<div class="prc-tl-row">`
+          +`<div class="prc-tl-top"><span class="prc-tl-idx">${i+1}</span><b>${prcEsc(t.name)}</b> <span class="prc-tr-hc">${prcEsc(t.code)}</span> <span class="prc-tl-t">${prcEsc(t.ts||'')}</span></div>`
+          +`<div class="prc-tl-meta"><span>진입 <b>${prcWon(t.entry)}</b> → 청산 <b>${prcWon(t.exit)}</b></span><span>${prcWon(t.qty)}주</span><span>수수료 ${prcWon(t.fee)}</span><span style="color:${col};font-weight:800;">${t.pnl>=0?'+':''}${prcWon(t.pnl)}원 (${t.pnlPct>=0?'+':''}${(t.pnlPct||0).toFixed(2)}%)</span></div>`
+        +`</div>`;
+      }).join('');
+    }
+  }
+}
+// ③단계: 매매일지 텍스트 생성(장전 시황체크 / 매매내역 / 성과 / 잘한점·잘못한점 / 개선점)
+function prcJournalText(){
+  const d=PRC.date||'', dd=(typeof prcFmtDate==='function')?prcFmtDate(d):d;
+  const st=prcPerfStats(), ts=PRC_TR.trades||[];
+  const won=v=>prcWon(v), sg=v=>(v>=0?'+':'')+prcWon(v);
+  const L=[];
+  L.push(`📓 연습 매매일지 — ${dd}`);
+  L.push('='.repeat(34));
+  // 1) 장전 시황체크
+  L.push('【장전 시황체크】');
+  const mk=(PRC.prep&&PRC.prep.market)||null;
+  if(mk){
+    const mi=(o,lbl)=> o ? `${lbl} ${o.close!=null?Number(o.close).toLocaleString():'—'}(${o.changePct>=0?'+':''}${o.changePct!=null?Number(o.changePct).toFixed(2):'—'}%)` : null;
+    const chips=[mi(mk.nasdaq,'나스닥'),mi(mk.kospi,'코스피'),mi(mk.kosdaq,'코스닥')].filter(Boolean);
+    L.push(`- 전일 시황(${PRC.prep&&PRC.prep.prevDate?prcFmtDate(PRC.prep.prevDate):'-'}): ${chips.length?chips.join(' · '):'데이터 없음'}`);
+  } else { L.push('- 전일 시황: 데이터 없음'); }
+  const syms=[...new Set(ts.map(t=>`${t.name}(${t.code})`))];
+  L.push(`- 매매 종목: ${syms.length?syms.join(', '):(PRC.symbol?`${PRC.name}(${PRC.symbol})`:'-')}`);
+  L.push('- 가상 자금: '+won(PRC_TR.cashInit)+'원');
+  L.push('');
+  // 2) 매매 내역
+  L.push('【매매 내역】');
+  if(!ts.length){ L.push('- 완료된 매매 없음'); }
+  else ts.forEach((t,i)=>{
+    L.push(`${i+1}. ${t.ts||''} ${t.name}(${t.code}) 진입 ${won(t.entry)} → 청산 ${won(t.exit)} · ${won(t.qty)}주 · 손익 ${sg(t.pnl)}원(${t.pnlPct>=0?'+':''}${(t.pnlPct||0).toFixed(2)}%) · 수수료 ${won(t.fee)}원`);
+  });
+  L.push('');
+  // 3) 성과 요약
+  L.push('【성과 요약】');
+  if(!st.n){ L.push('- 매매 없음'); }
+  else{
+    L.push(`- 총 매매 ${st.n}회 · 승률 ${st.winRate.toFixed(0)}% (승 ${st.wins}/패 ${st.losses})`);
+    L.push(`- 평균 수익률 ${st.avgPct>=0?'+':''}${st.avgPct.toFixed(2)}% · 손익비 ${st.payoff==null?'—(손실없음)':st.payoff.toFixed(2)}`);
+    L.push(`- 최대 수익 ${sg(st.maxProfit)}원 · 최대 손실 ${sg(st.maxLoss)}원`);
+    L.push(`- 실현손익 합계 ${sg(st.realizedSum)}원`);
+  }
+  L.push('');
+  // 4) 잘한 점 / 잘못한 점 (데이터 기반 자동 관찰 + 직접 메모)
+  const good=[], bad=[];
+  if(st.n){
+    if(st.winRate>=50) good.push(`승률 ${st.winRate.toFixed(0)}%로 절반 이상 성공`);
+    if(st.payoff!=null && st.payoff>=2) good.push(`손익비 ${st.payoff.toFixed(2)}로 손절 짧게·익절 길게 (2:1↑)`);
+    if(st.realizedSum>0) good.push(`이 세션 실현손익 흑자 (${sg(st.realizedSum)}원)`);
+    if(st.winRate<50) bad.push(`승률 ${st.winRate.toFixed(0)}% — 진입 타점 재점검 필요`);
+    if(st.payoff!=null && st.payoff<1) bad.push(`손익비 ${st.payoff.toFixed(2)} — 손실이 이익보다 큼(손절 지연 의심)`);
+    if(st.maxLoss <= -Math.abs(st.maxProfit) && st.maxProfit>0) bad.push(`최대 손실(${sg(st.maxLoss)})이 최대 수익(${sg(st.maxProfit)})보다 큼`);
+  }
+  if(PRC_TR.everWeightOver) bad.push(`1회 매수 비중 ${PRC_TR.risk.weightPct}% 초과 매수 있었음(집중 리스크)`);
+  L.push('【잘한 점】');
+  (good.length?good:['(직접 작성)']).forEach(x=>L.push('- '+x));
+  L.push('');
+  L.push('【잘못한 점 / 리스크】');
+  (bad.length?bad:['(직접 작성)']).forEach(x=>L.push('- '+x));
+  L.push('');
+  // 5) 개선점
+  L.push('【개선점】');
+  const imp=[];
+  if(st.payoff!=null && st.payoff<1.5) imp.push('손절은 기준(-3%)에서 기계적으로, 익절 목표는 더 길게');
+  if(st.winRate<40) imp.push('일봉 추세·수급 확인 후 진입(무리한 추격 매수 자제)');
+  if(PRC_TR.everWeightOver) imp.push('1회 매수 비중을 총자산의 20% 이내로 분할');
+  (imp.length?imp:['(직접 작성)']).forEach(x=>L.push('- '+x));
+  L.push('');
+  L.push('※ 연습(가상 체결) 기록 · 룩어헤드 없음 · 저장하려면 복사/내보내기 하세요.');
+  return L.join('\n');
+}
+// ③단계: 일지 정리(텍스트박스에 표시)
+function prcJournalShow(){
+  const el=document.getElementById('prcJournalOut'); if(!el) return;
+  el.value=prcJournalText();
+  prcTrFlash('매매일지를 정리했어요 — 복사/내보내기로 저장하세요');
+}
+// ③단계: 클립보드 복사(내보내기) — localStorage 대신 사용자가 직접 저장
+function prcJournalCopy(){
+  const txt=prcJournalText();
+  const el=document.getElementById('prcJournalOut'); if(el) el.value=txt;
+  const done=()=>prcTrFlash('📋 매매일지를 클립보드에 복사했어요');
+  // execCommand 폴백: textarea 를 선택해 복사(클립보드 API 가 막힌 환경 대비)
+  const fallback=()=>{
+    try{ if(el){ el.focus(); el.select(); const ok=document.execCommand&&document.execCommand('copy'); el.setSelectionRange(0,0);
+      if(ok){ done(); return true; } } }catch(e){}
+    if(el){ el.focus(); el.select(); }
+    prcTrFlash('아래 텍스트를 길게 눌러(Ctrl+C) 복사하세요 — 자동 복사가 막혔어요', true);
+    return false;
+  };
+  try{
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(txt).then(done).catch(fallback);
+    } else { fallback(); }
+  }catch(e){ fallback(); }
+}
+// ③단계: 텍스트 파일 내보내기(다운로드) — 메모리 기록을 파일로 저장
+function prcJournalExport(){
+  const txt=prcJournalText();
+  const el=document.getElementById('prcJournalOut'); if(el) el.value=txt;
+  try{
+    const blob=new Blob([txt],{type:'text/plain;charset=utf-8'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url; a.download=`practice_journal_${PRC.date||'session'}.txt`;
+    document.body.appendChild(a); a.click();
+    setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 100);
+    prcTrFlash('⬇ 매매일지를 텍스트 파일로 내보냈어요');
+  }catch(e){ prcTrFlash('내보내기 실패 — 복사 버튼을 이용하세요', true); }
 }
 
 // 후보 클릭 → 종목 선택칸 반영 + 그 종목 연습 차트 로드(선택→타점 연습 흐름)
