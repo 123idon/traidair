@@ -1995,10 +1995,43 @@ canvas{image-rendering:pixelated;}
       </div>
     </div>
 
-    <!-- ④ col4: 주문 자리 — R/R 손익비 계산기(매매 계획 도구). 매매 버튼은 추후 -->
+    <!-- ④ col4: 모의 매매(①단계: 매수/매도·잔고·평단) + R/R 손익비 계산기(매매 계획) -->
     <div class="prc-brp">
-      <div class="prc-ph-hd">R/R 손익비 계산 <span class="dim">· 매매 계획</span></div>
+      <div class="prc-ph-hd">🎮 모의 매매 <span class="dim">· 연습 · 가상 체결 · 룩어헤드 없음</span></div>
       <div class="prc-rr">
+        <!-- ══ 모의 매매 (①단계) — 상태는 메모리 전용(localStorage 미사용) · 리셋 버튼 제공 ══ -->
+        <div class="prc-tr-card">
+          <div class="prc-tr-top">
+            <div><span class="prc-tr-lbl">잔고</span> <b id="prcTrCash" class="prc-tr-cash">5,000,000원</b></div>
+            <button class="prc-tr-reset" onclick="prcTradeReset()" title="잔고·보유 초기화">🔄 리셋</button>
+          </div>
+          <div class="prc-tr-fund">
+            <span class="prc-tr-lbl">자금</span>
+            <input id="prcTrCashInput" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="5000000" aria-label="가상 자금" oninput="prcTrDigits(this)">
+            <button class="prc-tr-apply" onclick="prcTradeSetCash()" title="가상 자금 설정(보유 초기화)">적용</button>
+          </div>
+          <div class="prc-tr-cur-row">
+            <span class="prc-tr-lbl">현재가</span> <b id="prcTrCur">—</b>
+            <span class="prc-tr-hint">현재 재생 시점(n1)</span>
+          </div>
+          <div class="prc-tr-buy">
+            <div class="prc-tr-frow">
+              <span class="prc-tr-lbl2">가격</span>
+              <input id="prcTrPrice" class="prc-tr-pin" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="현재가" aria-label="매수가" oninput="prcTrDigits(this)">
+              <button class="prc-tr-curbtn" onclick="prcTradeFillCur()" title="현재 차트가를 매수가로">현재가</button>
+            </div>
+            <div class="prc-tr-frow">
+              <span class="prc-tr-lbl2">수량</span>
+              <input id="prcTrQty" class="prc-tr-qin2" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="주식 수" aria-label="매수 수량" oninput="prcTrDigits(this)">
+              <button class="prc-tr-maxbtn" onclick="prcTradeMax()" title="현재 잔고로 살 수 있는 최대 수량(수수료 반영)">MAX 매수</button>
+            </div>
+            <button class="prc-tr-buybtn" onclick="prcTradeBuy()">매수</button>
+          </div>
+          <div id="prcTrMsg" class="prc-tr-msg"></div>
+          <div class="prc-tr-hd2">📦 보유 현황</div>
+          <div id="prcTrHold"><div class="prc-tr-empty">보유 종목이 없습니다</div></div>
+          <div id="prcTrTotal" class="prc-tr-total"></div>
+        </div>
         <div class="prc-rr-card">
           <div class="prc-rr-ttl">📐 손익비(R/R) 계산기</div>
           <div class="prc-rr-row">
@@ -2022,7 +2055,6 @@ canvas{image-rendering:pixelated;}
           <b>R/R(손익비)</b> = (목표가−진입가) ÷ (진입가−손절가).<br>
           "한 번 위험 대비 몇 배 먹나"를 뜻해요. <b style="color:#10b981;">2:1 이상이면 양호</b> — 승률이 절반 이하여도 길게 보면 수익이 남습니다(Phase 8 핵심: 손절은 짧게·익절은 길게).
         </div>
-        <div class="prc-ph-s" style="text-align:center;padding:6px;border-top:1px solid var(--br);">🛒 매매 버튼은 추후 추가 예정</div>
       </div>
     </div>
 
@@ -2154,6 +2186,44 @@ canvas{image-rendering:pixelated;}
   .prc-rr-empty,.prc-rr-warn{font-size:11px;color:var(--tm,#b0b8c1);text-align:center;padding:12px 6px;line-height:1.6;}
   .prc-rr-warn{color:#f59e0b;font-weight:700;}
   .prc-rr-note{font-size:10px;color:var(--ts,#8b95a1);line-height:1.6;padding:2px 2px 8px;}
+  /* ══ 모의 매매 패널 (연습 전용 · prc- 접두사 · 실전 .hts CSS 무영향) ══ */
+  .prc-tr-card{border:1px solid var(--bd,#2a2d35);border-radius:10px;padding:9px 10px;margin-bottom:8px;background:var(--card,#0f1115);}
+  .prc-tr-top{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:6px;}
+  .prc-tr-lbl{font-size:10px;color:var(--ts,#8b95a1);font-weight:700;flex:none;}
+  .prc-tr-cash{font-family:var(--mono);font-size:14px;font-weight:800;color:var(--tp,#191f28);}
+  .prc-tr-reset{padding:4px 8px;border-radius:7px;border:1px solid var(--br,#e5e8eb);background:var(--pan,#fff);color:var(--ts,#8b95a1);font-size:10px;font-weight:800;cursor:pointer;touch-action:manipulation;white-space:nowrap;}
+  .prc-tr-fund{display:flex;align-items:center;gap:4px;margin-bottom:8px;}
+  .prc-tr-fund input{flex:1;min-width:0;background:var(--pan,#fff);border:1px solid var(--br,#e5e8eb);border-radius:7px;color:var(--tp,#191f28);font-family:var(--mono);font-size:11px;font-weight:700;padding:5px 7px;outline:none;text-align:right;-moz-appearance:textfield;}
+  .prc-tr-fund input:focus{border-color:var(--b,#3b82f6);}
+  .prc-tr-apply{flex:none;padding:5px 9px;border-radius:7px;border:1px solid var(--br,#e5e8eb);background:var(--pan,#fff);color:var(--tp,#191f28);font-size:10px;font-weight:800;cursor:pointer;white-space:nowrap;}
+  .prc-tr-cur-row{display:flex;align-items:baseline;gap:5px;margin-bottom:7px;font-size:12px;}
+  .prc-tr-cur-row b{font-family:var(--mono);font-weight:800;color:var(--tp,#191f28);}
+  .prc-tr-hint{font-size:9px;color:var(--tm,#b0b8c1);margin-left:auto;}
+  /* 매수 입력: 가격·수량을 각각 한 줄(라벨+큰 입력칸+액션버튼)로 → 펜/터치 탭 영역 확대 */
+  .prc-tr-buy{display:flex;flex-direction:column;gap:5px;margin-bottom:6px;}
+  .prc-tr-frow{display:flex;gap:4px;align-items:center;}
+  .prc-tr-lbl2{font-size:10px;color:var(--ts,#8b95a1);font-weight:800;flex:none;width:28px;}
+  .prc-tr-buy input{flex:1;min-width:0;background:var(--pan,#fff);border:1px solid var(--br,#e5e8eb);border-radius:7px;color:var(--tp,#191f28);font-family:var(--mono);font-size:13px;font-weight:700;padding:8px 9px;outline:none;text-align:right;touch-action:manipulation;}
+  .prc-tr-buy input:focus{border-color:var(--b,#3b82f6);}
+  .prc-tr-curbtn,.prc-tr-maxbtn{flex:none;padding:8px 8px;border-radius:7px;border:1px solid var(--b,#3b82f6);background:rgba(59,130,246,.08);color:var(--b,#3b82f6);font-size:10px;font-weight:800;cursor:pointer;white-space:nowrap;touch-action:manipulation;min-width:62px;}
+  .prc-tr-maxbtn{border-color:#f59e0b;color:#f59e0b;background:rgba(245,158,11,.10);}
+  .prc-tr-buybtn{width:100%;padding:10px;border-radius:8px;border:none;background:#ef4444;color:#fff;font-size:14px;font-weight:800;cursor:pointer;touch-action:manipulation;margin-top:1px;}
+  .prc-tr-msg{font-size:10px;font-weight:700;min-height:13px;margin-bottom:4px;line-height:1.4;color:var(--ts,#8b95a1);}
+  .prc-tr-hd2{font-size:11px;font-weight:800;color:var(--tp,#191f28);margin:8px 0 5px;padding-top:7px;border-top:1px solid var(--br);}
+  .prc-tr-empty{font-size:10px;color:var(--tm,#b0b8c1);text-align:center;padding:10px 4px;}
+  .prc-tr-hrow{border:1px solid var(--bd,#2a2d35);border-radius:8px;padding:6px 8px;margin-bottom:5px;}
+  .prc-tr-hrow.cur{border-color:var(--b,#3b82f6);background:rgba(59,130,246,.05);}
+  .prc-tr-hn{font-size:11px;font-weight:800;color:var(--tp,#191f28);margin-bottom:3px;display:flex;align-items:center;gap:4px;}
+  .prc-tr-hc{font-size:9px;color:var(--ts,#8b95a1);font-weight:600;}
+  .prc-tr-badge{font-size:8px;font-weight:800;color:var(--b,#3b82f6);background:rgba(59,130,246,.12);border-radius:4px;padding:1px 4px;}
+  .prc-tr-hg{display:flex;flex-wrap:wrap;gap:2px 8px;font-size:10px;color:var(--ts,#8b95a1);margin-bottom:5px;font-variant-numeric:tabular-nums;}
+  .prc-tr-hg b{color:var(--tp,#191f28);font-weight:800;font-family:var(--mono);}
+  .prc-tr-hact{display:flex;gap:4px;align-items:center;}
+  .prc-tr-sq{width:52px;flex:none;background:var(--pan,#fff);border:1px solid var(--br,#e5e8eb);border-radius:6px;color:var(--tp,#191f28);font-family:var(--mono);font-size:11px;font-weight:700;padding:4px 5px;outline:none;text-align:right;-moz-appearance:textfield;}
+  .prc-tr-bs{flex:1;padding:5px 4px;border-radius:6px;border:1px solid #3b82f6;background:rgba(59,130,246,.08);color:#3b82f6;font-size:10px;font-weight:800;cursor:pointer;touch-action:manipulation;}
+  .prc-tr-bs.all{background:#3b82f6;color:#fff;border-color:#3b82f6;}
+  .prc-tr-total{font-size:11px;color:var(--ts,#8b95a1);text-align:right;padding-top:7px;margin-top:3px;border-top:1px solid var(--br);font-variant-numeric:tabular-nums;}
+  .prc-tr-total b{color:var(--tp,#191f28);font-weight:800;font-family:var(--mono);}
   /* col3 정렬 탭: 3단계 타임프레임 미니 차트 */
   .prc-tf-head{font-size:11px;font-weight:800;color:var(--tp,#191f28);margin-bottom:4px;}
   .prc-tf-head span{display:block;font-size:9px;font-weight:600;color:var(--ts,#8b95a1);margin-top:1px;}
@@ -16058,6 +16128,161 @@ function prcCalcRR(){
    +`<div class="prc-rr-line" style="border-bottom:none;"><span>수수료 반영 R/R</span><span style="font-weight:800;color:${netRr>=2?'#10b981':'var(--tp,#191f28)'};">${netRr>0?netRr.toFixed(2)+' : 1':'—'}</span></div>`;
 }
 
+// ══════════════════════════════════════════════════════════════════════════
+// 🎮 연습모드 모의 매매 (①단계: 매수/매도 + 잔고 + 평단)
+//   · 생명선: prc* 접두사 · 연습 전용 CSS(.prc-tr*) · 실전 HTS(.hts/order 등) 무영향.
+//   · 상태는 이 메모리 객체(PRC_TR)에만 — localStorage 절대 미사용(구버전 데이터 꼬임 방지).
+//   · 룩어헤드 차단: 체결가는 prcCurrentPrice()(raw[0..n1-1] 종가) 또는 그 시점 기록가만 사용.
+//     미래 봉을 읽는 경로가 없어 미래 가격 체결이 불가능하다.
+//   · 종목/날짜가 바뀌어도 보유·잔고는 세션 중 유지(요구7), 초기화는 🔄 리셋 버튼으로만.
+// ══════════════════════════════════════════════════════════════════════════
+const PRC_TR = {
+  cashInit: 5000000,    // 가상 자금 기본 500만원 (설정 가능)
+  cash: 5000000,        // 현재 현금 잔고
+  pos: {},              // code -> {name, qty, avg, last}  — 분할매수 시 avg(평단) 재계산
+};
+// 숫자 입력칸(type=text inputmode=numeric) — 펜/터치/IME 에서도 안정적으로 입력되도록 숫자만 남긴다.
+//   (기존 type=number 는 좁은 폭+스피너로 펜/터치 탭 영역이 작아 입력이 안 되던 버그의 원인)
+function prcTrDigits(el){ if(el) el.value=String(el.value||'').replace(/[^0-9]/g,''); }
+// 수수료율(소수) — R/R 계산기와 동일한 cfg 값 재사용(없으면 기본: 매수 0.015% / 매도 0.015% / 거래세 0.18%)
+function prcTrFees(){
+  const c=(typeof cfg==='object'&&cfg)?cfg:{};
+  return { buy:(+c.bf||0.015)/100, sell:(+c.sf||0.015)/100, tax:(+c.tx||0.18)/100 };
+}
+function prcWon(n){ return Math.round(n||0).toLocaleString(); }
+function prcTrFlash(msg, warn){
+  const el=document.getElementById('prcTrMsg'); if(!el) return;
+  el.textContent=msg||''; el.style.color=warn?'#f59e0b':'#10b981';
+}
+// "현재가" 버튼 → 매수가 입력칸에 현재 재생 시점 차트가 자동 입력(룩어헤드 없음)
+function prcTradeFillCur(){
+  const p=prcCurrentPrice(); const e=document.getElementById('prcTrPrice');
+  if(p==null){ prcTrFlash('종목을 먼저 선택하세요', true); return; }
+  if(e){ e.value=Math.round(p); }
+}
+// "MAX 매수" 버튼 → 현재 잔고로 살 수 있는 최대 수량(수수료 반영) 계산 → 수량칸 자동 입력
+function prcTradeMax(){
+  if(!PRC.symbol){ prcTrFlash('종목을 먼저 선택하세요', true); return; }
+  const cur=prcCurrentPrice();
+  let price=parseFloat((document.getElementById('prcTrPrice')||{}).value);
+  if(!isFinite(price)||price<=0) price=cur;                 // 매수가 비우면 현재가 기준
+  if(!isFinite(price)||price<=0){ prcTrFlash('가격을 확인하세요(현재가 없음)', true); return; }
+  price=Math.round(price);
+  const f=prcTrFees();
+  const maxQty=Math.floor(PRC_TR.cash/(price*(1+f.buy)));   // 수수료까지 감당 가능한 최대 주수
+  if(maxQty<=0){ prcTrFlash(`잔고 ${prcWon(PRC_TR.cash)}원으로 살 수 있는 수량이 없어요`, true); return; }
+  const q=document.getElementById('prcTrQty'); if(q) q.value=String(maxQty);
+  const pe=document.getElementById('prcTrPrice'); if(pe && !pe.value) pe.value=String(price);
+  prcTrFlash(`최대 ${prcWon(maxQty)}주 (약 ${prcWon(maxQty*price)}원 + 수수료 ${prcWon(Math.round(maxQty*price*f.buy))}원)`);
+}
+// 매수 — 현재 차트 종목을 가상 체결(수수료 매수 0.015% 반영)
+function prcTradeBuy(){
+  if(!PRC.symbol){ prcTrFlash('종목을 먼저 선택하세요', true); return; }
+  const cur=prcCurrentPrice();
+  let price=parseFloat((document.getElementById('prcTrPrice')||{}).value);
+  if(!isFinite(price)||price<=0) price=cur;                 // 비우면 현재가로 체결
+  if(!isFinite(price)||price<=0){ prcTrFlash('가격을 확인하세요(현재가 없음)', true); return; }
+  price=Math.round(price);
+  const qty=Math.floor(parseFloat((document.getElementById('prcTrQty')||{}).value));
+  if(!isFinite(qty)||qty<=0){ prcTrFlash('매수 수량을 입력하세요', true); return; }
+  const f=prcTrFees();
+  const gross=price*qty, fee=Math.round(gross*f.buy), total=gross+fee;
+  if(total>PRC_TR.cash+1e-6){ prcTrFlash(`잔고 부족 · 필요 ${prcWon(total)}원 / 보유 ${prcWon(PRC_TR.cash)}원`, true); return; }
+  PRC_TR.cash-=total;
+  const p=PRC_TR.pos[PRC.symbol]||{name:PRC.name, qty:0, avg:0, last:price};
+  const nq=p.qty+qty;
+  p.avg=Math.round((p.avg*p.qty + price*qty)/nq);          // 평단(순수 가격 가중평균, 분할매수 자동 재계산)
+  p.qty=nq; p.name=PRC.name||PRC.symbol; p.last=(isFinite(cur)&&cur>0)?cur:price;
+  PRC_TR.pos[PRC.symbol]=p;
+  const qEl=document.getElementById('prcTrQty'); if(qEl) qEl.value='';
+  prcTrFlash(`✅ 매수 체결 · ${prcWon(qty)}주 @${prcWon(price)}원 (수수료 ${prcWon(fee)}원)`);
+  prcTradeSync();
+}
+// 매도 — code 종목 qtyArg 주(null=전량). 체결가: 현재 차트 종목이면 재생 시점가, 아니면 마지막 기록가(둘 다 과거/현재 → 룩어헤드 없음).
+function prcTradeSell(code, qtyArg){
+  const p=PRC_TR.pos[code];
+  if(!p||p.qty<=0){ prcTrFlash('보유 수량이 없습니다', true); return; }
+  let price=(code===PRC.symbol)?prcCurrentPrice():p.last;
+  if(!isFinite(price)||price<=0) price=p.last;
+  if(!isFinite(price)||price<=0){ prcTrFlash('현재가를 확인할 수 없습니다', true); return; }
+  price=Math.round(price);
+  let qty=(qtyArg==null)?p.qty:Math.floor(qtyArg);
+  if(!isFinite(qty)||qty<=0){ prcTrFlash('매도 수량을 확인하세요', true); return; }
+  qty=Math.min(qty, p.qty);
+  const f=prcTrFees();
+  const gross=price*qty, fee=Math.round(gross*f.sell), tax=Math.round(gross*f.tax), net=gross-fee-tax;
+  PRC_TR.cash+=net;
+  p.qty-=qty;
+  if(p.qty<=0){ delete PRC_TR.pos[code]; } else { p.last=price; }
+  prcTrFlash(`✅ 매도 체결 · ${prcWon(qty)}주 @${prcWon(price)}원 (수수료+세금 ${prcWon(fee+tax)}원)`);
+  prcTradeSync();
+}
+// 보유 행의 수량 입력칸을 읽어 일부 매도
+function prcTradeSellPartial(code){
+  const el=document.getElementById('prcSellQty_'+code);
+  const q=el?Math.floor(parseFloat(el.value)):NaN;
+  if(!isFinite(q)||q<=0){ prcTrFlash('매도 수량을 입력하세요', true); return; }
+  prcTradeSell(code, q);
+}
+// 가상 자금 설정(입력값 적용 + 보유·잔고 초기화) — prompt/confirm 미사용(다이얼로그 차단)
+function prcTradeSetCash(){
+  const el=document.getElementById('prcTrCashInput');
+  const n=Math.round(parseFloat(String((el&&el.value)||'').replace(/[,\s]/g,'')));
+  if(!isFinite(n)||n<=0){ prcTrFlash('올바른 가상 자금(원)을 입력하세요', true); return; }
+  PRC_TR.cashInit=n; PRC_TR.cash=n; PRC_TR.pos={};
+  if(el) el.value='';
+  prcTrFlash(`가상 자금을 ${prcWon(n)}원으로 설정했어요 (보유 초기화)`);
+  prcTradeSync();
+}
+// 🔄 리셋 — 잔고를 초기 자금으로, 보유 전량 청산(메모리만 초기화)
+function prcTradeReset(){
+  PRC_TR.cash=PRC_TR.cashInit; PRC_TR.pos={};
+  prcTrFlash(`초기화 완료 · 잔고 ${prcWon(PRC_TR.cashInit)}원`);
+  prcTradeSync();
+}
+// 매 재생/렌더/종목변경마다 호출 — 잔고·현재가·보유 평가금액 갱신(현재 차트 종목만 실시간가로 평가)
+function prcTradeSync(){
+  const cashEl=document.getElementById('prcTrCash'); if(cashEl) cashEl.textContent=prcWon(PRC_TR.cash)+'원';
+  const cur=prcCurrentPrice();
+  if(PRC.symbol && PRC_TR.pos[PRC.symbol] && isFinite(cur) && cur>0) PRC_TR.pos[PRC.symbol].last=Math.round(cur);
+  const curEl=document.getElementById('prcTrCur');
+  if(curEl) curEl.textContent=(PRC.symbol&&isFinite(cur)&&cur>0)?(prcWon(cur)+'원'):'—';
+  const pin=document.getElementById('prcTrPrice'); if(pin) pin.placeholder=(isFinite(cur)&&cur>0)?prcWon(cur):'현재가';
+  const box=document.getElementById('prcTrHold');
+  const codes=Object.keys(PRC_TR.pos);
+  let totalEval=0;
+  if(!codes.length){ if(box) box.innerHTML='<div class="prc-tr-empty">보유 종목이 없습니다</div>'; }
+  else if(box){
+    box.innerHTML=codes.map(code=>{
+      const p=PRC_TR.pos[code];
+      const ev=Math.round((p.last||p.avg)*p.qty); totalEval+=ev;
+      const pnl=((p.last||p.avg)-p.avg)*p.qty, pnlPct=p.avg?(((p.last||p.avg)-p.avg)/p.avg*100):0;
+      const isCur=(code===PRC.symbol);
+      const col=pnl>0?'#ef4444':(pnl<0?'#3b82f6':'var(--ts,#8b95a1)');
+      return `<div class="prc-tr-hrow${isCur?' cur':''}">`
+        +`<div class="prc-tr-hn">${prcEsc(p.name)} <span class="prc-tr-hc">${prcEsc(code)}</span>${isCur?'<span class="prc-tr-badge">차트</span>':''}</div>`
+        +`<div class="prc-tr-hg">`
+          +`<span>보유 <b>${prcWon(p.qty)}</b>주</span>`
+          +`<span>평단 <b>${prcWon(p.avg)}</b></span>`
+          +`<span>평가 <b>${prcWon(ev)}</b>원</span>`
+          +`<span style="color:${col};font-weight:800;">${pnl>=0?'+':''}${prcWon(pnl)} (${pnlPct>=0?'+':''}${pnlPct.toFixed(2)}%)</span>`
+        +`</div>`
+        +`<div class="prc-tr-hact">`
+          +`<input class="prc-tr-sq" type="text" inputmode="numeric" pattern="[0-9]*" id="prcSellQty_${prcEsc(code)}" placeholder="수량" aria-label="매도 수량" oninput="prcTrDigits(this)">`
+          +`<button class="prc-tr-bs" onclick="prcTradeSellPartial('${prcEsc(code)}')">일부매도</button>`
+          +`<button class="prc-tr-bs all" onclick="prcTradeSell('${prcEsc(code)}',null)">전량매도</button>`
+        +`</div>`
+      +`</div>`;
+    }).join('');
+  }
+  const teEl=document.getElementById('prcTrTotal');
+  if(teEl){
+    const total=PRC_TR.cash+totalEval, pl=total-PRC_TR.cashInit;
+    const col=pl>0?'#ef4444':(pl<0?'#3b82f6':'var(--ts,#8b95a1)');
+    teEl.innerHTML=`총 평가자산 <b>${prcWon(total)}</b>원 · <span style="color:${col};font-weight:800;">${pl>=0?'+':''}${prcWon(pl)}원</span>`;
+  }
+}
+
 // 후보 클릭 → 종목 선택칸 반영 + 그 종목 연습 차트 로드(선택→타점 연습 흐름)
 function prcPickCandidate(code){
   const ssel=document.getElementById('prcSymbol');
@@ -16307,6 +16532,7 @@ function prcRender(){
   _prcOverlayClear();            // 재생/재렌더로 봉이 바뀌면 이전 십자선 잔상 제거
   if(PRC.col3tab==='ind') prcRenderIndicators();   // col3 지표 탭: 재생 시점(n1)까지로 실시간 갱신 (룩어헤드 없음)
   else if(PRC.col3tab==='tf') prcRenderTFView();    // col3 정렬 탭: 3타임프레임 미니차트 재생 시점까지 갱신 (룩어헤드 없음)
+  if(typeof prcTradeSync==='function') prcTradeSync();   // 🎮 모의 매매: 현재가·잔고·보유 평가 실시간 갱신 (재생 시점 n1 기준, 룩어헤드 없음)
 }
 
 // ── 연습모드 툴팁 + 십자선 (pctx 전용, HTS 기본 차트 무영향) ──────────────────
