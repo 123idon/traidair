@@ -1877,6 +1877,24 @@ canvas{image-rendering:pixelated;}
             ⚠ 저장된 <b>대형주 44종목</b>만 집계 — 소형 테마주 대장주는 안 나올 수 있어요.
           </div>
         </div>
+        <!-- ── 📊 장중 실시간 종목 순위 — 재생 시점(n1)까지 누적 거래대금/거래량 순. 재생 전진 시 실시간 재정렬(룩어헤드 없음) ── -->
+        <!--   "장전 후보(어제 D-1)" 와 용도가 다름 — 이건 "지금 몰리는 종목(장중 n1)". 데이터: 44종목 1분봉 + sectors.json(외부 호출 0). -->
+        <div id="prcLiveRankBox" style="margin-bottom:10px;border:1px solid var(--bd,#2a2d35);border-radius:10px;padding:10px;background:var(--card,#0f1115);">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;flex-wrap:wrap;">
+            <span style="font-size:13px;font-weight:800;">📊 장중 실시간 종목 순위</span>
+            <span id="prcLiveRankClock" style="font-size:10px;font-weight:700;color:#ef4444;font-variant-numeric:tabular-nums;">—</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:5px;margin-bottom:6px;">
+            <span style="font-size:10px;color:var(--ts,#9aa);font-weight:700;">정렬</span>
+            <button id="prcRankTgAmt" class="prc-rank-tg on" onclick="prcSetRankMetric('amt')">💰 거래대금</button>
+            <button id="prcRankTgVol" class="prc-rank-tg" onclick="prcSetRankMetric('vol')">📦 거래량</button>
+            <span style="margin-left:auto;font-size:9.5px;color:var(--ts,#9aa);">지금까지 누적 · 클릭→차트</span>
+          </div>
+          <div id="prcLiveRank"><div style="color:var(--ts);font-size:12px;padding:4px 0;">날짜·종목을 고르고 ▶ 재생하세요</div></div>
+          <div style="font-size:9.5px;color:var(--ts,#9aa);margin-top:7px;line-height:1.4;">
+            ⚠ 저장된 <b>대형주 44종목</b>만 순위 — 소형 테마주는 안 나올 수 있어요. 장전 후보(아래)는 <b>어제(D-1)</b> 기준, 이 표는 <b>지금(장중)</b> 기준.
+          </div>
+        </div>
         <!-- ── 📋 장전 후보 (종목 선정) — 선택일 D 의 직전 거래일 D-1 기준만. 당일 데이터 미사용(룩어헤드 차단) ── -->
         <div id="prcPrep" style="margin-bottom:10px;border:1px solid var(--bd,#2a2d35);border-radius:10px;padding:10px;background:var(--card,#0f1115);">
           <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-wrap:wrap;">
@@ -2104,6 +2122,9 @@ canvas{image-rendering:pixelated;}
 </div>
 <style>
   .prc-tf,.prc-spd,.prc-th{padding:6px 11px;border-radius:8px;border:1px solid var(--bd,#2a2d35);background:var(--card,#16181d);color:var(--ts,#9aa);font-size:12px;font-weight:700;cursor:pointer;touch-action:manipulation;}
+  /* 장중 종목 순위 정렬 토글(거래대금/거래량) — 연습 전용, 실전 .hts 무관 */
+  .prc-rank-tg{padding:3px 8px;border-radius:7px;border:1px solid var(--bd,#2a2d35);background:var(--card,#16181d);color:var(--ts,#9aa);font-size:10.5px;font-weight:700;cursor:pointer;touch-action:manipulation;}
+  .prc-rank-tg.on{background:#ef4444;border-color:#ef4444;color:#fff;}
   .prc-tf.on,.prc-spd.on,.prc-th.on{background:var(--b,#3b82f6);color:#fff;border-color:var(--b,#3b82f6);}
   .prc-ma{padding:6px 11px;border-radius:8px;border:1px solid var(--bd,#2a2d35);background:var(--card,#16181d);color:var(--ts,#9aa);font-size:12px;font-weight:800;cursor:pointer;touch-action:manipulation;}
   .prc-ma.on{background:var(--mac,#3b82f6);color:#fff;border-color:var(--mac,#3b82f6);}
@@ -15761,8 +15782,9 @@ const PRC = {
   _barCount:0,       // 마지막 렌더의 실제 봉 수(추종/팬 한계 계산용)
   col3tab:'flow',    // col3 분석 패널 탭(flow=수급/공매도 · ind=지표 · info=종목정보), 기본 수급
   prep:null,         // 장전후보 응답 캐시(rows/market/sectors) — 종목정보 탭용(전일=과거, 룩어헤드 아님)
-  flow:null,         // 장중 실시간 섹터 자금용 그날 전 종목 분당 거래대금 {date,series,sectors,names} — 룩어헤드는 n1 컷오프(클라)로 차단
+  flow:null,         // 장중 실시간 섹터 자금/종목순위용 그날 전 종목 분당 [t,amt,vol,close] {date,series,sectors,names,prevClose} — 룩어헤드는 n1 컷오프(클라)로 차단
   _liveSecOpen:{},   // 펼쳐진 섹터명 집합(재렌더에도 펼침 상태 유지)
+  rankMetric:'amt',  // 장중 종목 순위 정렬 기준(amt=누적 거래대금 / vol=누적 거래량) — 토글
 };
 
 async function prcInit(){
@@ -15899,8 +15921,9 @@ async function prcLoadFlow(){
     const r=await fetch(`/api/practice/candles?flow=1&date=${date}`,{cache:'no-store'});
     const d=await r.json();
     if(!d.ok){ if(box) box.innerHTML='<div style="color:var(--ts);font-size:12px;padding:4px 0;">'+prcEsc(d.error||'섹터 자금을 불러오지 못했어요')+'</div>'; return; }
-    PRC.flow={date, series:d.series||{}, sectors:d.sectors||{}, names:d.names||{}};
+    PRC.flow={date, series:d.series||{}, sectors:d.sectors||{}, names:d.names||{}, prevClose:d.prevClose||{}};
     prcRenderLiveSectors();
+    prcRenderLiveRank();
   }catch(e){ if(box) box.innerHTML='<div style="color:var(--ts);font-size:12px;padding:4px 0;">섹터 자금 로드 오류: '+prcEsc(e.message)+'</div>'; }
 }
 
@@ -15968,6 +15991,76 @@ function prcRenderLiveSectors(){
 function prcToggleLiveSector(sector){
   PRC._liveSecOpen[sector]=!PRC._liveSecOpen[sector];
   prcRenderLiveSectors();
+}
+
+// ── 📊 장중 실시간 종목 순위 (col1) — 재생 시점(n1)까지 누적 거래대금/거래량 순 ──────────────
+//   "장전 후보(어제 D-1)" 와 용도가 다른 "지금 몰리는 종목(장중 n1)" 표. 44종목을 현재 시점까지의
+//   누적 거래대금(또는 거래량)으로 정렬 → 재생 전진 시 실시간 재정렬된다.
+//   ⭐ 룩어헤드 차단: series[code] 는 t 오름차순이라 T=raw[n1-1].t 이하(≤)만 누적하고 t>T 에서
+//      break(미래 미사용). 현재가=T 이하 마지막 봉 종가, 등락률=전일(D-1) 종가 대비.
+function prcSetRankMetric(m){
+  PRC.rankMetric = (m==='vol') ? 'vol' : 'amt';
+  const a=document.getElementById('prcRankTgAmt'), v=document.getElementById('prcRankTgVol');
+  if(a) a.classList.toggle('on', PRC.rankMetric==='amt');
+  if(v) v.classList.toggle('on', PRC.rankMetric==='vol');
+  prcRenderLiveRank();
+}
+// 거래량 약어(만/억 주). 대형주 하루 수백만~수천만 주 → 만/억 단위로 압축.
+function prcFmtVol(v){
+  const n=Number(v||0);
+  if(n>=1e8) return (n/1e8).toFixed(1)+'억';
+  if(n>=1e4) return Math.round(n/1e4).toLocaleString()+'만';
+  return n.toLocaleString();
+}
+function prcRenderLiveRank(){
+  const box=document.getElementById('prcLiveRank');
+  const clk=document.getElementById('prcLiveRankClock');
+  if(!box) return;
+  const flow=PRC.flow;
+  if(!flow || flow.date!==PRC.date){ if(clk) clk.textContent='—'; box.innerHTML='<div style="color:var(--ts);font-size:12px;padding:4px 0;">불러오는 중…</div>'; return; }
+  if(PRC.tf==='D'){ if(clk) clk.textContent='일봉'; box.innerHTML='<div style="color:var(--ts);font-size:12px;padding:4px 0;">일봉(참고용)에는 재생이 없어요. 1·3·5분봉에서 ▶ 재생하면 장중 종목 순위가 나와요.</div>'; return; }
+  const cur = PRC.raw[PRC.n1-1];
+  const T = cur ? cur.t : null;
+  if(clk) clk.textContent = T ? ('⏱ '+T+' 까지') : '—';
+  if(!T){ box.innerHTML='<div style="color:var(--ts);font-size:12px;padding:4px 0;">종목을 선택하고 ▶ 재생하세요</div>'; return; }
+
+  const series=flow.series, secMap=flow.sectors, names=flow.names, prevC=flow.prevClose||{};
+  const metric=PRC.rankMetric;   // 'amt'(index 1, 만원) | 'vol'(index 2, 주)
+  const rows=[];
+  for(const code in series){
+    const arr=series[code];
+    let amt=0, vol=0, close=null;
+    for(let i=0;i<arr.length;i++){
+      if(arr[i][0]<=T){ amt+=arr[i][1]; vol+=arr[i][2]; close=arr[i][3]; }   // 현재가=T 이하 마지막 봉 종가
+      else break;                                                            // 미래 미사용(룩어헤드 차단)
+    }
+    if(amt<=0 && vol<=0) continue;   // 아직 거래 없음
+    const pc=prevC[code];
+    const chg=(pc && close!=null) ? ((close-pc)/pc*100) : null;
+    rows.push({code, name:names[code]||code, sector:secMap[code]||'기타', amt, vol, close, chg});
+  }
+  rows.sort((a,b)=> metric==='vol' ? (b.vol-a.vol) : (b.amt-a.amt));
+  if(!rows.length){ box.innerHTML='<div style="color:var(--ts);font-size:12px;padding:4px 0;">아직 거래가 없어요 ('+prcEsc(T)+')</div>'; return; }
+
+  const body=rows.map((r,i)=>{
+    const primary = metric==='vol'
+      ? `거래량 <b style="color:var(--tp,#191f28);">${prcFmtVol(r.vol)}</b>`
+      : `거래대금 <b style="color:var(--tp,#191f28);">${prcFmtManwon(r.amt)}</b>`;
+    const priceStr = r.close!=null ? Number(r.close).toLocaleString() : '—';
+    return `<div class="prc-cand" onclick="prcPickCandidate('${r.code}')" title="클릭 → ${prcEsc(r.name)} 연습 차트">`
+      +`<div class="prc-cand-top">`
+        +`<span class="prc-cand-rank">${i+1}</span>`
+        +`<span class="prc-cand-nm">${prcEsc(r.name)} <span class="prc-cand-code">${r.code}</span></span>`
+        +`<span class="prc-cand-chg" style="color:${prcPctColor(r.chg)};">${prcFmtPct(r.chg)}</span>`
+      +`</div>`
+      +`<div class="prc-cand-meta">`
+        +`<span class="prc-cand-sec">${prcEsc(r.sector)}</span>`
+        +`<span>${primary}</span>`
+        +`<span>현재가 <b style="color:${prcPctColor(r.chg)};">${priceStr}</b></span>`
+      +`</div>`
+    +`</div>`;
+  }).join('');
+  box.innerHTML=`<div class="prc-cand-list">${body}</div>`;
 }
 
 // ── 전일(D-1) 공매도·수급 칼럼 포맷터 (data/krx_daily) ──
@@ -16931,6 +17024,7 @@ function prcRender(){
   _prcSyncMaUI();                // MA 토글 버튼 활성표시 동기화
   _prcOverlayClear();            // 재생/재렌더로 봉이 바뀌면 이전 십자선 잔상 제거
   prcRenderLiveSectors();                          // 🔴 col1 장중 실시간 섹터 자금: 재생 시점(n1)까지 누적 갱신 (룩어헤드 없음)
+  prcRenderLiveRank();                             // 📊 col1 장중 실시간 종목 순위: 재생 시점(n1)까지 누적 거래대금/거래량 재정렬 (룩어헤드 없음)
   if(PRC.col3tab==='ind') prcRenderIndicators();   // col3 지표 탭: 재생 시점(n1)까지로 실시간 갱신 (룩어헤드 없음)
   else if(PRC.col3tab==='tf') prcRenderTFView();    // col3 정렬 탭: 3타임프레임 미니차트 재생 시점까지 갱신 (룩어헤드 없음)
   if(typeof prcTradeSync==='function') prcTradeSync();   // 🎮 모의 매매: 현재가·잔고·보유 평가 실시간 갱신 (재생 시점 n1 기준, 룩어헤드 없음)
