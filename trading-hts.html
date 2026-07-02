@@ -2046,17 +2046,31 @@ canvas{image-rendering:pixelated;}
   .prc-prep-h span{font-size:10px;font-weight:600;color:var(--ts,#9aa);margin-left:6px;}
   .prc-mk{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:8px;border:1px solid var(--bd,#2a2d35);background:var(--pan,#16181d);font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;}
   .prc-mk b{font-weight:800;color:var(--ts,#9aa);font-size:11px;}
-  .prc-sec-row{display:flex;align-items:center;gap:8px;padding:3px 0;font-size:12px;}
-  .prc-sec-rank{width:18px;text-align:center;color:var(--ts,#9aa);font-weight:800;font-size:11px;flex:none;}
-  .prc-sec-name{width:84px;font-weight:700;flex:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .prc-sec-bar{flex:1;height:10px;border-radius:5px;background:var(--bd,#2a2d35);overflow:hidden;min-width:60px;}
+  .prc-sec-row{display:flex;align-items:center;gap:7px;padding:3px 0;font-size:12px;}
+  .prc-sec-rank{width:16px;text-align:center;color:var(--ts,#9aa);font-weight:800;font-size:11px;flex:none;}
+  .prc-sec-name{width:72px;font-weight:700;flex:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .prc-sec-bar{flex:1;height:10px;border-radius:5px;background:var(--bd,#2a2d35);overflow:hidden;min-width:34px;}
   .prc-sec-bar>span{display:block;height:100%;background:linear-gradient(90deg,#3b82f6,#60a5fa);border-radius:5px;}
-  .prc-sec-amt{width:120px;text-align:right;font-weight:800;font-variant-numeric:tabular-nums;flex:none;white-space:nowrap;}
-  table.prc-prep-tbl{width:100%;border-collapse:collapse;font-size:12px;}
-  table.prc-prep-tbl th{position:sticky;top:0;background:var(--pan,#16181d);color:var(--ts,#9aa);font-weight:700;font-size:11px;padding:7px 8px;text-align:right;border-bottom:1px solid var(--bd,#2a2d35);z-index:1;}
-  table.prc-prep-tbl td{padding:7px 8px;text-align:right;border-bottom:1px solid var(--bd,#2a2d35);white-space:nowrap;}
+  /* 금액 단위 약어(조/억)로 폭 절약 — 우측 안 잘리게 width 축소 */
+  .prc-sec-amt{width:78px;text-align:right;font-weight:800;font-variant-numeric:tabular-nums;flex:none;white-space:nowrap;}
+  table.prc-prep-tbl{width:100%;border-collapse:collapse;font-size:11px;}
+  table.prc-prep-tbl th{position:sticky;top:0;background:var(--pan,#16181d);color:var(--ts,#9aa);font-weight:700;font-size:10px;padding:6px 4px;text-align:right;border-bottom:1px solid var(--bd,#2a2d35);z-index:1;}
+  table.prc-prep-tbl td{padding:6px 4px;text-align:right;border-bottom:1px solid var(--bd,#2a2d35);white-space:nowrap;}
   table.prc-prep-tbl tbody tr{cursor:pointer;}
   table.prc-prep-tbl tbody tr:hover{background:rgba(59,130,246,.10);}
+  /* col1 종목 후보 = 종목당 2줄 스택 행(가로 잘림 제거, flex-wrap 세로 흐름) — prc 전용 */
+  .prc-cand-list{border:1px solid var(--bd,#2a2d35);border-radius:10px;overflow:hidden;max-height:360px;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+  .prc-cand{padding:6px 8px;border-bottom:1px solid var(--bd,#2a2d35);cursor:pointer;}
+  .prc-cand:last-child{border-bottom:none;}
+  .prc-cand:hover{background:rgba(59,130,246,.10);}
+  .prc-cand-top{display:flex;align-items:baseline;gap:6px;font-size:12px;}
+  .prc-cand-rank{color:var(--ts,#9aa);font-weight:800;font-size:10px;min-width:14px;text-align:center;flex:none;}
+  .prc-cand-nm{font-weight:700;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--tp,#191f28);}
+  .prc-cand-code{color:var(--ts,#8b95a1);font-weight:600;font-size:10px;}
+  .prc-cand-chg{font-weight:800;font-family:var(--mono);flex:none;font-variant-numeric:tabular-nums;}
+  .prc-cand-meta{display:flex;flex-wrap:wrap;gap:2px 8px;margin-top:3px;padding-left:20px;font-size:10px;color:var(--ts,#8b95a1);}
+  .prc-cand-meta b{font-family:var(--mono);font-weight:800;}
+  .prc-cand-sec{background:rgba(148,163,184,.16);border-radius:4px;padding:0 5px;font-weight:700;color:var(--tp,#191f28);}
   .prc-sel:focus{outline:none;border-color:var(--b,#3b82f6);}
   .prc-sel.placeholder{color:var(--tm,#b0b8c1);font-weight:500;}
   .prc-sel option{color:var(--tp,#191f28);font-weight:600;}
@@ -2068,7 +2082,8 @@ canvas{image-rendering:pixelated;}
   .prc-hts{
     display:grid;
     /* 연습 col1 은 종목선정 정보(장전후보+수급)를 담아 실전(180px)보다 약간 넓게 — prc 전용, 실전 .hts 무관 */
-    grid-template-columns:260px 1fr 200px 260px;
+    /* col1 300(후보표 칼럼 가독) · col3 240(수급표 무스크롤) · col4 220(R/R, 여백 흡수) → 차트 col2 ≈838px 유지 */
+    grid-template-columns:300px 1fr 240px 220px;
     grid-template-rows:minmax(0,1fr) 82px 64px;
     height:78vh; min-height:560px;
     overflow:hidden; position:relative; background:var(--bg);
@@ -2154,7 +2169,7 @@ canvas{image-rendering:pixelated;}
   /* ════════ 연습 전용 반응형 (.prc-hts 만 — 실전 .hts 미디어쿼리 무관) ════════ */
   /* 중간 폭(노트북/큰 태블릿 ~1280): col3·col4 를 약간 줄여 차트 폭 우선 확보 */
   @media (max-width:1280px){
-    .prc-hts{grid-template-columns:230px 1fr 180px 210px;}
+    .prc-hts{grid-template-columns:270px 1fr 210px 200px;}
   }
   /* 좁은 폭(태블릿/폴드 펼침/세로 모니터 ≤1100): 4분할 해제 → 세로로 쌓기(차트 우선) */
   @media (max-width:1100px){
@@ -15687,7 +15702,9 @@ function prcRenderPrepSectors(secs){
   const max=secs[0].amt||1;
   el.innerHTML = secs.map((s,i)=>{
     const w=Math.max(4,Math.round((s.amt/max)*100));
-    return `<div class="prc-sec-row"><span class="prc-sec-rank">${i+1}</span><span class="prc-sec-name" title="${prcEsc(s.sector)}">${prcEsc(s.sector)}</span><span class="prc-sec-bar"><span style="width:${w}%"></span></span><span class="prc-sec-amt">${Number(s.amtEok||0).toLocaleString()}억<span style="color:var(--ts);font-weight:600;font-size:11px;"> · ${s.count}</span></span></div>`;
+    const _eok=Number(s.amtEok||0);
+    const _amt=_eok>=10000?(_eok/10000).toFixed(1)+'조':_eok.toLocaleString()+'억';   // 단위 약어(1만억↑→조)
+    return `<div class="prc-sec-row"><span class="prc-sec-rank">${i+1}</span><span class="prc-sec-name" title="${prcEsc(s.sector)}">${prcEsc(s.sector)}</span><span class="prc-sec-bar"><span style="width:${w}%"></span></span><span class="prc-sec-amt" title="전일 거래대금 ${_eok.toLocaleString()}억 · ${s.count}종목">${_amt}<span style="color:var(--ts);font-weight:600;font-size:10px;"> · ${s.count}</span></span></div>`;
   }).join('');
 }
 
@@ -15704,23 +15721,33 @@ function prcShortCell(v){
 }
 function prcFlowCell(v){ return `<td style="color:${prcFlowColor(v)};font-weight:800;">${prcFmtEok(v)}</td>`; }
 
+// 칼럼 정리(§col1): 8칸 표는 260px 표영역에 물리적으로 안 들어가(숫자칸 5개만 ~250px) 가로 잘림 →
+// 종목당 2줄 스택 행으로 전환. 1줄=순위·종목명(코드)·등락, 2줄=섹터·거래대금·공매도·외인·기관(flex-wrap).
+// 가로 스크롤 없이 세로로 흐르므로 어떤 칼럼도 잘리지 않음. (거래량은 거래대금과 중복이라 제외)
 function prcRenderPrepTable(rows){
   const el=document.getElementById('prcPrepTable'); if(!el) return;
   if(!rows.length){ el.innerHTML='<div style="padding:12px;color:var(--ts);font-size:12px;">후보 종목이 없어요</div>'; return; }
-  const head=`<thead><tr><th style="text-align:center;">#</th><th style="text-align:left;">종목</th><th style="text-align:left;">섹터</th><th>전일 거래대금</th><th>거래량</th><th>등락률(D-1)</th>`
-    +`<th title="전일 공매도 거래량 비중 (5%↑ 주의)">공매도%</th><th title="전일 외국인 순매수 거래대금">외국인</th><th title="전일 기관 순매수 거래대금">기관</th></tr></thead>`;
-  const body=rows.map((r,i)=>`<tr onclick="prcPickCandidate('${r.code}')" title="클릭 → ${prcEsc(r.name)} 연습 차트">`
-    +`<td style="text-align:center;color:var(--ts);font-weight:700;">${i+1}</td>`
-    +`<td style="text-align:left;font-weight:700;">${prcEsc(r.name)} <span style="color:var(--ts);font-weight:600;font-size:11px;">${r.code}</span></td>`
-    +`<td style="text-align:left;">${prcEsc(r.sector||'—')}</td>`
-    +`<td>${Number(r.amtEok||0).toLocaleString()}억</td>`
-    +`<td style="color:var(--ts);">${Number(r.vol||0).toLocaleString()}</td>`
-    +`<td style="color:${prcPctColor(r.changePct)};font-weight:800;">${prcFmtPct(r.changePct)}</td>`
-    +prcShortCell(r.shortRatio)
-    +prcFlowCell(r.foreignEok)
-    +prcFlowCell(r.instEok)
-    +`</tr>`).join('');
-  el.innerHTML=`<div style="overflow:auto;max-height:360px;border:1px solid var(--bd,#2a2d35);border-radius:10px;"><table class="prc-prep-tbl">${head}<tbody>${body}</tbody></table></div>`;
+  const flowSpan=(v)=>`<b style="color:${prcFlowColor(v)};">${prcFmtEok(v)}</b>`;   // 외인/기관 순매수 색상값(+빨강/-파랑)
+  const shortSpan=(v)=>{                                                             // 공매도 비중(5%↑ 주황⚠)
+    if(v==null||isNaN(v)) return '<b style="color:var(--ts,#9aa);">—</b>';
+    const n=Number(v), warn=n>=5;
+    return `<b style="color:${warn?'#f59e0b':'var(--tp,#191f28)'};">${n.toFixed(2)}%${warn?' ⚠':''}</b>`;
+  };
+  const body=rows.map((r,i)=>`<div class="prc-cand" onclick="prcPickCandidate('${r.code}')" title="클릭 → ${prcEsc(r.name)} 연습 차트">`
+    +`<div class="prc-cand-top">`
+      +`<span class="prc-cand-rank">${i+1}</span>`
+      +`<span class="prc-cand-nm">${prcEsc(r.name)} <span class="prc-cand-code">${r.code}</span></span>`
+      +`<span class="prc-cand-chg" style="color:${prcPctColor(r.changePct)};">${prcFmtPct(r.changePct)}</span>`
+    +`</div>`
+    +`<div class="prc-cand-meta">`
+      +`<span class="prc-cand-sec">${prcEsc(r.sector||'—')}</span>`
+      +`<span>거래대금 <b style="color:var(--tp,#191f28);">${Number(r.amtEok||0).toLocaleString()}억</b></span>`
+      +`<span>공매도 ${shortSpan(r.shortRatio)}</span>`
+      +`<span>외인 ${flowSpan(r.foreignEok)}</span>`
+      +`<span>기관 ${flowSpan(r.instEok)}</span>`
+    +`</div>`
+    +`</div>`).join('');
+  el.innerHTML=`<div class="prc-cand-list">${body}</div>`;
 }
 
 // ── 📊 선택 종목 공매도·수급 추이 (연습 전용 pctx) — 선택일 D 직전 N거래일(D 미포함, 룩어헤드 차단) ──
@@ -15755,11 +15782,10 @@ function prcRenderKrxTrend(d){
   const el=document.getElementById('prcKrxTrend'); if(!el) return;
   const days=d.days||[];
   if(!days.length){ el.innerHTML='<div style="border:1px solid var(--bd,#2a2d35);border-radius:12px;padding:12px 14px;background:var(--card,#0f1115);color:var(--ts);font-size:12px;">직전 거래일 수급·공매도 데이터가 없어요</div>'; return; }
-  const maxFlow=Math.max(1,...days.map(x=>Math.abs(x.foreignEok||0)),...days.map(x=>Math.abs(x.instEok||0)));
+  // 인라인 46px 막대 제거(col3 폭 절약) → 색상 숫자만(+빨강 순매수/-파랑 순매도). 4칸 무스크롤.
   const bar=(v)=>{
     if(v==null||isNaN(v)) return '<span style="color:var(--ts,#9aa);">—</span>';
-    const w=Math.max(2,Math.round(Math.abs(v)/maxFlow*100)), col=prcFlowColor(v);
-    return `<span style="display:inline-flex;align-items:center;gap:6px;justify-content:flex-end;"><span style="color:${col};font-weight:800;">${prcFmtEok(v)}</span><span style="display:inline-block;width:46px;height:8px;border-radius:4px;background:var(--bd,#2a2d35);overflow:hidden;vertical-align:middle;"><span style="display:block;height:100%;width:${w}%;background:${col};margin-left:${v<0?'auto':'0'};"></span></span></span>`;
+    return `<span style="color:${prcFlowColor(v)};font-weight:800;">${prcFmtEok(v)}</span>`;
   };
   const shortCell=(v)=>{
     if(v==null||isNaN(v)) return '<span style="color:var(--ts,#9aa);">—</span>';
@@ -15780,7 +15806,7 @@ function prcRenderKrxTrend(d){
     +`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;"><span style="font-size:13px;font-weight:800;">📊 수급·공매도 추이</span>`
     +`<span style="font-size:11px;color:var(--ts);">${prcEsc(d.symbol)} · ${prcFmtDate(d.date)} 직전 ${days.length}거래일 · <b style="color:#10b981;">당일·미래 미사용</b></span></div>`
     +(summ?`<div style="font-size:12px;margin-bottom:8px;">${summ}</div>`:'')
-    +`<div style="overflow:auto;max-height:240px;border:1px solid var(--bd,#2a2d35);border-radius:10px;"><table class="prc-prep-tbl"><thead><tr><th style="text-align:left;">날짜</th><th>외국인 순매수</th><th>기관 순매수</th><th>공매도%</th></tr></thead><tbody>${body}</tbody></table></div></div>`;
+    +`<div style="overflow:auto;max-height:240px;border:1px solid var(--bd,#2a2d35);border-radius:10px;"><table class="prc-prep-tbl"><thead><tr><th style="text-align:left;">날짜</th><th title="외국인 순매수 거래대금">외인</th><th title="기관 순매수 거래대금">기관</th><th title="공매도 거래량 비중 (5%↑ 주의)">공매도</th></tr></thead><tbody>${body}</tbody></table></div></div>`;
 }
 
 // ════════ col3 분석 패널 탭 (실전 호가창 자리) ════════
