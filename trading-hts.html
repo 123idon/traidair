@@ -2104,6 +2104,7 @@ canvas{image-rendering:pixelated;}
   .prc-prep-h span{font-size:10px;font-weight:600;color:var(--ts,#9aa);margin-left:6px;}
   .prc-mk{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:8px;border:1px solid var(--bd,#2a2d35);background:var(--pan,#16181d);font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;}
   .prc-mk b{font-weight:800;color:var(--ts,#9aa);font-size:11px;}
+  .prc-mk-tag{font-size:9px;font-weight:800;border:1px solid currentColor;border-radius:5px;padding:0 4px;line-height:1.6;}
   .prc-sec-row{display:flex;align-items:center;gap:7px;padding:3px 0;font-size:12px;}
   .prc-sec-rank{width:16px;text-align:center;color:var(--ts,#9aa);font-weight:800;font-size:11px;flex:none;}
   .prc-sec-name{width:72px;font-weight:700;flex:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -15814,13 +15815,24 @@ async function prcLoadPrep(){
   }catch(e){ if(tblEl) tblEl.innerHTML='<div style="padding:12px;color:var(--ts);font-size:12px;">후보 로드 오류: '+prcEsc(e.message)+'</div>'; }
 }
 
+// ── 시황 칩(공유): 지수(등락%색) + S&P500 + VIX(변동성 경고색) + 환율(1,300 기준색) ──
+//   prep 시황 바 / col3 종목정보 공용. 데이터는 전부 D 이전 세션(룩어헤드 없음, market_context 매핑).
+function prcVixColor(v){ if(v==null||isNaN(v)) return 'var(--ts,#9aa)'; return v>=25?'#ef4444':(v>=20?'#f59e0b':'#10b981'); }
+function prcVixLabel(v){ if(v==null||isNaN(v)) return ''; return v>=25?'위험':(v>=20?'주의':'안정'); }
+function prcFxColor(v){ if(v==null||isNaN(v)) return 'var(--ts,#9aa)'; return v>1300?'#ef4444':'#10b981'; }   // 1,300 초과=원화 약세(부담)
+function prcFxLabel(v){ if(v==null||isNaN(v)) return ''; return v>1300?'고환율':'안정권'; }
+function prcMkIdx(o,lbl){ return (o&&o.close!=null) ? `<span class="prc-mk"><b>${lbl}</b> ${Number(o.close).toLocaleString()} <span style="color:${prcPctColor(o.changePct)};font-weight:800;">${prcFmtPct(o.changePct)}</span></span>` : ''; }
+function prcMkVix(o){ if(!o||o.close==null) return ''; const v=+o.close,c=prcVixColor(v);
+  return `<span class="prc-mk" title="VIX 공포지수 — 20↑ 주의·25↑ 위험 (변동성 경고)"><b>VIX</b> <span style="color:${c};font-weight:800;">${v.toFixed(2)}</span> <span class="prc-mk-tag" style="color:${c};border-color:${c};">${prcVixLabel(v)}</span></span>`; }
+function prcMkFx(o){ if(!o||o.close==null) return ''; const v=+o.close,c=prcFxColor(v);
+  return `<span class="prc-mk" title="원/달러 환율 — 1,300 초과 시 원화 약세(부담)"><b>환율</b> <span style="color:${c};font-weight:800;">${Number(v).toLocaleString()}</span> <span style="color:${prcPctColor(o.changePct)};font-weight:700;font-size:10px;">${prcFmtPct(o.changePct)}</span> <span class="prc-mk-tag" style="color:${c};border-color:${c};">${prcFxLabel(v)}</span></span>`; }
+function prcMarketChips(m){
+  if(!m) return '<span style="color:var(--ts);font-size:11px;">전일 시황 데이터 없음 (data/market_context)</span>';
+  return prcMkIdx(m.nasdaq,'나스닥')+prcMkIdx(m.sp500,'S&P500')+prcMkVix(m.vix)+prcMkIdx(m.kospi,'코스피')+prcMkIdx(m.kosdaq,'코스닥')+prcMkFx(m.usdkrw);
+}
 function prcRenderPrepMarket(d){
   const el=document.getElementById('prcPrepMarket'); if(!el) return;
-  const m=d.market;
-  const item=(o,lbl)=> o ? `<span class="prc-mk"><b>${lbl}</b> ${o.close!=null?Number(o.close).toLocaleString():'—'} <span style="color:${prcPctColor(o.changePct)};font-weight:800;">${prcFmtPct(o.changePct)}</span></span>` : '';
-  let chips = m ? (item(m.nasdaq,'나스닥')+item(m.kospi,'코스피')+item(m.kosdaq,'코스닥'))
-               : '<span style="color:var(--ts);font-size:11px;">전일 시황 데이터 없음 (data/market_context)</span>';
-  el.innerHTML = `<div style="font-size:11px;color:var(--ts);margin-bottom:6px;">🌐 전일 시황 · 후보 기준일 <b>${prcFmtDate(d.prevDate)}</b> (선택일 ${prcFmtDate(d.date)}의 직전 거래일) — <b style="color:#10b981;">당일 데이터 미사용</b></div><div style="display:flex;gap:8px;flex-wrap:wrap;">${chips}</div>`;
+  el.innerHTML = `<div style="font-size:11px;color:var(--ts);margin-bottom:6px;">🌐 전일 시황 · 후보 기준일 <b>${prcFmtDate(d.prevDate)}</b> (선택일 ${prcFmtDate(d.date)}의 직전 거래일) — <b style="color:#10b981;">당일 데이터 미사용</b></div><div style="display:flex;gap:8px;flex-wrap:wrap;">${prcMarketChips(d.market)}</div>`;
 }
 
 function prcRenderPrepSectors(secs){
@@ -16009,7 +16021,6 @@ function prcRenderStockInfo(){
   const fmtEok=v=>(v==null||isNaN(v))?'—':(Number(v)>0?'+':'')+Math.round(Number(v)).toLocaleString()+'억';
   const flowCol=v=>(v==null||isNaN(v))?'var(--ts,#9aa)':(v>0?'#ef4444':v<0?'#3b82f6':'var(--ts)');
   const rowR=(k,v,col)=>`<div class="prc-i-row"><span class="prc-i-k">${k}</span><span class="prc-i-v"${col?` style="color:${col};"`:''}>${v}</span></div>`;
-  const mkItem=(o,lbl)=> o ? `<span class="prc-mk"><b>${lbl}</b> ${o.close!=null?Number(o.close).toLocaleString():'—'} <span style="color:${prcPctColor(o.changePct)};font-weight:800;">${prcFmtPct(o.changePct)}</span></span>` : '';
   let html=`<div class="prc-i-note"><b>${prcEsc(PRC.name||PRC.symbol)}</b> ${prcEsc(PRC.symbol)} · 전일(D-1) 맥락 · <b style="color:#10b981;">당일 미사용</b></div>`;
   html+=`<div class="prc-i-card">`;
   if(row){
@@ -16023,9 +16034,8 @@ function prcRenderStockInfo(){
     html+=`<div class="prc-i-empty" style="padding:8px;">후보 목록 밖 종목이라<br>섹터·수급 정보가 없어요</div>`;
   }
   html+=`</div>`;
-  const chips=m?(mkItem(m.nasdaq,'나스닥')+mkItem(m.kospi,'코스피')+mkItem(m.kosdaq,'코스닥')):'';
   html+=`<div class="prc-i-card"><div class="prc-i-ttl">🌐 전일 시황</div>`
-       +(chips?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;">${chips}</div>`:`<div class="prc-i-empty" style="padding:6px;">시황 데이터 없음</div>`)+`</div>`;
+       +`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;">${prcMarketChips(m)}</div></div>`;
   el.innerHTML=html;
 }
 
