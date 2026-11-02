@@ -52,9 +52,10 @@ let _localCfg = {};
 try { _localCfg = JSON.parse(require('fs').readFileSync('./cfg.json','utf8')); } catch(e) {}
 
 let runtimeConfig = {
-  claudeKey:    process.env.ANTHROPIC_API_KEY || _localCfg.ck || '',
-  kisAppKey:    process.env.KIS_APP_KEY       || _localCfg.ak || 'PSrI4OkbeIl4zTuwKEO1ORdKbPklB2NeeAp4',
-  kisAppSecret: process.env.KIS_APP_SECRET    || _localCfg.as || 't8js7Q3Mh2HVkKdjWq4WK2QJAZtmi2oabSgLg1Y8ofaLde7ManMljS/D9hFjbw9csXRVncC2RRGBm8OUN+BabR+5u8hpsJx4s6wCh7X68hH6ETFyNn+Fzx/gt5zUDgNbS+ukh4KFKBntqVKt5MCCiD/vJ9IKv4ytAzrml3WyAp7uz5kZYjA=',
+  // AI API 비활성(비용 절감): AI_API_ENABLED=1 일 때만 키 사용
+  claudeKey:    (process.env.AI_API_ENABLED === '1') ? (process.env.ANTHROPIC_API_KEY || _localCfg.ck || '') : '',
+  kisAppKey:    process.env.KIS_APP_KEY       || _localCfg.ak || '',
+  kisAppSecret: process.env.KIS_APP_SECRET    || _localCfg.as || '',
   kisAccount:   process.env.KIS_ACCOUNT       || _localCfg.ac || '',
   kisMode:      process.env.KIS_MODE          || _localCfg.md || 'real',
   dartKey:      process.env.DART_API_KEY      || _localCfg.dk || '',
@@ -209,11 +210,7 @@ const MIME = {
   '.ico':  'image/x-icon',
 };
 
-const CORS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-};
+const CORS = { 'Vary': 'Origin' }; // 보안: 다른 사이트에서의 호출 허용 안 함 (same-origin 전용)
 
 const CORP_CODE_MAP = {
   '삼성전자': '00126380', 'SK하이닉스': '00164779', '현대차': '00164742',
@@ -461,10 +458,11 @@ function kstDateStr() {
 //  구현: 검증된 기존 /api/kis/* · /api/market-data 라우트를 내부 루프백으로 래핑하고,
 //        traidair가 보관한 KIS 키를 주입한다(에이전트는 키를 모름).
 // ════════════════════════════════════════════════════════════════════════
-const AGENT_KEY = process.env.AGENT_KEY || _localCfg.agentKey || 'traidair-agent-dev';
+const AGENT_KEY = process.env.AGENT_KEY || _localCfg.agentKey || ''; // 기본값 없음(미설정 시 에이전트 키 인증 불가)
 function agentAuthOk(req) {
+  if (req._authed) return true;               // 로그인한 브라우저
   const k = req.headers['x-agent-key'];
-  return !AGENT_KEY || k === AGENT_KEY;
+  return !!AGENT_KEY && k === AGENT_KEY;
 }
 function agentDeny(res) {
   res.writeHead(401, { 'Content-Type': 'application/json', ...CORS });
@@ -476,13 +474,127 @@ function kisKeys() {
 }
 function kisAccount() { return runtimeConfig.kisAccount || ''; }
 
+
+// ════════════════════════════════════════════════════════════════════════
+//  🔒 접근 보호 (2026-11) — 공개 URL에서 키·주문 API가 노출되던 문제 차단
+//  · APP_PASSWORD 로그인 → HttpOnly 쿠키. 미설정이면 로컬(127.0.0.1)만 허용.
+//  · 내부 루프백(callSelf)은 프로세스 랜덤 토큰 헤더로 통과.
+//  · 실계좌 주문은 LIVE_ORDER_ENABLED=1 일 때만 허용 (기본 차단).
+// ════════════════════════════════════════════════════════════════════════
+const APP_PASSWORD = process.env.APP_PASSWORD || _localCfg.appPassword || '';
+const SESSION_SECRET = process.env.SESSION_SECRET || APP_PASSWORD || crypto.randomBytes(32).toString('hex');
+const INTERNAL_TOKEN = crypto.randomBytes(24).toString('hex');
+const LIVE_ORDER_ENABLED = process.env.LIVE_ORDER_ENABLED === '1';
+const AUTH_COOKIE = 'tai_auth';
+function _authToken() { return crypto.createHmac('sha256', SESSION_SECRET).update('traidair-v1:' + APP_PASSWORD).digest('hex'); }
+function _parseCookies(req) {
+  const out = {}; (req.headers.cookie || '').split(';').forEach(p => { const i = p.indexOf('='); if (i > 0) out[p.slice(0, i).trim()] = decodeURIComponent(p.slice(i + 1).trim()); });
+  return out;
+}
+function _safeEq(a, b) { const A = Buffer.from(String(a)), B = Buffer.from(String(b)); return A.length === B.length && crypto.timingSafeEqual(A, B); }
+function _isLoopback(req) { const ip = (req.socket && req.socket.remoteAddress) || ''; return ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1'; }
+function isAuthed(req) {
+  if (req.headers['x-internal-token'] && _safeEq(req.headers['x-internal-token'], INTERNAL_TOKEN) && _isLoopback(req)) return true;
+  if (!APP_PASSWORD) return _isLoopback(req) && !req.headers['x-forwarded-for'];
+  const c = _parseCookies(req)[AUTH_COOKIE];
+  return !!c && _safeEq(c, _authToken());
+}
+const _loginFails = new Map(); // ip → {n, until}
+function _clientIp(req) { return String(req.headers['x-forwarded-for'] || (req.socket && req.socket.remoteAddress) || '').split(',')[0].trim(); }
+function loginPage(msg) {
+  return '<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>TraidAIr 로그인</title>' +
+    '<style>body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f4f6f9;font-family:system-ui,sans-serif}' +
+    'form{background:#fff;padding:28px 24px;border-radius:14px;box-shadow:0 4px 20px rgba(0,0,0,.08);width:min(320px,90vw)}h1{font-size:18px;margin:0 0 16px}' +
+    'input{width:100%;box-sizing:border-box;padding:12px;border:1.5px solid #d0d5dd;border-radius:8px;font-size:16px}button{margin-top:12px;width:100%;padding:12px;border:0;border-radius:8px;background:#3182f6;color:#fff;font-size:16px;font-weight:600}' +
+    'p{color:#e5484d;font-size:13px;margin:10px 0 0}</style></head><body><form method="POST" action="/login"><h1>🔒 TraidAIr</h1>' +
+    '<input type="password" name="password" placeholder="비밀번호" autofocus autocomplete="current-password"><button type="submit">로그인</button>' +
+    (msg ? '<p>' + msg + '</p>' : '') + '</form></body></html>';
+}
+// 브라우저가 보낸 KIS 키는 무시하고 서버 보관 키를 쓴다(키를 브라우저로 내보내지 않기 위함).
+function withServerKis(o) {
+  o = o || {};
+  if (runtimeConfig.kisAppKey && runtimeConfig.kisAppSecret) { o.appKey = runtimeConfig.kisAppKey; o.appSecret = runtimeConfig.kisAppSecret; }
+  else if (o.appKey === '__server__') { o.appKey = ''; o.appSecret = ''; }
+  if (!o.account || o.account === '__server__') o.account = runtimeConfig.kisAccount || '';
+  if (!o.mode) o.mode = runtimeConfig.kisMode || 'mock';
+  return o;
+}
+function liveOrderBlocked(mode) { return (mode || 'mock') === 'real' && !LIVE_ORDER_ENABLED; }
+
+
+// ════════════════════════════════════════════════════════════════════════
+//  📊 강세섹터 로컬 계산 (LLM 없음) — GET /api/local/hot-sectors
+//  데이터: KIS 거래대금 순위(코스피·코스닥 각 30) + KIS 종목기본조회의 업종명(캐시).
+//  점수: 섹터 거래대금 순위(50%) + 거래대금 가중 등락률 순위(30%) + 상승종목 비율(20%).
+//  가중 등락률 ≤ 0 인 섹터는 제외. 섹터당 대장주 2개(거래대금 순, 상한가·하락 종목 제외).
+// ════════════════════════════════════════════════════════════════════════
+const _sectorCache = new Map();        // code → 업종명 (거의 안 바뀜)
+let _hotSecCache = { ts: 0, data: null };
+async function _kisSectorOf(code, token) {
+  if (_sectorCache.has(code)) return _sectorCache.get(code);
+  let name = '';
+  try {
+    const r = await kisRequest({
+      hostname: kisHost('real'), port: kisPort('real'), method: 'GET',
+      path: `/uapi/domestic-stock/v1/quotations/search-stock-info?PRDT_TYPE_CD=300&PDNO=${code}`,
+      headers: { 'Content-Type': 'application/json', 'authorization': `Bearer ${token}`,
+        'appkey': runtimeConfig.kisAppKey, 'appsecret': runtimeConfig.kisAppSecret, 'tr_id': 'CTPF1002R', 'custtype': 'P' },
+    });
+    const o = (r.data && r.data.output) || {};
+    name = o.idx_bztp_mcls_cd_name || o.idx_bztp_lcls_cd_name || o.std_idst_clsf_cd_name || '';
+  } catch (e) {}
+  name = String(name || '').trim();
+  if (name) _sectorCache.set(code, name);
+  return name || '기타';
+}
+async function computeHotSectors({ force = false } = {}) {
+  if (!force && _hotSecCache.data && Date.now() - _hotSecCache.ts < 60 * 1000) return _hotSecCache.data;
+  if (!runtimeConfig.kisAppKey || !runtimeConfig.kisAppSecret) return { ok: false, error: 'KIS 키 미설정' };
+  const token = await getKisToken(runtimeConfig.kisAppKey, runtimeConfig.kisAppSecret, 'real');
+  if (!token) return { ok: false, error: 'KIS 토큰 발급 실패' };
+  const lists = await Promise.all(['0001', '1001'].map(mk => callSelf('/api/kis/volume-rank', { method: 'POST', body: { market: mk, rankBy: 3, topN: 30 } })));
+  const seen = new Set(); const items = [];
+  lists.forEach((l, i) => (l && l.ok ? l.items : []).forEach(it => {
+    if (!it.code || seen.has(it.code)) return;
+    // ETF/ETN/스팩·우선주 제외(이름 기반)
+    if (/KODEX|TIGER|KBSTAR|ARIRANG|HANARO|KOSEF|SOL |ACE |RISE |PLUS |ETN|스팩|[0-9]호$/.test(it.name || '')) return;
+    if (/우$|우B$|우C$/.test(it.name || '')) return;
+    seen.add(it.code); items.push({ ...it, market: i === 0 ? 'KOSPI' : 'KOSDAQ' });
+  }));
+  if (!items.length) return { ok: false, error: '거래대금 순위 조회 실패(장 시간·키 확인)' };
+  for (const it of items) { it.sector = await _kisSectorOf(it.code, token); }   // 순차(호출 제한 보호), 캐시 후엔 즉시
+  const by = {};
+  items.forEach(it => { (by[it.sector] = by[it.sector] || []).push(it); });
+  let secs = Object.entries(by).map(([name, arr]) => {
+    const tv = arr.reduce((a, b) => a + (b.turnover || 0), 0) || 1;
+    const wChg = arr.reduce((a, b) => a + (b.turnover || 0) * (b.changePct || 0), 0) / tv;
+    const up = arr.filter(x => (x.changePct || 0) > 0).length / arr.length;
+    return { name, count: arr.length, turnover: tv, wChg: +wChg.toFixed(2), upRatio: +up.toFixed(2), arr };
+  }).filter(x => x.name !== '기타' && x.wChg > 0);
+  const pct = (vals, v) => vals.length <= 1 ? 1 : vals.filter(x => x < v).length / (vals.length - 1);
+  const tvs = secs.map(x => x.turnover), chs = secs.map(x => x.wChg);
+  secs.forEach(x => { x.score = +(0.5 * pct(tvs, x.turnover) + 0.3 * pct(chs, x.wChg) + 0.2 * x.upRatio).toFixed(3); });
+  secs.sort((a, b) => b.score - a.score);
+  const out = secs.slice(0, 3).map((x, i) => ({
+    rank: i + 1, name: x.name, score: x.score, wChg: x.wChg, upRatio: x.upRatio, count: x.count,
+    turnoverEok: Math.round(x.turnover / 1e8),
+    reason: `거래대금 ${Math.round(x.turnover / 1e8).toLocaleString()}억 · 가중등락 ${x.wChg > 0 ? '+' : ''}${x.wChg}% · 상승비율 ${Math.round(x.upRatio * 100)}% (${x.count}종목)`,
+    stocks: x.arr.filter(s => (s.changePct || 0) > 0 && (s.changePct || 0) < 29)
+      .sort((a, b) => (b.turnover || 0) - (a.turnover || 0)).slice(0, 2)
+      .map((s, k) => ({ code: s.code, name: s.name, price: s.price, changePct: s.changePct, turnoverEok: Math.round((s.turnover || 0) / 1e8), role: k === 0 ? '대장주' : '2등주', market: s.market })),
+  })).filter(x => x.stocks.length);
+  const data = { ok: true, asOf: new Date().toISOString(), source: 'KIS 거래대금순위+업종(로컬 계산)', universe: items.length, sectors: out };
+  _hotSecCache = { ts: Date.now(), data };
+  return data;
+}
+
 // 내부 루프백 — 같은 서버의 기존 라우트를 HTTP로 호출(기존 로직 재사용, 무수정).
 function callSelf(routePath, { method = 'GET', body = null } = {}) {
   return new Promise((resolve) => {
     const data = body != null ? (typeof body === 'string' ? body : JSON.stringify(body)) : null;
     const opts = {
       hostname: '127.0.0.1', port: PORT, path: routePath, method,
-      headers: { 'Content-Type': 'application/json', ...(data ? { 'Content-Length': Buffer.byteLength(data) } : {}) },
+      headers: { 'Content-Type': 'application/json', 'X-Internal-Token': INTERNAL_TOKEN, ...(data ? { 'Content-Length': Buffer.byteLength(data) } : {}) },
     };
     const r = http.request(opts, resp => {
       let d = ''; resp.on('data', c => d += c);
@@ -667,6 +779,49 @@ const server = http.createServer(async (req, res) => {
   const url = req.url.split('?')[0];
   const query = new URLSearchParams(req.url.includes('?') ? req.url.split('?')[1] : '');
 
+  // ── 🔒 로그인 게이트 ──
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  if (url === '/login' && req.method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+    res.end(loginPage(APP_PASSWORD ? '' : '서버에 APP_PASSWORD가 설정되지 않아 외부 접속이 막혀 있어요.'));
+    return;
+  }
+  if (url === '/login' && req.method === 'POST') {
+    let body = ''; req.on('data', c => { body += c; if (body.length > 4096) req.destroy(); });
+    req.on('end', () => {
+      const ip = _clientIp(req); const now = Date.now();
+      const f = _loginFails.get(ip) || { n: 0, until: 0 };
+      if (f.until > now) { res.writeHead(429, { 'Content-Type': 'text/html; charset=utf-8' }); res.end(loginPage('시도가 너무 많아요. 10분 뒤 다시 시도하세요.')); return; }
+      const pw = new URLSearchParams(body).get('password') || '';
+      if (APP_PASSWORD && _safeEq(pw, APP_PASSWORD)) {
+        _loginFails.delete(ip);
+        res.writeHead(302, { Location: '/', 'Set-Cookie': `${AUTH_COOKIE}=${_authToken()}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${60 * 60 * 24 * 30}` });
+        res.end(); return;
+      }
+      f.n += 1; if (f.n >= 5) { f.until = now + 10 * 60 * 1000; f.n = 0; } _loginFails.set(ip, f);
+      res.writeHead(401, { 'Content-Type': 'text/html; charset=utf-8' }); res.end(loginPage('비밀번호가 맞지 않아요.'));
+    });
+    return;
+  }
+  if (url === '/logout') {
+    res.writeHead(302, { Location: '/login', 'Set-Cookie': `${AUTH_COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0` }); res.end(); return;
+  }
+  req._authed = isAuthed(req);
+  const _agentKeyOk = !!AGENT_KEY && req.headers['x-agent-key'] === AGENT_KEY;
+  const _publicPath = url === '/api/version' || url === '/favicon.ico';
+  if (!req._authed && !_publicPath && !(_agentKeyOk && (url.startsWith('/api/agent/') || url.startsWith('/api/backtest/')))) {
+    if (url.startsWith('/api/')) { res.writeHead(401, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ok: false, error: 'login required' })); }
+    else { res.writeHead(302, { Location: '/login', 'Cache-Control': 'no-store' }); res.end(); }
+    return;
+  }
+
+
+  // ── 📊 강세섹터 로컬 계산 (LLM 미사용) ──
+  if (url === '/api/local/hot-sectors' && req.method === 'GET') {
+    let data; try { data = await computeHotSectors({ force: query.get('force') === '1' }); } catch (e) { data = { ok: false, error: e.message }; }
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(data)); return;
+  }
   // ── 설정 저장 (/api/save-config)
   if (url === '/api/save-config' && req.method === 'POST') {
     let body = '';
@@ -674,7 +829,8 @@ const server = http.createServer(async (req, res) => {
     req.on('end', () => {
       try {
         const cfg = JSON.parse(body);
-        if (cfg.claudeKey && cfg.claudeKey.startsWith('sk-ant-')) runtimeConfig.claudeKey = cfg.claudeKey;
+        // claudeKey는 저장하지 않음(AI API 비활성)
+        for (const k of Object.keys(cfg)) if (cfg[k] === '__server__' || cfg[k] === '') delete cfg[k];
         if (cfg.kisAppKey)    runtimeConfig.kisAppKey = cfg.kisAppKey;
         if (cfg.kisAppSecret) runtimeConfig.kisAppSecret = cfg.kisAppSecret;
         if (cfg.kisAccount)   runtimeConfig.kisAccount = cfg.kisAccount;
@@ -685,11 +841,9 @@ const server = http.createServer(async (req, res) => {
         saveToFile(runtimeConfig);
         console.log('✅ 설정 저장:', Object.keys(cfg).join(', '));
         // GitHub에 영구 저장 (재배포 후에도 유지)
-        saveConfigToGitHub(runtimeConfig).then(ok => {
-          if(ok) console.log('✅ GitHub 영구 저장 완료');
-        }).catch(()=>{});
+        // 🔒 키를 GitHub(공개 저장소)에 저장하던 동작 제거
         res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
-        res.end(JSON.stringify({ ok: true, saved: Object.keys(cfg), github: true }));
+        res.end(JSON.stringify({ ok: true, saved: Object.keys(cfg), github: false }));
       } catch(e) {
         res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
         res.end(JSON.stringify({ ok: false, error: e.message }));
@@ -700,39 +854,26 @@ const server = http.createServer(async (req, res) => {
 
   // ── 설정 조회 (/api/get-config)
   if (url === '/api/get-config') {
-    res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
+    // 🔒 키는 절대 내려보내지 않는다. 브라우저는 '__server__' 표식만 받고, 서버가 보관 키로 대신 호출한다.
+    const kisSet = !!(runtimeConfig.kisAppKey && runtimeConfig.kisAppSecret);
+    const acc = runtimeConfig.kisAccount || '';
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...CORS });
     res.end(JSON.stringify({
       ok: true,
-      claudeKeyFull: runtimeConfig.claudeKey || '',
-      claudeKey: runtimeConfig.claudeKey ? runtimeConfig.claudeKey.slice(0,10)+'...' : '',
-      kisAppKey:    runtimeConfig.kisAppKey || '',
-      kisAppSecret: runtimeConfig.kisAppSecret || '',
-      kisAccount:   runtimeConfig.kisAccount || '',
-      kisMode:      runtimeConfig.kisMode || 'mock',
-      dartKey:      runtimeConfig.dartKey || '',
-      notionToken:  runtimeConfig.notionToken ? runtimeConfig.notionToken.slice(0,10)+'...' : '',
-      notionTokenSet: !!runtimeConfig.notionToken,
+      claudeKeyFull: '', claudeKey: '', aiApiEnabled: !!runtimeConfig.claudeKey,
+      kisAppKey: kisSet ? '__server__' : '', kisAppSecret: kisSet ? '__server__' : '',
+      kisSet, kisAccount: acc ? '__server__' : '', kisAccountMasked: acc ? ('****' + acc.slice(-4)) : '',
+      kisMode: runtimeConfig.kisMode || 'mock', liveOrderEnabled: LIVE_ORDER_ENABLED,
+      dartKey: '', dartSet: !!runtimeConfig.dartKey,
+      notionToken: '', notionTokenSet: !!runtimeConfig.notionToken,
       notionPageId: runtimeConfig.notionPageId || '',
     }));
     return;
   }
 
   // ── Claude 키 세션 설정 (/api/set-claude-key)
-  if (url === '/api/set-claude-key' && req.method === 'POST') {
-    let body = '';
-    req.on('data', c => body += c);
-    req.on('end', () => {
-      try {
-        const { key } = JSON.parse(body);
-        if (key && key.startsWith('sk-ant-')) runtimeConfig.claudeKey = key;
-        res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
-        res.end(JSON.stringify({ ok: true }));
-      } catch(e) {
-        res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
-        res.end(JSON.stringify({ ok: false }));
-      }
-    });
-    return;
+  if (url === '/api/set-claude-key') { // 🔒 제거됨 — 브라우저가 키를 서버에 다시 주입하던 경로
+    res.writeHead(410, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ok: false, error: 'removed' })); return;
   }
 
   // ── Claude API 프록시
@@ -743,7 +884,7 @@ const server = http.createServer(async (req, res) => {
       const apiKey = runtimeConfig.claudeKey || '';
       if (!apiKey) {
         res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
-        res.end(JSON.stringify({ error: 'Claude API 키 없음. 설정창에서 키를 입력하세요.' }));
+        res.end(JSON.stringify({ error: { type: 'ai_disabled', message: 'AI API 비활성(비용 절감) — 계산은 로컬에서 동작합니다' } }));
         return;
       }
       // 시스템 프롬프트 자동 주입 + prompt caching 적용 (input 토큰 ~90% 절감)
@@ -819,7 +960,7 @@ const server = http.createServer(async (req, res) => {
         res.write('event: error\ndata: ' + JSON.stringify({ error: msg }) + '\n\n');
         res.end();
       };
-      if (!apiKey) { sseErr('Claude API 키 없음. 설정창에서 키를 입력하세요.'); return; }
+      if (!apiKey) { sseErr('AI API 비활성(비용 절감)'); return; }
       let bodyToSend = body;
       try {
         const parsed = JSON.parse(body);
@@ -864,7 +1005,7 @@ const server = http.createServer(async (req, res) => {
     req.on('data', c => body += c);
     req.on('end', async () => {
       try {
-        const { appKey, appSecret, mode } = JSON.parse(body);
+        const { appKey, appSecret, mode } = withServerKis(JSON.parse(body));
         const ak = appKey || runtimeConfig.kisAppKey;
         const as = appSecret || runtimeConfig.kisAppSecret;
         const md = mode || runtimeConfig.kisMode || 'real';
@@ -889,7 +1030,7 @@ const server = http.createServer(async (req, res) => {
     req.on('data', c => body += c);
     req.on('end', async () => {
       try {
-        const { appKey, appSecret, mode, code, date, tf } = JSON.parse(body);
+        const { appKey, appSecret, mode, code, date, tf } = withServerKis(JSON.parse(body));
         if (!appKey || !appSecret) throw new Error('appKey/appSecret 필요');
         const token = await getKisToken(appKey, appSecret, mode || 'real');
         if (!token) throw new Error('토큰 발급 실패');
@@ -973,7 +1114,7 @@ const server = http.createServer(async (req, res) => {
     req.on('data', c => body += c);
     req.on('end', async () => {
       try {
-        const { appKey, appSecret, mode, code } = JSON.parse(body);
+        const { appKey, appSecret, mode, code } = withServerKis(JSON.parse(body));
         if (!appKey || !appSecret) throw new Error('appKey/appSecret 필요');
         const token = await getKisToken(appKey, appSecret, mode || 'real');
         if (!token) throw new Error('토큰 발급 실패');
@@ -1016,7 +1157,7 @@ const server = http.createServer(async (req, res) => {
     req.on('data', c => body += c);
     req.on('end', async () => {
       try {
-        const { appKey, appSecret, mode, code } = JSON.parse(body);
+        const { appKey, appSecret, mode, code } = withServerKis(JSON.parse(body));
         const token = await getKisToken(appKey, appSecret, mode || 'mock');
         if (!token) throw new Error('토큰 없음');
         const result = await kisRequest({
@@ -1053,7 +1194,8 @@ const server = http.createServer(async (req, res) => {
     req.on('data', c => body += c);
     req.on('end', async () => {
       try {
-        const { appKey, appSecret, mode, account, side, code, qty, price, orderType } = JSON.parse(body);
+        const { appKey, appSecret, mode, account, side, code, qty, price, orderType } = withServerKis(JSON.parse(body));
+        if (liveOrderBlocked(mode)) throw new Error('실계좌 주문 차단됨 (LIVE_ORDER_ENABLED=1 일 때만 허용)');
         if (!appKey || !appSecret || !account) throw new Error('필수 정보 누락');
         const token = await getKisToken(appKey, appSecret, mode || 'mock');
         if (!token) throw new Error('토큰 없음');
@@ -1087,7 +1229,7 @@ const server = http.createServer(async (req, res) => {
     req.on('data', c => body += c);
     req.on('end', async () => {
       try {
-        const { appKey, appSecret, mode, account } = JSON.parse(body);
+        const { appKey, appSecret, mode, account } = withServerKis(JSON.parse(body));
         const token = await getKisToken(appKey, appSecret, mode || 'mock');
         if (!token) throw new Error('토큰 없음');
         const [acntPfx, acntSfx] = account.includes('-') ? account.split('-') : [account.slice(0,8), account.slice(8)];
@@ -1130,7 +1272,8 @@ const server = http.createServer(async (req, res) => {
     req.on('data', c => body += c);
     req.on('end', async () => {
       try {
-        const { appKey, appSecret, mode, account, side, code, qty, price, orderType, crdtType, loanDate } = JSON.parse(body);
+        const { appKey, appSecret, mode, account, side, code, qty, price, orderType, crdtType, loanDate } = withServerKis(JSON.parse(body));
+        if (liveOrderBlocked(mode)) throw new Error('실계좌 주문 차단됨 (LIVE_ORDER_ENABLED=1 일 때만 허용)');
         if (!appKey || !appSecret || !account) throw new Error('필수 정보 누락');
         if ((mode || 'real') !== 'real') throw new Error('신용주문은 실전(real) 모드 전용');
         if (side === 'sell' && !loanDate) throw new Error('신용 매도 시 loanDate(YYYYMMDD) 필수');
@@ -1190,7 +1333,8 @@ const server = http.createServer(async (req, res) => {
     req.on('data', c => body += c);
     req.on('end', async () => {
       try {
-        const { appKey, appSecret, mode, account, orgOrdNo, krxFwdgOrgno, action, qty, price, orderType, qtyAllOrd } = JSON.parse(body);
+        const { appKey, appSecret, mode, account, orgOrdNo, krxFwdgOrgno, action, qty, price, orderType, qtyAllOrd } = withServerKis(JSON.parse(body));
+        if (liveOrderBlocked(mode)) throw new Error('실계좌 주문 차단됨 (LIVE_ORDER_ENABLED=1 일 때만 허용)');
         if (!appKey || !appSecret || !account || !orgOrdNo) throw new Error('필수 정보 누락 (orgOrdNo 포함)');
         const token = await getKisToken(appKey, appSecret, mode || 'mock');
         if (!token) throw new Error('토큰 없음');
@@ -1252,7 +1396,7 @@ const server = http.createServer(async (req, res) => {
     req.on('data', c => body += c);
     req.on('end', async () => {
       try {
-        const { appKey, appSecret, mode, account } = JSON.parse(body);
+        const { appKey, appSecret, mode, account } = withServerKis(JSON.parse(body));
         if (!appKey || !appSecret || !account) throw new Error('필수 정보 누락');
         const token = await getKisToken(appKey, appSecret, mode || 'mock');
         if (!token) throw new Error('토큰 없음');
@@ -1306,7 +1450,7 @@ const server = http.createServer(async (req, res) => {
     req.on('data', c => body += c);
     req.on('end', async () => {
       try {
-        const { appKey, appSecret, mode, account, code, price, orderType } = JSON.parse(body);
+        const { appKey, appSecret, mode, account, code, price, orderType } = withServerKis(JSON.parse(body));
         if (!appKey || !appSecret || !account) throw new Error('필수 정보 누락');
         const token = await getKisToken(appKey, appSecret, mode || 'mock');
         if (!token) throw new Error('토큰 없음');
@@ -1357,7 +1501,7 @@ const server = http.createServer(async (req, res) => {
     req.on('data', c => body += c);
     req.on('end', async () => {
       try {
-        const { appKey, appSecret, market, rankBy, minPrice, maxPrice, topN } = JSON.parse(body);
+        const { appKey, appSecret, market, rankBy, minPrice, maxPrice, topN } = withServerKis(JSON.parse(body));
         if (!appKey || !appSecret) throw new Error('appKey/appSecret 필요');
         const token = await getKisToken(appKey, appSecret, 'real');
         if (!token) throw new Error('토큰 없음');
@@ -1410,7 +1554,7 @@ const server = http.createServer(async (req, res) => {
     req.on('data', c => body += c);
     req.on('end', async () => {
       try {
-        const { appKey, appSecret, code } = JSON.parse(body);
+        const { appKey, appSecret, code } = withServerKis(JSON.parse(body));
         if (!appKey || !appSecret || !code) throw new Error('필수 정보 누락 (code 포함)');
         const token = await getKisToken(appKey, appSecret, 'real');
         if (!token) throw new Error('토큰 없음');
@@ -2705,7 +2849,7 @@ server.on('upgrade', (req, socket) => {
   if (u !== '/ws/market') { socket.destroy(); return; }
   const q = new URLSearchParams(req.url.includes('?') ? req.url.split('?')[1] : '');
   const key = req.headers['x-agent-key'] || q.get('key');
-  if (AGENT_KEY && key !== AGENT_KEY) { socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n'); socket.destroy(); return; }
+  if (!isAuthed(req) && !(AGENT_KEY && key === AGENT_KEY)) { socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n'); socket.destroy(); return; }
   const wsKey = req.headers['sec-websocket-key'];
   if (!wsKey) { socket.destroy(); return; }
   const accept = crypto.createHash('sha1').update(wsKey + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11').digest('base64');
@@ -2726,7 +2870,7 @@ server.on('upgrade', (req, socket) => {
 
 server.listen(PORT, () => {
   console.log(`TraidAIr running on port ${PORT}`);
-  console.log(`Claude API: ${runtimeConfig.claudeKey ? '✅' : '❌ 없음 — Railway Variables에 ANTHROPIC_API_KEY 설정'}`);
+  console.log(`AI API: ${runtimeConfig.claudeKey ? '✅ 활성' : '⛔ 비활성(로컬 계산 모드)'}  | 접속 비밀번호: ${APP_PASSWORD ? '설정됨' : '❌ 미설정(외부 접속 차단)'} | 실주문: ${LIVE_ORDER_ENABLED ? '허용' : '차단'}`);
   console.log(`KIS API: ${runtimeConfig.kisAppKey ? '✅' : '❌ 없음'}`);
   console.log(`DART API: ${runtimeConfig.dartKey ? '✅' : '❌ 없음'}`);
 });
@@ -2762,7 +2906,7 @@ async function loadConfigFromGitHub() {
             if (cfg.kisAccount)   runtimeConfig.kisAccount = cfg.kisAccount;
             if (cfg.kisMode)      runtimeConfig.kisMode = cfg.kisMode;
             if (cfg.dartKey)      runtimeConfig.dartKey = cfg.dartKey;
-            if (cfg.claudeKey)    runtimeConfig.claudeKey = cfg.claudeKey;
+            // claudeKey는 불러오지 않음(AI API 비활성)
             console.log('✅ GitHub에서 설정 로드됨:', {
               kis: cfg.kisAppKey ? '✅' : '❌',
               account: cfg.kisAccount || '없음',
@@ -2845,7 +2989,7 @@ loadConfigFromGitHub().then(() => {
   console.log('설정 최종 상태:', {
     claude: runtimeConfig.claudeKey ? '✅' : '❌',
     kis: runtimeConfig.kisAppKey ? '✅' : '❌',
-    account: runtimeConfig.kisAccount || '없음',
+    account: runtimeConfig.kisAccount ? '설정됨' : '없음',
   });
 });
 
@@ -2867,7 +3011,7 @@ function saveUserData(data) {
     const merged = { ...current, ...data, _savedAt: new Date().toISOString() };
     fs.writeFileSync(USER_DATA_PATH, JSON.stringify(merged), 'utf8');
     // GitHub에도 백업
-    saveUserDataToGitHub(merged).catch(() => {});
+    // 🔒 공개 저장소로의 사용자 데이터 백업 중단
     return true;
   } catch(e) {
     console.error('userdata 저장 실패:', e.message);

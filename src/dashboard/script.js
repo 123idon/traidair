@@ -599,3 +599,47 @@ setInterval(refreshChartFromHTS, 3000);
 loadDashData();
 // ★ 페이지 열리면 시장 데이터 자동 로드
 autoLoadMarketData();
+
+
+// ════════════════════════════════════════════════════════════════════════
+// 📊 강세섹터 후보 (로컬 계산 · LLM 미사용) — 새로고침 시 HTS 관심종목(후보)에 자동 반영
+// ════════════════════════════════════════════════════════════════════════
+async function loadLocalHotSectors(force){
+  let d = null;
+  try{
+    if(window.parent && window.parent !== window && typeof window.parent.syncCandidatesToWatchlist === 'function'){
+      d = await window.parent.syncCandidatesToWatchlist(!!force);   // HTS 관심종목·순위배지까지 갱신
+    } else {
+      const r = await fetch('/api/local/hot-sectors' + (force ? '?force=1' : ''), {cache:'no-store'});
+      d = await r.json();
+    }
+  }catch(e){ d = {ok:false, error:e.message}; }
+  const el = document.getElementById('candList');
+  if(!d || !d.ok){
+    if(el && d && d.error) el.innerHTML = '<div style="padding:10px;color:var(--tm);font-size:11px;">강세섹터 후보: ' + String(d.error).replace(/</g,'&lt;') + '</div>';
+    return d;
+  }
+  const cands = [];
+  (d.sectors || []).forEach(sec => (sec.stocks || []).forEach(s => cands.push({
+    rank: cands.length + 1, name: s.name, code: s.code,
+    reason: `강세섹터 ${sec.rank}위 ${sec.name} · ${s.role} · ${s.changePct > 0 ? '+' : ''}${s.changePct}% · 거래대금 ${Number(s.turnoverEok||0).toLocaleString()}억`,
+    signals: [`섹터 ${sec.rank}위`, s.role, s.market],
+    strategy: '로컬 판단 엔진이 눌림목·돌파 조건 충족 시에만 진입', stop: '설정 손절(%) 적용',
+  })));
+  // HTS 쪽은 syncCandidatesToWatchlist 가 이미 반영 → 여기서는 화면 표시만 (parent 재호출 방지)
+  if(el){
+    const _save = window.parent && window.parent.updateCandsFromDash;
+    try{ if(window.parent) window.parent.updateCandsFromDash = null; }catch(e){}
+    try{ renderCandidates(cands); } finally { try{ if(window.parent) window.parent.updateCandsFromDash = _save; }catch(e){} }
+  }
+  return d;
+}
+(function(){
+  if(typeof autoLoadMarketData !== 'function') return;
+  const _orig = autoLoadMarketData;
+  autoLoadMarketData = async function(){
+    const r = await _orig.apply(this, arguments);
+    try{ await loadLocalHotSectors(true); }catch(e){}
+    return r;
+  };
+})();
