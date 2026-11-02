@@ -2816,6 +2816,18 @@ function btState(){
   }
   return _btStateShared.p.then(function(t){ return JSON.parse(t); });
 }
+// 상태 위젯 공용 주기(2초) — 위젯마다 타이머를 따로 돌리지 않고 한 주기에 한 번만 받아 나눠 준다.
+// 구독자별로 btState() 를 부르지만 같은 주기 안이라 서버 요청은 1회. 탭이 숨겨지면 쉰다.
+var _btTickSubs=[], _btTickTimer=null;
+function btOnTick(onData, onErr){
+  _btTickSubs.push({ok:onData, err:onErr||function(){}});
+  if(!_btTickTimer) _btTickTimer=setInterval(_btTickRun, 2000);
+  _btTickRun();
+}
+function _btTickRun(){
+  if(document.hidden) return;
+  _btTickSubs.forEach(function(x){ btState().then(x.ok, x.err).catch(function(){}); });
+}
 </script>
 <script>
 // 에이전트(멀티에이전트 백테스트) 주문/체결을 HTS 위에 실시간 표시. 기존 수동 주문창과 공존.
@@ -2842,11 +2854,7 @@ function btState(){
         '<span style="font-family:monospace;">'+won(t.price)+' '+pnl+'</span></div>';
     }).join('');
   }
-  function tick(){
-    if(document.hidden) return;
-    btState().then(render).catch(function(){});
-  }
-  setInterval(tick, 2000); tick();
+  btOnTick(render);
 })();
 </script>
 
@@ -3008,14 +3016,10 @@ function btState(){
     out.push(row('🧠','메타 총괄','종합 '+(mt.perfScore!=null?mt.perfScore:'–')+'점 · 승률 '+(mt.winRate!=null?mt.winRate+'%':'—')+' · 손익비 '+pf,''));
     rowsEl.innerHTML=out.join('');
   }
-  function tick(){
-    if(document.hidden) return;
-    btState().then(render).catch(function(){
-      var rowsEl=document.getElementById('agentTeamRows'); if(rowsEl&&!rowsEl.innerHTML) rowsEl.innerHTML=idle();
-    });
-  }
   document.getElementById('agentTeamRows').innerHTML=idle();
-  setInterval(tick, 3000); tick();
+  btOnTick(render, function(){
+    var rowsEl=document.getElementById('agentTeamRows'); if(rowsEl&&!rowsEl.innerHTML) rowsEl.innerHTML=idle();
+  });
 })();
 </script>
 <script>// ═══════════════════════════════
@@ -3387,30 +3391,26 @@ function updateCandsFromDash(candidates){
   renderCands();
 }
 
+// 조건 목록만 둔다. 고정 종목 "결과"는 가짜 데이터라 제거(규칙 3) — 실시간 조건검색 연동 전까지 결과 없음.
 const FILTERS=[
   // 수급 조건
-  {nm:"수급폭발 300%+",col:"var(--g)",cat:"수급",desc:"전일대비 거래량 300% 이상",stocks:["373220","207940","068270"]},
-  {nm:"기관+외국인 동반매수",col:"var(--b)",cat:"수급",desc:"기관 3일 연속 + 외국인 당일 순매수",stocks:["005930","000660"]},
-  {nm:"외국인 연속 순매수",col:"var(--b)",cat:"수급",desc:"외국인 3일 이상 연속 순매수",stocks:["005930","373220"]},
+  {nm:"수급폭발 300%+",col:"var(--g)",cat:"수급",desc:"전일대비 거래량 300% 이상"},
+  {nm:"기관+외국인 동반매수",col:"var(--b)",cat:"수급",desc:"기관 3일 연속 + 외국인 당일 순매수"},
+  {nm:"외국인 연속 순매수",col:"var(--b)",cat:"수급",desc:"외국인 3일 이상 연속 순매수"},
   // 차트 조건
-  {nm:"장초반 모멘텀",col:"var(--a)",cat:"차트",desc:"당일 상승률 +3% 이상, 거래량 급증",stocks:["035420","051910"]},
-  {nm:"눌림목 탐색",col:"var(--p)",cat:"차트",desc:"최근 5일 +10% 후 -5~-10% 조정",stocks:["207940","005380"]},
-  {nm:"상한가 근접",col:"var(--r)",cat:"차트",desc:"상한가 대비 -20% 이내, 거래량 500%+",stocks:["207940"]},
-  {nm:"이평선 정배열",col:"var(--g)",cat:"차트",desc:"5MA>20MA>60MA 정배열",stocks:["005930","000660","035420"]},
+  {nm:"장초반 모멘텀",col:"var(--a)",cat:"차트",desc:"당일 상승률 +3% 이상, 거래량 급증"},
+  {nm:"눌림목 탐색",col:"var(--p)",cat:"차트",desc:"최근 5일 +10% 후 -5~-10% 조정"},
+  {nm:"상한가 근접",col:"var(--r)",cat:"차트",desc:"상한가 대비 -20% 이내, 거래량 500%+"},
+  {nm:"이평선 정배열",col:"var(--g)",cat:"차트",desc:"5MA>20MA>60MA 정배열"},
   // 재료 조건
-  {nm:"실적 서프라이즈",col:"var(--a)",cat:"재료",desc:"어닝서프라이즈 발표 후 강세",stocks:["005930","051910"]},
-  {nm:"신규 공시/수주",col:"var(--g)",cat:"재료",desc:"당일 대규모 수주/계약 공시",stocks:["373220","012450"]},
-  {nm:"테마 주도주",col:"var(--r)",cat:"재료",desc:"핵심 테마 섹터 주도 종목",stocks:["207940","068270","373220"]},
-  {nm:"뉴스 모멘텀",col:"var(--b)",cat:"재료",desc:"주요 뉴스 촉매 발생",stocks:["035420","035720"]},
-  {nm:"정책 수혜",col:"var(--p)",cat:"재료",desc:"정부 정책 수혜 직접 해당",stocks:["012450","064350"]},
+  {nm:"실적 서프라이즈",col:"var(--a)",cat:"재료",desc:"어닝서프라이즈 발표 후 강세"},
+  {nm:"신규 공시/수주",col:"var(--g)",cat:"재료",desc:"당일 대규모 수주/계약 공시"},
+  {nm:"테마 주도주",col:"var(--r)",cat:"재료",desc:"핵심 테마 섹터 주도 종목"},
+  {nm:"뉴스 모멘텀",col:"var(--b)",cat:"재료",desc:"주요 뉴스 촉매 발생"},
+  {nm:"정책 수혜",col:"var(--p)",cat:"재료",desc:"정부 정책 수혜 직접 해당"},
 ];
-const NEWS=[
-  {ttl:"나스닥 +1.45% · AI 반도체 강세 지속",tm:"07:32",cat:"해외",col:"var(--b)"},
-  {ttl:"삼성전자 HBM4 양산 임박 보도",tm:"08:10",cat:"호재",col:"var(--g)"},
-  {ttl:"원/달러 1,382원 · 수출주 수혜 기대",tm:"08:25",cat:"환율",col:"var(--a)"},
-  {ttl:"LG에너지솔루션 유럽 대형 수주 공시",tm:"08:41",cat:"공시",col:"var(--b)"},
-  {ttl:"셀트리온 FDA 임상 결과 오늘 발표",tm:"08:55",cat:"주의",col:"var(--r)"},
-];
+// 실시간 뉴스 피드는 아직 연결되지 않았다 — 가짜 헤드라인을 보여주지 않는다(규칙 3). 공시는 DART 목록 사용.
+const NEWS=[];
 
 // ═══════════════════════════════
 // UTILS & CALC
@@ -3484,25 +3484,59 @@ function _peekSimCandlesFor(tk, dateStr, untilIdx){
 
 
 // ── 서버 데이터 저장/로드 (모의투자 계좌, 매매일지, 통계 영구 보존) ──
-let _saveTimer = null;
+// 서버 저장 — 키마다 독립 큐.
+//  · 예전에는 타이머 하나를 모든 키가 같이 써서, saveMock() 처럼 두 키를 연달아 저장하면 htsMock(체결 내역)이 취소됐다.
+//  · 같은 키는 한 번에 한 요청만 보내고, 진행 중 들어온 값은 최신 1개만 이어서 전송한다.
+//  · 저장마다 증가하는 순번(rev)을 붙이고 서버는 더 오래된 rev 를 버린다 — 이탈 시 keepalive 와 진행 중 요청이 뒤섞여 도착해도 최신 값이 남는다.
+//  · 매매 상태(htsMock·htsStopOrders)는 localStorage 에 두지 않으므로(규칙 4) 기다리지 않고 바로 보내고, 실패하면 재시도·경고.
+const _SERVER_ONLY_KEYS = { htsMock: 1, htsStopOrders: 1 };
+const _saveQ = {};   // key → {pending:{v,rev}|null, inflight:{v,rev}|null, timer, retry}
+let _saveWarned = false, _saveRevSeq = 0;
+function _nextSaveRev(){ _saveRevSeq = (_saveRevSeq + 1) % 1000; return Date.now() * 1000 + _saveRevSeq; }
 function saveToServer(key, value) {
-  // 즉시 localStorage에 저장 (빠른 복원)
-  try { localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value)); } catch(e) {}
-  // 서버에 비동기 저장 (디바운스 1초)
-  clearTimeout(_saveTimer);
-  _saveTimer = setTimeout(() => {
-    fetch('/api/user-data/' + key, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ value: typeof value === 'string' ? value : JSON.stringify(value) })
-    }).catch(() => {});
-  }, 1000);
+  const v = typeof value === 'string' ? value : JSON.stringify(value);
+  if (!_SERVER_ONLY_KEYS[key]) { try { localStorage.setItem(key, v); } catch(e) {} }   // 그 외 키는 빠른 복원용 사본
+  const q = _saveQ[key] || (_saveQ[key] = { pending: null, inflight: null, timer: null, retry: 0 });
+  q.pending = { v: v, rev: _nextSaveRev() };
+  clearTimeout(q.timer);
+  q.timer = setTimeout(function(){ q.timer = null; _saveFlush(key); }, _SERVER_ONLY_KEYS[key] ? 0 : 1000);
 }
+function _saveFlush(key) {
+  const q = _saveQ[key];
+  if (!q || q.inflight || !q.pending) return;
+  const item = q.pending; q.pending = null; q.inflight = item;
+  fetch('/api/user-data/' + key, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value: item.v, rev: item.rev }) })
+    .then(function(r){ return r.json().catch(function(){ return null; }).then(function(d){ if (!r.ok || !d || d.ok !== true) throw new Error((d && d.error) || ('HTTP ' + r.status)); }); })
+    .then(function(){
+      q.retry = 0;
+      if (_saveWarned && !Object.keys(_saveQ).some(function(k){ return _saveQ[k].retry > 0; })) _saveWarned = false;   // 모두 복구되면 다음 장애도 다시 알린다
+    })
+    .catch(function(e){
+      if (!q.pending) q.pending = item;   // 더 새 값이 없으면 이 값을 다시 보낸다
+      q.retry = Math.min((q.retry || 0) + 1, 6);
+      clearTimeout(q.timer);
+      q.timer = setTimeout(function(){ q.timer = null; _saveFlush(key); }, 1000 * Math.pow(2, q.retry));   // 2s → 최대 64s
+      if (!_saveWarned) { _saveWarned = true; try { showAlert('서버 저장 실패', key + ' 저장에 실패해 재시도 중이에요 (' + e.message + '). 화면을 닫기 전에 잠시 기다려 주세요.'); } catch(_e) {} }
+    })
+    .finally(function(){ q.inflight = null; if (q.pending && !q.timer) _saveFlush(key); });
+}
+// 페이지 이탈: 아직 확인 못 받은 최신 값(대기 중 > 진행 중)을 keepalive 로 한 번 더 보낸다. rev 덕분에 순서가 뒤바뀌어도 안전.
+function _saveOnPageHide() {
+  Object.keys(_saveQ).forEach(function(key){
+    const q = _saveQ[key]; const item = q && (q.pending || q.inflight); if (!item) return;
+    const body = JSON.stringify({ value: item.v, rev: item.rev });
+    const bytes = new Blob([body]).size;   // UTF-8 바이트(한글은 글자 수보다 크다)
+    if (bytes > 60000) { console.warn('[saveToServer] ' + key + ' ' + bytes + 'B — 이탈 시 전송 한도(약 64KB) 초과라 생략(진행 중 요청에 맡김)'); return; }
+    try { fetch('/api/user-data/' + key, { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: body }).catch(function(e){ console.warn('[saveToServer] 이탈 시 전송 실패', key, e && e.message); }); } catch(e) {}
+  });
+}
+window.addEventListener('pagehide', _saveOnPageHide);
 
 async function loadFromServer() {
   try {
     const r = await fetch('/api/user-data');
     const d = await r.json();
+    if (d && d.error === 'userdata_corrupt') { try { showAlert('서버 데이터 손상', '서버의 사용자 데이터 파일이 손상돼 불러오지 못했어요. 덮어쓰지 않도록 저장도 막아 두었습니다. 백업본(.bak)으로 복구가 필요해요.'); } catch(e) {} }
     if (!d.ok || !d.data) return false;
     const data = d.data;
     window.__srvData = data;   // 매매 상태(htsMock/htsStopOrders)는 localStorage 경유 없이 메모리로만 받는다
@@ -10118,30 +10152,14 @@ function applySelectedFilters(){
     resultEl.innerHTML="<div style='font-size:9px;color:var(--tm);'>조건을 선택하세요 (여러 개 선택 시 교집합)</div>";
     return;
   }
-  // 교집합: 선택된 모든 필터에 포함된 종목만
-  const sets=Array.from(selectedFilters).map(i=>new Set(FILTERS[i].stocks));
-  let intersection=[...sets[0]];
-  for(let j=1;j<sets.length;j++) intersection=intersection.filter(tk=>sets[j].has(tk));
-
-  if(intersection.length===0){
-    resultEl.innerHTML="<div style='font-size:9px;color:var(--r);padding:4px;'>교집합 없음 — 조건 조합을 바꿔보세요</div>";
-    return;
-  }
-  resultEl.innerHTML=intersection.map(tk=>{
-    const s=STOCKS.find(s=>s.tk===tk)||{tk,nm:tk,pr:0,base:1};
-    const c=((s.pr-s.base)/s.base*100).toFixed(2),up=parseFloat(c)>=0;
-    const filNames=Array.from(selectedFilters).map(i=>FILTERS[i].nm).join(' ∩ ');
-    return`<div class="wli" onclick="selectStk('${tk}');addCandFromFilter('${tk}','${filNames.slice(0,20)}')" style="cursor:pointer;">
-      <div class="wl-tk">${tk.slice(-4)}</div>
-      <div style="flex:2"><div class="wl-nm">${s.nm}</div><div style="font-size:7px;color:var(--tm);">+후보추가</div></div>
-      <div class="wl-ch ${up?"cu":"cd"}">${up?"+":""}${c}%</div>
-    </div>`;
-  }).join("");
+  // 실시간 조건검색 데이터가 아직 없다 — 고정 종목을 결과처럼 보여주지 않는다(규칙 3, 후보 없으면 관망)
+  resultEl.innerHTML="<div style='font-size:9px;color:var(--tm);padding:4px;'>실시간 조건검색은 아직 연결되지 않았어요 — 강세섹터·스크리닝 후보를 확인하세요 (관망)</div>";
 }
 
 // 기존 applyFil 호환
 function applyFil(i,el){ toggleFil(i,el); }
 function renderNews(){
+  if(!NEWS.length){ const el=document.getElementById("newsList"); if(el) el.innerHTML="<div style='font-size:9px;color:var(--tm);padding:6px 9px;'>실시간 뉴스 피드가 아직 연결되지 않았어요. 공시는 DART 목록을 확인하세요.</div>"; return; }
   const grades=["A","B","A","A","S"]; // 뉴스별 재료 강도 (실제로는 AI 분석)
   document.getElementById("newsList").innerHTML=NEWS.map((n,i)=>{
     const g=grades[i]||"B";
@@ -11107,6 +11125,15 @@ window.addEventListener('resize',()=>{
   requestAnimationFrame(()=>drawChart());
 },false);
 
+// 대시보드 ↔ HTS 전환 (상단 📊 버튼). bc1de3c 에서 추가됐다가 이후 정리 중 빠진 것을 복원
+function quickSwitch(){
+  const dashPage=document.getElementById("page-dash");
+  const isDash=!!(dashPage&&dashPage.classList.contains("on"));
+  const target=isDash?"hts":"dash";
+  goPage(target,document.getElementById("tab-"+target));
+  const icon=document.getElementById("quickSwitchIcon");
+  if(icon) icon.textContent=isDash?"📊":"🏠";
+}
 function lTab(el,id){document.querySelectorAll(".lpt").forEach(t=>t.classList.remove("on"));el.classList.add("on");document.querySelectorAll(".lpb").forEach(b=>{b.classList.remove("on");b.style.display="none";});const t=document.getElementById(id);if(t){t.style.display="block";t.classList.add("on");}}
 function rTab(el,id){document.querySelectorAll(".rpt").forEach(t=>t.classList.remove("on"));el.classList.add("on");document.querySelectorAll(".rpb").forEach(b=>{b.classList.remove("on");b.style.display="none";});const t=document.getElementById(id);if(t){t.style.display="block";t.classList.add("on");}}
 function brTab(el,id){document.querySelectorAll(".brpt").forEach(t=>t.classList.remove("on"));el.classList.add("on");document.querySelectorAll(".brpb").forEach(b=>{b.classList.remove("on");b.style.display="none";});const t=document.getElementById(id);if(t){t.style.display=id==="brpb-ai"?"flex":"block";t.classList.add("on");}}
