@@ -212,6 +212,22 @@ const MIME = {
 
 const CORS = { 'Vary': 'Origin' }; // 보안: 다른 사이트에서의 호출 허용 안 함 (same-origin 전용)
 
+// 매매 파라미터(리스크·진입·청산) 단일 출처. 요청마다 읽어서 재시작 없이 반영된다.
+const PARAMS_PATH = path.join(__dirname, 'params.json');
+function loadTradingParams() {
+  try { return JSON.parse(fs.readFileSync(PARAMS_PATH, 'utf8')); }
+  catch (e) { console.error('[params] params.json 읽기 실패:', e.message); return null; }
+}
+// 파라미터가 없으면 주입하지 않는다 → 클라이언트가 자동매매 시작을 거부한다.
+function injectParams(html) {
+  const p = loadTradingParams();
+  if (!p) return html;
+  const tag = '<script>window.__PARAMS=' + JSON.stringify(p).replace(/</g, '\\u003c') + ';</script>';
+  const s = html.toString('utf8');
+  const i = s.indexOf('<head>');
+  return i < 0 ? tag + s : s.slice(0, i + 6) + tag + s.slice(i + 6);
+}
+
 const CORP_CODE_MAP = {
   '삼성전자': '00126380', 'SK하이닉스': '00164779', '현대차': '00164742',
   'POSCO홀딩스': '00146163', 'NAVER': '00266961', 'LG화학': '00116003',
@@ -2068,6 +2084,12 @@ const server = http.createServer(async (req, res) => {
     res.end(JSON.stringify({version:"1.0.3", buildTs:String(buildTs), htmlSize:_hs?_hs.size:0, ts:Date.now()}));
     return;
   }
+  if ((url === '/api/params' || url === '/api/agent/params') && req.method === 'GET') {
+    const p = loadTradingParams();
+    res.writeHead(p ? 200 : 500, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+    res.end(JSON.stringify(p ? { ok: true, params: p } : { ok: false, error: 'params.json missing or invalid' }));
+    return;
+  }
   // ── ai-agent 실시간 현황 (/api/agent/status) ──
   // 같은 머신의 ai-agent(C:\ai-team) journal/state 파일을 읽어 요약 반환.
   // 데이터 소스 경로는 AI_AGENT_DIR 환경변수로 변경 가능.
@@ -2800,7 +2822,7 @@ const server = http.createServer(async (req, res) => {
     fs.readFile(path.join(__dirname, 'trading-hts.html'), (err, data) => {
       if (err) { res.writeHead(404, CORS); res.end('trading-hts.html not found'); return; }
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, no-store, must-revalidate', ...CORS });
-      res.end(data);
+      res.end(injectParams(data));
     });
     return;
   }
@@ -2831,7 +2853,7 @@ const server = http.createServer(async (req, res) => {
       fs.readFile(path.join(__dirname, 'trading-hts.html'), (e2, d2) => {
         if (e2) { res.writeHead(404); res.end('Not found'); return; }
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control':'no-cache, no-store, must-revalidate', 'Pragma':'no-cache', 'Expires':'0' });
-        res.end(d2);
+        res.end(injectParams(d2));
       });
       return;
     }
@@ -2839,7 +2861,7 @@ const server = http.createServer(async (req, res) => {
     const mimeType = MIME[ext] || 'text/plain; charset=utf-8';
     const cacheHeader = ext === '.html' ? {'Cache-Control':'no-cache, no-store, must-revalidate','Pragma':'no-cache','Expires':'0'} : {};
     res.writeHead(200, { 'Content-Type': mimeType, ...CORS, ...cacheHeader });
-    res.end(data);
+    res.end(path.basename(filePath) === 'trading-hts.html' ? injectParams(data) : data);
   });
 });
 

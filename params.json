@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "entry": {
+    "minScore": 6
+  },
+  "risk": {
+    "maxPositionPct": 20,
+    "stopPct": 3,
+    "dailyLossPct": 2,
+    "maxStopsPerStockPerDay": 2,
+    "maxConsecutiveLosses": 3
+  },
+  "exit": {
+    "t1Pct": 3,
+    "t2Pct": 5,
+    "minRR": 1.5
+  },
+  "scalp": {
+    "minHoldSec": 60
+  }
+}
