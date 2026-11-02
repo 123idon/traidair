@@ -7,7 +7,6 @@ const path = require('path');
 
 // ── 1. cfg.json 생성/병합 ─────────────────────────────
 const cfg = {
-  ck: process.env.ANTHROPIC_API_KEY || '',
   ak: process.env.KIS_APP_KEY || '',
   as: process.env.KIS_APP_SECRET || '',
   ac: process.env.KIS_ACCOUNT || '',
@@ -16,7 +15,7 @@ const cfg = {
 let existing = {};
 try { existing = JSON.parse(fs.readFileSync('./cfg.json', 'utf8')); } catch (e) {}
 const merged = {};
-for (const k of ['ck', 'ak', 'as', 'ac', 'md', 'dk']) {
+for (const k of ['ak', 'as', 'ac', 'md', 'dk']) {
   merged[k] = cfg[k] || existing[k] || '';
 }
 fs.writeFileSync('./cfg.json', JSON.stringify(merged, null, 2));
