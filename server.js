@@ -6,45 +6,6 @@ const crypto = require('crypto');
 
 const PORT = process.env.PORT || 3000;
 
-// 멘토 시스템 프롬프트 — 클라이언트가 system 없이 호출 시 자동 주입
-const MENTOR_SYSTEM = `당신은 주식 단타 전문 트레이딩 멘토이자 실전 파트너다. 20년 이상의 단타 경험을 가진 전문가로서 학습·분석·실전 조언을 모두 제공한다. 수익보다 손실 방어를 항상 우선하고 틀린 판단은 직접적으로 지적한다.
-
-# 행동 원칙
-- 틀린 판단은 직접 틀렸다고 한다. 애매한 표현 금지.
-- 좋은 점보다 리스크와 문제점을 먼저 짚는다.
-- 추측은 "(추정)", 확인 불가는 "확인 불가"로 명시.
-- 결론 먼저, 근거는 그 다음.
-- 수익보다 손실 방어가 우선.
-- 단순 동조 없이 논리로 반박. 사용자 판단이 감정적으로 보이면 뇌동매매 경고를 먼저 발동.
-- 투자 조언임을 인지하고 최종 판단은 본인이 내림을 전제.
-
-# 사용자 현황
-- 단타 경험 중급, 당일매매·스윙 해본 적 있음, 스캘핑은 학습 필요
-- 주된 방식: 이슈/수급 기반 타점 진입 후 목표가 도달 시 익절
-
-# 리스크 기본값
-- 1회 매매 최대 비중: 자산의 20% 이하
-- 종목당 최대 손실: 진입가 대비 -3%
-- 일일 최대 손실: 자산의 -2%
-
-# 보조지표 기본
-- RSI 70+ 과매수 / 30- 과매도, 단타는 60 돌파 모멘텀
-- MACD 12/26/9, 골든크로스 진입
-- 볼린저 20/2σ, 수축 후 확장 시 돌파
-- MA: 스캘핑 5/10, 당일 20/60, 스윙 60/120
-- 거래량 전일 대비 300%+면 강한 수급
-
-# 매매 시간대
-- 스캘핑: 수초~수분, 0.3~1%
-- 당일: 수분~당일청산, 1~5%
-- 스윙: 2일~수주, 5~20%
-
-# 뇌동매매 경고 신호
-"빨리 들어가야", "다들 사고 있는", "본전만 오면", "물타기", 손실 중 추가매수, 손절 기준 낮추기, 연속 손실 후 즉각 재진입 → 분석 전에 경고 먼저.
-
-# 면책
-모든 분석은 참고용. 최종 판단은 본인. 원금 손실 가능.`;
-
 
 // ── 환경변수 기반 설정 (Railway Variables에서 영구 유지)
 // cfg.json에서 키 로드 (git 제외, Railway에 영구 보존)
@@ -52,8 +13,6 @@ let _localCfg = {};
 try { _localCfg = JSON.parse(require('fs').readFileSync('./cfg.json','utf8')); } catch(e) {}
 
 let runtimeConfig = {
-  // AI API 비활성(비용 절감): AI_API_ENABLED=1 일 때만 키 사용
-  claudeKey:    (process.env.AI_API_ENABLED === '1') ? (process.env.ANTHROPIC_API_KEY || _localCfg.ck || '') : '',
   kisAppKey:    process.env.KIS_APP_KEY       || _localCfg.ak || '',
   kisAppSecret: process.env.KIS_APP_SECRET    || _localCfg.as || '',
   kisAccount:   process.env.KIS_ACCOUNT       || _localCfg.ac || '',
@@ -74,7 +33,6 @@ function saveToFile(data) {
 }
 
 console.log('✅ 설정 로드:', {
-  claude: runtimeConfig.claudeKey ? '✅' : '❌',
   kis: runtimeConfig.kisAppKey ? '✅' : '❌',
   dart: runtimeConfig.dartKey ? '✅' : '❌',
   notion: runtimeConfig.notionToken ? '✅' : '❌',
@@ -845,7 +803,6 @@ const server = http.createServer(async (req, res) => {
     req.on('end', () => {
       try {
         const cfg = JSON.parse(body);
-        // claudeKey는 저장하지 않음(AI API 비활성)
         for (const k of Object.keys(cfg)) if (cfg[k] === '__server__' || cfg[k] === '') delete cfg[k];
         if (cfg.kisAppKey)    runtimeConfig.kisAppKey = cfg.kisAppKey;
         if (cfg.kisAppSecret) runtimeConfig.kisAppSecret = cfg.kisAppSecret;
@@ -876,7 +833,6 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...CORS });
     res.end(JSON.stringify({
       ok: true,
-      claudeKeyFull: '', claudeKey: '', aiApiEnabled: !!runtimeConfig.claudeKey,
       kisAppKey: kisSet ? '__server__' : '', kisAppSecret: kisSet ? '__server__' : '',
       kisSet, kisAccount: acc ? '__server__' : '', kisAccountMasked: acc ? ('****' + acc.slice(-4)) : '',
       kisMode: runtimeConfig.kisMode || 'mock', liveOrderEnabled: LIVE_ORDER_ENABLED,
@@ -884,134 +840,6 @@ const server = http.createServer(async (req, res) => {
       notionToken: '', notionTokenSet: !!runtimeConfig.notionToken,
       notionPageId: runtimeConfig.notionPageId || '',
     }));
-    return;
-  }
-
-  // ── Claude 키 세션 설정 (/api/set-claude-key)
-  if (url === '/api/set-claude-key') { // 🔒 제거됨 — 브라우저가 키를 서버에 다시 주입하던 경로
-    res.writeHead(410, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ok: false, error: 'removed' })); return;
-  }
-
-  // ── Claude API 프록시
-  if (url === '/api/claude' && req.method === 'POST') {
-    let body = '';
-    req.on('data', c => body += c);
-    req.on('end', () => {
-      const apiKey = runtimeConfig.claudeKey || '';
-      if (!apiKey) {
-        res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
-        res.end(JSON.stringify({ error: { type: 'ai_disabled', message: 'AI API 비활성(비용 절감) — 계산은 로컬에서 동작합니다' } }));
-        return;
-      }
-      // 시스템 프롬프트 자동 주입 + prompt caching 적용 (input 토큰 ~90% 절감)
-      // 1024 토큰 이상이어야 cache 적용됨. MENTOR_SYSTEM은 약 1100자/약 800토큰
-      // → ephemeral 5분 캐시. 같은 system 반복 호출 시 input 비용 1/10
-      let bodyToSend = body;
-      try{
-        const parsed = JSON.parse(body);
-        // ★ user message에 들어있는 강의 컨텍스트를 자동으로 system으로 분리 (캐시 적용)
-        // 강의 컨텍스트는 '【강의 원칙' 또는 '강의 매매 원칙'으로 시작
-        let extractedLecture = '';
-        if(Array.isArray(parsed.messages) && parsed.messages.length){
-          const lastUser = parsed.messages.find(m => m.role === 'user');
-          if(lastUser && typeof lastUser.content === 'string'){
-            const m = lastUser.content.match(/【강의 원칙[^】]*】[\s\S]*?(?=\n【|\n\d|$)/);
-            if(m && m[0].length > 200){
-              extractedLecture = m[0];
-              lastUser.content = lastUser.content.replace(m[0], '').trim();
-            }
-          }
-        }
-        // system 처리 — string이면 cache 가능한 배열로 변환
-        let baseSys = parsed.system;
-        if(typeof baseSys === 'string' && baseSys) baseSys = [{ type:'text', text: baseSys }];
-        if(!baseSys) baseSys = [{ type:'text', text: MENTOR_SYSTEM }];
-        // 강의 컨텍스트를 system 끝에 추가 (별도 cache breakpoint)
-        const sysArr = baseSys.map((b, i) => ({ ...b, cache_control: { type:'ephemeral' } }));
-        if(extractedLecture){
-          sysArr.push({ type:'text', text: extractedLecture, cache_control: { type:'ephemeral' } });
-        }
-        parsed.system = sysArr;
-        // 자동 모델 다운그레이드: sonnet + max_tokens<=300 → haiku
-        if(parsed.model === 'claude-sonnet-4-5' && (parsed.max_tokens||0) <= 300){
-          parsed.model = 'claude-haiku-4-5';
-        }
-        bodyToSend = JSON.stringify(parsed);
-      }catch(e){ /* 파싱 실패 시 원본 그대로 전달 */ }
-      const opts = {
-        hostname: 'api.anthropic.com',
-        path: '/v1/messages',
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-          'Content-Length': Buffer.byteLength(bodyToSend),
-        },
-      };
-      const pr = https.request(opts, proxyRes => {
-        let d = '';
-        proxyRes.on('data', c => d += c);
-        proxyRes.on('end', () => {
-          res.writeHead(proxyRes.statusCode, { 'Content-Type': 'application/json', ...CORS });
-          res.end(d);
-        });
-      });
-      pr.on('error', e => { res.writeHead(500, CORS); res.end(JSON.stringify({ error: e.message })); });
-      pr.write(bodyToSend); pr.end();
-    });
-    return;
-  }
-
-  // ── Claude 스트리밍 (/api/claude/stream) — SSE 그대로 중계 (상담 말풍선 잘림 해결, 요구 1) ──
-  // /api/claude 와 동일한 system 캐싱 처리 후 stream:true 로 Anthropic 응답을 클라이언트에
-  // text/event-stream 으로 흘려보낸다. 클라이언트는 델타를 누적해 말풍선을 점진 렌더한다.
-  if (url === '/api/claude/stream' && req.method === 'POST') {
-    let body = '';
-    req.on('data', c => body += c);
-    req.on('end', () => {
-      const apiKey = runtimeConfig.claudeKey || '';
-      const sseErr = (msg) => {
-        res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive', ...CORS });
-        res.write('event: error\ndata: ' + JSON.stringify({ error: msg }) + '\n\n');
-        res.end();
-      };
-      if (!apiKey) { sseErr('AI API 비활성(비용 절감)'); return; }
-      let bodyToSend = body;
-      try {
-        const parsed = JSON.parse(body);
-        let extractedLecture = '';
-        if (Array.isArray(parsed.messages) && parsed.messages.length) {
-          const lastUser = parsed.messages.find(m => m.role === 'user');
-          if (lastUser && typeof lastUser.content === 'string') {
-            const m = lastUser.content.match(/【강의 원칙[^】]*】[\s\S]*?(?=\n【|\n\d|$)/);
-            if (m && m[0].length > 200) { extractedLecture = m[0]; lastUser.content = lastUser.content.replace(m[0], '').trim(); }
-          }
-        }
-        let baseSys = parsed.system;
-        if (typeof baseSys === 'string' && baseSys) baseSys = [{ type: 'text', text: baseSys }];
-        if (!baseSys) baseSys = [{ type: 'text', text: MENTOR_SYSTEM }];
-        const sysArr = baseSys.map(b => ({ ...b, cache_control: { type: 'ephemeral' } }));
-        if (extractedLecture) sysArr.push({ type: 'text', text: extractedLecture, cache_control: { type: 'ephemeral' } });
-        parsed.system = sysArr;
-        parsed.stream = true;                      // ★ 스트리밍 강제
-        bodyToSend = JSON.stringify(parsed);
-      } catch (e) { /* 파싱 실패 시 원본 그대로 + stream 보장 못함 → 그냥 전달 */ }
-      res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive', ...CORS });
-      const opts = {
-        hostname: 'api.anthropic.com', path: '/v1/messages', method: 'POST',
-        headers: {
-          'Content-Type': 'application/json', 'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01', 'Content-Length': Buffer.byteLength(bodyToSend),
-        },
-      };
-      const pr = https.request(opts, proxyRes => {
-        proxyRes.on('data', c => { try { res.write(c); } catch (e) {} });
-        proxyRes.on('end', () => { try { res.end(); } catch (e) {} });
-      });
-      pr.on('error', e => { try { res.write('event: error\ndata: ' + JSON.stringify({ error: e.message }) + '\n\n'); res.end(); } catch (_) {} });
-      pr.write(bodyToSend); pr.end();
-    });
     return;
   }
 
@@ -2466,14 +2294,15 @@ const server = http.createServer(async (req, res) => {
   // ── 상담 중 자연어 → 전략 자동 반영 (💬 상담 채팅, paper 전용) ──
   // 사용자가 "신호 조건 4개로 바꿔줘"처럼 말하면 규칙 파서가 화이트리스트 키 변경을
   // 추출해 즉시 strategy_params.yaml 수정 + 재읽기 검증 + git 커밋. LLM 협조 없이도
-  // 결정적으로 적용된다(요구: "반영할까요?" 묻지 말고 무조건 적용). 하드리밋/live는 거부 사유 반환.
+  // 결정적으로 적용된다. {dry:true} 면 --dry-run: 변경 후보(changes[])만 돌려주고 적용하지 않는다
+  // (상담 탭은 dry 로 미리보기 → 사용자가 ✅ 적용을 눌러야 /api/agent/consult/apply-param 로 반영). 하드리밋/live는 거부 사유 반환.
   // scripts/consult_apply.py --text "<문장>" → {ok, applied[], failed[], hard_limit, warning}.
   if (url === '/api/agent/consult/apply-text' && req.method === 'POST') {
     let body = '';
     req.on('data', c => body += c);
     req.on('end', () => {
-      let text = '';
-      try { const o = JSON.parse(body || '{}'); text = String(o.text || '').trim(); } catch (e) {}
+      let text = '', dry = false;
+      try { const o = JSON.parse(body || '{}'); text = String(o.text || '').trim(); dry = o.dry === true; } catch (e) {}
       const reply = (obj) => {
         res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...CORS });
         res.end(JSON.stringify(obj));
@@ -2484,7 +2313,7 @@ const server = http.createServer(async (req, res) => {
       let out = '', err = '', child;
       try {
         // 한글 문장은 argv 로 넘기면 Windows 코드페이지에서 깨질 수 있어 stdin(UTF-8)으로 전달.
-        child = spawn(btPython(), [script, '--stdin'], { cwd: AGENT_DIR, env: { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' }, windowsHide: true });
+        child = spawn(btPython(), [script, '--stdin'].concat(dry ? ['--dry-run'] : []), { cwd: AGENT_DIR, env: { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' }, windowsHide: true });
       } catch (e) { reply({ ok: false, reason: '적용기 실행 실패: ' + e.message }); return; }
       child.stdout.on('data', d => { out += d; });
       child.stderr.on('data', d => { err += d; });
@@ -2599,38 +2428,6 @@ const server = http.createServer(async (req, res) => {
       if (Array.isArray(arr)) log = arr;
     } catch (e) {}
     reply({ ok: true, total: log.length, meetings: log.slice(-limit) });
-    return;
-  }
-
-  // ── 전체 팀 회의 결과 저장 + 자동커밋 (💬 상담 회의 종료 시, 요구 2) ──
-  // scripts/save_meeting.py 가 team_meeting_log.json append + git commit → 결과 JSON.
-  if (url === '/api/agent/consult/meeting/save' && req.method === 'POST') {
-    let body = '';
-    req.on('data', c => body += c);
-    req.on('end', () => {
-      const reply = (obj) => {
-        res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...CORS });
-        res.end(JSON.stringify(obj));
-      };
-      const rec = (body || '').trim();
-      if (!rec) { reply({ ok: false, reason: '회의 레코드가 비었어요.' }); return; }
-      const script = path.join(AGENT_DIR, 'scripts', 'save_meeting.py');
-      let out = '', err = '', child;
-      try {
-        child = spawn(btPython(), [script], { cwd: AGENT_DIR, env: { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' }, windowsHide: true });
-      } catch (e) { reply({ ok: false, reason: '저장기 실행 실패: ' + e.message }); return; }
-      child.stdout.on('data', d => { out += d; });
-      child.stderr.on('data', d => { err += d; });
-      child.on('error', e => reply({ ok: false, reason: '저장기 오류: ' + e.message }));
-      child.on('close', () => {
-        const line = out.trim().split('\n').filter(s => s.trim().startsWith('{')).pop();
-        let data = null; if (line) { try { data = JSON.parse(line); } catch (e) {} }
-        if (!data) { reply({ ok: false, reason: '저장 결과 파싱 실패: ' + (err.trim().slice(-200) || out.trim().slice(-200) || '출력 없음') }); return; }
-        reply(data);
-      });
-      // 레코드를 stdin 으로 전달(긴 한글 JSON 도 인자 길이 제한 없이 안전).
-      try { child.stdin.write(rec); child.stdin.end(); } catch (e) {}
-    });
     return;
   }
 
@@ -2892,7 +2689,7 @@ server.on('upgrade', (req, socket) => {
 
 server.listen(PORT, () => {
   console.log(`TraidAIr running on port ${PORT}`);
-  console.log(`AI API: ${runtimeConfig.claudeKey ? '✅ 활성' : '⛔ 비활성(로컬 계산 모드)'}  | 접속 비밀번호: ${APP_PASSWORD ? '설정됨' : '❌ 미설정(외부 접속 차단)'} | 실주문: ${LIVE_ORDER_ENABLED ? '허용' : '차단'}`);
+  console.log(`AI API: 없음(로컬 계산 전용)  | 접속 비밀번호: ${APP_PASSWORD ? '설정됨' : '❌ 미설정(외부 접속 차단)'} | 실주문: ${LIVE_ORDER_ENABLED ? '허용' : '차단'}`);
   console.log(`KIS API: ${runtimeConfig.kisAppKey ? '✅' : '❌ 없음'}`);
   console.log(`DART API: ${runtimeConfig.dartKey ? '✅' : '❌ 없음'}`);
 });
@@ -2928,11 +2725,9 @@ async function loadConfigFromGitHub() {
             if (cfg.kisAccount)   runtimeConfig.kisAccount = cfg.kisAccount;
             if (cfg.kisMode)      runtimeConfig.kisMode = cfg.kisMode;
             if (cfg.dartKey)      runtimeConfig.dartKey = cfg.dartKey;
-            // claudeKey는 불러오지 않음(AI API 비활성)
             console.log('✅ GitHub에서 설정 로드됨:', {
               kis: cfg.kisAppKey ? '✅' : '❌',
               account: cfg.kisAccount || '없음',
-              claude: cfg.claudeKey ? '✅' : '❌',
             });
           }
         } catch(e) { console.log('GitHub 설정 파싱 실패:', e.message); }
@@ -3009,7 +2804,6 @@ async function saveConfigToGitHub(cfg) {
 // 서버 시작 시 GitHub에서 설정 로드
 loadConfigFromGitHub().then(() => {
   console.log('설정 최종 상태:', {
-    claude: runtimeConfig.claudeKey ? '✅' : '❌',
     kis: runtimeConfig.kisAppKey ? '✅' : '❌',
     account: runtimeConfig.kisAccount ? '설정됨' : '없음',
   });

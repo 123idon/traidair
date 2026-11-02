@@ -621,29 +621,13 @@ canvas{image-rendering:pixelated;}
 .cons-name-tag{font-size:10px;font-weight:700;color:var(--ts);margin-bottom:3px;}
 .cons-bub b{font-weight:700;}
 /* 파라미터 적용 카드 */
-.cons-param{margin-top:9px;background:var(--pan);border:1.5px solid var(--b);border-radius:12px;padding:11px 12px;box-shadow:var(--sh0);}
-.cons-param-t{font-size:11px;font-weight:800;color:var(--tp);margin-bottom:3px;}
-.cons-param-d{font-size:10.5px;color:var(--ts);line-height:1.5;margin-bottom:8px;}
-.cons-param-val{font-family:var(--mono);font-size:11px;color:var(--tp);background:var(--bg);border-radius:7px;padding:3px 7px;display:inline-block;margin-bottom:8px;}
-.cons-param-btn{width:100%;padding:9px;border-radius:9px;border:none;background:var(--g);color:#fff;font-size:11.5px;font-weight:800;cursor:pointer;transition:opacity .12s;}
-.cons-param-btn:hover{opacity:.9;}
-.cons-param-btn:disabled{background:var(--tm);cursor:default;opacity:1;}
-.cons-param.done{border-color:var(--g);}
-.cons-param.fail{border-color:var(--r);}
 /* 입력 */
 .cons-chat-foot{display:flex;gap:8px;align-items:flex-end;padding:11px 13px;border-top:1px solid var(--br);flex-shrink:0;}
 .cons-input{flex:1;resize:none;border:1.5px solid var(--br);border-radius:13px;padding:10px 13px;font-size:12.5px;font-family:var(--sans);color:var(--tp);background:var(--bg);outline:none;max-height:120px;line-height:1.5;transition:border-color .12s;}
 .cons-input:focus{border-color:var(--b);background:var(--pan);}
 .cons-send{padding:0 18px;height:42px;border-radius:13px;border:none;background:var(--b);color:#fff;font-size:13px;font-weight:800;cursor:pointer;flex-shrink:0;transition:opacity .12s;}
 .cons-send:disabled{background:var(--tm);cursor:default;}
-.cons-typing{display:flex;gap:4px;padding:12px 14px;}
-.cons-typing span{width:7px;height:7px;border-radius:50%;background:var(--tm);animation:consBlink 1.2s infinite;}
-.cons-typing span:nth-child(2){animation-delay:.2s;}
-.cons-typing span:nth-child(3){animation-delay:.4s;}
-@keyframes consBlink{0%,60%,100%{opacity:.3;}30%{opacity:1;}}
 /* 스트리밍 커서(요구 1) — 텍스트가 다 받아질 때까지 깜빡이다 done()에서 제거된다 */
-.cons-cursor{display:inline-block;width:7px;height:13px;background:var(--b);margin-left:2px;border-radius:1px;animation:consBlink 1s infinite;vertical-align:text-bottom;}
-.cons-stream-body{white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere;}
 /* 협력 안내(요구 3) — 부서 간 의견 요청 시 가운데 안내줄 */
 .cons-row.sys .cons-bub{max-width:100%;}
 /* 모바일 */
@@ -906,7 +890,7 @@ canvas{image-rendering:pixelated;}
         <div class="sec" style="padding:5px 8px;">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
             <span class="sec-t" style="margin-bottom:0;">🔥 뉴스→섹터 영향</span>
-            <button onclick="runNewsImpact()" style="padding:1px 6px;border-radius:4px;border:none;background:var(--p);color:#fff;font-size:8px;cursor:pointer;">AI분석</button>
+            <button onclick="runNewsImpact()" style="padding:1px 6px;border-radius:4px;border:none;background:var(--p);color:#fff;font-size:8px;cursor:pointer;">뉴스 질문 복사</button>
           </div>
           <textarea id="newsInputTa" style="width:100%;height:42px;background:var(--bg);border:1px solid var(--br);border-radius:5px;color:var(--tp);font-family:var(--sans);font-size:9px;padding:3px 5px;resize:none;outline:none;" placeholder="뉴스 텍스트 붙여넣기 또는 공시 클릭시 자동입력..."></textarea>
           <div id="newsImpactResult" style="font-size:9px;color:var(--tm);margin-top:3px;line-height:1.6;"></div>
@@ -1060,9 +1044,9 @@ canvas{image-rendering:pixelated;}
     <!-- 차트 우클릭 AI 분석 메뉴 -->
     <div id="chartCtxMenu" style="display:none;position:fixed;z-index:999;background:var(--pan);border:1px solid var(--br);border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,.15);padding:4px;min-width:160px;">
       <div style="font-size:9px;font-weight:700;padding:4px 8px;color:var(--tm);border-bottom:1px solid var(--br);margin-bottom:2px;" id="ctxCandleInfo">-</div>
-      <button onclick="ctxAskAI('buy')" style="width:100%;text-align:left;padding:5px 8px;border:none;background:none;color:var(--g);font-size:10px;font-weight:600;cursor:pointer;border-radius:4px;">🟢 여기서 매수하면?</button>
-      <button onclick="ctxAskAI('sell')" style="width:100%;text-align:left;padding:5px 8px;border:none;background:none;color:var(--r);font-size:10px;font-weight:600;cursor:pointer;border-radius:4px;">🔴 여기서 매도하면?</button>
-      <button onclick="ctxAskAI('analysis')" style="width:100%;text-align:left;padding:5px 8px;border:none;background:none;color:var(--b);font-size:10px;font-weight:600;cursor:pointer;border-radius:4px;">🔍 이 구간 AI 분석</button>
+      <button onclick="ctxAskAI('buy')" style="width:100%;text-align:left;padding:5px 8px;border:none;background:none;color:var(--g);font-size:10px;font-weight:600;cursor:pointer;border-radius:4px;">🟢 여기서 매수하면? (질문 복사)</button>
+      <button onclick="ctxAskAI('sell')" style="width:100%;text-align:left;padding:5px 8px;border:none;background:none;color:var(--r);font-size:10px;font-weight:600;cursor:pointer;border-radius:4px;">🔴 여기서 매도하면? (질문 복사)</button>
+      <button onclick="ctxAskAI('analysis')" style="width:100%;text-align:left;padding:5px 8px;border:none;background:none;color:var(--b);font-size:10px;font-weight:600;cursor:pointer;border-radius:4px;">🔍 이 구간 질문 복사</button>
       <button onclick="closeChartCtx()" style="width:100%;text-align:left;padding:4px 8px;border:none;background:none;color:var(--tm);font-size:9px;cursor:pointer;">닫기</button>
     </div>
     <!-- AI 분석 결과 팝업 -->
@@ -1382,7 +1366,7 @@ canvas{image-rendering:pixelated;}
             <div class="ai-av ai">AI</div>
             <div>
               <div class="ai-bub">안녕하세요! 실시간 차트 분석 및 매매 조언을 드립니다.</div>
-              <div class="ai-meta">Claude · 지금</div>
+              <div class="ai-meta">로컬 · 지금</div>
             </div>
           </div>
         </div>
@@ -1413,7 +1397,7 @@ canvas{image-rendering:pixelated;}
       <h2 style="font-size:15px;font-weight:700;">복기 통계</h2>
       <div style="display:flex;gap:6px;">
         <button class="ibtn" onclick="renderStats()">↺ 새로고침</button>
-        <button class="ibtn pri" onclick="runAIPatternAnalysis()">🤖 AI 패턴 분석</button>
+        <button class="ibtn pri" onclick="runAIPatternAnalysis()">📊 패턴 분석·질문 복사</button>
       </div>
     </div>
 
@@ -1438,7 +1422,7 @@ canvas{image-rendering:pixelated;}
       <div class="chart-card" style="margin-bottom:0;">
         <div class="chart-card-t" style="display:flex;align-items:center;justify-content:space-between;">
           <span>✅ 수익 나는 패턴</span>
-          <button onclick="runMySetupAI()" style="padding:2px 7px;border-radius:4px;border:none;background:var(--p);color:#fff;font-size:9px;cursor:pointer;">🤖 나만의 셋업 추출 (Phase 10-10)</button>
+          <button onclick="runMySetupAI()" style="padding:2px 7px;border-radius:4px;border:none;background:var(--p);color:#fff;font-size:9px;cursor:pointer;">📊 나만의 셋업 추출 (Phase 10-10)</button>
         </div>
         <div id="winPatterns" style="font-size:11px;color:var(--tm);">데이터 없음</div>
       </div>
@@ -1503,7 +1487,7 @@ canvas{image-rendering:pixelated;}
           <span id="learnCount" style="font-size:9px;color:var(--tm);padding:2px 4px;"></span>
           <button onclick="renderLearningMgmt()" style="padding:2px 7px;border-radius:4px;border:1px solid var(--br);background:var(--bg);color:var(--ts);font-size:9px;cursor:pointer;">↺</button>
           <button onclick="_autoTrimLearning();renderLearningMgmt();saveToServer('htsLearningMemory',JSON.stringify(learningMemory));addMsg('ai','🧹 일반적 조언 자동 삭제 완료 ('+learningMemory.length+'개 남음)');" style="padding:2px 7px;border-radius:4px;border:1px solid var(--a);background:var(--bg);color:var(--a);font-size:9px;cursor:pointer;" title="일반적 조언(전략유지/정상 등) 즉시 삭제">빠른정리</button>
-          <button onclick="cleanupLearning()" style="padding:2px 7px;border-radius:4px;border:none;background:var(--r);color:#fff;font-size:9px;cursor:pointer;" title="AI가 중복/불필요 항목 분석 후 정리">AI정리</button>
+          <button onclick="cleanupLearning()" style="padding:2px 7px;border-radius:4px;border:none;background:var(--r);color:#fff;font-size:9px;cursor:pointer;" title="같은 분류·같은 문장 중복 병합 (로컬)">중복 정리</button>
         </div>
       </div>
       <div id="learningMgmtPanel" style="display:flex;flex-direction:column;gap:4px;max-height:350px;overflow-y:auto;font-size:10px;"></div>
@@ -1556,7 +1540,7 @@ canvas{image-rendering:pixelated;}
       <div class="stab" onclick="jTab(this,'jt-form')" style="font-size:11px;">✏ 일지 작성</div>
       <div class="stab" onclick="jTab(this,'jt-rule')" style="font-size:11px;">📋 개인 원칙</div>
       <div class="stab" onclick="jTab(this,'jt-checklist')" style="font-size:11px;">✅ 통합 체크리스트</div>
-      <button class="ibtn pri" onclick="genAllJournals(event)" style="margin-left:auto;font-size:10px;">🤖 AI 일지 생성</button>
+      <button class="ibtn pri" onclick="genAllJournals(event)" style="margin-left:auto;font-size:10px;">📓 기본 일지 일괄 저장</button>
       <button class="ibtn" onclick="copyAllJournals()" style="font-size:10px;">📋 전체 복사</button>
       <button class="ibtn red" onclick="clearAllJournals()" style="font-size:10px;">🗑 전체 삭제</button>
     </div>
@@ -1585,10 +1569,10 @@ canvas{image-rendering:pixelated;}
       <div id="jSuggestBox" style="background:linear-gradient(135deg,rgba(139,92,246,0.06),rgba(49,130,246,0.03));border:1px dashed var(--p);border-radius:12px;padding:14px;margin-bottom:12px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
           <div style="font-size:13px;font-weight:800;color:var(--p);">💡 AI 기능 제안</div>
-          <button class="ibtn pur" onclick="askAIForFeatureSuggestion(event)" style="font-size:10px;padding:3px 8px;">🤖 제안 받기</button>
+          <button class="ibtn pur" onclick="askAIForFeatureSuggestion(event)" style="font-size:10px;padding:3px 8px;">📋 제안 질문 복사</button>
         </div>
         <div id="jSuggestBody" style="font-size:11px;color:var(--ts);line-height:1.6;">
-          매매일지·학습 노트·현재 기능을 분석해서 <b>새 기능 / 개선점</b>을 AI가 제안합니다. 매매 성능에 직접 도움되는 항목을 골라드려요.
+          매매일지·학습 노트·현재 기능을 분석해서 <b>새 기능 / 개선점</b>을 묻는 질문을 만들어 드려요. 복사해서 claude.ai에 붙여넣으세요.
         </div>
       </div>
       <div id="journalList"><div style="font-size:12px;color:var(--tm);text-align:center;padding:40px;">거래 내역이 없습니다.</div></div>
@@ -2456,7 +2440,7 @@ canvas{image-rendering:pixelated;}
           <b>Lv0</b> 완전수동 ·
           <b>Lv1</b> AI 종목 추천 ·
           <b>Lv2</b> 진입 신호 제시 ·
-          <b>Lv3</b> Claude 검토 후 자동 매수 ·
+          <b>Lv3</b> 로컬 룰 검토 후 자동 매수 ·
           <b>Lv4</b> 완전자동 + 15:20 마감 청산 ·
           <b>스크리닝</b> 종목풀 자동 검색 ·
           <b>AI 매수 판단</b> Phase 8 체크리스트 기반 ·
@@ -2486,7 +2470,7 @@ canvas{image-rendering:pixelated;}
           <b>적용 결과 댓글</b> 매매 후 성공/실패 자동 기록 ·
           <b>실패 교훈 분류</b> 성공률 50%↓ 자동 분리 ·
           <b>빠른 정리</b> 무의미 항목 삭제 ·
-          <b>AI 정리</b> 중복만 병합 ·
+          <b>중복 정리</b> 중복만 병합 ·
           <b>백업/복원</b> 정리 전 자동 백업 ·
           <b>일지에서 복구</b> 일지 기반 재생성 ·
           <b>노션 강의 동기화</b> 외부 강의 자동 로드
@@ -2606,49 +2590,11 @@ canvas{image-rendering:pixelated;}
     <div style="display:flex;gap:0;border-bottom:1px solid var(--br);flex-shrink:0;">
       <div class="stab on" onclick="sTab(this,'st-api')">🔑 API 키</div>
       <div class="stab" onclick="sTab(this,'st-trade')">💰 매매 설정</div>
-      <div class="stab" onclick="sTab(this,'st-usage')">📊 사용량</div>
     </div>
     <div class="modal-body" style="padding:0;">
 
       <!-- API 키 탭 -->
       <div class="stb on" id="st-api">
-        <!-- Claude API -->
-        <div class="sg" style="margin:0;border-bottom:1px solid var(--br);padding:14px 16px;">
-          <div class="sg-title" style="margin-bottom:10px;">🤖 Claude API (Anthropic)</div>
-          <div class="sg-r">
-            <div><div class="sg-l">Claude API Key</div><div class="sg-s">sk-ant-api03-...</div></div>
-            <input class="sg-i" type="password" id="claude-apikey" placeholder="sk-ant-api03-..." style="font-family:var(--mono);">
-          </div>
-          <div style="font-size:9px;color:var(--tm);margin:4px 0 8px;">
-            <a href="https://console.anthropic.com" target="_blank" style="color:var(--b);">console.anthropic.com</a> → API Keys → Create Key → 복사 후 입력
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-            <div style="background:var(--bg);border-radius:8px;padding:10px;">
-              <div style="font-size:9px;color:var(--tm);font-family:var(--mono);">사용 모델</div>
-              <div style="font-family:var(--mono);font-size:11px;font-weight:600;margin-top:2px;">claude-sonnet-4-5</div>
-            </div>
-            <div style="background:var(--bg);border-radius:8px;padding:10px;">
-              <div style="font-size:9px;color:var(--tm);font-family:var(--mono);">오늘 호출 횟수</div>
-              <div style="font-family:var(--mono);font-size:14px;font-weight:700;color:var(--b);margin-top:2px;" id="apiCallCount">0회</div>
-            </div>
-            <div style="background:var(--bg);border-radius:8px;padding:10px;">
-              <div style="font-size:9px;color:var(--tm);font-family:var(--mono);">오늘 입력 토큰</div>
-              <div style="font-family:var(--mono);font-size:14px;font-weight:700;margin-top:2px;" id="apiInTokens">0</div>
-            </div>
-            <div style="background:var(--bg);border-radius:8px;padding:10px;">
-              <div style="font-size:9px;color:var(--tm);font-family:var(--mono);">오늘 출력 토큰</div>
-              <div style="font-family:var(--mono);font-size:14px;font-weight:700;margin-top:2px;" id="apiOutTokens">0</div>
-            </div>
-          </div>
-          <div style="margin-top:8px;background:var(--bg);border-radius:8px;padding:10px;">
-            <div style="font-size:9px;color:var(--tm);font-family:var(--mono);margin-bottom:4px;">예상 요금 (오늘)</div>
-            <div style="display:flex;align-items:baseline;gap:6px;">
-              <span style="font-family:var(--mono);font-size:18px;font-weight:800;color:var(--b);" id="apiCost">$0.000</span>
-              <span style="font-size:9px;color:var(--tm);">Sonnet 4: 입력 $3/1M · 출력 $15/1M</span>
-            </div>
-          </div>
-        </div>
-
         <!-- KIS API -->
         <div class="sg" style="margin:0;padding:14px 16px;">
           <div class="sg-title" style="margin-bottom:10px;">📈 KIS API (한국투자증권)</div>
@@ -2755,64 +2701,6 @@ canvas{image-rendering:pixelated;}
         </div>
       </div>
 
-      <!-- 사용량 탭 -->
-      <div class="stb" id="st-usage" style="padding:14px 16px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-          <div style="font-size:11px;font-weight:700;">Claude API 사용량 추적</div>
-          <button onclick="resetUsage()" style="padding:2px 8px;border-radius:5px;border:1px solid var(--br);background:var(--bg);color:var(--ts);font-size:9px;cursor:pointer;">초기화</button>
-        </div>
-        <!-- 오늘 요약 -->
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;">
-          <div style="background:rgba(49,130,246,.06);border-radius:10px;padding:10px;text-align:center;">
-            <div style="font-size:9px;color:var(--tm);font-family:var(--mono);">오늘 호출</div>
-            <div style="font-family:var(--mono);font-size:18px;font-weight:800;color:var(--b);" id="u_calls">0</div>
-            <div style="font-size:8px;color:var(--tm);">회</div>
-          </div>
-          <div style="background:rgba(5,192,114,.06);border-radius:10px;padding:10px;text-align:center;">
-            <div style="font-size:9px;color:var(--tm);font-family:var(--mono);">오늘 토큰</div>
-            <div style="font-family:var(--mono);font-size:18px;font-weight:800;color:var(--g);" id="u_tokens">0</div>
-            <div style="font-size:8px;color:var(--tm);">tokens</div>
-          </div>
-          <div style="background:rgba(124,58,237,.06);border-radius:10px;padding:10px;text-align:center;">
-            <div style="font-size:9px;color:var(--tm);font-family:var(--mono);">오늘 요금</div>
-            <div style="font-family:var(--mono);font-size:18px;font-weight:800;color:var(--p);" id="u_cost">$0.000</div>
-            <div style="font-size:8px;color:var(--tm);">USD</div>
-          </div>
-        </div>
-        <!-- 누적 -->
-        <div style="background:var(--bg);border-radius:10px;padding:12px;margin-bottom:12px;">
-          <div style="font-size:10px;font-weight:700;margin-bottom:8px;">📅 누적 통계</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:10px;">
-            <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--br);">
-              <span style="color:var(--tm);">총 호출 횟수</span>
-              <span style="font-family:var(--mono);font-weight:700;" id="u_total_calls">0회</span>
-            </div>
-            <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--br);">
-              <span style="color:var(--tm);">총 입력 토큰</span>
-              <span style="font-family:var(--mono);font-weight:700;" id="u_total_in">0</span>
-            </div>
-            <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--br);">
-              <span style="color:var(--tm);">총 출력 토큰</span>
-              <span style="font-family:var(--mono);font-weight:700;" id="u_total_out">0</span>
-            </div>
-            <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--br);">
-              <span style="color:var(--tm);">총 요금</span>
-              <span style="font-family:var(--mono);font-weight:700;color:var(--p);" id="u_total_cost">$0.000</span>
-            </div>
-          </div>
-        </div>
-        <!-- 기능별 사용량 -->
-        <div style="background:var(--bg);border-radius:10px;padding:12px;">
-          <div style="font-size:10px;font-weight:700;margin-bottom:8px;">🔍 기능별 호출 횟수</div>
-          <div id="u_breakdown" style="font-size:10px;"></div>
-        </div>
-        <!-- 요금 계산 기준 -->
-        <div style="margin-top:10px;padding:8px 10px;background:rgba(49,130,246,.05);border-radius:8px;font-size:9px;color:var(--tm);line-height:1.6;">
-          💡 요금 기준 (claude-sonnet-4-5)<br>
-          입력: $3.00 / 1M tokens · 출력: $15.00 / 1M tokens<br>
-          실제 청구는 Anthropic 콘솔에서 확인 → <a href="https://console.anthropic.com" target="_blank" style="color:var(--b);">console.anthropic.com</a>
-        </div>
-      </div>
 
     </div>
     <div class="modal-ft">
@@ -2828,7 +2716,7 @@ canvas{image-rendering:pixelated;}
   <div class="modal" style="width:620px;">
     <div class="modal-hdr"><span class="modal-ttl">📓 AI 매매일지</span><button class="modal-x" onclick="closeModal('journal')">×</button></div>
     <div class="modal-body"><div id="jModalBody"></div></div>
-    <div class="modal-ft"><button class="ibtn" onclick="closeModal('journal')">닫기</button><button class="ibtn pri" onclick="genJModal()">🤖 AI 일지 생성</button></div>
+    <div class="modal-ft"><button class="ibtn" onclick="closeModal('journal')">닫기</button><button class="ibtn pri" onclick="genJModal()">📋 일지 평가 질문 복사</button></div>
   </div>
 </div>
 
@@ -2894,7 +2782,7 @@ canvas{image-rendering:pixelated;}
   </div>
 </div>
 <script>
-// 🔒 보안·비용 가드 (2026-11): ① 브라우저에 남은 키 정리 ② AI API 호출 차단(네트워크 미발생) ③ 매매상태 localStorage 잔재 제거
+// 🔒 보안 가드 (2026-11): ① 브라우저에 남은 키 정리(옛 claudeKey 포함) ② 매매상태 localStorage 잔재 제거 ③ 401이면 로그인 페이지로
 (function(){
   try{
     ['traidair_api_config_v2','kisConfig'].forEach(function(k){
@@ -2906,22 +2794,28 @@ canvas{image-rendering:pixelated;}
     });
     localStorage.removeItem('htsMock'); localStorage.removeItem('htsStopOrders');
   }catch(e){}
-  window.AI_API_DISABLED = true;
   var _f = window.fetch.bind(window);
   window.fetch = function(input, init){
     var u = (typeof input==='string') ? input : ((input && input.url) || '');
-    if(/\/api\/claude(\/stream)?(\?|$)/.test(u)){
-      var msg='AI API 비활성(비용 절감) — 계산·판단은 로컬에서 동작합니다';
-      if(/\/stream/.test(u)) return Promise.resolve(new Response('event: error\ndata: '+JSON.stringify({error:msg})+'\n\n',{status:200,headers:{'Content-Type':'text/event-stream'}}));
-      return Promise.resolve(new Response(JSON.stringify({error:{type:'ai_disabled',message:msg}}),{status:200,headers:{'Content-Type':'application/json'}}));
-    }
-    if(/\/api\/set-claude-key/.test(u)) return Promise.resolve(new Response('{"ok":false}',{status:200,headers:{'Content-Type':'application/json'}}));
     return _f(input, init).then(function(r){
       if(r.status===401 && /\/api\//.test(u) && !window.__loginRedirect){ window.__loginRedirect=1; location.href='/login'; }
       return r;
     });
   };
 })();
+// /api/backtest/state 공용 조회 — 여러 패널·타이머가 동시에 불러도 0.45초 안의 요청은 서버 1회로 합친다.
+// 응답 원문만 공유하고 호출마다 새로 JSON.parse 하므로 한쪽이 값을 바꿔도 다른 쪽에 섞이지 않는다.
+var _btStateShared={ts:0,p:null};
+function btState(){
+  var now=Date.now();
+  if(!_btStateShared.p || now-_btStateShared.ts>450){
+    _btStateShared.ts=now;
+    var p=fetch('/api/backtest/state',{cache:'no-store'}).then(function(r){return r.text();});
+    _btStateShared.p=p;
+    p.catch(function(){ if(_btStateShared.p===p){ _btStateShared.ts=0; _btStateShared.p=null; } });   // 실패한 그 요청일 때만 초기화
+  }
+  return _btStateShared.p.then(function(t){ return JSON.parse(t); });
+}
 </script>
 <script>
 // 에이전트(멀티에이전트 백테스트) 주문/체결을 HTS 위에 실시간 표시. 기존 수동 주문창과 공존.
@@ -2950,7 +2844,7 @@ canvas{image-rendering:pixelated;}
   }
   function tick(){
     if(document.hidden) return;
-    fetch('/api/backtest/state',{cache:'no-store'}).then(function(r){return r.json();}).then(render).catch(function(){});
+    btState().then(render).catch(function(){});
   }
   setInterval(tick, 2000); tick();
 })();
@@ -3116,7 +3010,7 @@ canvas{image-rendering:pixelated;}
   }
   function tick(){
     if(document.hidden) return;
-    fetch('/api/backtest/state',{cache:'no-store'}).then(function(r){return r.json();}).then(render).catch(function(){
+    btState().then(render).catch(function(){
       var rowsEl=document.getElementById('agentTeamRows'); if(rowsEl&&!rowsEl.innerHTML) rowsEl.innerHTML=idle();
     });
   }
@@ -3125,9 +3019,13 @@ canvas{image-rendering:pixelated;}
 })();
 </script>
 <script>// ═══════════════════════════════
-// 멘토 페르소나 — 모든 Claude 호출 system 프롬프트로 사용
+// 멘토 페르소나 — 복사용 질문(copyAsk) 머리말로 사용
 // ═══════════════════════════════
 function fW(v){return Math.round(v||0).toLocaleString();}
+// 한국 시간 기준 오늘 날짜(YYYY-MM-DD) — 리플레이에서 실시간 데이터 사용 여부 판단(룩어헤드 차단)
+function _kstToday(){ return new Date(Date.now()+9*3600*1000).toISOString().slice(0,10); }
+// HTML 이스케이프 — innerHTML에 외부·사용자 텍스트를 넣을 때 공통으로 사용
+function escH(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 const MENTOR_SYSTEM_PROMPT = `당신은 주식 단타 전문 트레이딩 멘토이자 실전 파트너다. 20년 이상의 단타 경험을 가진 전문가로서 학습·분석·실전 조언을 모두 제공한다. 수익보다 손실 방어를 항상 우선하고 틀린 판단은 직접적으로 지적한다.
 
 # 행동 원칙
@@ -3259,7 +3157,7 @@ window.debugTraidair = function debugTraidair(){
 [진단]
 ${tk===0 ? '⚠ 매매 0건 — 자동매매가 안 돌았거나 진입 조건 미달.\n   백테스트 끝까지 돌렸는지 확인. autoState.cfg.brk가 true면 연속 손절로 중지됐을 수도.' :
   sells===0 ? '⚠ 매도 0건 — 매수만 했음. 마감 청산이 작동 안 함. 백테스트 끝나면 청산되는지 확인.' :
-  journals===0 ? '⚠ 매매는 있는데 일지 0개 — autoSaveJournalOnTrade 실패. AI 일지 생성 버튼 눌러서 확인.' :
+  journals===0 ? '⚠ 매매는 있는데 일지 0개 — autoSaveJournalOnTrade 실패. 기본 일지 일괄 저장 버튼 눌러서 확인.' :
   '✅ 데이터 정상'}
 
 [최근 JS 에러] (${(window._jsErrors||[]).length}건)
@@ -3270,20 +3168,51 @@ ${(window._jsErrors||[]).slice(-5).map(e=>'• '+(e.msg||'').slice(0,80)).join('
   return msg;
 };
 
-// Claude 호출 헬퍼 — 모든 호출에 멘토 시스템 프롬프트 자동 첨부
-async function claudeAsk(opts){
-  const body = {
-    model: opts.model || 'claude-sonnet-4-5',
-    max_tokens: opts.max_tokens || 600,
-    system: MENTOR_SYSTEM_PROMPT,
-    messages: opts.messages || [{role:'user', content: opts.prompt || ''}],
-  };
-  const r = await fetch('/api/claude', {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify(body),
-  });
-  return await r.json();
+// 질문 복사 — LLM을 호출하지 않는다. 화면에서 만든 질문을 복사해 claude.ai에 붙여넣도록 모달로 보여준다.
+// (매매 판단·계산 경로와 무관한 보조 기능. 프롬프트는 URL에 싣지 않는다.)
+function copyAsk(title, prompt, opts){
+  opts = opts || {};
+  var full = (opts.noMentor ? '' : MENTOR_SYSTEM_PROMPT + '\n\n---\n\n') + String(prompt || '');
+  var bg = document.getElementById('modal-copyask');
+  if(!bg){
+    bg = document.createElement('div');
+    bg.className = 'modal-bg'; bg.id = 'modal-copyask';
+    bg.style.zIndex = '10002';   // 차트 AI 팝업(998)·에이전트 위젯(9000) 위에 뜨도록
+    bg.innerHTML = '<div class="modal" style="width:min(560px,94vw);">'
+      + '<div class="modal-hdr"><span class="modal-ttl" id="copyAskTtl">질문 복사</span><button class="modal-x" onclick="closeModal(\'copyask\')">×</button></div>'
+      + '<div class="modal-body"><div style="font-size:11px;color:var(--ts);margin-bottom:6px;line-height:1.5;">아래 질문을 복사해 claude.ai에 붙여넣으세요. (이 앱은 AI 서버를 호출하지 않습니다)</div>'
+      + '<textarea id="copyAskText" readonly style="width:100%;height:240px;font-size:11px;line-height:1.5;resize:vertical;background:var(--bg2,#0b1220);color:inherit;border:1px solid var(--br);border-radius:6px;padding:6px;box-sizing:border-box;"></textarea>'
+      + '<div id="copyAskMsg" style="font-size:10px;color:var(--g);min-height:14px;margin-top:4px;"></div></div>'
+      + '<div class="modal-ft"><button class="ibtn" onclick="closeModal(\'copyask\')">닫기</button>'
+      + '<button class="ibtn" onclick="window.open(\'https://claude.ai/new\',\'_blank\',\'noopener\')">claude.ai 열기</button>'
+      + '<button class="ibtn pri" onclick="_copyAskDo()">복사</button></div></div>';
+    bg.addEventListener('click', function(e){ if(e.target === bg) closeModal('copyask'); });
+    document.body.appendChild(bg);
+  }
+  document.getElementById('copyAskTtl').textContent = title || '질문 복사';
+  document.getElementById('copyAskText').value = full;
+  var _m = document.getElementById('copyAskMsg'); _m.textContent = ''; _m.style.color = 'var(--g)';
+  openModal('copyask');
+}
+function _copyAskDo(){
+  var ta = document.getElementById('copyAskText'), msg = document.getElementById('copyAskMsg');
+  if(!ta) return;
+  var ok = function(){ if(msg) msg.textContent = '복사했습니다. claude.ai에 붙여넣으세요.'; };
+  var fail = function(){ ta.focus(); ta.select(); if(msg){ msg.style.color = 'var(--a)'; msg.textContent = '자동 복사 실패 — Ctrl+C로 직접 복사하세요.'; } };
+  try{
+    if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(ta.value).then(ok, function(){ try{ ta.select(); document.execCommand('copy') ? ok() : fail(); }catch(e){ fail(); } }); return; }
+    ta.select(); document.execCommand('copy') ? ok() : fail();
+  }catch(e){ fail(); }
+}
+// 결과 칸 안에 "질문 복사" 버튼만 넣는다(클릭하면 copyAsk 모달). 자동 호출 경로에서 모달이 갑자기 뜨지 않게 할 때 쓴다.
+function copyAskInline(el, label, title, prompt){
+  if(!el) return;
+  el.textContent = '';
+  var b = document.createElement('button');
+  b.className = 'ibtn pri';
+  b.textContent = '📋 ' + label;
+  b.addEventListener('click', function(){ copyAsk(title, prompt); });
+  el.appendChild(b);
 }
 
 // ═══════════════════════════════
@@ -3583,7 +3512,7 @@ async function loadFromServer() {
       'manualJournals','personalRules','masterCL',
       'htsSectorInfo','htsAutoTks','htsAutoSyncDate','htsSectorTime',
       'htsAutoState','htsChatMsgs','htsDecisionLog','htsAiStatus',
-      'htsIntra','trustScore','apiUsage','htsSimState',
+      'htsIntra','trustScore','htsSimState',
       'htsLearningMemory','htsLearnedDates','htsFeatureSuggestions',
       'htsLectureContent','htsLectureUpdatedAt','htsCoachingHistory'
     ];
@@ -3638,7 +3567,7 @@ function loadState(){
               const h=(it.content||'').replace(/\n/g,'<br>');
               const d=document.createElement('div');
               d.className='ai-msg'+(it.role==='me'?' me':'');
-              d.innerHTML='<div class="ai-av '+(it.role==='ai'?'ai':'me')+'">'+(it.role==='ai'?'AI':'나')+'</div><div><div class="ai-bub">'+h+'</div><div class="ai-meta">'+(it.role==='ai'?'Claude · ':'나 · ')+(it.tm||'')+'</div></div>';
+              d.innerHTML='<div class="ai-av '+(it.role==='ai'?'ai':'me')+'">'+(it.role==='ai'?'AI':'나')+'</div><div><div class="ai-bub">'+h+'</div><div class="ai-meta">'+(it.role==='ai'?'로컬 · ':'나 · ')+(it.tm||'')+'</div></div>';
               m.appendChild(d);
             });
             m.scrollTop=m.scrollHeight;
@@ -4577,47 +4506,6 @@ function auditEvolvedTechniques(){
     }
   });
 }
-async function _aiRefineGenes(){
-  var top=_evoPlus.pool.slice().sort(function(a,b){return b.fitness-a.fitness;}).slice(0,3);
-  if(!top.length)return;
-  var sells=(mock.trades||[]).filter(function(t){return t.side==='sell';});
-  var winTrades=sells.filter(function(t){return(t.pnl||0)>0;}).slice(-10);
-  var lossTrades=sells.filter(function(t){return(t.pnl||0)<=0;}).slice(-10);
-  var tradeData='';
-  winTrades.forEach(function(t){tradeData+='[수익] '+t.nm+' '+(t.technique||'?')+' 손익+'+(t.pnl||0)+'\n';});
-  lossTrades.forEach(function(t){tradeData+='[손실] '+t.nm+' '+(t.technique||'?')+' 손익'+(t.pnl||0)+'\n';});
-  var topDesc=top.map(function(g,i){
-    var wr=g.wins+g.losses>0?Math.round(g.wins/(g.wins+g.losses)*100):0;
-    return(i+1)+'. 적합도'+g.fitness.toFixed(0)+' 승률'+wr+'% 조건: '+_geneToDesc(g);
-  }).join('\n');
-  var prompt='단타 매매 전략 진화 시스템이다. 아래 데이터를 분석해서 새 전략 조건을 제안해줘.\n\n'+
-    '[유전 알고리즘 상위 전략]\n'+topDesc+'\n\n'+
-    '[최근 매매 기록]\n'+tradeData+'\n\n'+
-    '위 데이터 패턴을 분석해서 새로운 진입 조건 조합 2개를 JSON으로 제안해줘.\n'+
-    '각 조합은 기존 상위 전략의 강점을 살리고 약점을 보완해야 한다.\n'+
-    'JSON 형식:\n'+
-    '[{"name":"기법명","maAlign":"triple|short|none","volMin":숫자,"rsiLow":숫자,"rsiHigh":숫자,'+
-    '"bodyRatio":숫자,"candleBull":bool,"lowerWickMin":숫자,"useVwap":bool,"useRisingLows":bool,'+
-    '"usePrevBull":bool,"useDivergence":bool,"stopPct":숫자,"targetMult":숫자,"reason":"이유"}]';
-  try{
-    var data=await callClaude({model:"claude-sonnet-4-5",max_tokens:600,messages:[{role:"user",content:prompt}]},"진화+ AI정제");
-    var text=(data.content&&data.content[0]&&data.content[0].text)||'';
-    var jsonMatch=text.match(/\[\s*\{[\s\S]*?\}\s*\]/);
-    if(jsonMatch){
-      var suggestions;try{suggestions=JSON.parse(jsonMatch[0]);}catch(_jp){var m2=text.match(/\{[\s\S]*?"name"[\s\S]*?\}/g);if(m2)suggestions=m2.map(function(s){try{return JSON.parse(s);}catch(_e){return null;}}).filter(Boolean);}
-      if(!suggestions||!suggestions.length){addMsg('ai','⚠ AI 응답 파싱 실패');return;}
-      suggestions.forEach(function(s){
-        var gene=_randomGene();
-        ['maAlign','volMin','rsiLow','rsiHigh','bodyRatio','candleBull','lowerWickMin','useVwap','useRisingLows','usePrevBull','useDivergence','stopPct','targetMult'].forEach(function(k){if(s[k]!==undefined)gene[k]=s[k];});
-        gene.name=s.name||'AI기법_G'+_evoPlus.generation;
-        gene.generation=_evoPlus.generation;
-        _evoPlus.pool.push(gene);
-        _evoPlus.log.push({time:Date.now(),type:'ai',msg:'AI 제안: '+gene.name+' — '+(s.reason||_geneToDesc(gene))});
-      });
-      addMsg('ai','🤖 AI가 '+suggestions.length+'개 전략을 제안했습니다. 다음 세대에서 검증합니다.');
-    }
-  }catch(e){console.warn('AI refine error:',e.message);}
-}
 // (진화+ 통합으로 이동 — 하위 호환 스텁 아래에 있음)
 function renderEvoPlusPanel(){
   var pool=_evoPlus.pool.slice().sort(function(a,b){return b.fitness-a.fitness;});
@@ -4829,12 +4717,6 @@ async function _gaRound(gen){
   if(gen===2)try{evolveFeatureWeights();}catch(_e){}
   _saveEvoPlus();
   if(gen<4){setTimeout(function(){_gaRound(gen+1);},50);return;}
-  // GA 5세대 완료 → AI 정제 (5사이클마다 — 토큰 절감)
-  if(_evolveCycle%5===0&&_evolveRunning){
-    _evolvePhase='ai';
-    _updBtn('🧬 L'+_evolveLoop+' AI정제');
-    await _aiRefineGenes();
-  }
   // 사이클 완료 → 다음 사이클
   if(_evolveRunning){_startLearnPhase();}
 }
@@ -5923,7 +5805,7 @@ function runStep(){
 function setSpd(el,v){sim.speed=v;document.querySelectorAll(".spd-btn").forEach(b=>b.classList.remove("on"));el.classList.add("on");}
 
 // ═══════════════════════════════════════════════
-// 노션 강의 자동 동기화 — Claude 프롬프트에 강의 원칙 첨부
+// 노션 강의 자동 동기화 — 복사용 질문에 강의 원칙 첨부
 // ═══════════════════════════════════════════════
 window.lectureContent = (function(){
   try{ return localStorage.getItem('htsLectureContent') || ''; }catch(e){ return ''; }
@@ -5988,12 +5870,6 @@ async function refreshLecture(force){
     return lectureContent || '';
   }
 }
-function getLectureContext(maxChars){
-  if(!lectureContent) return '';
-  const max = maxChars || 3000;
-  const content = lectureContent.length > max ? lectureContent.slice(0, max) + '\n...(이하 생략)' : lectureContent;
-  return '【강의 원칙 — 반드시 이 규칙을 우선 적용할 것】\n' + content + '\n\n';
-}
 
 // ═══════════════════════════════════════════════
 // 학습 메모리 — 매매일지에서 누적된 깨달음
@@ -6032,36 +5908,6 @@ window.learnedDates = (function(){
   }catch(e){}
   console.log('✅ 학습 노트 복구 완료: '+_seed.length+'개');
 })();
-function appendLesson(date, ai){
-  const items=[];
-  if(ai.bad && ai.bad !== '-' && ai.bad !== '없음') items.push({date, category:'반성', text:ai.bad});
-  if(ai.improvement && ai.improvement !== '-') items.push({date, category:'개선', text:ai.improvement});
-  if(ai.mentor_comment && ai.mentor_comment !== '-') items.push({date, category:'멘토', text:ai.mentor_comment});
-  if(ai.psychology && ai.psychology !== '-') items.push({date, category:'심리', text:ai.psychology});
-  if(!items.length) return;
-  const newItems = items.filter(item =>
-    !learningMemory.some(m => m.date===item.date && m.text===item.text)
-  );
-  if(!newItems.length) return;
-  // 완전 동일 텍스트 중복만 제거 (유사도 제거 삭제)
-  newItems.forEach(ni => {
-    const dupeIdx = learningMemory.findIndex(m =>
-      m.category === ni.category && m.text.trim() === ni.text.trim()
-    );
-    if(dupeIdx >= 0) learningMemory.splice(dupeIdx, 1);
-  });
-  learningMemory.push(...newItems);
-  if(learningMemory.length > 200) learningMemory = learningMemory.slice(-200);
-  window.learningMemory = learningMemory;
-  if(!learnedDates.includes(date)){
-    learnedDates.push(date);
-    if(learnedDates.length > 200) learnedDates = learnedDates.slice(-200);
-    window.learnedDates = learnedDates;
-    saveToServer('htsLearnedDates', JSON.stringify(learnedDates));
-  }
-  saveToServer('htsLearningMemory', JSON.stringify(learningMemory));
-  updateLearnerStage();
-}
 function _textSimilarity(a, b){
   if(!a||!b) return 0;
   const wa=new Set(a.split(/\s+/)), wb=new Set(b.split(/\s+/));
@@ -6188,7 +6034,7 @@ function openLearningMemo(){
         <button class="ibtn" onclick="restoreLearningBackup();document.getElementById('lmDlg').remove();openLearningMemo();" style="font-size:10px;border:1.5px solid var(--g);color:var(--g);">백업 복원</button>
         <button class="ibtn" onclick="rebuildLearningFromJournals();document.getElementById('lmDlg').remove();setTimeout(openLearningMemo,300);" style="font-size:10px;border:1.5px solid var(--g);color:var(--g);">일지에서 복구</button>
         <button class="ibtn" onclick="_backupLearning();_autoTrimLearning();saveToServer('htsLearningMemory',JSON.stringify(learningMemory));document.getElementById('lmDlg').remove();openLearningMemo();addMsg('ai','🧹 빠른 정리 완료 ('+learningMemory.length+'개 남음)');" style="font-size:10px;border:1.5px solid var(--a);color:var(--a);">빠른 정리</button>
-        <button class="ibtn" onclick="cleanupLearning().then(()=>{try{document.getElementById('lmDlg').remove();openLearningMemo();}catch(e){}});" style="font-size:10px;background:var(--b);color:#fff;">AI 정리</button>
+        <button class="ibtn" onclick="cleanupLearning().then(()=>{try{document.getElementById('lmDlg').remove();openLearningMemo();}catch(e){}});" style="font-size:10px;background:var(--b);color:#fff;">중복 정리</button>
         <button class="ibtn red" onclick="if(confirm('전체 학습 노트를 초기화할까요?')){_backupLearning();learningMemory=[];learnedDates=[];saveToServer('htsLearningMemory','[]');saveToServer('htsLearnedDates','[]');document.getElementById('lmDlg').remove();updateLearnerStage();}" style="font-size:10px;">전체 초기화</button>
       </div>
     </div>
@@ -7288,7 +7134,7 @@ function checkPriceAlerts(){
 // ═══════════════════════════════
 // AI AUTO-TRADE ENGINE
 // ═══════════════════════════════
-let autoLevel=3; // 기본 Lv3: 진입 자동 (Claude 검토 + 자동 매수). 0 = 완전수동, 4 = 완전자동(15:20 청산 포함)
+let autoLevel=3; // 기본 Lv3: 진입 자동 (로컬 룰 검토 + 자동 매수). 0 = 완전수동, 4 = 완전자동(15:20 청산 포함)
 
 // ═══════════════════════════════
 // 장중 체크리스트 (Phase 8 실시간)
@@ -7452,46 +7298,14 @@ async function runNewsImpact(){
   const text=(document.getElementById("newsInputTa")||{}).value?.trim();
   const el=document.getElementById("newsImpactResult"); if(!el)return;
   if(!text){el.textContent="뉴스 텍스트를 입력해주세요.";return;}
-  el.innerHTML='<span style="color:var(--tm);font-style:italic;">AI 분석 중...</span>';
-  try{
-    const res=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({model:"claude-sonnet-4-5",max_tokens:500,
-        messages:[{role:"user",content:`단타 트레이딩 멘토. 아래 뉴스/공시가 어떤 섹터에 어떻게 영향 미치는지 분석해줘.
+  const prompt=`단타 트레이딩 멘토. 아래 뉴스/공시가 어떤 섹터에 어떻게 영향 미치는지 분석해줘.
 
 뉴스: ${text}
 
-JSON만 답해:
-{
-  "mainSector": "주영향 섹터명",
-  "impact": "긍정/부정/중립",
-  "strength": "강/보통/약",
-  "duration": "당일/수일/수주",
-  "relatedStocks": ["종목명1","종목명2","종목명3"],
-  "strategy": "매매 전략 1~2줄",
-  "caution": "주의사항 1줄",
-  "grade": "S/A/B/C"
-}`}]})});
-    const data=await res.json();
-    const raw=data.content?.[0]?.text||"{}";
-    let p;try{const m=raw.match(/\{[\s\S]*\}/);p=JSON.parse(m?m[0]:"{}"); }catch(e){p={};}
-    if(p.mainSector){
-      const ic={"긍정":"var(--g)","부정":"var(--r)","중립":"var(--ts)"}[p.impact]||"var(--ts)";
-      const gc={"S":"var(--p)","A":"var(--b)","B":"var(--a)","C":"var(--r)"}[p.grade]||"var(--ts)";
-      el.innerHTML=`<div style="padding:5px 7px;background:var(--bg);border-radius:7px;border-left:3px solid ${ic};">
-        <div style="display:flex;align-items:center;gap:5px;margin-bottom:3px;">
-          <span style="font-weight:700;font-size:10px;">${p.mainSector}</span>
-          <span style="color:${ic};font-size:9px;font-weight:700;">${p.impact} ${p.strength}</span>
-          <span style="font-family:var(--mono);font-size:9px;padding:0 4px;border-radius:3px;background:${gc}18;color:${gc};">${p.grade}급</span>
-        </div>
-        <div style="font-size:9px;color:var(--ts);margin-bottom:2px;">⏱ ${p.duration} | 관련: ${(p.relatedStocks||[]).join(", ")}</div>
-        <div style="font-size:9px;color:var(--tp);">${p.strategy||""}</div>
-        ${p.caution?`<div style="font-size:9px;color:var(--r);margin-top:2px;">⚠ ${p.caution}</div>`:""}
-      </div>`;
-      // 재료 강도도 업데이트
-      document.getElementById("materialInput").value=text;
-      addDecisionLog(`뉴스분석: ${p.mainSector}`,`${p.impact} ${p.strength} | ${p.duration}`,`Phase 6-1 재료강도 ${p.grade}급`);
-    } else el.textContent=raw.slice(0,150);
-  }catch(e){el.textContent="API 오류";}
+답변 형식: 주영향 섹터, 영향(긍정/부정/중립)과 강도(강/보통/약), 지속 기간(당일/수일/수주), 관련 종목 3개, 매매 전략 1~2줄, 주의사항 1줄, 재료 등급(S/A/B/C).`;
+  const mi=document.getElementById("materialInput"); if(mi) mi.value=text;   // 재료 강도 입력란에도 채워 둔다(기존 동작 유지)
+  copyAskInline(el,'뉴스 영향 질문 다시 열기','뉴스 영향 질문',prompt);
+  copyAsk('뉴스 영향 질문',prompt);
 }
 
 // ═══════════════════════════════
@@ -7501,7 +7315,6 @@ async function runAIPatternAnalysis(){
   const el=document.getElementById("aiPatternResult"); if(!el)return;
   const trades=(mock.trades||[]).filter(t=>t.side==='sell');
   if(trades.length<3){el.textContent="매도 내역이 3개 이상 있어야 분석 가능합니다.";return;}
-  el.innerHTML='<span style="color:var(--tm);font-style:italic;">AI 패턴 분석 중... (전체 '+trades.length+'건 분석)</span>';
   const wins=trades.filter(t=>(t.pnl||0)>0);
   const losses=trades.filter(t=>(t.pnl||0)<0);
   const avgWin=wins.length?Math.round(wins.reduce((a,t)=>a+(t.pnl||0),0)/wins.length):0;
@@ -7521,13 +7334,16 @@ async function runAIPatternAnalysis(){
   });
   const stockSummary=Object.entries(byStock).sort((a,b)=>b[1].pnl-a[1].pnl)
     .map(([nm,s])=>`${nm}: ${s.wins}승${s.losses}패 ${s.pnl>=0?'+':''}${Math.round(s.pnl).toLocaleString()}원`).join(' | ');
-  try{
-    const res=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({model:"claude-sonnet-4-5",max_tokens:800,
-        messages:[{role:"user",content:`단타 트레이딩 멘토. Phase 12 복기 분석을 해줘.
+  const byTech={};
+  trades.forEach(t=>{const k=t.technique||'미분류'; if(!byTech[k]) byTech[k]={wins:0,losses:0,pnl:0}; if((t.pnl||0)>0) byTech[k].wins++; else byTech[k].losses++; byTech[k].pnl+=(t.pnl||0);});
+  const techSummary=Object.entries(byTech).sort((a,b)=>b[1].pnl-a[1].pnl).map(([k,s])=>`${k}: ${s.wins}승${s.losses}패 ${s.pnl>=0?'+':''}${Math.round(s.pnl).toLocaleString()}원`).join(' | ');
+  const plr=avgLoss?(avgWin/Math.abs(avgLoss)).toFixed(2):'-';
+  const stats=`${summary}\n손익비 1:${plr}\n\n종목별: ${stockSummary}\n\n기법별: ${techSummary}`;
+  const prompt=`단타 트레이딩 멘토. Phase 12 복기 분석을 해줘.
 
 매매 통계:
 ${summary}
+기법별: ${techSummary}
 
 ★ 수익 거래 내역 (최근 ${Math.min(15,wins.length)}건/${wins.length}건):
 ${winDetail}
@@ -7546,70 +7362,28 @@ ${stockSummary}
 5. 개인화 원칙 제안 (진입/손절/익절 각 1줄)
 
 수익 거래가 있으면 반드시 패턴을 찾아줘. 없으면 "수익 데이터 부족"으로.
-각 항목에 Phase 번호 포함. 300자 이내.`}]})});
-    const data=await res.json();
-    const text=data.content?.[0]?.text||"분석 실패";
-    el.style.whiteSpace="pre-wrap";
-    el.style.color="var(--ts)";
-    el.style.whiteSpace='pre-wrap';
-    el.style.color='var(--ts)';
-    // 텍스트 + AI 즉시반영 버튼
-    el.innerHTML = `<div style="white-space:pre-wrap;margin-bottom:8px;">${text.replace(/</g,'&lt;')}</div>
-      <button onclick="applyCoachingToAI()" data-coaching="${encodeURIComponent(text)}" style="background:var(--p);color:#fff;border:none;padding:6px 14px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;">⚡ AI에 즉시 반영 (영구 저장)</button>
-      <button onclick="alert('이미 누적된 코칭은 학습 메모리 노트(좌측 🎓)에서 확인 가능합니다.')" style="background:none;color:var(--tm);border:1px solid var(--br);padding:6px 10px;border-radius:6px;font-size:10px;cursor:pointer;margin-left:4px;">ℹ 누적 확인</button>`;
-    window._lastCoachingText = text;
-  }catch(e){el.textContent="API 오류: "+e.message;}
+각 항목에 Phase 번호 포함. 300자 이내.`;
+  el.style.whiteSpace='pre-wrap'; el.style.color='var(--ts)';
+  el.textContent=stats;
+  const wrap=document.createElement('div'); wrap.style.marginTop='8px'; el.appendChild(wrap);
+  copyAskInline(wrap,'복기 질문 복사 (claude.ai)','복기 분석 질문',prompt);
 }
 
 // AI 복기 분석 결과를 학습 메모리에 영구 저장 — 이후 모든 매매 결정에 반영
-function applyCoachingToAI(){
-  try{
-    const text = window._lastCoachingText || '';
-    if(!text){ showAlert('반영 실패', '복기 분석 결과가 없습니다'); return; }
-    // 학습 메모리에 누적 (카테고리: 복기)
-    if(!window.learningMemory) window.learningMemory = [];
-    const date = sim.date || new Date().toISOString().slice(0,10);
-    // 한 번에 여러 항목으로 쪼개서 저장
-    const lines = text.split(/\n+/).filter(l => l.trim().length > 8);
-    lines.slice(0, 8).forEach(line => {
-      learningMemory.push({ date, category:'복기', text: line.trim() });
-    });
-    if(learningMemory.length > 80) learningMemory = learningMemory.slice(-80);
-    window.learningMemory = learningMemory;
-    // 영구 저장
-    try{
-      saveToServer('htsLearningMemory', JSON.stringify(learningMemory));
-      localStorage.setItem('htsLearningMemory', JSON.stringify(learningMemory));
-    }catch(_e){}
-    // 별도 코칭 히스토리에도 누적
-    try{
-      const hist = JSON.parse(localStorage.getItem('htsCoachingHistory') || '[]');
-      hist.push({ ts: Date.now(), date, text });
-      if(hist.length > 50) hist.shift();
-      saveToServer('htsCoachingHistory', JSON.stringify(hist));
-      localStorage.setItem('htsCoachingHistory', JSON.stringify(hist));
-    }catch(_e){}
-    if(typeof updateLearnerStage === 'function') updateLearnerStage();
-    showAlert('✅ AI에 반영 완료', '복기 분석이 학습 메모리에 누적됐어요.\n다음 모든 매매 결정 프롬프트에 자동 첨부됩니다.\n좌측 🎓 노트로 확인 가능.');
-    if(typeof addDecisionLog === 'function') addDecisionLog('🎓 코칭 반영', lines.length+'개 항목 학습 메모리에 저장', '학습');
-  }catch(e){ showAlert('반영 오류', e.message); }
-}
-
 // 자신만의 셋업 개발 AI (Phase 10-10)
 async function runMySetupAI(){
   const el=document.getElementById('aiPatternResult'); if(!el)return;
   const trades=mock.trades||[];
   if(trades.length<10){el.textContent='10회 이상 매매 필요';return;}
-  el.innerHTML='<span style="color:var(--tm);font-style:italic;">수익 패턴에서 나만의 셋업 추출 중...</span>';
   const wins=trades.filter(t=>t.pnl>0);
   const summary=`수익 매매 ${wins.length}회 / 총 ${trades.length}회\n승률 ${(wins.length/trades.length*100).toFixed(0)}%\n평균수익 ${wins.length?Math.round(wins.reduce((a,t)=>a+t.pnl,0)/wins.length).toLocaleString():'0'}원`;
-  try{
-    const data=await callClaude({model:"claude-sonnet-4-5",max_tokens:500,
-      messages:[{role:"user",content:`단타 트레이딩 Phase 10-10. 아래 매매 데이터에서 나만의 셋업을 추출해줘.\n\n${summary}\n\n수익 거래: ${wins.slice(-10).map(t=>`${t.nm} ${fW(t.price)}원 +${Math.round(t.pnl)}원 (${t.time||''})`).join(' / ')}\n\n분석:\n1. 수익 패턴의 공통 조건 (시간대/종목특성/진입방식)\n2. 나만의 셋업 이름 제안\n3. 셋업 진입 조건 3가지\n4. 셋업 청산 조건\n5. 백테스트 권장 사항\n100자 이내.`}]},
-      "나만의셋업AI");
-    el.style.whiteSpace='pre-wrap'; el.style.color='var(--ts)';
-    el.textContent=data.content?.[0]?.text||'분석 실패';
-  }catch(e){el.textContent='API 오류';}
+  const byTech={}; wins.forEach(t=>{const k=t.technique||'미분류'; byTech[k]=(byTech[k]||0)+1;});
+  const topTech=Object.entries(byTech).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([k,n])=>k+' '+n+'회').join(' · ')||'-';
+  const prompt=`단타 트레이딩 Phase 10-10. 아래 매매 데이터에서 나만의 셋업을 추출해줘.\n\n${summary}\n\n수익 거래: ${wins.slice(-10).map(t=>`${t.nm} ${fW(t.price)}원 +${Math.round(t.pnl)}원 (${t.time||''}) ${t.technique||''}`).join(' / ')}\n\n분석:\n1. 수익 패턴의 공통 조건 (시간대/종목특성/진입방식)\n2. 나만의 셋업 이름 제안\n3. 셋업 진입 조건 3가지\n4. 셋업 청산 조건\n5. 백테스트 권장 사항\n100자 이내.`;
+  el.style.whiteSpace='pre-wrap'; el.style.color='var(--ts)';
+  el.textContent=summary+'\n수익 기법 상위: '+topTech;
+  const wrap=document.createElement('div'); wrap.style.marginTop='6px'; el.appendChild(wrap);
+  copyAskInline(wrap,'셋업 추출 질문 복사 (claude.ai)','나만의 셋업 질문',prompt);
 }
 
 function renderStatsEnhanced(){
@@ -7942,7 +7716,7 @@ function renderTradeDetailLog(){
   }).join('');
 }
 
-// ═══ 학습 프롬프트 관리 — 개별 삭제 + AI 정리 ═══
+// ═══ 학습 프롬프트 관리 — 개별 삭제 + 중복 정리 ═══
 function renderLearningMgmt(){
   const el=document.getElementById('learningMgmtPanel'); if(!el) return;
   const cnt=document.getElementById('learnCount'); if(cnt) cnt.textContent=(learningMemory||[]).length+'개';
@@ -8000,56 +7774,25 @@ function restoreLearningBackup(){
 async function cleanupLearning(){
   if(!learningMemory||!learningMemory.length){showAlert('학습 노트','정리할 노트가 없습니다.');return;}
   _backupLearning();
-  var _allBtns=document.querySelectorAll('[onclick*="cleanupLearning"]');
-  _allBtns.forEach(function(b){b.textContent='🔄 정리하는 중...';b.disabled=true;b.style.opacity='0.6';});
-  addMsg('ai','🔄 AI 학습 정리 시작... ('+learningMemory.length+'개 분석 중)');
-  var _backup = JSON.parse(JSON.stringify(learningMemory));
-  try{
-    var prompt='너는 트레이딩 멘토. 아래 학습 노트에서 **중복된 내용만** 병합 정리해줘.\n\n'+
-      '정리 원칙:\n'+
-      '- 완전히 같은 뜻의 내용이 2개 이상이면 → 가장 구체적인 1개로 병합\n'+
-      '- 중복이 아닌 항목은 원문 그대로 유지 (절대 삭제 금지)\n'+
-      '- 마크다운 헤더(##, #)만 있는 줄 → 삭제 가능\n'+
-      '- 내용이 있는 항목은 비슷해 보여도 유지 (각각 다른 상황의 교훈일 수 있음)\n'+
-      '- 원본 개수의 70% 이상을 반드시 유지할 것\n\n'+
-      '현재 노트 ('+learningMemory.length+'개):\n'+
-      learningMemory.map(function(l,i){return '- ['+l.category+'] '+l.text;}).join('\n')+
-      '\n\nJSON만: {"notes":[{"category":"반성|개선|멘토|심리","text":"정리된 내용"},...], "summary":"뭘 했는지 한줄"}';
-    var res=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:1500,messages:[{role:'user',content:prompt}]})});
-    if(!res.ok) throw new Error('API 응답 오류 ('+res.status+')');
-    var data=await res.json();
-    if(data.error) throw new Error('API: '+(typeof data.error==='string'?data.error:JSON.stringify(data.error)));
-    var text=(data.content&&data.content[0]&&data.content[0].text)||'';
-    if(!text) throw new Error('AI 응답이 비어있음');
-    var result=robustJsonParse(text);
-    if(!result.notes||!Array.isArray(result.notes)||result.notes.length<3){
-      throw new Error('AI 결과 부족 ('+((result.notes||[]).length)+'개) — 응답: '+text.slice(0,100));
-    }
-    var before=learningMemory.length;
-    var today=typeof todayStr==='function'?todayStr():new Date().toISOString().slice(0,10);
-    learningMemory=result.notes.map(function(n){return{
-      date:today, category:n.category||'개선', text:(n.text||'').trim()
-    };}).filter(function(n){return n.text.length>=5;});
-    if(learningMemory.length < Math.min(5, before)){
-      learningMemory=_backup;
-      window.learningMemory=_backup;
-      addMsg('ai','⚠ AI 정리 결과가 너무 적음 → 복원됨');
-      _allBtns.forEach(function(b){b.textContent='AI 정리';b.disabled=false;b.style.opacity='1';});
-      return;
-    }
-    window.learningMemory=learningMemory;
-    localStorage.setItem('htsLearningMemory',JSON.stringify(learningMemory));
-    saveToServer('htsLearningMemory',JSON.stringify(learningMemory));
-    renderLearningMgmt();
-    updateLearnerStage();
-    addMsg('ai','✅ 학습 노트 AI 정리 완료\n'+before+'개 → '+learningMemory.length+'개\n'+(result.summary||''));
-  }catch(e){
-    learningMemory=_backup;
-    window.learningMemory=_backup;
-    addMsg('ai','⚠ 정리 실패 (복원됨): '+e.message);
-  }
-  _allBtns.forEach(function(b){b.textContent='AI 정리';b.disabled=false;b.style.opacity='1';});
+  var before=learningMemory.length;
+  // 로컬 정리(LLM 미사용): 마크다운 제목만 있는 줄 삭제 + 같은 분류·같은 문장(공백·기호 무시) 중복은 더 긴 쪽 1개만 남김
+  var norm=function(s){return String(s||'').toLowerCase().replace(/[^0-9a-z\u3131-\u318e\uac00-\ud7a3]+/g,'');};
+  var idxByKey={}, out=[];
+  learningMemory.forEach(function(n){
+    var text=String((n&&n.text)||'').trim();
+    if(!text||(/^#{1,6}\s/.test(text)&&text.indexOf('\n')<0)) return;   // 제목만 있는 한 줄짜리만 삭제(제목+본문 메모는 유지)
+    var key=(n.category||'')+'|'+norm(text);
+    if(idxByKey[key]===undefined){ idxByKey[key]=out.length; out.push(n); }
+    else if(text.length>String(out[idxByKey[key]].text||'').length){ out[idxByKey[key]]=n; }
+  });
+  if(!out.length){ addMsg('ai','⚠ 정리 결과가 비어 중단했습니다(원본 유지)'); return; }
+  learningMemory=out;
+  window.learningMemory=learningMemory;
+  localStorage.setItem('htsLearningMemory',JSON.stringify(learningMemory));
+  saveToServer('htsLearningMemory',JSON.stringify(learningMemory));
+  renderLearningMgmt();
+  updateLearnerStage();
+  addMsg('ai','✅ 학습 노트 중복 정리 완료\n'+before+'개 → '+learningMemory.length+'개 (같은 분류·같은 문장 병합, 제목줄 삭제)');
 }
 async function rebuildLearningFromJournals(){
   let js=safeParseJSON(localStorage.getItem('htsJournals'),'{}');
@@ -8622,7 +8365,7 @@ function addDecisionLog(action,reason,phase){
 // ══════════════════════════════════════════════════════
 // 자동매매 3단계 AI 검토 시스템
 // 1단계: 기술적 사전 필터 (빠른 로컬 계산)
-// 2단계: Claude AI 심층 분석 (추세/타점/R/R/리스크)
+// 2단계: 로컬 룰 기반 심층 판단 (추세/타점/R/R/리스크)
 // 3단계: 뇌동매매 체크 + 최종 실행 결정
 // ══════════════════════════════════════════════════════
 
@@ -8989,10 +8732,10 @@ async function _runScreeningAsync(){
     return;
   }
 
-  addDecisionLog('['+best.stk.nm+'] 1단계 통과 ('+best.score+'점)',best.tags.join(' '),'2단계 AI 검토');
-  updAdvBoxes('🔍 AI 검토 중 — '+best.stk.nm,'1단계: '+best.score+'점\nClaude 심층 분석 중...');
+  addDecisionLog('['+best.stk.nm+'] 1단계 통과 ('+best.score+'점)',best.tags.join(' '),'2단계 로컬 검토');
+  updAdvBoxes('🔍 로컬 검토 중 — '+best.stk.nm,'1단계: '+best.score+'점\n로컬 룰 기반 최종 판단 중...');
 
-  // ── 빠른 배속(>=300): Claude 우회 + 다층 필터 기반 진입 ──
+  // ── 빠른 배속(>=300): 다층 필터 기반 진입 ──
   if(autoState.level>=3 && (sim&&sim.speed>=300)){
     // 필수 게이트는 이미 위에서 통과 (gateFails 없는 종목만 scored에 들어옴)
     // 같은 봉 사이클에서 같은 종목 재진입만 차단 (갈아타기는 허용)
@@ -9014,9 +8757,9 @@ async function _runScreeningAsync(){
     }
     return;
   }
-  // ── Claude AI 심층 분석 (레벨3 이상, 평상시 배속) ──
+  // ── 로컬 룰 기반 심층 판단 (레벨3 이상, 평상시 배속) ──
   if(autoState.level>=3){
-    // 진화+ 중에만 규칙 기반 (실매매에서는 항상 Claude 사용)
+    // 진화+ 중에만 규칙 기반
     if(_evolveRunning){
       {
         var lcQ2=best.lc;
@@ -9025,19 +8768,6 @@ async function _runScreeningAsync(){
         if(best.entryCond)recordPattern('buy',best.detTech,best.entryCond,0);
         if(best.ruleCheck){if(!_tradeContext[best.tk])_tradeContext[best.tk]={};_tradeContext[best.tk]._ruleCheck=best.ruleCheck;}
         try{await execAutoBuy(lcQ2.c,best.stk,best.score,_bestTech2);}catch(_e){}
-      }
-      return;
-    }
-    // AI 판단 캐시: 같은 종목+비슷한 점수+5분 이내 → 재사용
-    if(!window._aiDecisionCache)window._aiDecisionCache={};
-    var _cacheKey=best.tk+'_'+Math.floor(best.score/2);
-    var _cached=window._aiDecisionCache[_cacheKey];
-    if(_cached&&Date.now()-_cached.ts<120000){
-      if(_cached.decision==='BUY'&&_cached.confidence>=65){
-        addDecisionLog('['+best.stk.nm+'] ✅ AI캐시매수','캐시 재사용 (신뢰도'+_cached.confidence+'%)','캐시');
-        var _bestTech3=best.tags.indexOf('대장첫숨')!==-1?'대장첫숨':'';
-        if(best.entryCond)recordPattern('buy',best.detTech,best.entryCond,0);
-        try{await execAutoBuy(best.lc.c,best.stk,best.score,_bestTech3);}catch(_e){}
       }
       return;
     }
@@ -9275,12 +9005,17 @@ async function fetchDartNews(corpName){
   const stk=STOCKS.find(s=>s.tk===activeTk)||STOCKS[0];
   const nm=corpName||stk.nm;
   // 고유번호 조회
-  let corpCode="";
-  try{
-    const cr=await fetch(`/api/dart/corpcode?nm=${encodeURIComponent(nm)}`);
-    const cd=await cr.json();
-    corpCode=cd.corp_code||"";
-  }catch(e){}
+  // 고유번호는 종목명별로 바뀌지 않으므로 캐시 — 30초 주기 갱신마다 다시 조회하지 않는다
+  const _cc = window._dartCorpCodeCache || (window._dartCorpCodeCache = {});
+  let corpCode=_cc[nm]||"";
+  if(!corpCode){
+    try{
+      const cr=await fetch(`/api/dart/corpcode?nm=${encodeURIComponent(nm)}`);
+      const cd=await cr.json();
+      corpCode=cd.corp_code||"";
+      if(corpCode) _cc[nm]=corpCode;
+    }catch(e){}
+  }
   // DART API 호출
   try{
     const params=new URLSearchParams({days:3});
@@ -9364,7 +9099,7 @@ async function analyzeDart(title, type, corp){
 ${title}
 
 공시 유형: ${type}
-→ 재료 분석 패널에서 결과를 확인하세요. (Phase 6-5)`);
+→ 재료 분석 패널에서 질문을 복사해 확인하세요. (Phase 6-5)`);
   }catch(e){console.error("analyzeDart:",e);}
 }
 
@@ -9482,23 +9217,13 @@ async function detectTechnique(cs, stk){
 // AI 종합분석 + Phase 8 체크리스트
 // ═══════════════════════════════
 let analysisRunning=false;
-let analysisCache={};
 var _tradeContext={};
 window._pendingSellReason='';
 async function runFullAnalysis(userInitiated){
   try{
-  const _cacheKey='analysis_'+activeTk+'_'+sim.idx;
-  const _cached=_getCachedAnalysis(_cacheKey);
-  if(_cached){const box=document.getElementById('aiAdvBox');if(box)box.innerHTML=_cached;finishProgress('캐시된 분석');return;}
   if(analysisRunning)return;
-  const cacheKey=activeTk+'_'+sim.idx;
-  if(analysisCache[cacheKey]&&Date.now()-analysisCache[cacheKey].ts<300000){
-    const p=analysisCache[cacheKey].result;
-    if(p){applyAnalysisResult(p);document.getElementById('analysisTk').textContent='캐시됨(5분)';}
-    return;
-  }
   analysisRunning=true;
-  showProgress('AI 종합 분석 중...', 5);
+  showProgress('종합 분석 중...', 5);
   const stk=STOCKS.find(s=>s.tk===activeTk)||STOCKS[0];
   const cs=getCandles(20);
   if(cs.length<5){analysisRunning=false;finishProgress('데이터 모으는 중');return;}
@@ -9510,49 +9235,35 @@ async function runFullAnalysis(userInitiated){
   document.getElementById("goNogoTag").textContent="-";
   document.getElementById("goNogoTag").style.cssText="font-size:9px;padding:1px 6px;border-radius:3px;font-weight:700;font-family:var(--mono);";
 
-  // Claude API 키 없으면 로컬 분석만.
-  // [1] 자동 호출(userInitiated 아님: 페이지 로드·종목전환)은 Claude를 부르지 않고
-  //     로컬 분석만 한다 → AI 호출은 사용자가 🔍분석 버튼을 누를 때로 미룬다.
-  const hasClaudeKey = !!(kisConfig.claudeKey && kisConfig.claudeKey.startsWith('sk-ant-'));
-  if(!hasClaudeKey || !userInitiated){
-    // 로컬 분석으로 대체
-    const tech=await detectTechnique(cs, stk);
-    const lc2=getCurrentCandle()||cs[cs.length-1];
-    const ep2=document.getElementById("entryPoint");
-    if(tech){
-      document.getElementById("techniqueTag").textContent=tech.technique;
-      document.getElementById("techniqueTag").style.color="var(--b)";
-      const rea=document.getElementById("techniqueReason");
-      if(rea)rea.textContent=tech.cond||'';
-      if(ep2) ep2.innerHTML=
-        `<span style="color:var(--r);font-weight:700;">📍 진입 ${fW(tech.entry||lc2.c)}원</span><br>`+
-        `<span style="color:var(--b);">✂ 손절 ${(tech.stop||Math.round(lc2.c*0.97)).toLocaleString()}원</span><br>`+
-        `<span style="color:var(--g);">🎯 목표 ${(tech.target||Math.round(lc2.c*1.06)).toLocaleString()}원</span><br>`+
-        `<span style="font-size:8px;color:var(--ts);">R/R 1:${tech.rr||2}</span><br>`+
-        `<span style="font-size:7px;color:var(--tm);">* Claude 키 설정 시 AI 심층분석</span>`;
-      const goEl=document.getElementById("goNogoTag");
-      if(goEl){goEl.textContent=tech.score>=3?'✅ 진입검토':'⚪ 관망';goEl.style.color=tech.score>=3?'var(--g)':'var(--ts)';}
-    } else {
-      if(ep2) ep2.innerHTML=
-        `<span style="color:var(--r);font-weight:700;">📍 진입 ${fW(lc2.c)}원</span><br>`+
-        `<span style="color:var(--b);">✂ 손절 ${Math.round(lc2.c*0.97).toLocaleString()}원</span><br>`+
-        `<span style="color:var(--g);">🎯 목표 ${Math.round(lc2.c*1.06).toLocaleString()}원</span><br>`+
-        `<span style="font-size:8px;color:var(--ts);">R/R 1:2 (기본값)</span><br>`+
-        `<span style="font-size:7px;color:var(--tm);">* 봉 데이터 축적 중</span>`;
-    }
-    analysisRunning=false;
-    finishProgress('로컬 분석 완료');
-    return;
-  }
-
-  // 1. 로컬 기법 감지
+  // 로컬 분석만 수행한다(LLM 호출 없음). 🔍분석 버튼(userInitiated)일 때만 질문 복사 창을 추가로 띄운다.
   const tech=await detectTechnique(cs, stk);
+  const lc2=getCurrentCandle()||cs[cs.length-1];
+  const ep2=document.getElementById("entryPoint");
   if(tech){
     document.getElementById("techniqueTag").textContent=tech.technique;
     document.getElementById("techniqueTag").style.color="var(--b)";
+    const rea=document.getElementById("techniqueReason");
+    if(rea)rea.textContent=tech.cond||'';
+    if(ep2) ep2.innerHTML=
+      `<span style="color:var(--r);font-weight:700;">📍 진입 ${fW(tech.entry||lc2.c)}원</span><br>`+
+      `<span style="color:var(--b);">✂ 손절 ${(tech.stop||Math.round(lc2.c*0.97)).toLocaleString()}원</span><br>`+
+      `<span style="color:var(--g);">🎯 목표 ${(tech.target||Math.round(lc2.c*1.06)).toLocaleString()}원</span><br>`+
+      `<span style="font-size:8px;color:var(--ts);">R/R 1:${tech.rr||2}</span>`;
+    const goEl=document.getElementById("goNogoTag");
+    if(goEl){goEl.textContent=tech.score>=3?'✅ 진입검토':'⚪ 관망';goEl.style.color=tech.score>=3?'var(--g)':'var(--ts)';}
+  } else {
+    if(ep2) ep2.innerHTML=
+      `<span style="color:var(--r);font-weight:700;">📍 진입 ${fW(lc2.c)}원</span><br>`+
+      `<span style="color:var(--b);">✂ 손절 ${Math.round(lc2.c*0.97).toLocaleString()}원</span><br>`+
+      `<span style="color:var(--g);">🎯 목표 ${Math.round(lc2.c*1.06).toLocaleString()}원</span><br>`+
+      `<span style="font-size:8px;color:var(--ts);">R/R 1:2 (기본값)</span><br>`+
+      `<span style="font-size:7px;color:var(--tm);">* 봉 데이터 축적 중</span>`;
   }
+  analysisRunning=false;
+  finishProgress('로컬 분석 완료');
+  if(!userInitiated) return;
 
-  // 2. Claude API로 종합 분석
+  // 🔍분석 버튼: 로컬 지표·성과를 담은 질문을 만들어 복사하도록 보여준다
   const cls=cs.map(c=>c.c), vls=cs.map(c=>c.v);
   const ma5=calcMA(cls,5), ma20=calcMA(cls,20), ma60=calcMA(cls,60);
   const rsi=(calcRSI(cls,14).slice(-1)[0]||50).toFixed(1);
@@ -9593,150 +9304,9 @@ ${_learnCtx||'없음'}
 - 최근 학습에서 경고/실수 있는 종목 → 신중 진입
 - 전체 성과 점수 30 미만 → 모든 진입 기준 상향
 
-Phase 8 STEP 0~7 간략 점검 결과를 JSON으로 답해:
-{
-  "technique": "매매기법명",
-  "techniqueReason": "이 기법을 선택한 이유 1문장",
-  "entry": 진입가숫자,
-  "stop": 손절가숫자,
-  "target1": 1차목표가숫자,
-  "target2": 2차목표가숫자,
-  "rr": RR비율숫자,
-  "entryTiming": "진입 타이밍 설명",
-  "phase8": {
-    "step0_psych": "심리상태: 정상/주의",
-    "step1_market": "시장환경: 우호/중립/비우호",
-    "step2_sector": "섹터: 강/보통/약",
-    "step3_screen": "스크리닝: 통과/주의/실패",
-    "step4_chart": "차트: 진입가능/주의/불가",
-    "step5_supply": "수급: 강/보통/약",
-    "step6_rr": "R/R: 충족/미달",
-    "step7_final": "최종: GO/NO-GO"
-  },
-  "goNogo": "GO" or "NO-GO",
-  "goScore": 0~8,
-  "positionAdj": "비중조절 이유 (성과 기반)",
-  "caution": "주의사항"
-}`;
-
-  try{
-    const data=await callClaude({model:"claude-sonnet-4-5",max_tokens:700,messages:[{role:"user",content:prompt}]},"Phase8 종합분석");
-    const raw=data.content?.[0]?.text||"{}";
-    let p;try{const m=raw.match(/\{[\s\S]*\}/);p=JSON.parse(m?m[0]:"{}"); }catch(e){p={};}
-
-    // 매매기법
-    if(p.technique){
-      document.getElementById("techniqueTag").textContent=p.technique;
-      document.getElementById("techniqueTag").style.color="var(--b)";
-      document.getElementById("techniqueReason").textContent=(p.techniqueReason||"")+(p.phase8?.step4_chart?` · ${p.phase8.step4_chart}`:"");
-    }
-
-    // 타점
-    if(p.entry){
-      const rrStr=p.rr?` (R/R 1:${p.rr})`:"";
-      document.getElementById("entryPoint").innerHTML=
-        `<span style="color:var(--b);font-weight:700;">진입 ${fW(p.entry)}원</span><br>`+
-        `<span style="color:var(--r);">✂ 손절 ${fW(p.stop)}원</span><br>`+
-        `<span style="color:var(--g);">🎯 1차 ${fW(p.target1)}원</span><br>`+
-        `<span style="color:var(--g);">🎯 2차 ${fW(p.target2)}원</span>`+
-        `<br><span style="font-size:8px;color:var(--ts);">${p.entryTiming||""}${rrStr}</span>`;
-      // 주문창에 자동 입력
-      document.getElementById("ofPr").value=p.entry;
-      document.getElementById("ofStop").value=p.stop;
-      document.getElementById("ofT1").value=p.target1;
-      document.getElementById("ofT2").value=p.target2;
-      updOSum();
-    }
-
-    // Phase 8 체크리스트
-    if(p.phase8){
-      const ph=p.phase8;
-      const checkIcon=v=>v&&(v.includes("우호")||v.includes("강")||v.includes("통과")||v.includes("GO")||v.includes("충족")||v.includes("정상"))?"✅":v&&(v.includes("비우호")||v.includes("약")||v.includes("실패")||v.includes("NO")||v.includes("미달"))?"❌":"🟡";
-      document.getElementById("phase8Check").innerHTML=
-        `${checkIcon(ph.step0_psych)} STEP0 ${ph.step0_psych||"-"}<br>`+
-        `${checkIcon(ph.step1_market)} STEP1 ${ph.step1_market||"-"}<br>`+
-        `${checkIcon(ph.step2_sector)} STEP2 ${ph.step2_sector||"-"}<br>`+
-        `${checkIcon(ph.step3_screen)} STEP3 ${ph.step3_screen||"-"}<br>`+
-        `${checkIcon(ph.step4_chart)} STEP4 ${ph.step4_chart||"-"}<br>`+
-        `${checkIcon(ph.step5_supply)} STEP5 ${ph.step5_supply||"-"}<br>`+
-        `${checkIcon(ph.step6_rr)} STEP6 ${ph.step6_rr||"-"}<br>`+
-        `${checkIcon(ph.step7_final)} STEP7 ${ph.step7_final||"-"}`;
-    }
-
-    // GO/NO-GO 태그
-    const isGo=p.goNogo==="GO";
-    const tag=document.getElementById("goNogoTag");
-    tag.textContent=isGo?`✅ GO (${p.goScore||0}/8)`:p.goNogo?`❌ NO-GO (${p.goScore||0}/8)`:`🟡 (${p.goScore||0}/8)`;
-    tag.style.background=isGo?"rgba(5,192,114,.15)":"rgba(240,62,62,.15)";
-    tag.style.color=isGo?"var(--g)":"var(--r)";
-
-    // AI 결정 로그
-    addDecisionLog(
-      `[${stk.nm}] ${p.technique||"분석"} → ${p.goNogo||"분석중"}`,
-      `진입 ${fW(p.entry)} / 손절 ${fW(p.stop)} / 목표 ${fW(p.target1)} · ${p.phase8?.step7_final||""}`,
-      `Phase ${TECHNIQUES[p.technique]?.phase||"10"} · Phase 8`
-    );
-
-    // 캐시 저장 + 매매 컨텍스트
-    if(p){
-      analysisCache[activeTk+'_'+sim.idx]={ts:Date.now(),result:p};
-      _tradeContext[activeTk]={technique:p.technique||'',reason:p.techniqueReason||'',entryTiming:p.entryTiming||'',goScore:p.goScore||0,phase8:p.phase8||{},ts:Date.now()};
-    }
-    // 채팅에도 알림
-    if(p.goNogo){
-      addMsg("ai",
-        `📊 AI 종합분석 완료: ${stk.nm}
-
-`+
-        `매매기법: ${p.technique||"-"} (${TECHNIQUES[p.technique]?.phase||""})
-`+
-        `${p.techniqueReason||""}
-
-`+
-        `진입가: ${fW(p.entry)}원
-`+
-        `손절가: ${fW(p.stop)}원
-`+
-        `1차목표: ${fW(p.target1)}원
-`+
-        `2차목표: ${fW(p.target2)}원
-`+
-        `R/R: 1:${p.rr||"-"}
-
-`+
-        `Phase 8 점수: ${p.goScore||0}/8 → ${p.goNogo}
-`+
-        `${p.caution?"⚠ "+p.caution:""}`
-      );
-    }
-  }catch(e){
-    document.getElementById("techniqueTag").textContent=tech?.technique||"분석실패";
-    document.getElementById("entryPoint").textContent="API 오류";
-    document.getElementById("phase8Check").textContent="API 오류";
-    failProgress('분석 실패: '+e.message);
-    analysisRunning=false;
-    return;
-  }
-  analysisRunning=false;
-  finishProgress('AI 분석 완료');
-  }catch(e){failProgress("AI 분석 실패");console.error("runFullAnalysis:",e);}
-}
-function applyAnalysisResult(p){
-  if(!p)return;
-  if(p.technique){
-    const el=document.getElementById('techniqueTag');
-    if(el){el.textContent=p.technique;el.style.color='var(--b)';}
-    const re=document.getElementById('techniqueReason');
-    if(re)re.textContent=p.techniqueReason||'';
-  }
-  if(p.entry){
-    const ep=document.getElementById('entryPoint');
-    if(ep)ep.innerHTML='<span style="color:var(--b);font-weight:700;">진입 '+fW(p.entry)+'원</span><br><span style="color:var(--r);">✂ 손절 '+fW(p.stop)+'원</span><br><span style="color:var(--g);">🎯 1차 '+fW(p.target1)+' | 2차 '+fW(p.target2)+'원</span><br><span style="font-size:8px;color:var(--ts);">R/R 1:'+(p.rr||'-')+'</span>';
-  }
-  const tag=document.getElementById('goNogoTag');
-  if(tag&&p.goNogo){const isGo=p.goNogo==='GO';tag.textContent=isGo?'✅ GO ('+(p.goScore||0)+'/8)':'❌ NO-GO ('+(p.goScore||0)+'/8)';tag.style.background=isGo?'rgba(5,192,114,.15)':'rgba(240,62,62,.15)';tag.style.color=isGo?'var(--g)':'var(--r)';}
-  const p8=document.getElementById('phase8Check');
-  if(p8&&p.checkList)p8.innerHTML=p.checkList;
+위 데이터를 바탕으로 진입 가능 여부(GO/NO-GO), 진입가·손절가·1·2차 목표가, 근거를 간단히 알려줘.`;
+  copyAsk('종합 분석 질문', prompt);
+  }catch(e){analysisRunning=false;failProgress("분석 실패");console.error("runFullAnalysis:",e);}
 }
 
 // ═══════════════════════════════
@@ -9791,130 +9361,10 @@ const MATERIAL_GRADES = {
   C:"소문/SNS — 수분~수시간. 진입금지"
 };
 
-async function runAISectorAnalysis(){
-  const el=document.getElementById("aiSectorResult");
-  el.innerHTML='<span style="color:var(--tm);font-style:italic;">AI 분석 중...</span>';
-  // ★ 미래 참조 금지: getDashData(당일 최종점수) 대신 현재 봉까지의 데이터 사용
-  const cs = getCandles(2);
-  const cls = cs.map(c=>c.c);
-  const curRSI = (calcRSI(cls,14).slice(-1)[0]||50).toFixed(0);
-  const curVol = cs.length>=2?(cs[cs.length-1].v/cs[cs.length-2].v).toFixed(1):'1.0';
-  const lc = cs[cs.length-1]||{};
-  const marketCtx = `현재시각 ${lc.t||'--'} | RSI ${curRSI} | 거래량비율 ${curVol}배 | 종가 ${fW(lc.c)}원`;
-  const prompt=`단타 트레이딩 멘토. 오늘 섹터 분석을 해줘. (Phase 6-1,6-4 기준)
-
-시장: ${marketCtx}
-현재 종목: ${STOCKS.find(s=>s.tk===activeTk)?.nm||activeTk}
-
-아래 섹터들 중 오늘 집중해야 할 섹터를 분석해줘:
-- 반도체/AI (삼성전자, SK하이닉스)
-- 2차전지 (LG에너지솔루션)
-- 바이오 (삼성바이오, 셀트리온)
-- 인터넷 (NAVER, 카카오)
-- 자동차 (현대차)
-
-각 섹터에 대해:
-1. 오늘 투자 강도: 🟢강함/🟡보통/🔴약함
-2. 재료강도: S/A/B/C
-3. 한줄 이유
-
-JSON 형식으로만 답해 (다른 텍스트 없이):
-{"sectors":[{"name":"섹터명","grade":"🟢","material":"A","reason":"이유"},...], "topSector":"최우선섹터명", "caution":"오늘 주의사항"}`;
-  try{
-    const res=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-5",max_tokens:500,messages:[{role:"user",content:prompt}]})});
-    const data=await res.json();
-    const raw=data.content?.[0]?.text||"{}";
-    let p;try{const m=raw.match(/\{[\s\S]*\}/);p=JSON.parse(m?m[0]:"{}");}catch(e){p={};}
-    if(p.sectors){
-      const html=p.sectors.map(s=>`<div style="padding:3px 0;border-bottom:1px solid var(--br);display:flex;align-items:center;gap:5px;">
-        <span>${s.grade}</span>
-        <span style="font-weight:600;font-size:10px;flex:1;">${s.name}</span>
-        <span style="font-family:var(--mono);font-size:9px;padding:1px 4px;border-radius:3px;background:${s.material==="S"||s.material==="A"?"rgba(49,130,246,.1)":"rgba(0,0,0,.05)"};">${s.material}급</span>
-      </div>`).join("")+
-      (p.topSector?`<div style="margin-top:5px;padding:4px 6px;background:rgba(124,58,237,.08);border-radius:6px;font-size:9px;color:var(--p);font-weight:700;">⭐ 오늘 핵심: ${p.topSector}</div>`:"")+
-      (p.caution?`<div style="margin-top:3px;font-size:9px;color:var(--r);">⚠ ${p.caution}</div>`:"");
-      el.innerHTML=html;
-    } else el.innerHTML=raw.slice(0,200);
-  }catch(e){el.innerHTML='<span style="color:var(--r);">API 오류</span>';}
-}
-
-async function runAIStockScreening(){
-  const el=document.getElementById("aiScreenResult");
-  el.innerHTML='<span style="color:var(--tm);font-style:italic;">스크리닝 중...</span>';
-  // Phase 7-7: 4가지 필터 로컬 계산
-  const results=[];
-  STOCKS.forEach(stk=>{
-    let score=0,tags=[];
-    const chgPct=(stk.pr-stk.base)/stk.base*100;
-    // 실제 기술적 분석 기반 스크리닝 (가짜 random 없음)
-    const cs2=getCandles(20);
-    if(cs2.length>=5){
-      const cls2=cs2.map(c=>c.c),vls2=cs2.map(c=>c.v);
-      const lc2=cs2[cs2.length-1],pc2=cs2[cs2.length-2]||lc2;
-      const ma5_2=(calcMA(cls2,5).slice(-1)[0]||0);
-      const ma20_2=(calcMA(cls2,20).slice(-1)[0]||0);
-      const rsi2=parseFloat((calcRSI(cls2,14).slice(-1)[0]||50).toFixed(0));
-      const volR2=vls2.length>=2?vls2[vls2.length-1]/vls2[vls2.length-2]:1;
-      // 실제 지표 기반 점수
-      if(volR2>=1.5){score+=3;tags.push(`거래량×${volR2.toFixed(1)}`);}
-      if(ma5_2>ma20_2){score+=2;tags.push("MA정배열");}
-      if(rsi2>=45&&rsi2<=70){score+=2;tags.push(`RSI${rsi2}`);}
-      if(lc2.c>lc2.o&&pc2.c<pc2.o){score+=2;tags.push("음→양전환");}
-      if(chgPct>=1){score+=2;tags.push(`+${chgPct.toFixed(1)}%`);}
-    }
-    if(score>=4)results.push({stk,score,tags});
-  });
-  results.sort((a,b)=>b.score-a.score);
-  const top3=results.slice(0,3);
-  if(!top3.length){el.innerHTML="현재 조건 충족 종목 없음";return;}
-  // AI 심화 분석
-  const prompt=`단타 트레이딩 멘토. Phase 7-7 스크리닝 기준으로 아래 후보 종목을 분석해줘.
-
-후보 종목:
-${top3.map(r=>`- ${r.stk.nm}(${r.stk.tk}): 점수${r.score}/10, 신호:${r.tags.join(",")}, 등락${((r.stk.pr-r.stk.base)/r.stk.base*100).toFixed(2)}%`).join("\n")}
-
-각 종목에 대해:
-1. 단타 적합도: ○(적합)/△(보통)/✗(부적합)
-2. 재료강도: S/A/B/C
-3. 손절 기준 (진입가 기준 %)
-4. 한줄 이유
-
-JSON만 답해:
-{"stocks":[{"name":"종목명","fit":"○","material":"A","stop":"3%","reason":"이유"},...], "bestPick":"최우선종목명"}`;
-  try{
-    const res=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-5",max_tokens:400,messages:[{role:"user",content:prompt}]})});
-    const data=await res.json();
-    const raw=data.content?.[0]?.text||"{}";
-    let p;try{const m=raw.match(/\{[\s\S]*\}/);p=JSON.parse(m?m[0]:"{}");}catch(e){p={};}
-    if(p.stocks){
-      const html=p.stocks.map((s,i)=>`<div style="padding:4px 0;border-bottom:1px solid var(--br);" onclick="selectStk('${top3[i]?.stk?.tk||"005930"}')">
-        <div style="display:flex;align-items:center;gap:4px;">
-          <span style="font-size:13px;">${s.fit==="○"?"🟢":s.fit==="△"?"🟡":"🔴"}</span>
-          <span style="font-weight:700;font-size:10px;flex:1;cursor:pointer;color:var(--b);">${s.name}</span>
-          <span style="font-family:var(--mono);font-size:9px;">${s.material}급</span>
-        </div>
-        <div style="font-size:9px;color:var(--ts);margin-top:1px;">손절 -${s.stop} · ${s.reason}</div>
-      </div>`).join("")+
-      (p.bestPick?`<div style="margin-top:5px;padding:4px 6px;background:rgba(49,130,246,.08);border-radius:6px;font-size:9px;font-weight:700;color:var(--b);">⭐ 최우선: ${p.bestPick}</div>`:"");
-      el.innerHTML=html;
-    // AI 스크리닝 결과를 '오늘 후보' 목록에 자동 반영
-    if(p.bestPick&&top3.length){
-      const bestStk=top3.find(r=>r.stk.nm===p.bestPick)||top3[0];
-      if(bestStk&&!CANDS.find(c=>c.tk===bestStk.stk.tk)){
-        CANDS.unshift({tk:bestStk.stk.tk,why:`AI스크리닝 최우선 (${bestStk.score}/10)`});
-        if(CANDS.length>3)CANDS.pop();
-        renderCands();
-      }
-    }
-    } else el.innerHTML=raw.slice(0,200);
-  }catch(e){el.innerHTML='<span style="color:var(--r);">API 오류</span>';}
-}
-
 async function runMaterialAnalysis(){
   const text=document.getElementById("materialInput").value.trim();
   const el=document.getElementById("materialResult");
   if(!text){showAlert("입력 필요","뉴스나 공시 내용을 입력해주세요.");return;}
-  el.innerHTML='<span style="color:var(--tm);font-style:italic;">분석 중...</span>';
   const prompt=`단타 트레이딩 멘토. 아래 뉴스/공시의 재료 강도를 Phase 6-1 기준으로 판별해줘.
 
 내용: ${text}
@@ -9925,23 +9375,12 @@ A급: 실적/계약/정책 — 1~5일
 B급: 테마/이슈 — 수시간~수일
 C급: 소문/SNS — 진입금지
 
-JSON만 답해:
-{"grade":"A","duration":"1~3일","action":"눌림목 진입 검토","reason":"이유 1문장","warning":"주의사항"}`;
-  try{
-    const res=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-5",max_tokens:250,messages:[{role:"user",content:prompt}]})});
-    const data=await res.json();
-    const raw=data.content?.[0]?.text||"{}";
-    let p;try{const m=raw.match(/\{[\s\S]*\}/);p=JSON.parse(m?m[0]:"{}");}catch(e){p={};}
-    const gc={"S":"var(--p)","A":"var(--b)","B":"var(--a)","C":"var(--r)"}[p.grade]||"var(--ts)";
-    el.innerHTML=`<div style="padding:5px 7px;background:rgba(0,0,0,.04);border-radius:7px;border-left:3px solid ${gc};">
-      <div style="font-size:14px;font-weight:800;color:${gc};">${p.grade||"?"}급 재료</div>
-      <div style="font-size:9px;color:var(--ts);margin-top:2px;">${MATERIAL_GRADES[p.grade]||""}</div>
-      <div style="font-size:10px;margin-top:4px;"><b>지속:</b> ${p.duration||"-"}</div>
-      <div style="font-size:10px;"><b>전략:</b> ${p.action||"-"}</div>
-      <div style="font-size:9px;color:var(--ts);margin-top:2px;">${p.reason||""}</div>
-      ${p.warning?`<div style="font-size:9px;color:var(--r);margin-top:2px;">⚠ ${p.warning}</div>`:""}
-    </div>`;
-  }catch(e){el.innerHTML='<span style="color:var(--r);">API 오류</span>';}
+답변 형식: 등급(S/A/B/C), 지속 기간, 대응 전략, 이유 1문장, 주의사항.`;
+  copyAskInline(el,'재료 강도 질문 복사','재료 강도 질문',prompt);
+  const ref=document.createElement('div');
+  ref.style.cssText='font-size:9px;color:var(--ts);margin-top:4px;line-height:1.5;';
+  ref.innerHTML=Object.keys(MATERIAL_GRADES).map(function(k){return k+'급 '+MATERIAL_GRADES[k];}).join('<br>');
+  el.appendChild(ref);
 }
 
 async function updateAIAdvisor(){
@@ -10028,179 +9467,6 @@ function updAdvBoxes(now,action){
 // ═══════════════════════════════
 
 // ═══════════════════════════════
-// API 사용량 추적
-// ═══════════════════════════════
-const CLAUDE_IN_PRICE = 3.0 / 1_000_000;   // $3 per 1M input tokens
-const CLAUDE_OUT_PRICE = 15.0 / 1_000_000;  // $15 per 1M output tokens
-
-let apiUsage = (()=>{try{return JSON.parse(localStorage.getItem('apiUsage') || JSON.stringify({
-  today: {date:'', calls:0, inTokens:0, outTokens:0, cost:0, breakdown:{}},
-  total: {calls:0, inTokens:0, outTokens:0, cost:0}
-}))}catch(e){return {today:{date:"",calls:0,inTokens:0,outTokens:0,cost:0},total:{calls:0,inTokens:0,outTokens:0,cost:0}};}})();
-
-function ensureToday(){
-  const today = new Date().toISOString().slice(0,10);
-  if(apiUsage.today.date !== today){
-    apiUsage.today = {date:today, calls:0, inTokens:0, outTokens:0, cost:0, breakdown:{}};
-    saveUsage();
-  }
-}
-function saveUsage(){localStorage.setItem('apiUsage', JSON.stringify(apiUsage));}
-
-function trackApiCall(feature, inTokens, outTokens){
-  ensureToday();
-  const cost = inTokens * CLAUDE_IN_PRICE + outTokens * CLAUDE_OUT_PRICE;
-  // 오늘
-  apiUsage.today.calls++;
-  apiUsage.today.inTokens += inTokens;
-  apiUsage.today.outTokens += outTokens;
-  apiUsage.today.cost += cost;
-  if(!apiUsage.today.breakdown[feature]) apiUsage.today.breakdown[feature] = 0;
-  apiUsage.today.breakdown[feature]++;
-  // 누적
-  apiUsage.total.calls++;
-  apiUsage.total.inTokens += inTokens;
-  apiUsage.total.outTokens += outTokens;
-  apiUsage.total.cost += cost;
-  saveUsage();
-  updateUsageUI();
-}
-
-function updateUsageUI(){
-  ensureToday();
-  const t = apiUsage.today;
-  const total = apiUsage.total;
-  // 설정창 API 탭
-  const f = id => document.getElementById(id);
-  if(f('apiCallCount')) f('apiCallCount').textContent = t.calls + '회';
-  if(f('apiInTokens')) f('apiInTokens').textContent = t.inTokens.toLocaleString();
-  if(f('apiOutTokens')) f('apiOutTokens').textContent = t.outTokens.toLocaleString();
-  if(f('apiCost')) f('apiCost').textContent = '$' + t.cost.toFixed(4);
-  // 사용량 탭
-  if(f('u_calls')) f('u_calls').textContent = t.calls;
-  if(f('u_tokens')) f('u_tokens').textContent = (t.inTokens + t.outTokens).toLocaleString();
-  if(f('u_cost')) f('u_cost').textContent = '$' + t.cost.toFixed(4);
-  if(f('u_total_calls')) f('u_total_calls').textContent = total.calls + '회';
-  if(f('u_total_in')) f('u_total_in').textContent = total.inTokens.toLocaleString();
-  if(f('u_total_out')) f('u_total_out').textContent = total.outTokens.toLocaleString();
-  if(f('u_total_cost')) f('u_total_cost').textContent = '$' + total.cost.toFixed(4);
-  // 기능별
-  const bd = f('u_breakdown');
-  if(bd && t.breakdown){
-    bd.innerHTML = Object.entries(t.breakdown).sort((a,b)=>b[1]-a[1]).map(([k,v])=>
-      `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--br);">
-        <span style="color:var(--ts);">${k}</span>
-        <span style="font-family:var(--mono);font-weight:700;">${v}회</span>
-      </div>`
-    ).join('') || '<span style="color:var(--tm);">호출 없음</span>';
-  }
-}
-function resetUsage(){
-  if(!confirm('사용량 통계를 초기화하시겠습니까?')) return;
-  apiUsage = {
-    today:{date:'',calls:0,inTokens:0,outTokens:0,cost:0,breakdown:{}},
-    total:{calls:0,inTokens:0,outTokens:0,cost:0}
-  };
-  saveUsage(); updateUsageUI();
-}
-
-// Claude API 래퍼 — 모든 fetch("/api/claude") 호출을 이것으로 교체
-async function callClaude(payload, feature, opts){
-  feature = feature || 'AI 기타';
-  // [1] silent=자동/백그라운드 호출(페이지 로드·종목전환·연습모드 봉넘김 등).
-  //     이 경우 키가 없거나 401이어도 빨간 경고 띠를 띄우지 않고 조용히 폴백한다.
-  //     실제 사용자가 AI 기능(상담/회의/조언/🔍분석 등)을 쓸 때만 경고를 띄운다.
-  const silent = !!(opts && opts.silent);
-  const res = await fetch("/api/claude", {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body: JSON.stringify(payload)
-  });
-  const data = await res.json();
-  // API 키 만료/오류 감지 — AI 기능을 "실제로 사용할 때"만 (silent=false)
-  if(!silent){
-    if(data.error){ checkApiKeyExpiry(JSON.stringify(data.error)); }
-    if(res.status === 401 || res.status === 403){ checkApiKeyExpiry('401 Unauthorized'); }
-  }
-  const usage = data.usage || {};
-  const inTok = usage.input_tokens || estimateTokens(JSON.stringify(payload));
-  const outTok = usage.output_tokens || estimateTokens(data.content?.[0]?.text || '');
-  trackApiCall(feature, inTok, outTok);
-  return data;
-}
-// ── Claude 스트리밍 호출(요구 1: 말풍선 잘림 해결) ──
-//  /api/claude/stream(SSE) 을 읽어 텍스트 델타를 누적하고, onText(누적텍스트)로 점진 렌더.
-//  반환: {text, stop_reason}. stop_reason==='max_tokens'면 호출측에서 이어쓰기 한다.
-async function callClaudeStream(payload, feature, onText){
-  feature = feature || 'AI 기타';
-  let full='', stopReason=null, errored=null;
-  const usage={ input_tokens:0, output_tokens:0 };
-  let res;
-  try{
-    res = await fetch('/api/claude/stream',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
-  }catch(e){ throw new Error('스트리밍 연결 실패: '+e.message); }
-  if(!res.body){ // 스트림 미지원 폴백 — 일반 호출
-    const d = await callClaude(payload, feature);
-    const t=(d.content&&d.content[0]&&d.content[0].text)||(d.error?('⚠ '+(d.error.message||'')):'');
-    if(onText) onText(t);
-    return { text:t, stop_reason:(d.stop_reason||null) };
-  }
-  const reader=res.body.getReader(); const dec=new TextDecoder(); let buf='';
-  while(true){
-    const { done, value } = await reader.read();
-    if(done) break;
-    buf += dec.decode(value,{stream:true});
-    let idx;
-    while((idx=buf.indexOf('\n\n'))>=0){
-      const chunk=buf.slice(0,idx); buf=buf.slice(idx+2);
-      let ev=null, dataStr='';
-      chunk.split('\n').forEach(line=>{
-        if(line.indexOf('event:')===0) ev=line.slice(6).trim();
-        else if(line.indexOf('data:')===0) dataStr += line.slice(5).trim();
-      });
-      if(!dataStr) continue;
-      let d; try{ d=JSON.parse(dataStr); }catch(e){ continue; }
-      const t=d.type||ev;
-      if(t==='content_block_delta' && d.delta && d.delta.type==='text_delta' && d.delta.text){
-        full += d.delta.text; if(onText) onText(full);
-      }else if(t==='message_start' && d.message && d.message.usage){
-        usage.input_tokens=d.message.usage.input_tokens||0;
-      }else if(t==='message_delta'){
-        if(d.usage && d.usage.output_tokens!=null) usage.output_tokens=d.usage.output_tokens;
-        if(d.delta && d.delta.stop_reason) stopReason=d.delta.stop_reason;
-      }else if(t==='error'){
-        errored=(d.error && (d.error.message||d.error))||'스트리밍 오류';
-      }
-    }
-  }
-  if(errored && !full) throw new Error(errored);
-  trackApiCall(feature, usage.input_tokens||estimateTokens(JSON.stringify(payload)), usage.output_tokens||estimateTokens(full));
-  return { text:full, stop_reason:stopReason };
-}
-// 잘림 없이 끝까지 — max_tokens로 끊기면 자동 이어쓰기(최대 2회). onText는 누적 전체를 받는다.
-async function consComplete(payload, feature, onText){
-  let acc='';
-  const p=JSON.parse(JSON.stringify(payload));
-  for(let i=0;i<3;i++){
-    const r=await callClaudeStream(p, feature, cur=>{ if(onText) onText(acc+cur); });
-    acc += r.text;
-    if(onText) onText(acc);
-    if(r.stop_reason!=='max_tokens') break;
-    p.messages = (p.messages||[]).concat([
-      { role:'assistant', content:r.text },
-      { role:'user', content:'끊긴 부분에서 이어서 계속 써줘. 앞 내용을 반복하지 말고 이어서만.' }
-    ]);
-  }
-  return acc;
-}
-function estimateTokens(text){
-  // 토큰 수 추정 (응답에 usage 없을 때): 영문 4자/토큰, 한글 2자/토큰
-  const korean = (text.match(/[가-힣]/g)||[]).length;
-  const other = text.length - korean;
-  return Math.round(korean / 2 + other / 4);
-}
-
-// ═══════════════════════════════
 // KIS API 설정 저장/로드
 // ═══════════════════════════════
 // ── API 설정 (localStorage 영구 저장) ──
@@ -10241,7 +9507,6 @@ async function saveKisConfig(){
   const as = document.getElementById('kis-appsecret')?.value?.trim() || '';
   const ac = document.getElementById('kis-account')?.value?.trim() || '';
   const dk = document.getElementById('dart-key')?.value?.trim() || '';
-  const ck = document.getElementById('claude-apikey')?.value?.trim() || '';
   const nt = document.getElementById('notion-token')?.value?.trim() || '';
   const np = document.getElementById('notion-page-id')?.value?.trim() || '';
   const mode = document.getElementById('kis-real')?.checked ? 'real' : 'mock';
@@ -10250,7 +9515,7 @@ async function saveKisConfig(){
       document.getElementById('kis-mock').checked = true; return;
     }
   }
-  kisConfig = { appKey:ak, appSecret:as, account:ac, mode, dartKey:dk, claudeKey:ck };
+  kisConfig = { appKey:ak, appSecret:as, account:ac, mode, dartKey:dk };
   // localStorage 저장 (로컬 빠른 복원용)
   const serialized = JSON.stringify(kisConfig);
   localStorage.setItem(KIS_CFG_KEY, serialized);
@@ -10261,7 +9526,6 @@ async function saveKisConfig(){
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
-        claudeKey: ck,
         kisAppKey: ak,
         kisAppSecret: as,
         kisAccount: ac,
@@ -10327,14 +9591,13 @@ async function loadKisConfig(){
   try {
     const r = await fetch('/api/get-config');
     const d = await r.json();
-    if(d.ok && (d.kisAppKey || d.claudeKeyFull)) {
+    if(d.ok && d.kisAppKey) {
       kisConfig = {
         appKey: d.kisAppKey || kisConfig.appKey || '',
         appSecret: d.kisAppSecret || kisConfig.appSecret || '',
         account: d.kisAccount || kisConfig.account || '',
         mode: d.kisMode || kisConfig.mode || 'mock',
         dartKey: d.dartKey || kisConfig.dartKey || '',
-        claudeKey: d.claudeKeyFull || kisConfig.claudeKey || '',
       };
       // localStorage도 동기화
       localStorage.setItem(KIS_CFG_KEY, JSON.stringify(kisConfig));
@@ -10345,12 +9608,10 @@ async function loadKisConfig(){
   const ks=document.getElementById('kis-appsecret');
   const ka=document.getElementById('kis-account');
   const kd=document.getElementById('dart-key');
-  const kc=document.getElementById('claude-apikey');
   if(ki && kisConfig.appKey) ki.value=kisConfig.appKey;
   if(ks && kisConfig.appSecret) ks.value=kisConfig.appSecret;
   if(ka && kisConfig.account) ka.value=kisConfig.account;
   if(kd && kisConfig.dartKey) kd.value=kisConfig.dartKey;
-  if(kc && kisConfig.claudeKey) kc.value=kisConfig.claudeKey;
   // 노션 토큰/페이지 ID 입력란 채우기 + 상태 표시
   try{
     const r2 = await fetch('/api/get-config');
@@ -10554,7 +9815,6 @@ function sTab(el, id){
   document.querySelectorAll('.stb').forEach(b=>b.classList.remove('on'));
   document.getElementById(id).classList.add('on');
   if(id==='st-api') loadKisConfig();
-  if(id==='st-usage') updateUsageUI();
 }
 
 function buildSys(){
@@ -10689,7 +9949,7 @@ function _detectBrainDongInChat(text){
   return null;
 }
 
-async function sendChat(txt){
+function sendChat(txt){
   if(chatBusy)return;
   const inp=document.getElementById("aiIn");
   const msg=txt||inp.value.trim();if(!msg)return;
@@ -10704,14 +9964,10 @@ async function sendChat(txt){
     chatBusy=false;
     return;
   }
-  appendTyping();chatBusy=true;document.getElementById("sendBtn").disabled=true;
-  try{
-    const res=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-5",max_tokens:500,system:buildSys(),messages:chatHist.slice(-10)})});
-    const data=await res.json();removeTyping();
-    const rep=data.content?.[0]?.text||"응답 오류";
-    chatHist.push({role:"assistant",content:rep});addMsg("ai",rep);
-  }catch(e){removeTyping();addMsg("ai","⚠ API 오류. /api/claude 서버 확인 필요");}
-  chatBusy=false;document.getElementById("sendBtn").disabled=false;
+  // LLM을 호출하지 않는다: 현재 화면 상태와 대화를 복사해 claude.ai에 붙여넣도록 한다
+  const _hist=chatHist.slice(-10).map(m=>(m.role==='user'?'[나] ':'[답변] ')+m.content).join('\n');
+  copyAsk('멘토에게 질문','[현재 화면 상태]\n'+buildSys()+'\n\n[대화]\n'+_hist+'\n\n위 상태를 바탕으로 마지막 질문에 답해줘.');
+  addMsg("ai","📋 질문을 복사할 수 있게 열어 두었어요. claude.ai에 붙여넣어 답을 받아보세요. (이 앱은 AI 서버를 호출하지 않습니다)");
 }
 function qa(t){
   // BUG13 FIX: brp 패널의 마지막 탭 직접 지정
@@ -10728,7 +9984,7 @@ function addMsg(role,content){
     .replace(/(손절|경고|⚠|🚨)/g,"<span class='adv-tag warn'>$1</span>")
     .replace(/(Phase \d+[-\d]*)/g,"<span class='adv-tag pha'>$1</span>");
   const d=document.createElement("div");d.className="ai-msg"+(role==="me"?" me":"");
-  d.innerHTML=`<div class="ai-av ${role==="ai"?"ai":"me"}">${role==="ai"?"AI":"나"}</div><div><div class="ai-bub">${h}</div><div class="ai-meta">${role==="ai"?"Claude · ":"나 · "}${tm}</div></div>`;
+  d.innerHTML=`<div class="ai-av ${role==="ai"?"ai":"me"}">${role==="ai"?"AI":"나"}</div><div><div class="ai-bub">${h}</div><div class="ai-meta">${role==="ai"?"로컬 · ":"나 · "}${tm}</div></div>`;
   m&&m.appendChild(d);if(m)m.scrollTop=m.scrollHeight;
   // 영구 저장 (최근 100개)
   if(!window._chatMsgs) window._chatMsgs=[];
@@ -11128,7 +10384,7 @@ function renderStats(){
 // ═══════════════════════════════
 // JOURNAL
 // ═══════════════════════════════
-async function genJModal(){
+function genJModal(){
   const body=document.getElementById("jModalBody");
   const tt=mock.trades.filter(t=>t.date===sim.date);
   if(!tt.length){body.innerHTML="<div style='font-size:11px;color:var(--tm);'>오늘 거래 내역이 없습니다.</div>";return;}
@@ -11156,31 +10412,11 @@ async function genJModal(){
     trades: str,
   };
   saveJEntry(sim.date, baseEntry, pnl, wins, total, str);
-
-  body.innerHTML="<div style='font-size:11px;color:var(--tm);font-style:italic;'>AI 분석 중... (이미 저장됨)</div>";
-
-  try{
-    const res=await fetch("/api/claude",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-5",max_tokens:600,messages:[{role:"user",content:`당신은 20년 경력 단타 트레이딩 멘토입니다. Phase 0~12 강의 기준으로 아래 매매를 완전 분석하세요.
-
-[매매 데이터]
-${str}
-총손익: ${pnl>=0?"+":""}${pnl}원 | 승률: ${total?Math.round(wins/total*100):0}% | 매매횟수: ${total}회
-
-JSON만 출력 (다른 텍스트 없이):
-{"summary":"오늘 매매 한줄 총평","market_context":"오늘 시장 환경 평가(코스피/나스닥 방향 등)","why_bought":"진입 이유 분석 - Phase 8 STEP 기준 충족 여부","why_sold":"청산 이유 분석 - 손절/익절 원칙 준수 여부","mistakes":"가장 심각한 실수 2~3가지(구체적 수치와 함께)","psychology":"심리 상태 평가(FOMO/복수매매/조기익절 등 오류)","phase_check":"Phase 8 체크리스트 중 건너뛴 항목","improvement":"다음에 같은 상황에서 다르게 할 행동(구체적으로)","score_principle":8,"score_timing":7,"score_psychology":7,"score_total":7,"score_reason":"점수 이유"}`}]})});
-    const data=await res.json();
-    let p;try{const m=(data.content?.[0]?.text||"{}").match(/\{[\s\S]*\}/);p=JSON.parse(m?m[0]:"{}"); }catch(e){p={};}
-    p.aiGenerated=true; p.trades=str;
-    // ── 2. AI 성공 시 덮어쓰기 저장 ──
-    saveJEntry(sim.date,p,pnl,wins,total,str);
-    body.innerHTML=_renderJEntry({...p,date:sim.date,pnl,wins,total,tradeCount:tt.length});
-  }catch(e){
-    // ── 3. AI 실패해도 기본 저장은 이미 됨 ──
-    body.innerHTML=`<div class='jday'><div class='jd-hdr'><span class='jd-dt'>${sim.date}</span><span class='jd-pnl ${pnl>=0?"cu":"cd"}'>${pnl>=0?"+":""}${fW(pnl)}원</span></div>
-      <div class='jd-sub'>${tt.length}건 · 승률${total?Math.round(wins/total*100):0}%</div>
-      <div class='jd-note' style='color:var(--a);'>⚠ AI 분석 실패 — 기본 일지로 저장됨. Claude API 키 확인.</div>
-      <div style='font-size:10px;color:var(--ts);margin-top:6px;white-space:pre-wrap;'>${str}</div></div>`;
-  }
+  const prompt=`단타 트레이딩 멘토로서 오늘 매매일지를 평가해줘.\n\n[매매 데이터]\n${str}\n총손익: ${pnl>=0?"+":""}${pnl}원 | 승률: ${total?Math.round(wins/total*100):0}% | 매매횟수: ${total}회\n\n답변 형식: 한줄 총평, 진입 이유 평가, 청산 이유 평가, 잘한 점, 반성할 점, 심리 평가, 내일 개선 행동 1가지. 손익(결과)과 원칙 준수(과정)를 분리해서 평가해줘.`;
+  body.innerHTML=`<div class='jday'><div class='jd-hdr'><span class='jd-dt'>${sim.date}</span><span class='jd-pnl ${pnl>=0?"cu":"cd"}'>${pnl>=0?"+":""}${fW(pnl)}원</span></div>
+      <div class='jd-sub'>${tt.length}건 · 승률${total?Math.round(wins/total*100):0}% · 기본 일지로 저장됨</div>
+      <div style='font-size:10px;color:var(--ts);margin-top:6px;white-space:pre-wrap;'>${escH(str)}</div><div id='jCopyWrap' style='margin-top:8px;'></div></div>`;
+  copyAskInline(document.getElementById('jCopyWrap'),'일지 평가 질문 복사 (claude.ai)','일지 평가 질문',prompt);
 }
 
 function _renderJEntry(e){
@@ -11297,7 +10533,7 @@ function renderJPage(){
         ${e.bad&&e.bad!=='-'?`<div style="font-size:10px;margin-bottom:3px;border-left:3px solid var(--r);padding-left:6px;">🔴 ${e.bad}</div>`:""}
         ${e.psychology&&e.psychology!=='-'&&e.psychology!=='정상'?`<div style="font-size:10px;margin-bottom:3px;border-left:3px solid var(--a);padding-left:6px;">🧠 ${e.psychology}</div>`:""}
         ${e.mentor_comment&&e.mentor_comment!=='-'?`<div style="font-size:10px;margin-bottom:3px;border-left:3px solid var(--p);padding-left:6px;">🎯 ${e.mentor_comment}</div>`:""}
-        ${!e.aiGenerated&&!e.summary?`<div style="font-size:9px;color:var(--tm);font-style:italic;">AI 일지 미생성 — 상단 🤖 버튼으로 생성하세요</div>`:""}
+        ${!e.aiGenerated&&!e.summary?`<div style="font-size:9px;color:var(--tm);font-style:italic;">일지 미저장 — 상단 📓 버튼으로 저장하세요</div>`:""}
       </div>
       ${e.mistakes&&e.mistakes!=='-'?`<div class="jd-note err" style="font-size:10px;">🔴 ${e.mistakes}</div>`:""}
       ${e.improvement&&e.improvement!=='-'?`<div class="jd-note tip" style="font-size:10px;">💡 ${e.improvement}</div>`:""}
@@ -11492,12 +10728,8 @@ function renderJournalStats(){
 }
 
 // AI 기능 제안 — 매매일지·학습노트·통계 보고 새 기능/개선점 제안
-async function askAIForFeatureSuggestion(ev){
-  const btn = (ev && ev.target) || document.querySelector('button[onclick*="askAIForFeatureSuggestion"]');
-  const _restore = _btnBusy(btn, '🤖 분석 중...');
+function askAIForFeatureSuggestion(ev){
   const body = document.getElementById('jSuggestBody');
-  if(body) body.innerHTML = '<div style="color:var(--tm);">🤖 분석 중...</div>';
-  try{
   try{
     const s = _journalStatsData();
     const stage = (typeof getLearnerStage==='function') ? getLearnerStage() : null;
@@ -11519,48 +10751,19 @@ ${lastJournals || '없음'}
 【최근 학습 노트】
 ${learnSummary || '없음'}
 
-JSON만:
-{"suggestions":[
- {"title":"기능명 (5자내외)","why":"왜 필요한지 통계 근거 1줄","what":"무엇을 만들지 2~3줄","impact":"예상 성능 영향","priority":"높음/중간/낮음"},
- ...총 3개
-]}`;
-    const res = await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:600,messages:[{role:'user',content:prompt}]})});
-    const data = await res.json();
-    const txt = (data.content&&data.content[0]&&data.content[0].text)||'{}';
-    const ai = robustJsonParse(txt);
-    const sugs = ai.suggestions || [];
-    if(!sugs.length){ body.innerHTML = '<div style="color:var(--tm);">제안 없음</div>'; return; }
-    body.innerHTML = sugs.map((s,i)=>{
-      const pCol = s.priority==='높음'?'var(--r)':s.priority==='중간'?'var(--a)':'var(--tm)';
-      return `
-        <div style="background:var(--pan);border-radius:8px;padding:10px;margin-bottom:6px;border-left:4px solid ${pCol};">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
-            <div style="font-size:12px;font-weight:800;">${i+1}. ${s.title}</div>
-            <span style="font-size:9px;background:${pCol};color:#fff;padding:1px 6px;border-radius:3px;font-weight:700;">${s.priority}</span>
-          </div>
-          <div style="font-size:10px;color:var(--ts);margin-bottom:4px;">📊 ${s.why}</div>
-          <div style="font-size:10px;line-height:1.6;margin-bottom:4px;">🔧 ${s.what}</div>
-          <div style="font-size:10px;color:var(--g);font-weight:600;">📈 ${s.impact}</div>
-        </div>`;
-    }).join('');
-    // 메모리에 저장 (다음 빌드에 참고)
-    try{
-      const list = JSON.parse(localStorage.getItem('htsFeatureSuggestions')||'[]');
-      list.push({ts:Date.now(), suggestions:sugs});
-      if(list.length>30) list.shift();
-      saveToServer('htsFeatureSuggestions', JSON.stringify(list));
-    }catch(e){}
+답변 형식: 기능 3가지 각각 — 기능명(5자 내외), 필요한 이유(통계 근거 1줄), 만들 내용 2~3줄, 예상 성능 영향, 우선순위(높음/중간/낮음).`;
+    if(body) copyAskInline(body,'기능 제안 질문 다시 열기','기능 제안 질문',prompt);
+    copyAsk('기능 제안 질문',prompt);
   }catch(e){
     if(body) body.innerHTML = '<div style="color:var(--r);">실패: '+e.message+'</div>';
   }
-  }finally{ _restore(); }
 }
 
 async function genAllJournals(ev){
   const btn = (ev && ev.target) || document.querySelector('button[onclick="genAllJournals()"]');
   const _restore = _btnBusy(btn, '🤖 생성 중...');
   try{
-    // 매매가 있고 아직 aiGenerated 안 된 날짜만 작성
+    // 매매가 있고 아직 일지가 없는 날짜만 저장
     const bd={};
     (mock.trades||[]).forEach(t=>{ if(!bd[t.date]) bd[t.date]=[]; bd[t.date].push(t); });
     // 일지에 있는 날짜도 포함 (관망일지)
@@ -11568,8 +10771,8 @@ async function genAllJournals(ev){
     Object.keys(existing).forEach(d=>{ if(!bd[d]) bd[d]=[]; });
     const dates = Object.keys(bd).sort();
     if(!dates.length){ showAlert('일지 생성','매매 내역이 없습니다'); return; }
-    const todo = dates.filter(d => !(existing[d] && existing[d].aiGenerated) && (bd[d]||[]).length>0);
-    if(!todo.length){ showAlert('일지 생성','모든 거래일의 AI 일지가 이미 작성돼 있습니다.'); return; }
+    const todo = dates.filter(d => !existing[d] && (bd[d]||[]).length>0);
+    if(!todo.length){ showAlert('일지 생성','모든 거래일의 일지가 이미 저장돼 있습니다.'); return; }
     let toast = document.getElementById('genJToast');
     if(!toast){
       toast = document.createElement('div');
@@ -11578,18 +10781,18 @@ async function genAllJournals(ev){
       document.body.appendChild(toast);
     }
     let done = 0, fail = 0;
-    toast.innerHTML = `🤖 일지 작성 중 0 / ${todo.length}`;
+    toast.innerHTML = `📓 일지 저장 중 0 / ${todo.length}`;
     let _consecFail = 0;
     for(const date of todo){
       const _t0 = Date.now();
       let _timerId;
-      const _updateToast = ()=>{ toast.innerHTML = `🤖 ${date} 작성중 (${done+1}/${todo.length}) · ${Math.round((Date.now()-_t0)/1000)}초`; };
+      const _updateToast = ()=>{ toast.innerHTML = `📓 ${date} 저장 중 (${done+1}/${todo.length}) · ${Math.round((Date.now()-_t0)/1000)}초`; };
       _updateToast();
       _timerId = setInterval(_updateToast, 1000);
       try{
         await Promise.race([
           autoSaveJournalOnTrade(date),
-          new Promise((_, rej) => setTimeout(()=>rej(new Error('timeout 10s — Claude 한도/네트워크')), 10000)),
+          new Promise((_, rej) => setTimeout(()=>rej(new Error('timeout 10s')), 10000)),
         ]);
         done++;
         _consecFail = 0;
@@ -11602,7 +10805,7 @@ async function genAllJournals(ev){
         // 연속 3회 실패 → API 한도/네트워크 문제 → 중단
         if(_consecFail >= 3){
           clearInterval(_timerId);
-          toast.innerHTML = `❌ Claude API 응답 실패 3연속 — Anthropic 한도/네트워크 확인 필요. ${done}/${todo.length} 완료, 중단합니다.`;
+          toast.innerHTML = `❌ 일지 저장 3연속 실패. ${done}/${todo.length} 완료, 중단합니다.`;
           setTimeout(()=>{ try{toast.remove();}catch(_e){} }, 5000);
           renderJPage();
           return;
@@ -11917,7 +11120,7 @@ function openModal(id){
     // ★ 설정창 열릴 때 서버에서 API 키 자동 로드
     loadKisConfig();
   }
-  if(id==="journal"){const tt=mock.trades.filter(t=>t.date===sim.date);const pnl=tt.filter(t=>t.side==="sell").reduce((a,t)=>a+t.pnl,0);document.getElementById("jModalBody").innerHTML=tt.length?`<div style="font-size:11px;color:var(--ts);">${sim.date} 거래 ${tt.length}건 · 손익 ${pnl>=0?"+":""}${fW(pnl)}원</div><div style="font-size:10px;color:var(--tm);margin-top:5px;">AI 일지 생성 버튼을 눌러주세요.</div>`:"<div style='font-size:11px;color:var(--tm);'>오늘 거래가 없습니다.</div>";}
+  if(id==="journal"){const tt=mock.trades.filter(t=>t.date===sim.date);const pnl=tt.filter(t=>t.side==="sell").reduce((a,t)=>a+t.pnl,0);document.getElementById("jModalBody").innerHTML=tt.length?`<div style="font-size:11px;color:var(--ts);">${sim.date} 거래 ${tt.length}건 · 손익 ${pnl>=0?"+":""}${fW(pnl)}원</div><div style="font-size:10px;color:var(--tm);margin-top:5px;">아래 📋 일지 평가 질문 복사 버튼을 누르면 기본 일지를 저장하고 평가 질문을 만들어요.</div>`:"<div style='font-size:11px;color:var(--tm);'>오늘 거래가 없습니다.</div>";}
 }
 function closeModal(id){document.getElementById("modal-"+id).classList.remove("show");}
 function showAlert(t,m){document.getElementById("alertTtl").textContent=t;document.getElementById("alertMsg").textContent=m;openModal("alert");}
@@ -11990,7 +11193,7 @@ function closeChartCtx(){
   const m = document.getElementById('chartCtxMenu');
   if(m) m.style.display='none';
 }
-async function ctxAskAI(type){
+function ctxAskAI(type){
   closeChartCtx();
   const c = _ctxCandle;
   const stk = STOCKS.find(s=>s.tk===activeTk)||STOCKS[0];
@@ -12008,7 +11211,6 @@ async function ctxAskAI(type){
     popup.style.transform='translate(-50%,-50%)';
   }
   if(title) title.textContent = type==='buy'?'🟢 매수 판단':type==='sell'?'🔴 매도 판단':'🔍 구간 분석';
-  if(body) body.textContent='분석 중...';
 
   const prompts = {
     buy: `단타 트레이더야. 솔직하게 쉽게 말해줘 (토스 알림처럼).
@@ -12025,12 +11227,10 @@ RSI: ${rsi} | 5MA: ${ma5} | 20MA: ${ma20}
 RSI: ${rsi} | 5MA: ${ma5} | 20MA: ${ma20}
 이 구간 차트 상황 한마디로 요약하고 대응 알려줘. 4줄 이내.`,
   };
-  try{
-    const data = await callClaude({model:'claude-sonnet-4-5',max_tokens:200,messages:[{role:'user',content:prompts[type]}]},'차트클릭AI');
-    const text = data.content?.[0]?.text||'분석 실패';
-    if(body) body.innerHTML = text.replace(/\n/g,'<br>');
-  }catch(e){
-    if(body) body.textContent = '분석 실패: '+e.message;
+  if(body){
+    body.textContent='현재가 '+fW(c?.c||0)+'원 · RSI '+rsi+' · 5MA '+ma5+' · 20MA '+ma20+(type==='analysis'&&c?' · 캔들 O'+c.o+' H'+c.h+' L'+c.l+' C'+c.c:'');
+    const w=document.createElement('div'); w.style.marginTop='6px'; body.appendChild(w);
+    copyAskInline(w,'질문 복사 (claude.ai)',(title?title.textContent:'차트')+' 질문',prompts[type]);
   }
 }
 
@@ -12139,57 +11339,6 @@ function updatePhase8Live(){
 }
 
 function drawSignalOverlay(){}
-
-// ── API 키 만료/한도 감지 + 어떤 API인지 추정 ──
-function checkApiKeyExpiry(errorMsg, hint){
-  if(!errorMsg) return;
-  const msg = String(errorMsg);
-  // 사용량 한도(Usage Limits)와 키 만료를 구분
-  const isUsageLimit = /usage limit|reached your specified|regain access on|rate_limit|429/i.test(msg);
-  const expired = isUsageLimit || msg.includes('expired') || msg.includes('invalid') ||
-                  msg.includes('401') || msg.includes('authentication') ||
-                  msg.includes('Unauthorized') || msg.includes('invalid_api_key') ||
-                  msg.includes('EGW') /* KIS 에러코드 */ ||
-                  msg.includes('rt_cd') /* KIS */ ;
-  if(!expired) return;
-  // 어떤 API인지 추정
-  let api = hint || '';
-  if(!api){
-    if(/anthropic|claude|sk-ant|invalid_api_key|invalid_request_error|usage limit/i.test(msg)) api = 'Claude (Anthropic)';
-    else if(/kis|koreainvestment|appkey|appsecret|EGW|rt_cd/i.test(msg)) api = 'KIS 한국투자증권';
-    else if(/notion/i.test(msg)) api = 'Notion';
-    else if(/dart/i.test(msg)) api = 'DART';
-    else api = 'API (상세 불명)';
-  }
-  // 중복 배너 방지
-  const exist = document.querySelector('[data-api-expiry-banner]');
-  if(exist) exist.remove();
-  const box = document.createElement('div');
-  box.setAttribute('data-api-expiry-banner','1');
-  box.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#dc2626;color:#fff;padding:10px 16px;font-size:12px;font-weight:600;display:flex;align-items:center;gap:10px;flex-wrap:wrap;';
-  // Usage limit인 경우: 잔액 충전과 별개. 콘솔에서 한도 늘려야 함
-  if(isUsageLimit && api.includes('Claude')){
-    // reset 날짜 추출
-    const dateMatch = msg.match(/regain access on (\d{4}-\d{2}-\d{2})/i);
-    const resetDate = dateMatch ? dateMatch[1] : '한도 reset일';
-    box.innerHTML = `⚠️ <b>Claude 사용량 한도 초과</b>
-      <span style="font-size:11px;">잔액 충전 ≠ 한도 해제. 콘솔에서 직접 한도(Spend limit) 상향 필요</span>
-      <a href="https://console.anthropic.com/settings/limits" target="_blank" style="border:2px solid #fff;background:#fff;color:#dc2626;padding:3px 10px;border-radius:5px;text-decoration:none;font-weight:700;">콘솔 한도 설정 ↗</a>
-      <span style="font-size:10px;opacity:.9;">재접근 가능: ${resetDate}</span>
-      <button onclick="this.parentNode.remove()" style="border:none;background:none;color:#fff;cursor:pointer;font-size:16px;margin-left:auto;">✕</button>`;
-  }else{
-    const lifetime = api.includes('Claude') ? '영구 (한도 초과/직접 폐기 시 발생)'
-      : api.includes('KIS') ? '실거래 키 1년 / 모의투자 키 1개월 (모의는 자주 만료)'
-      : api.includes('Notion') ? '영구 (Integration 삭제 시)'
-      : api.includes('DART') ? '영구' : '확인 필요';
-    box.innerHTML = `⚠️ <b>${api}</b> 키 만료/오류 — 일반적인 만료 주기: <i>${lifetime}</i>
-      <span style="font-size:10px;opacity:.9;">에러: ${msg.slice(0,120)}</span>
-      <button onclick="openModal('settings');this.parentNode.remove()" style="border:2px solid #fff;background:none;color:#fff;padding:3px 12px;border-radius:5px;cursor:pointer;font-weight:700;margin-left:auto;">설정 열기</button>
-      <button onclick="this.parentNode.remove()" style="border:none;background:none;color:#fff;cursor:pointer;font-size:16px;">✕</button>`;
-  }
-  document.body.appendChild(box);
-  try{ addDecisionLog('⚠ '+api, (isUsageLimit?'사용량 한도':'키 오류')+' — '+msg.slice(0,80), 'NOGO'); }catch(_e){}
-}
 
 // ── 대시보드 데이터 브릿지 ──
 let _dashCache = {};
@@ -12368,31 +11517,23 @@ function _setIdxUI(id, val, chg){
 
 async function runIdxAIPrediction(){
   const now=Date.now();
-  if(now-_idxSim.lastPred < 3*60*1000) return; // 3분 쿨다운
-  _idxSim.lastPred = now;
+  if(now-(window._idxPredLast||0) < 3*60*1000) return; // 3분 쿨다운
+  window._idxPredLast = now;
   const cs=getRecentCandles(10);
   if(cs.length<3) return;
   const cls=cs.map(c=>c.c);
-  const rsi=(calcRSI(cls,9).slice(-1)[0]||50).toFixed(0);
-  const vol=cs.length>=2?(cs[cs.length-1].v/cs[cs.length-2].v).toFixed(1):'1.0';
-  const lc=cs[cs.length-1];
-  try{
-    const data=await callClaude({
-      model:'claude-sonnet-4-5',max_tokens:80,
-      messages:[{role:'user',content:`지금 시장 초단기(5~15분) 방향 예측. RSI:${rsi} 거래량:${vol}배 현재가:${fW(lc.c)}. JSON만: {"dir":"상승예상"또는"하락예상"또는"횡보","confidence":75}`}]
-    },'지수예측',{silent:true});
-    const text=data.content?.[0]?.text||'';
-    const p=robustJsonParse(text);
-    if(!p.dir) return;
-    const el=document.getElementById('idx-pred');
-    if(!el)return;
-    const isUp=p.dir?.includes('상승');
-    const isDown=p.dir?.includes('하락');
-    el.style.display='block';
-    el.textContent=`${isUp?'▲':isDown?'▼':'→'} ${p.dir||'횡보'} (${p.confidence||50}%)`;
-    el.style.background=isUp?'rgba(5,192,114,.15)':isDown?'rgba(240,64,64,.15)':'rgba(156,163,175,.15)';
-    el.style.color=isUp?'var(--g)':isDown?'var(--r)':'var(--tm)';
-  }catch(e){}
+  const rsi=+(calcRSI(cls,9).slice(-1)[0]||50);
+  const vol=(cs.length>=2&&cs[cs.length-2].v)?cs[cs.length-1].v/cs[cs.length-2].v:1;
+  // 로컬 지표 요약(예측이 아님): RSI·최근 3봉 방향·거래량비
+  const up=cls[cls.length-1]>cls[cls.length-3];
+  const dir=(rsi>=55&&up)?'상승 우위':(rsi<=45&&!up)?'하락 우위':'횡보';
+  const el=document.getElementById('idx-pred');
+  if(!el)return;
+  const isUp=dir==='상승 우위', isDown=dir==='하락 우위';
+  el.style.display='block';
+  el.textContent=(isUp?'▲':isDown?'▼':'→')+' '+dir+' (RSI '+rsi.toFixed(0)+' · 거래량 '+vol.toFixed(1)+'배)';
+  el.style.background=isUp?'rgba(5,192,114,.15)':isDown?'rgba(240,64,64,.15)':'rgba(156,163,175,.15)';
+  el.style.color=isUp?'var(--g)':isDown?'var(--r)':'var(--tm)';
 }
 
 // ── updChartToIdx: 봉 이동 시 일괄 처리 (무한재귀 없음) ──
@@ -12480,15 +11621,16 @@ function addToWatchlistWithAnalysis(tk, why){
     </div>`;
   popup.style.display='block';
 
-  // AI 분석 실행
+  // 로컬 요약(LLM 미사용): 시세·등락률·섹터·강세섹터 순위
   const ab=document.getElementById('watchAnalysisBody');
-  callClaude({
-    model:'claude-sonnet-4-5',max_tokens:200,
-    messages:[{role:'user',content:`단타 관점에서 ${stk.nm}(${tk}) 종목 체크포인트를 알려줘. 수급/모멘텀/재료/공매도/리스크 각 1줄씩. 쉽게.`}]
-  },'종목분석팝업').then(d=>{
-    const t=d.content?.[0]?.text||'분석 실패';
-    if(ab)ab.innerHTML=t.replace(/\n/g,'<br>');
-  }).catch(e=>{ if(ab)ab.textContent='Claude API 키 필요'; });
+  if(ab){
+    const chg=stk.base?((stk.pr-stk.base)/stk.base*100):0;
+    const si=(window._sectorInfo||{})[tk];
+    const lines=[stk.nm+' 현재가 '+fW(stk.pr)+'원 ('+(chg>=0?'+':'')+chg.toFixed(2)+'%)'];
+    if(stk.sec) lines.push('섹터: '+stk.sec);
+    if(si) lines.push('강세섹터 '+si.rank+'위 '+(si.role||'')+(si.turnoverEok?' · 거래대금 '+Math.round(si.turnoverEok).toLocaleString()+'억':''));
+    ab.textContent=lines.join('\n'); ab.style.whiteSpace='pre-wrap';
+  }
 }
 
 // addCandFromFilter 업그레이드 — 팝업 포함
@@ -12619,7 +11761,7 @@ function saveJEntry(date,p,pnl,wins,total,str){
 }
 
 // 거래 발생 시 즉시 기본 일지 저장 (AI 없이도 항상 기록)
-// autoSaveJournalOnTrade는 아래 async 버전에서 정의됨 (Claude AI 평가 + 학습 누적 포함)
+// autoSaveJournalOnTrade는 아래 async 버전에서 정의됨 (로컬 기본 일지 저장)
 
 // ═══════════════════════════════════════════════════
 // 🤖 AI 파트너 — 장중 자동 체크 + 섹터수급 + 진입후보
@@ -12709,72 +11851,81 @@ setInterval(()=>{ if(document.querySelector('.lpt.on[onclick*="lpb-ck"]')) runIn
 
 // ── 섹터 수급 순위 (AI) ──
 let _prevSectorRank=[];
+// 섹터 순위 표시 전용 — 관심종목·진입후보는 바꾸지 않는다(LLM 미사용, 서버 로컬 계산 결과만 표시)
 async function loadSectorRanking(){
   const el=document.getElementById('sectorRankList');
   const btn=document.getElementById('sectorRankBtn');
   if(!el) return;
-  el.innerHTML='<span style="color:var(--tm);font-style:italic;font-size:9px;">AI 분석 중...</span>';
+  const note=function(t,col){ el.innerHTML='<span style="color:'+(col||'var(--tm)')+';font-size:9px;"></span>'; el.firstChild.textContent=t; };
+  if(sim && sim.date && sim.date!==_kstToday()){ note('과거 리플레이('+sim.date+') — 실시간 강세섹터는 미래 정보라 쓰지 않습니다 (관망)'); return; }
+  note('강세섹터 로컬 계산 중...');
   if(btn) btn.disabled=true;
   try{
-    const cs=getRecentCandles(20);
-    const cls=cs.map(c=>c.c);
-    const rsi=(calcRSI(cls,14).slice(-1)[0]||50).toFixed(0);
-    const volR=cs.length>=2?(cs[cs.length-1].v/cs[cs.length-2].v).toFixed(1):'1.0';
-    const prompt=`지금 이 순간 단타 트레이더 관점에서 섹터별 수급 점수를 알려줘.
-RSI:${rsi} 거래량:${volR}배 종목:${STOCKS.find(s=>s.tk===activeTk)?.nm||activeTk}
-
-섹터: 반도체, 2차전지, 바이오, 자동차, 인터넷, 방산, 조선, 철강
-0~100점 평가. JSON만: {"sectors":[{"name":"반도체","score":82,"reason":"외국인 순매수 지속","stocks":["삼성전자","SK하이닉스"]},...]}`; 
-    const data=await callClaude({model:'claude-sonnet-4-5',max_tokens:500,messages:[{role:'user',content:prompt}]},'섹터수급');
-    const text=data.content?.[0]?.text||'';
-    const m=text.match(/\{[\s\S]*\}/);
-    if(!m) throw new Error('파싱실패');
-    const sectors=(robustJsonParse(text).sectors||[]).sort((a,b)=>b.score-a.score);
-    const prevNames=_prevSectorRank.map(s=>s.name);
-    const newOnes=sectors.filter((s,i)=>i<3&&!prevNames.slice(0,3).includes(s.name));
+    const r=await fetch('/api/local/hot-sectors',{cache:'no-store'})   // 서버 60초 캐시 사용(클릭마다 KIS 재호출 안 함);
+    const d=await r.json();
+    if(!d||!d.ok) throw new Error((d&&d.error)||'응답 없음');
+    const sectors=(d.sectors||[]).slice().sort(function(a,b){return (a.rank||99)-(b.rank||99);});
+    const prevNames=_prevSectorRank.map(function(s){return s.name;});
+    const newOnes=sectors.filter(function(s,i){return i<3&&prevNames.slice(0,3).indexOf(s.name)===-1;});
     _prevSectorRank=sectors;
-    el.innerHTML=sectors.slice(0,6).map((s,i)=>{
-      const sc=s.score||50;
-      const col=sc>=75?'var(--g)':sc>=55?'var(--a)':'var(--r)';
-      const isNew=newOnes.some(n=>n.name===s.name);
-      return `<div onclick="loadSectorStocks('${s.name}','${(s.stocks||[]).join(',')}','${s.reason||''}')" style="padding:5px 3px;border-radius:6px;cursor:pointer;margin-bottom:2px;" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='none'">
-        <div style="display:flex;align-items:center;gap:4px;margin-bottom:2px;">
-          <span style="font-size:10px;font-weight:800;color:${i<3?'var(--b)':'var(--tm)'};min-width:14px;">${i+1}</span>
-          <span style="font-size:10px;font-weight:700;flex:1;">${s.name}</span>
-          ${isNew?'<span style="font-size:8px;background:var(--r);color:#fff;padding:1px 4px;border-radius:3px;font-weight:700;">NEW</span>':''}
-          <span style="font-family:var(--mono);font-size:10px;font-weight:800;color:${col};">${sc}점</span>
-        </div>
-        <div style="height:3px;background:var(--bg);border-radius:2px;overflow:hidden;">
-          <div style="height:100%;width:${sc}%;background:${col};border-radius:2px;"></div>
-        </div>
-        <div style="font-size:8px;color:var(--tm);margin-top:1px;">${s.reason||''}</div>
-      </div>`;
-    }).join('');
+    if(!sectors.length){ note('강세섹터 없음 — 관망 (장중 KIS 연결 필요)'); }
+    else el.textContent='';
+    sectors.slice(0,6).forEach(function(s,i){
+      const names=(s.stocks||[]).map(function(x){return x&&x.name;}).filter(Boolean);
+      const row=document.createElement('div');
+      row.style.cssText='padding:5px 3px;border-radius:6px;cursor:pointer;margin-bottom:2px;';
+      row.innerHTML='<div style="display:flex;align-items:center;gap:4px;margin-bottom:2px;"><span class="_si" style="font-size:10px;font-weight:800;min-width:14px;"></span><span class="_sn" style="font-size:10px;font-weight:700;flex:1;"></span>'+(newOnes.indexOf(s)!==-1?'<span style="font-size:8px;background:var(--r);color:#fff;padding:1px 4px;border-radius:3px;font-weight:700;">NEW</span>':'')+'</div><div class="_sr" style="font-size:8px;color:var(--tm);margin-top:1px;"></div>';
+      const _si=row.querySelector('._si'); _si.textContent=String(s.rank||i+1); _si.style.color=i<3?'var(--b)':'var(--tm)';
+      row.querySelector('._sn').textContent=s.name||'-';
+      row.querySelector('._sr').textContent=names.join('·')+(s.reason?' — '+s.reason:'');
+      row.addEventListener('click',function(){ loadSectorStocks(s.name,names.join(','),s.reason||'',s.stocks||[]); });
+      el.appendChild(row);
+    });
   }catch(e){
-    el.innerHTML=`<span style="color:var(--r);font-size:9px;">Claude API 키 필요</span>`;
+    note('강세섹터 계산 실패: '+(e.message||e),'var(--r)');
   }
   if(btn){btn.disabled=false;btn.textContent='↺ 갱신';}
 }
 
-function loadSectorStocks(name, stocksStr, reason){
-  // 섹터 종목 중 STOCKS에 있는 것 필터
-  const stkNames=(stocksStr||'').split(',').filter(Boolean);
-  const matched=STOCKS.filter(s=>stkNames.some(n=>s.nm.includes(n)||n.includes(s.nm)));
-  if(!matched.length){ showAlert(name+' 섹터', reason||'수급 집중 섹터'); return; }
+// 섹터 주도주 팝업 — list(강세섹터 API 종목 [{code,name,price,changePct}])가 있으면 그것을, 없으면 STOCKS 이름 매칭을 표시.
+// 전역 STOCKS 는 열람만으로 바꾸지 않고, 사용자가 종목을 "클릭해 선택"할 때만 등록한다. 모든 텍스트는 textContent.
+function loadSectorStocks(name, stocksStr, reason, list){
+  const okCode=function(c){ return typeof c==='string' && /^[0-9A-Z]{6}$/.test(c); };   // 종목코드 6자리(신규 영문 혼합 포함)
+  let rows=(list||[]).filter(function(x){ return x && okCode(x.code); }).map(function(x){ return {tk:x.code, nm:x.name||x.code, chg:+x.changePct||0, api:x}; });
+  if(!rows.length){
+    const stkNames=(stocksStr||'').split(',').filter(Boolean);
+    rows=STOCKS.filter(function(s){ return stkNames.some(function(n){ return s.nm.includes(n)||n.includes(s.nm); }); })
+      .map(function(s){ return {tk:s.tk, nm:s.nm, chg:s.base?(s.pr-s.base)/s.base*100:0}; });
+  }
+  if(!rows.length){ showAlert(name+' 섹터', reason||'수급 집중 섹터'); return; }
   let popup=document.getElementById('_sectorPopup');
   if(!popup){ popup=document.createElement('div'); popup.id='_sectorPopup';
     popup.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9999;background:var(--pan);border-radius:14px;box-shadow:0 8px 40px rgba(0,0,0,.2);padding:18px;width:280px;max-width:92vw;';
     document.body.appendChild(popup); }
-  popup.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-    <span style="font-size:14px;font-weight:800;">🔥 ${name} 주도주</span>
-    <button onclick="document.getElementById('_sectorPopup').style.display='none'" style="border:none;background:none;font-size:16px;cursor:pointer;">✕</button>
-  </div>
-  <div style="font-size:10px;color:var(--tm);margin-bottom:10px;">${reason}</div>
-  ${matched.map(s=>{const chg=((s.pr-s.base)/s.base*100).toFixed(2);const up=parseFloat(chg)>=0;
-    return `<div onclick="selectStk('${s.tk}');document.getElementById('_sectorPopup').style.display='none';" style="display:flex;align-items:center;gap:8px;padding:7px;border-radius:8px;cursor:pointer;margin-bottom:3px;" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='none'">
-      <div style="font-size:11px;font-weight:700;flex:1;">${s.nm}</div>
-      <div class="${up?'cu':'cd'}" style="font-size:11px;">${up?'+':''}${chg}%</div>
-    </div>`;}).join('')}`;
+  const close=function(){ popup.style.display='none'; };
+  popup.textContent='';
+  const hdr=document.createElement('div'); hdr.style.cssText='display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;';
+  const ttl=document.createElement('span'); ttl.style.cssText='font-size:14px;font-weight:800;'; ttl.textContent='🔥 '+name+' 주도주';
+  const x=document.createElement('button'); x.style.cssText='border:none;background:none;font-size:16px;cursor:pointer;'; x.textContent='✕'; x.addEventListener('click',close);
+  hdr.appendChild(ttl); hdr.appendChild(x); popup.appendChild(hdr);
+  const rs=document.createElement('div'); rs.style.cssText='font-size:10px;color:var(--tm);margin-bottom:10px;'; rs.textContent=reason||''; popup.appendChild(rs);
+  rows.forEach(function(r){
+    const row=document.createElement('div');
+    row.style.cssText='display:flex;align-items:center;gap:8px;padding:7px;border-radius:8px;cursor:pointer;margin-bottom:3px;';
+    row.addEventListener('mouseover',function(){ row.style.background='var(--bg)'; });
+    row.addEventListener('mouseout',function(){ row.style.background='none'; });
+    const nm=document.createElement('div'); nm.style.cssText='font-size:11px;font-weight:700;flex:1;'; nm.textContent=r.nm;
+    const ch=document.createElement('div'); ch.className=r.chg>=0?'cu':'cd'; ch.style.fontSize='11px'; ch.textContent=(r.chg>=0?'+':'')+r.chg.toFixed(2)+'%';
+    row.appendChild(nm); row.appendChild(ch);
+    row.addEventListener('click',function(){
+      if(r.api && !STOCKS.some(function(s){ return s.tk===r.tk; })){
+        const a=r.api, base=a.changePct?Math.round(a.price/(1+a.changePct/100)):a.price;
+        STOCKS.push({tk:r.tk, nm:r.nm, pr:a.price, base:base||a.price, sec:name, cap:''});   // 시가총액 미제공 → 빈 값
+      }
+      selectStk(r.tk); close();
+    });
+    popup.appendChild(row);
+  });
   popup.style.display='block';
 }
 
@@ -12906,20 +12057,6 @@ function safeParseJSON(str, fallback){
     }catch(e2){return fallback;}
   }
 }
-function robustJsonParse(text){
-  const m=text.match(/\{[\s\S]*\}/);
-  if(!m) return {};
-  try{ return JSON.parse(m[0]); }catch(e){}
-  try{ return JSON.parse(m[0].replace(/,\s*([}\]])/g,'$1')); }catch(e2){}
-  return {};
-}
-const _analysisCache={};
-function _getCachedAnalysis(key){
-  const c=_analysisCache[key];
-  if(c&&Date.now()-c.ts<5*60*1000) return c.data;
-  return null;
-}
-function _setCachedAnalysis(key,data){_analysisCache[key]={ts:Date.now(),data};}
 
 // 매매 시 시장 컨텍스트 자동 수집 (매매일지용)
 function collectMarketCtx(){
@@ -12989,14 +12126,13 @@ window.onload=()=>{
   setTimeout(runIntraCheck, 1500);
   // ★ 서버에서 저장된 API 설정 로드 (재배포 후에도 유지)
   fetch('/api/get-config').then(r=>r.json()).then(d=>{
-    if(d.ok && (d.kisAppKey || d.claudeKeyFull)){
+    if(d.ok && d.kisAppKey){
       kisConfig={
         appKey: d.kisAppKey||kisConfig.appKey||'',
         appSecret: d.kisAppSecret||kisConfig.appSecret||'',
         account: d.kisAccount||kisConfig.account||'',
         mode: d.kisMode||kisConfig.mode||'mock',
         dartKey: d.dartKey||kisConfig.dartKey||'',
-        claudeKey: d.claudeKeyFull||kisConfig.claudeKey||'',
       };
       localStorage.setItem(KIS_CFG_KEY, JSON.stringify(kisConfig));
       updateKisStatus();
@@ -13036,7 +12172,6 @@ window.onload=()=>{
   },800);
   setInterval(()=>{updateTimeGuide();},30000);
   setInterval(()=>fetchDartNews(),30000);
-  ensureToday(); updateUsageUI();
   const savedTrust=localStorage.getItem('trustScore');
   if(savedTrust){trustScore=parseInt(savedTrust);const sl=document.getElementById('trustSlider');if(sl)sl.value=trustScore;updateTrustScore(trustScore);}
   setTimeout(()=>{renderGrowthRoadmap();detectSlump();},500);
@@ -13162,7 +12297,7 @@ async function refreshHotSectors(force){
   const btn=document.getElementById('hotSecRefreshBtn');
   if(btn){btn.textContent='…';btn.disabled=true;}
   try{
-    await syncCandidatesToWatchlist();
+    await syncCandidatesToWatchlist(force);
     const now2=new Date();
     const hh=String(now2.getHours()).padStart(2,'0'), mm=String(now2.getMinutes()).padStart(2,'0');
     saveToServer('htsSectorTime', hh+':'+mm);
@@ -13178,7 +12313,7 @@ async function syncCandidatesToWatchlist(){
   // 📊 강세섹터 1~3위 + 대장주를 시세 데이터로 로컬 계산 (LLM 미사용, 비용 0)
   //    서버 /api/local/hot-sectors : KIS 거래대금 순위(코스피·코스닥) + 업종 집계
   try{
-    var _todayKST = new Date(Date.now()+9*3600*1000).toISOString().slice(0,10);
+    var _todayKST = _kstToday();
     if(sim && sim.date && sim.date !== _todayKST){
       addDecisionLog('강세섹터 미사용','과거 날짜('+sim.date+') 리플레이 — 실시간 순위를 쓰면 미래 정보가 섞임','종목선정');
       return null;
@@ -13301,7 +12436,7 @@ function getMarketTrades(date){
 
 async function autoSaveJournalOnTrade(forceDate){
   const date=forceDate||sim.date;
-  // ★ 같은 날짜에 이미 AI 일지 작성 중이면 건너뜀 (중복 호출 방지)
+  // ★ 같은 날짜 일지를 이미 저장 중이면 건너뜀 (중복 호출 방지)
   if(!window._journalInProgress) window._journalInProgress={};
   if(window._journalInProgress[date]) return;
   window._journalInProgress[date]=true;
@@ -13341,62 +12476,7 @@ async function _autoSaveJournalOnTradeInner(date){
     trades: str
   };
   saveJEntry(date,baseEntry,pnl,wins,total,str);
-  try{
-    const logs=(window._decisionLog||[]).slice(-20).map(function(d){return '['+(d.phase||'')+'] '+d.title+': '+(d.body||'');}).join('\n');
-    const _lecJ = typeof getLectureContext==='function' ? getLectureContext(2500) : '';
-    const _winRate = total>0 ? Math.round(wins/total*100) : 0;
-    const _resultGrade = pnl>0 ? '수익(GAIN)' : pnl<0 ? '손실(LOSS)' : '무변동(FLAT)';
-    const prompt='단타 트레이딩 멘토. 오늘 매매를 강의 원칙 기준으로 평가해서 매매일지 작성.\n\n'+_lecJ+
-      '\n날짜: '+date+
-      '\n결과: '+_resultGrade+' / 손익 '+(pnl>=0?'+':'')+fW(pnl)+'원 / 승률 '+_winRate+'% ('+wins+'/'+total+')'+
-      '\n\n매매내역:\n'+str+
-      '\n\nAI결정로그:\n'+(logs||'없음')+
-      '\n\n[평가 원칙 — 반드시 지킬 것]\n'+
-      '1. 결과(손익)와 과정(원칙 준수)을 분리해서 평가\n'+
-      '2. 손익이 +면 절대 "실패"라고 하지 말 것. 과정에 문제 있어도 "결과는 성공, 다만 X 위험"으로 표현\n'+
-      '3. 손익이 -면 "실패" 명확히 — 단 과정이 좋았다면 "과정 OK였으나 시장 운"으로 구분\n'+
-      '4. 승률 낮아도 손익 +면 "큰 익절 + 작은 손절" 손익비 잘 잡았다는 신호 — 칭찬할 것\n'+
-      '5. 승률 높아도 손익 -면 "작은 익절 + 큰 손절" 손익비 잘못 — 강하게 지적\n\n'+
-      'JSON만:\n'+
-      '{"result_grade":"성공/실패/혼합","process_grade":"성공/실패/혼합",'+
-      '"summary":"한줄 총평(결과와 과정 모두 언급)",'+
-      '"why_bought":"매수이유","why_sold":"청산이유",'+
-      '"good":"잘한점","bad":"반성할점(손익+면 부드럽게)",'+
-      '"psychology":"심리평가","improvement":"개선행동",'+
-      '"phase_check":"적용Phase","mentor_comment":"멘토한마디(결과/과정 통합)"}';
-    // fetch + timeout (30초) — 멈춤 방지
-    const ctrl = new AbortController();
-    const _timer = setTimeout(()=>ctrl.abort(), 15000); // 15초 — 일지는 중요하므로 넉넉히
-    const res = await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},signal:ctrl.signal,body:JSON.stringify({model:'claude-haiku-4-5',max_tokens:500,messages:[{role:'user',content:prompt}]})});
-    clearTimeout(_timer);
-    const data=await res.json();
-    const text=(data.content&&data.content[0]&&data.content[0].text)||'{}';
-    const m=text.match(/\{[\s\S]*\}/);
-    if(!m)throw new Error('JSON파싱실패');
-    const ai=robustJsonParse(text);
-    if(!ai||!ai.summary) throw new Error('AI 응답 파싱 실패');
-    const aiEntry={summary:ai.summary||(date+' 매매 '+tt.length+'건 / '+(pnl>=0?'+':'')+fW(pnl)+'원'),result_grade:ai.result_grade||(pnl>0?'성공':pnl<0?'실패':'혼합'),process_grade:ai.process_grade||'-',why_bought:ai.why_bought||'-',why_sold:ai.why_sold||'-',good:ai.good||'-',bad:ai.bad||'-',psychology:ai.psychology||'-',improvement:ai.improvement||'-',phase_check:ai.phase_check||'-',mentor_comment:ai.mentor_comment||'-',aiGenerated:true,trades:str};
-    saveJEntry(date,aiEntry,pnl,wins,total,str);
-    // 학습 메모리 누적 (다음 매매 결정에 자동 반영)
-    try{ appendLesson(date, ai); }catch(_e){}
-    const stage = (typeof getLearnerStage==='function') ? getLearnerStage() : {lv:1,label:'초보'};
-    addMsg('ai','📓 매매일지 자동 작성 완료\n\n'+date+' '+(pnl>=0?'+':'')+fW(pnl)+'원\n\n✅ 잘한점: '+ai.good+'\n\n🔴 반성: '+ai.bad+'\n\n💡 개선: '+ai.improvement+'\n\n🎯 멘토: '+ai.mentor_comment+'\n\n🎓 학습 단계: Lv'+stage.lv+' '+stage.label+' (노트 '+learningMemory.length+'건)');
-    const nPageId=localStorage.getItem('notionJournalPageId');
-    if(nPageId)await _saveJournalToNotion(date,aiEntry,pnl,str);
-  }catch(e){
-    console.warn('AI일지실패:',e.message);
-    addMsg('ai','📓 기본 일지 저장 완료 (AI실패: '+e.message+')');
-  }
-}
-
-async function _saveJournalToNotion(date,entry,pnl,trades){
-  try{
-    const nPageId=localStorage.getItem('notionJournalPageId');
-    if(!nPageId)return;
-    const body='## '+date+' 매매일지\n\n**손익**: '+(pnl>=0?'+':'')+fW(pnl)+'원\n\n**매매내역**:\n'+trades+'\n\n**매수이유**: '+entry.why_bought+'\n**청산이유**: '+entry.why_sold+'\n**잘한점**: '+(entry.good||'-')+'\n**반성**: '+(entry.bad||'-')+'\n**심리**: '+(entry.psychology||'-')+'\n**개선**: '+(entry.improvement||'-')+'\n**멘토**: '+(entry.mentor_comment||'-');
-    await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:200,mcp_servers:[{type:'url',url:'https://mcp.notion.com/mcp',name:'notion'}],messages:[{role:'user',content:'Notion 페이지('+nPageId+')에 아래 내용을 추가해줘.\n\n'+body}]})});
-    addMsg('ai','📝 Notion 일지 저장 완료');
-  }catch(e){console.warn('Notion저장실패:',e.message);}
+  addMsg('ai','📓 매매일지 저장 완료\n\n'+date+' '+(pnl>=0?'+':'')+fW(pnl)+'원 ('+tt.length+'건, 승률 '+_winRate+'%)');
 }
 
 // ─── AI 실시간 사고 패널 ───
@@ -13429,7 +12509,7 @@ function updAIThought(s){
   }
 }
 function _showThought_blocking(r,d){updAIThought({type:'blocking',title:'매수 차단',trend:{type:'bad',label:'⛔ 추세:',text:r},conclusion:'매수 불가 - '+d});}
-function _showThought_analyzing(n,sc,rs){updAIThought({type:'analyzing',title:'AI 분석 중 - '+n,trend:{type:'info',label:'1단계:',text:'기술 '+sc+'/6점 ('+rs.slice(0,2).join(', ')+')'},entry:{type:'info',label:'2단계:',text:'Claude AI 심층 검토중...'},conclusion:null});}
+function _showThought_analyzing(n,sc,rs){updAIThought({type:'analyzing',title:'AI 분석 중 - '+n,trend:{type:'info',label:'1단계:',text:'기술 '+sc+'/6점 ('+rs.slice(0,2).join(', ')+')'},entry:{type:'info',label:'2단계:',text:'로컬 룰 기반 심층 검토중...'},conclusion:null});}
 function _showThought_pass(n,r,w){updAIThought({type:'pass',title:'관망 - '+n,trend:{type:'warn',label:'AI 판단:',text:r},entry:{type:'info',label:'기다릴것:',text:w||'추세 전환 확인'},conclusion:'지금은 아님 - '+r});}
 function _showThought_buy(n,p,sp,t1,rr,cf,r){updAIThought({type:'buy',title:'매수 결정 - '+n,trend:{type:'ok',label:'진입근거:',text:r},entry:{type:'ok',label:'타점:',text:fW(p)+'원 신뢰도 '+cf+'%'},risk:{type:'info',label:'리스크:',text:'손절 '+fW(sp)+' 목표 '+fW(t1)+' R/R 1:'+rr},decision:{type:'ok',label:'결정:',text:'자동 매수 실행'},conclusion:'매수 - '+n+' '+fW(p)+'원 ('+cf+'%)'});}
 function _showThought_idle(n){updAIThought({type:'waiting',title:'모니터링 - '+(n||''),trend:{type:'info',label:'상태:',text:'자동매매 실행중 5초마다 스크리닝'},conclusion:null});}
@@ -13486,7 +12566,7 @@ function _btSetBusy(on){
 }
 // 서버의 **실제** 실행 여부를 묻는다(화면 상태 agentBT.running 과 별개 — desync 방지, 요구 2).
 function _btQueryRunning(){
-  return fetch('/api/backtest/state',{cache:'no-store'}).then(r=>r.json())
+  return btState()
     .then(s=> (s && s.ok && s.running) ? s : null).catch(()=>null);
 }
 // 살아있는 엔진에 화면을 다시 연결(폴링 재개) — '기존 진행 보기' / 새로고침 reattach 공용(요구 2).
@@ -13551,7 +12631,7 @@ function _btWaitStopped(timeoutMs){
   const deadline=Date.now()+(timeoutMs||9000);
   return new Promise(function(resolve){
     (function chk(){
-      fetch('/api/backtest/state',{cache:'no-store'}).then(r=>r.json()).then(function(s){
+      btState().then(function(s){
         if(!s || !s.running || Date.now()>deadline){ resolve(); return; }
         setTimeout(chk, 400);
       }).catch(function(){ resolve(); });
@@ -13563,7 +12643,7 @@ function _btVerifyStarted(){
   let tries=0;
   (function chk(){
     tries++;
-    fetch('/api/backtest/state',{cache:'no-store'}).then(r=>r.json()).then(function(s){
+    btState().then(function(s){
       if(s && s.ok && s.running){ return; }            // 정상 가동 확인 — 끝.
       if(tries>=8){                                     // ~4초간 안 뜸 = 시작 직후 종료
         agentBT.running=false; agentBT.paused=false; agentBTStopPoll(); _syncBtToggleBtn();
@@ -13613,7 +12693,7 @@ function agentBTStop(){
   }).catch(()=>{});
   // 잠시 후 최종 상태 1회만 반영(완료/정지 표시) — 폴링은 재개하지 않음.
   setTimeout(()=>{
-    fetch('/api/backtest/state',{cache:'no-store'}).then(r=>r.json()).then(s=>{
+    btState().then(s=>{
       if(s && s.ok){ s.running=false; try{ agentBTApply(s); }catch(_e){} }
       agentBT.running=false; _syncBtToggleBtn();
     }).catch(()=>{});
@@ -13639,7 +12719,7 @@ function agentBTToggle(){
       .then(r=>r.json()).then(()=>{ _agentToast('⏸ 일시정지 (이어서 진행 가능)'); })
       .catch(()=>{});
     // 마지막 상태 1회만 반영(폴링은 재개하지 않음)
-    setTimeout(()=>{ fetch('/api/backtest/state',{cache:'no-store'}).then(r=>r.json()).then(s=>{ if(s&&s.ok){ try{ agentBTApply(s); }catch(_e){} } agentBT.paused=true; agentBT.running=true; _syncBtToggleBtn(); }).catch(()=>{}); }, 400);
+    setTimeout(()=>{ btState().then(s=>{ if(s&&s.ok){ try{ agentBTApply(s); }catch(_e){} } agentBT.paused=true; agentBT.running=true; _syncBtToggleBtn(); }).catch(()=>{}); }, 400);
     return;
   }
   // 완전 정지/미실행 → **새로 시작**: /api/backtest/start 로 보낸다.
@@ -13700,7 +12780,7 @@ function agentBTPauseBtn(){
     fetch('/api/backtest/toggle',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
       .then(r=>r.json()).then(()=>{ _agentToast('⏸ 일시정지 (현재 위치에서 멈춤 · 재개 가능)'); }).catch(()=>{});
     // 마지막 상태 1회만 반영(폴링 재개 안 함)
-    setTimeout(()=>{ fetch('/api/backtest/state',{cache:'no-store'}).then(r=>r.json()).then(s=>{ if(s&&s.ok){ try{ agentBTApply(s); }catch(_e){} } agentBT.paused=true; agentBT.running=true; _syncBtToggleBtn(); }).catch(()=>{}); }, 400);
+    setTimeout(()=>{ btState().then(s=>{ if(s&&s.ok){ try{ agentBTApply(s); }catch(_e){} } agentBT.paused=true; agentBT.running=true; _syncBtToggleBtn(); }).catch(()=>{}); }, 400);
     return;
   }
   // 일시정지 → 재개(멈춘 지점부터, 가상시계 유지)
@@ -13733,7 +12813,7 @@ function agentBTHaltBtn(){
     _agentToast('⏹ 백테스트 정지 완료 — 잔고·누적성과는 유지돼요 (리셋은 ↺)');
     // 종료 후 최종 상태 1회 반영 + 결과 리포트 표시. 패널을 비우지 않아 잔고/성과가 유지된다.
     setTimeout(()=>{
-      fetch('/api/backtest/state',{cache:'no-store'}).then(r=>r.json()).then(s=>{
+      btState().then(s=>{
         if(s && s.ok){
           s.running=false; agentBT.state=s; agentBT._reported=true;
           try{ agentBTApply(s); }catch(_e){}
@@ -13828,7 +12908,7 @@ function agentBTPollOnce(){
   if(agentBT._inflight) return;
   agentBT._inflight = true;
   const ep = agentBT.epoch||0;
-  fetch('/api/backtest/state',{cache:'no-store'}).then(r=>r.json()).then(s=>{
+  btState().then(s=>{
     if((agentBT.epoch||0)!==ep) return;   // 리셋/정지 후 도착한 stale 응답 무시
     agentBTApply(s);
   }).catch(()=>{}).finally(()=>{ agentBT._inflight = false; });
@@ -14358,7 +13438,7 @@ function _agentFullReset(){
   //     죽은 잔재는 자동으로 running:false 가 되어 아래 정리 분기로 간다.)
   //  · 죽은 잔재(orphan)거나 미실행이면 → 그때만 정리용 stop 을 보낸다(살아있는 엔진엔 무영향).
   try{
-    fetch('/api/backtest/state',{cache:'no-store'}).then(r=>r.json()).then(s=>{
+    btState().then(s=>{
       if(s && s.ok && s.running){
         // 실행 중 — 정지시키지 말고 현재 진행 상황에 다시 붙는다(폴링 재개).
         agentBT.epoch=(agentBT.epoch||0)+1;
@@ -14381,41 +13461,11 @@ window.addEventListener('beforeunload', function(){
 
 // ═══════════════════════════════════════════════════════════════
 //  💬 에이전트 상담 (CLAUDE.md 부서별 역할 챗)
-//  - 왼쪽 카드에서 부서 선택 → 그 부서가 자기반성 보고부터 시작
-//  - 대화 중 파라미터 수정 제안 → ✅ 적용(스cript yaml 수정 + git 커밋, paper 전용)
-//  - 🤝 전체 팀 회의: 전 부서 라운드테이블 + CEO 종합
+//  - 왼쪽 카드에서 부서 선택 → 그 부서 관할 데이터가 담긴 "자기반성 질문" 복사 버튼 표시 (LLM 미호출)
+//  - 질문 전송 → 전략 변경 후보 미리보기 카드(✅ 적용을 눌러야 반영, paper 전용) + 질문 복사 모달
+//  - 🤝 전체 팀 회의: 부서별 관할 현황을 모은 "회의 안건" 질문 복사
 // ═══════════════════════════════════════════════════════════════
 
-// 수정 가능한 전략 파라미터 화이트리스트 (ai-team optimizer TUNABLE_KEYS와 동일)
-// 상담(💬)에서 자연어로 바꿀 수 있는 모든 키. 하드리밋(hard_limits.yaml: 동시보유·쿨다운·
-// 진입금지 시간·슬리피지·담보비율)은 여기에 없으며 변경 불가(§4). 그 외는 모의 모드에서 전부 적용.
-const CONS_TUNABLE = {
-  // 스크리닝
-  'screening.threshold':       { label:'스크리닝 통과 점수', hint:'높을수록 후보가 까다로워져 거래 수가 줄어요 (SSOT 75)', range:'70~80' },
-  // 신호분석 — 진입 조건 개수(요구 4: "신호 조건 N개로")
-  'signal.entry_rules.strong_min_indicators':      { label:'진입 필요 지표 수(STRONG)', hint:'분봉 타점 4개 중 몇 개 충족해야 강한 진입인지 (예: 4개→3개)', range:'1~4' },
-  'signal.entry_rules.conditional_min_indicators': { label:'조건부 진입 지표 수', hint:'몇 개 충족하면 조건부 진입인지', range:'1~4' },
-  // 신호분석 — 지표 임계
-  'signal.rsi.entry_zone':     { label:'RSI 진입 구간', hint:'분봉 매수 타점 RSI 구간 [낮음,높음] (예: 55~65)', range:'45~72' },
-  'signal.rsi.overbought':     { label:'RSI 과매수 상단', hint:'이 위면 진입 금지', range:'65~80' },
-  'signal.breakout.volume_mult': { label:'돌파 거래량 배수', hint:'돌파 캔들 거래량이 직전 캔들 대비 몇 배여야 하는지', range:'1.0~5.0' },
-  'signal.breakout.lookback':  { label:'돌파 고점 룩백', hint:'직전 몇 봉의 고점을 돌파 기준으로 볼지', range:'3~30' },
-  'signal.volume_surge_multiplier': { label:'거래량 급증 배수(구)', hint:'호환용 — 실제 매매는 돌파 거래량 배수 사용', range:'1.5~3.0' },
-  // 포지션 사이징 (§25.3)
-  'entry.sizing.cash_fraction_strong':      { label:'진입 비중(STRONG)', hint:'가용현금 대비 매수 비중 (0.7=70%)', range:'0.1~1.0' },
-  'entry.sizing.cash_fraction_conditional': { label:'진입 비중(조건부)', hint:'조건부 진입 시 매수 비중', range:'0.1~1.0' },
-  'entry.sizing.credit_multiplier':         { label:'신용 배수', hint:'신용 포함 매수여력 배수 (가용현금 × N)', range:'1.0~2.5' },
-  'entry.conditional_cap_pct':              { label:'조건부 진입 상한', hint:'조건부 진입 비중 캡', range:'0.1~1.0' },
-  // 손절 (§5.4)
-  'stop_loss.hard_max_pct':         { label:'하드 손절(%)', hint:'최대 손절선. -0.02=-2% (안전범위 -0.5%~-10%)', range:'-0.10~-0.005' },
-  'stop_loss.technical_buffer_pct': { label:'기술적 손절 버퍼(%)', hint:'진입캔들 저점 아래로 이 폭만큼 더 빠지면 손절 (0.005=-0.5%)', range:'0~0.05' },
-  'stop_loss.technical_stop_enabled': { label:'기술적 손절 사용', hint:'진입캔들 저점 이탈 손절 on/off (끄면 하드 손절만)', range:'true/false' },
-  // 익절 (§5.3)
-  'take_profit.step1.pct_range':   { label:'1차 익절 목표', hint:'1차 익절 수익 구간 [낮음,높음]', range:'0~1' },
-  'take_profit.step2.pct_range':   { label:'2차 익절 목표', hint:'2차 익절 수익 구간 [낮음,높음]', range:'0~1' },
-  'take_profit.step3_trailing.trail_from_high_pct': { label:'트레일링 이탈(%)', hint:'고점 대비 이만큼 밀리면 잔량 전량 청산', range:'0.005~0.10' },
-  // 타임스톱(시간 기반 매도)은 제거되었다(§5.5) — 시간 경과를 이유로 파는 일은 없다.
-};
 
 // ── 각 에이전트 정의 — 관할(jurisdiction)을 완전히 분리 ──
 //  charter.talk     : 이 에이전트가 "말하는 것"
@@ -14423,7 +13473,6 @@ const CONS_TUNABLE = {
 //  charter.reflect  : 자기반성에서 다룰 범위(자기 관할 실수만)
 //  scope            : 이 에이전트가 참조할 컨텍스트 데이터 키 (자기 관할만)
 //  topicPrefix      : 저널에서 자기 관할로 인정할 토픽 접두사
-//  tunables         : 이 에이전트가 직접 제안 가능한 파라미터 키(자기 관할만)
 const CONS_AGENTS = [
   { id:'ceo', emoji:'🧠', color:'#3182f6', name:'CEO (총괄)', role:'팀 성과 총평 · 모드 전환 · 전략 방향',
     identity:'너는 자동매매 시스템의 CEO다. 전 부서를 총괄하지만, 세부 실무는 각 담당에게 맡긴다.',
@@ -14431,7 +13480,7 @@ const CONS_AGENTS = [
       talk:'오늘 팀 전체가 어땠는지 한 문장 총평, 잘한 부서/아쉬운 부서, 모드(paper/live) 유지·전환 판단, 앞으로의 큰 전략 방향.',
       never:'개별 지표(RSI·MACD 등) 수치, 주문 체결·슬리피지 상세, 종목별 스크리닝 점수 계산 과정. 이런 건 절대 직접 말하지 않는다.',
       reflect:'총괄로서의 판단 실수(모드 전환 타이밍, 부서 조율 부족, 전략 방향 오판)만 돌아본다.' },
-    scope:['mode','perfOverall','teamActivity'], topicPrefix:[], tunables:[] },
+    scope:['mode','perfOverall','teamActivity'], topicPrefix:[] },
 
   { id:'screening', emoji:'📡', color:'#0ea5e9', name:'스크리닝 담당', role:'장 전 종목 선정 · 스크리닝 점수',
     identity:'너는 정보부 스크리닝 담당이다. 장 시작 전에 그날 매매할 후보 종목을 골라내는 일만 한다.',
@@ -14439,7 +13488,7 @@ const CONS_AGENTS = [
       talk:'오늘 몇 종목을 검토했는지, 왜 이 종목들을 후보로 골랐는지(거래대금·갭·정배열·테마·ATR 점수), 어떤 종목을 왜 탈락시켰는지.',
       never:'매매 타점·진입 신호, 손절/익절 기준, 주문 체결 과정. 후보를 넘긴 뒤의 일은 내 관할이 아니다.',
       reflect:'종목 선정 실수(놓친 강세 종목, 잘못 올린 후보, 점수 가중치 문제)만 돌아본다.' },
-    scope:['screening','threshold'], topicPrefix:['screening','market'], tunables:['screening.threshold'] },
+    scope:['screening','threshold'], topicPrefix:['screening','market'] },
 
   { id:'signal', emoji:'📊', color:'#7c3aed', name:'신호분석 담당', role:'RSI·MACD·MA·거래량·캔들 5지표',
     identity:'너는 분석부 신호분석 담당이다. 스크리닝이 넘긴 종목의 5지표만 보고 진입 강도를 판정한다.',
@@ -14447,7 +13496,7 @@ const CONS_AGENTS = [
       talk:'오늘 신호가 몇 번 발생했는지, STRONG_ENTRY/CONDITIONAL_ENTRY/NO_ENTRY를 왜 그렇게 판정했는지(5지표 중 몇 개 충족), 놓친 신호.',
       never:'어떤 종목을 후보로 뽑을지(스크리닝 관할), 주문을 어떻게 낼지(주문실행 관할), 리스크 한도·사이징(리스크 관할).',
       reflect:'지표 판정 실수(거짓 신호, 늦은 포착, 임계값 문제)만 돌아본다.' },
-    scope:['signalParam'], topicPrefix:['signal'], tunables:['signal.entry_rules.strong_min_indicators','signal.entry_rules.conditional_min_indicators','signal.rsi.entry_zone','signal.rsi.overbought','signal.breakout.volume_mult','signal.breakout.lookback','signal.volume_surge_multiplier'] },
+    scope:['signalParam'], topicPrefix:['signal'] },
 
   { id:'risk', emoji:'🛡', color:'#f03e3e', name:'리스크 담당', role:'하드리밋 · 손절/익절 · 쿨다운',
     identity:'너는 리스크부 담당이다. 하드리밋(HL-01~06)을 감시하고 손절·익절·연속손절 쿨다운을 집행한다.',
@@ -14455,7 +13504,7 @@ const CONS_AGENTS = [
       talk:'오늘 하드리밋이 발동했는지(동시보유 3종목·연속손절 쿨다운·시간대 금지·슬리피지 5틱·담보비율), 위험했던 순간, 손절 집행 내역과 익절 기준. 하드리밋은 절대 변경 불가임을 분명히 한다.',
       never:'어떤 종목을 고를지(스크리닝 관할), 지표 분석 수치(신호분석 관할), 주문을 실제로 어떻게 넣었는지의 체결 과정(주문실행 관할).',
       reflect:'리스크 관리 실수(늦은 손절, 과도한 사이징, 쿨다운 누락)만 돌아본다.' },
-    scope:['riskParam','hardLimits'], topicPrefix:['risk'], tunables:['stop_loss.hard_max_pct','stop_loss.technical_buffer_pct','stop_loss.technical_stop_enabled','take_profit.step1.pct_range','take_profit.step2.pct_range','take_profit.step3_trailing.trail_from_high_pct','entry.sizing.cash_fraction_strong','entry.sizing.cash_fraction_conditional','entry.sizing.credit_multiplier','entry.conditional_cap_pct'] },
+    scope:['riskParam','hardLimits'], topicPrefix:['risk'] },
 
   { id:'order', emoji:'⚡', color:'#ff9900', name:'주문실행 담당', role:'KIS 주문 · 체결 · 슬리피지',
     identity:'너는 실행부 주문실행 담당이다. 리스크부 승인(APPROVE)을 받은 주문만 KIS로 보내고 체결을 관리한다.',
@@ -14463,7 +13512,7 @@ const CONS_AGENTS = [
       talk:'오늘 주문을 몇 건 냈는지, 체결이 얼마나 잘 됐는지(체결률), 슬리피지가 얼마였는지, 현금/신용 분기, 미체결·실패 내역.',
       never:'어떤 종목을 고를지(스크리닝 관할), 지표 분석(신호분석 관할), 리스크 한도·승인 여부 판단(리스크 관할). 나는 승인된 주문을 "실행"만 한다.',
       reflect:'주문 실행 실수(슬리피지 과다, 체결 실패, 분할 오류)만 돌아본다.' },
-    scope:[], topicPrefix:['order'], tunables:[] },
+    scope:[], topicPrefix:['order'] },
 
   { id:'learning', emoji:'📚', color:'#05c072', name:'학습부', role:'패턴 분석 · 복기 · 백테스트',
     identity:'너는 학습부다. 끝난 거래를 복기하고 패턴을 분석하며 백테스트 결과를 해석한다(실시간 매매에는 관여하지 않는다).',
@@ -14471,7 +13520,7 @@ const CONS_AGENTS = [
       talk:'오늘(또는 최근 백테스트에서) 발견한 패턴, 잘 된 조건과 못 된 조건, 다음에 적용하면 좋을 교훈.',
       never:'실시간 주문 실행(주문실행 관할), 리스크 한도(리스크 관할), 종목 선정(스크리닝 관할). 나는 "지난 일을 복기"할 뿐 실시간에 끼어들지 않는다.',
       reflect:'복기·패턴 분석의 실수(표본 부족, 잘못된 인과 추론, 놓친 교훈)만 돌아본다.' },
-    scope:['patterns','perfOverall'], topicPrefix:['learning'], tunables:[] },
+    scope:['patterns','perfOverall'], topicPrefix:['learning'] },
 
   { id:'meta', emoji:'🔬', color:'#e8590c', name:'메타 옵티마이저', role:'에이전트 성과 점수 · 토큰 · 파라미터',
     identity:'너는 메타 옵티마이저다. 각 에이전트의 성과와 토큰 사용을 관찰하고 파라미터 최적화를 제안한다(직접 매매는 안 한다).',
@@ -14479,21 +13528,18 @@ const CONS_AGENTS = [
       talk:'어떤 에이전트가 잘했고 어떤 에이전트가 부진했는지, 토큰 낭비·중복 호출 분석, 근거 기반 파라미터 최적화 제안(paper에서만 적용, 승인 후 반영).',
       never:'특정 종목을 사라/팔아 같은 직접 매매 지시, 실시간 체결 개입. 나는 "시스템을 관찰·개선"할 뿐이다.',
       reflect:'관찰·제안의 실수(잘못된 성과 귀속, 근거 약한 제안)만 돌아본다.' },
-    scope:['mode','perfOverall','teamActivity','allParams'], topicPrefix:['meta','*'], tunables:Object.keys(CONS_TUNABLE) },
+    scope:['mode','perfOverall','teamActivity','allParams'], topicPrefix:['meta','*'] },
 ];
 
-// 부서 id → 한글 담당명 (관할 밖 질문을 떠넘길 때 사용)
-const CONS_OWNER = { ceo:'CEO(총괄)', screening:'스크리닝 담당', signal:'신호분석 담당', risk:'리스크 담당', order:'주문실행 담당', learning:'학습부', meta:'메타 옵티마이저' };
 
 let consState = {
   agent: null,        // 현재 선택된 에이전트 객체 (null이면 팀회의 모드)
-  history: {},        // {agentId: [{role,content}...]} Claude messages
+  history: {},        // {agentId: [{role,content}...]} 대화 기록
   busy: false,
   ctx: null,          // 최근 컨텍스트 캐시 (params/mode/perf/journal)
   ctxAt: 0,
   initDone: false,
   meeting: false,     // 전체 팀 회의 모드 여부 (true면 입력이 팀 전체로 전달됨)
-  meetingLog: [],     // 회의 라운드 기록 [{q, a}]
 };
 
 // ── 진입 시 1회 초기화: 카드 렌더 + 모드/파라미터 로드 ──
@@ -14907,7 +13953,7 @@ async function consLoadContext(force){
   }catch(e){}
   // 백테스트 상태 (성과/스크리닝/매매)
   try{
-    const s = await (await fetch('/api/backtest/state',{cache:'no-store'})).json();
+    const s = await btState();
     if(s && s.ok){
       ctx.perf = s.report || { cumPnlPct:s.cumPnlPct, trades:s.todayTrades?s.todayTrades.length:undefined };
       ctx.screening = (s.screening||[]).slice(0,8).map(x=>({code:x.code,name:x.name,score:x.score}));
@@ -15016,32 +14062,12 @@ function consStyleRules(){
 // ── 에이전트별 시스템 프롬프트(관할 완전 분리) ──
 function consAgentSystem(agent, ctx){
   const c = agent.charter;
-  const tun = (agent.tunables||[]).map(k=>k+'('+(CONS_TUNABLE[k]?CONS_TUNABLE[k].label:k)+')');
   const parts = [];
   parts.push(agent.identity);
   parts.push('【내 관할 — 이것만 말한다】\n'+c.talk);
   parts.push('【절대 말하지 않는 것 — 다른 부서 관할】\n'+c.never);
-  parts.push('【관할 밖 질문을 받으면】\n"그건 제 관할이 아니에요, [담당]에게 물어보세요"처럼 해당 담당 부서를 명확히 알려주고 넘긴다. 추측으로 다른 부서 일을 대신 답하지 않는다. (부서: '+Object.keys(CONS_OWNER).map(k=>CONS_OWNER[k]).join(' / ')+')');
-  if(tun.length){
-    parts.push('【내가 조정 가능한 파라미터】\n'+tun.join(', ')+' — 이 키들.\n'
-      +'★ 중요: 사용자가 수치를 분명히 말하면(예 "신호 조건 4개로", "RSI 55~65로", "하드 손절 -2%로") 시스템이 그 변경을 strategy_params.yaml 에 **즉시 자동 반영**한다(모의 모드). 따라서 너는 "반영할까요?"·"적용할까요?"·"여기서는 못 바꿔요" 같은 말을 절대 하지 마라 — 이미 적용됐다고 보고 확인·설명만 하라. (시스템 안내문이 함께 주어지면 그 내용을 그대로 따르라.)\n'
-      +'네가 먼저 변경을 권하고 싶을 땐 답변 맨 끝에 한 줄: [[PARAM:키=값|한줄이유]]. 실전(live) 모드면 "지금은 잠겨서 모의에서만 적용돼요"라고 덧붙인다. 내 관할 밖 파라미터는 메타나 해당 담당에게 넘긴다. 하드리밋(동시보유·연속손절 쿨다운·진입금지 시간·슬리피지·담보비율)은 바꿀 수 없다고 분명히 말하라.');
-  } else {
-    parts.push('【파라미터】\n내 관할에는 직접 바꿀 전략 파라미터가 없다. 파라미터 변경 얘기가 나오면 메타 옵티마이저(또는 해당 담당)에게 넘긴다. [[PARAM:...]] 형식을 쓰지 않는다.');
-  }
+  parts.push('【관할 밖 질문을 받으면】\n"그건 제 관할이 아니에요, [담당]에게 물어보세요"처럼 담당 부서를 알려주고 넘긴다. 추측으로 다른 부서 일을 답하지 않는다.');
   parts.push(consStyleRules());
-  // 부서 협력(요구 3): 다른 부서 의견이 꼭 필요하면 ASK 토큰으로 호출
-  parts.push('【부서 협력】\n다른 부서의 의견이 꼭 필요할 때만, 답변 맨 끝에 한 줄로 [[ASK:부서id|구체적인 질문]] 을 쓸 수 있다(부서id: '+Object.keys(CONS_OWNER).join(' / ')+'). 그러면 그 담당이 와서 자기 관점으로 의견을 준다. 정말 필요할 때만, 최대 1개. 평소엔 쓰지 않는다.');
-  // 지난 팀 회의 참고(요구 2)
-  if(ctx.meetings && ctx.meetings.length){
-    const lines=ctx.meetings.slice(-2).map(m=>{
-      const imp=(m.improvements||[]).map(x=>x.key+'='+x.val).join(', ');
-      const when=String(m.ts||'').slice(0,16).replace('T',' ');
-      const concl=String(m.ceo||'').replace(/\s+/g,' ').slice(0,180);
-      return '· ['+when+'] 안건: '+(m.q||'정기회의')+' → 결론: '+concl+(imp?(' / 합의 개선안: '+imp):'');
-    });
-    parts.push('【지난 팀 회의 결론 — 이어서 일관되게 답하라】\n'+lines.join('\n'));
-  }
   parts.push('【내 관할 실시간 현황 — 이 데이터만 참조한다】\n'+consScopedCtx(agent, ctx));
   return parts.join('\n\n');
 }
@@ -15072,47 +14098,62 @@ async function consSelect(id){
     return;
   }
   consState.history[id] = [];
-  consSysMsg(a.emoji+' '+a.name+'와 상담을 시작합니다. 먼저 자기 관할에 대한 자기반성 보고부터 들어볼게요.');
-  await consAsk(a, '너의 관할 영역에 한정해서 "자기반성 보고"를 해줘. '+a.charter.reflect+' 형식은 ①내 관할에서 잘하고 있는 점 ②내 관할에서 부족하거나 걱정되는 점 ③내 관할에서 개선하고 싶은 것 한 가지. 다른 부서 일(예: '+(a.id!=='screening'?'종목 선정':'지표 분석')+' 등)은 절대 언급하지 말고, 오직 네 관할만 돌아봐. 내 관할 파라미터로 바꾸면 좋을 게 있으면 제안해줘.', true);
+  consSysMsg(a.emoji+' '+a.name+' 상담 — 이 앱은 AI 서버를 호출하지 않아요. 관할 데이터가 담긴 질문을 복사해 claude.ai에서 상담하세요.');
+  const _tok = consState.selectToken = (consState.selectToken||0) + 1;   // 빠른 부서 전환 시 늦게 끝난 이전 호출 무시
+  const _ctx = await consLoadContext(false);
+  if(_tok !== consState.selectToken || consState.agent !== a) return;
+  consUpdateModeBadge();
+  const _self = '너의 관할 영역에 한정해서 "자기반성 보고"를 해줘. '+a.charter.reflect+' 형식은 ①내 관할에서 잘하고 있는 점 ②내 관할에서 부족하거나 걱정되는 점 ③내 관할에서 개선하고 싶은 것 한 가지. 다른 부서 일(예: '+(a.id!=='screening'?'종목 선정':'지표 분석')+' 등)은 절대 언급하지 말고, 오직 네 관할만 돌아봐. 내 관할 파라미터로 바꾸면 좋을 게 있으면 제안해줘.';
+  consCopyRow('자기반성 질문 복사 (claude.ai)', a.name+' 자기반성 질문', consAgentSystem(a,_ctx)+'\n\n【질문】\n'+_self);
 }
 
-// ── Claude에 질문 (단일 에이전트) — 스트리밍(요구 1) + 협력(요구 3) ──
-// ── 결정적 자동 반영(요구 1~3): 사용자 문장에서 전략 변경을 감지하면 LLM 협조 없이
-//    즉시 strategy_params.yaml 수정 + git 커밋하고, 결과 카드를 화면에 띄운다. "반영할까요?"
-//    "여기선 못해요"로 끝나지 않게 — 무조건 적용한다(하드리밋/live만 거부 사유 표시).
-//    반환값: LLM에 주입할 안내문(적용됨/거부됨). 감지 못 하면 '' (LLM이 평소처럼 대화).
+// ── 상담: 사용자 문장 → 전략 변경 후보 미리보기(확인 후 적용) + 질문 복사 ──
+// 결정적 규칙 파서(LLM 아님)가 문장에서 전략 변경을 감지하면 후보 카드만 띄운다(apply-text {dry:true}).
+// 사용자가 ✅ 적용을 눌러야 /api/agent/consult/apply-param 으로 strategy_params.yaml 에 반영된다(paper 전용, live 는 서버가 거부).
+// 반환값: 복사할 질문에 붙일 안내문(후보 감지/거부). 감지 못 하면 ''.
 async function consAutoApplyText(userText){
   try{
-    const r=await fetch('/api/agent/consult/apply-text',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:userText})});
+    const r=await fetch('/api/agent/consult/apply-text',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:userText,dry:true})});
     const d=await r.json();
-    const applied=(d&&d.applied)||[];
-    if(applied.length){
-      // 캐시 갱신 + 결과 카드
-      applied.forEach(a=>{ if(consState.ctx&&consState.ctx.params) consState.ctx.params[a.key]=a.to; });
-      const lines=applied.map(a=>{
-        const commit=a.commit?(' · 커밋 '+a.commit):'';
-        return '✅ '+(a.display||(a.key+': '+a.from+' → '+a.to))+commit;
-      });
-      consAutoApplyCard('done', '✅ 적용 완료', lines);
-      return '【시스템 안내 — 반드시 따르라】 사용자의 위 요청을 strategy_params.yaml 에 이미 자동 반영 완료했다: '
-        +applied.map(a=>(a.display||(a.key+' '+a.from+'→'+a.to))).join(' / ')
-        +'. 그러니 "반영할까요?"·"적용할까요?"라고 절대 되묻지 마라. "✅ 적용 완료했어요"라고 확정해서 알리고, 그 변경이 매매에 어떤 효과·주의가 있는지만 1~3문장으로 설명하라. 다음 백테스트/세션부터 바로 적용된다는 점도 덧붙여라.';
+    const changes=(d&&d.preview&&d.changes)||[];
+    if(changes.length){
+      consApplyPreviewCard(changes, d.mode);
+      return '【시스템 안내】 사용자 문장에서 다음 전략 변경 후보가 감지됐지만 아직 적용하지 않았다(사용자 확인 대기): '
+        +changes.map(c=>(c.label||c.key)+' → '+c.value_str).join(' / ')
+        +'. 이 변경이 매매에 어떤 효과·주의가 있는지 1~3문장으로 설명하라.';
     }
     if(d&&(d.hard_limit||d.locked)){
       consAutoApplyCard('fail', (d.locked?'🔒 적용 불가':'🚫 변경 불가'), [String(d.reason||'변경할 수 없는 값이에요.')]);
-      return '【시스템 안내】 사용자의 요청은 적용하지 못했다: '+String(d.reason||'')
-        +' 왜 안 되는지(하드리밋이거나 실전 잠금) 정중히 설명하고, 바꿀 수 있는 대안이 있으면 안내하라. 절대 적용됐다고 말하지 마라.';
+      return '【시스템 안내】 사용자의 요청은 적용할 수 없다: '+String(d.reason||'')
+        +' 왜 안 되는지(하드리밋이거나 실전 잠금) 정중히 설명하고, 바꿀 수 있는 대안이 있으면 안내하라.';
     }
-    if(d&&d.failed&&d.failed.length&&!applied.length){
-      // "값이 이미 N이라 변경할 게 없어요" 등 — 조용히 알린다.
-      const reasons=d.failed.map(f=>f.reason).filter(Boolean);
-      if(reasons.some(x=>/이미/.test(x))){
-        consAutoApplyCard('info', 'ℹ️ 이미 그 값이에요', reasons.slice(0,2));
-        return '【시스템 안내】 사용자가 요청한 값은 이미 현재 설정과 같아서 바뀐 게 없다. 그 사실을 알려주고, 다른 조정이 필요한지 물어보라.';
-      }
-    }
-  }catch(e){ /* 자동반영 실패는 비치명 — LLM이 평소대로 대화 */ }
+  }catch(e){ /* 미리보기 실패는 비치명 — 질문 복사는 그대로 진행 */ }
   return '';
+}
+// 전략 변경 후보 카드 — 항목마다 ✅ 적용 버튼. 누를 때만 반영한다.
+function consApplyPreviewCard(changes, mode){
+  const b=document.getElementById('consChatBody'); if(!b) return;
+  const d=document.createElement('div'); d.className='cons-row sys'; d.style.alignSelf='center'; d.style.maxWidth='94%';
+  const bub=document.createElement('div'); bub.className='cons-bub'; bub.style.cssText='background:rgba(49,130,246,.08);border:1px solid rgba(49,130,246,.35);';
+  const t=document.createElement('div'); t.style.cssText='font-size:12px;font-weight:800;margin-bottom:4px;'; t.textContent='📝 전략 변경 후보 — 확인 후 적용';
+  bub.appendChild(t);
+  changes.forEach(function(c){
+    const row=document.createElement('div'); row.style.cssText='display:flex;align-items:center;gap:6px;font-size:11px;margin-top:4px;';
+    const lab=document.createElement('span'); lab.style.flex='1'; lab.textContent=(c.label||c.key)+' → '+c.value_str+(c.reason?' ("'+c.reason+'")':'');
+    const btn=document.createElement('button'); btn.className='ibtn pri'; btn.textContent='✅ 적용';
+    if(mode==='live'){ btn.disabled=true; btn.title='실전 모드에서는 전략 수정 불가'; }
+    btn.addEventListener('click', async function(){
+      btn.disabled=true; btn.textContent='⏳ 적용 중…';
+      try{
+        const r=await fetch('/api/agent/consult/apply-param',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:c.key,value:c.value_str})});
+        const res=await r.json();
+        if(res&&res.ok){ btn.textContent='✅ 적용됨'; if(consState.ctx&&consState.ctx.params) consState.ctx.params[c.key]=c.value; consUpdateModeBadge(); consSysMsg(res.message||('✅ '+(c.label||c.key)+' 적용 완료')); }
+        else { btn.disabled=false; btn.textContent='✅ 적용'; consSysMsg('⚠ 적용 실패: '+((res&&(res.reason||res.message))||'알 수 없음')); }
+      }catch(e){ btn.disabled=false; btn.textContent='✅ 적용'; consSysMsg('⚠ 적용 통신 오류: '+e.message); }
+    });
+    row.appendChild(lab); row.appendChild(btn); bub.appendChild(row);
+  });
+  d.appendChild(bub); b.appendChild(d); consScrollEnd();
 }
 function consAutoApplyCard(kind, title, lines){
   const b=document.getElementById('consChatBody'); if(!b) return;
@@ -15126,92 +14167,41 @@ function consAutoApplyCard(kind, title, lines){
   d.innerHTML=h; b.appendChild(d); consScrollEnd();
 }
 
+// 질문 복사 줄 — 상담 화면에 "📋 …" 버튼을 한 줄 추가한다(클릭하면 복사 모달).
+function consCopyRow(label, title, prompt){
+  const b=document.getElementById('consChatBody'); if(!b) return;
+  const d=document.createElement('div'); d.className='cons-row sys'; d.style.alignSelf='center'; d.style.maxWidth='94%';
+  const bub=document.createElement('div'); bub.className='cons-bub';
+  const btn=document.createElement('button'); btn.className='ibtn pri'; btn.textContent='📋 '+label;
+  btn.addEventListener('click',function(){ copyAsk(title,prompt,{noMentor:true}); });
+  bub.appendChild(btn); d.appendChild(bub); b.appendChild(d); consScrollEnd();
+}
+
+// LLM을 호출하지 않는다: 관할 데이터가 담긴 질문을 만들어 복사 모달로 보여준다.
 async function consAsk(agent, userText, isSelf){
   if(consState.busy) return;
   consState.busy = true;
-  const ctx = await consLoadContext(false);
-  consUpdateModeBadge();
-  // 결정적 자동 반영 먼저(요구 1~3): 감지된 변경은 LLM과 무관하게 즉시 yaml 반영 + 카드 표시.
-  const applyNote = isSelf ? '' : await consAutoApplyText(userText);
-  if(applyNote) consUpdateModeBadge();   // 적용 후 모드/값 배지 갱신
-  const sys = consAgentSystem(agent, ctx) + (applyNote ? ('\n\n'+applyNote) : '');
-  const hist = consState.history[agent.id] || (consState.history[agent.id]=[]);
-  const um = { role:'user', content:userText }; if(isSelf) um._self=true;
-  hist.push(um);
-  const stream = consRenderStreaming(agent);
   try{
-    const msgs = hist.filter(m=>!m._hidden).map(m=>({role:m.role,content:m.content}));
-    const text = await consComplete({ model:'claude-sonnet-4-5', max_tokens:1500, system:sys, messages:msgs.slice(-12) }, '상담:'+agent.id, cur=>stream.set(cur));
-    hist.push({ role:'assistant', content:text });
-    const parsed = stream.done(text);
-    consScrollEnd();
-    // 요구 3: 협력 — 모델이 [[ASK]]를 썼으면 그 부서를 호출, 아니면 사용자 문장에서 부서 요청 감지
-    if(!isSelf){
-      const asks = (parsed.asks||[]).filter(a=>a.dept!==agent.id);
-      if(asks.length){
-        for(const a of asks){ await consCollaborate(agent, a.dept, a.q); }
-      }else{
-        const reqDept = consDetectDeptRequest(userText, agent.id);
-        if(reqDept) await consCollaborate(agent, reqDept, userText);
-      }
-    }
+    const ctx = await consLoadContext(false);
+    consUpdateModeBadge();
+    // 전략 변경 후보 미리보기(LLM 무관): 감지되면 확인 카드만 표시 — ✅ 적용을 눌러야 반영.
+    const applyNote = isSelf ? '' : await consAutoApplyText(userText);
+    if(applyNote) consUpdateModeBadge();
+    const hist = consState.history[agent.id] || (consState.history[agent.id]=[]);
+    const um = { role:'user', content:userText }; if(isSelf) um._self=true;
+    const past = hist.filter(m=>!m._hidden&&!m._self).slice(-8).map(m=>(m.role==='user'?'사용자':agent.name)+': '+m.content).join('\n');
+    hist.push(um);
+    const prompt = consAgentSystem(agent, ctx)+(applyNote?('\n\n'+applyNote):'')+(past?('\n\n【이전 대화】\n'+past):'')+'\n\n【질문】\n'+userText;
+    consCopyRow('질문 복사 (claude.ai)', agent.name+' 상담 질문', prompt);
+    copyAsk(agent.name+' 상담 질문', prompt, {noMentor:true});
   }catch(e){
-    if(stream) stream.fail('⚠ 상담 중 오류가 났어요: '+e.message+'\n(설정창에서 Claude API 키를 확인해 주세요)');
+    consSysMsg('⚠ 질문 만들기 실패: '+e.message);
   }finally{
     consState.busy = false;
   }
 }
 // ── 사용자 문장에서 "다른 부서 의견 들어봐" 류 요청 감지(요구 3) ──
-function consDetectDeptRequest(text, currentId){
-  if(!text) return null;
-  const low=text.toLowerCase();
-  if(!/(의견|물어|들어봐|불러|에게|한테|담당|생각|어떻게 보)/.test(text)) return null;
-  const kw={
-    risk:['리스크','위험','손절','익절','하드리밋','쿨다운','담보'],
-    signal:['신호','지표','rsi','macd','이동평균','거래량','캔들','진입강도'],
-    screening:['스크리닝','종목 선정','종목선정','후보','선별'],
-    order:['주문','체결','슬리피지','실행','분할매수'],
-    learning:['학습','복기','패턴','백테','교훈'],
-    meta:['메타','최적화','토큰','옵티마'],
-    ceo:['총괄','모드 전환','전략 방향','대표']
-  };
-  for(const id of Object.keys(kw)){
-    if(id===currentId) continue;
-    if(kw[id].some(k=>low.indexOf(k.toLowerCase())>=0)) return id;
-  }
-  return null;
-}
 // ── 부서 간 협력(요구 3): toAgent가 의견 → fromAgent가 짧게 응답(자연스럽게 이어짐) ──
-async function consCollaborate(fromAgent, toAgentId, question){
-  const to = CONS_AGENTS.find(x=>x.id===toAgentId);
-  if(!to || to.id===fromAgent.id) return;
-  const ctx = await consLoadContext(false);
-  consSysMsg('🤝 '+fromAgent.name+'가 '+to.name+'의 의견을 요청했어요.');
-  const fromHist = consState.history[fromAgent.id]||(consState.history[fromAgent.id]=[]);
-  const recent = fromHist.filter(m=>!m._self&&!m._hidden).slice(-4)
-    .map(m=>(m.role==='user'?'사용자':fromAgent.name)+': '+consStripTokens(m.content)).join('\n');
-  // 1) 동료 부서가 자기 관점으로 의견(동의/반박)
-  const toSys = consAgentSystem(to, ctx)+'\n\n【지금은 부서 간 협력 — 동료의 의견 요청】 다른 부서('+fromAgent.name+')와 사용자가 나눈 대화를 보고, 네 관할 관점에서 의견을 줘. 동의하면 동의 근거를, 이견이 있으면 정중히 반박 근거를 대라(2~4문장). 관할 밖이면 누가 담당인지만 한 줄. [[ASK]]·[[PARAM]]은 쓰지 마라.';
-  const toAsk='지금까지 대화:\n'+(recent||'(맥락 없음)')+'\n\n['+fromAgent.name+']가 너에게 물은 것: '+question+'\n\n네 관할 관점에서 의견을 줘.';
-  const s1=consRenderStreaming(to);
-  let toText='';
-  try{
-    toText=await consComplete({model:'claude-sonnet-4-5',max_tokens:800,system:toSys,messages:[{role:'user',content:toAsk}]},'협력:'+to.id,cur=>s1.set(cur));
-    s1.done(toText);
-  }catch(e){ if(s1) s1.fail('⚠ 협력 중 오류: '+e.message); return; }
-  // 동료 의견을 원 부서 맥락에 주입(대화가 끊기지 않게)
-  fromHist.push({ role:'user', content:'['+to.name+' 의견] '+toText });
-  // 2) 원 부서가 동료 의견에 짧게 응답(수용/보완/정중한 재반박)
-  const fromSys=consAgentSystem(fromAgent, ctx)+'\n\n【방금 '+to.name+'가 네 사안에 의견을 줬다】 그 의견을 받아 네 관할 관점에서 짧게 응답해라(수용/보완/정중한 재반박, 2~3문장). [[ASK]]는 다시 쓰지 마라.';
-  const s2=consRenderStreaming(fromAgent);
-  try{
-    const fmsgs=fromHist.filter(m=>!m._self&&!m._hidden).map(m=>({role:m.role,content:m.content})).slice(-10);
-    const ftext=await consComplete({model:'claude-sonnet-4-5',max_tokens:700,system:fromSys,messages:fmsgs},'협력응답:'+fromAgent.id,cur=>s2.set(cur));
-    fromHist.push({ role:'assistant', content:ftext });
-    s2.done(ftext);
-  }catch(e){ if(s2) s2.fail('⚠ 응답 중 오류: '+e.message); }
-}
-
 // ── 사용자 입력 전송 ──
 function consSend(){
   const inp = document.getElementById('consInput');
@@ -15241,7 +14231,6 @@ async function consTeamMeeting(){
   if(consState.busy) return;
   consState.agent = null;
   consState.meeting = true;          // 회의 모드 진입 — 이후 입력은 팀 전체로 전달
-  consState.meetingLog = [];
   document.querySelectorAll('.cons-card').forEach(c=>c.classList.remove('on'));
   const ava=document.getElementById('consHeadAva'), nm=document.getElementById('consHeadName'), rl=document.getElementById('consHeadRole');
   if(ava){ ava.textContent='🤝'; ava.style.background='var(--card)'; }
@@ -15258,111 +14247,30 @@ async function consTeamMeeting(){
 // ── 회의 1라운드 실행 (요구 2·3: 토론·반박 + 결과 저장/적용) ──
 //  흐름: ①각 부서 발언 → ②CEO 중간 제안 → ③각 부서 동의/반박 토론 → ④CEO 최종 종합(+개선안)
 //        → ⑤기록 저장 + 깃 커밋. 개선안은 ✅ 적용 카드로 strategy_params.yaml 반영.
+// LLM을 호출하지 않는다: 각 부서 관할 현황을 모아 "회의 안건" 질문을 만들어 복사하도록 보여준다.
 async function consRunMeeting(userText){
   if(consState.busy) return;
   consState.busy = true;
   const sendBtn=document.getElementById('consSend'); if(sendBtn) sendBtn.disabled=true;
-  const ctx = await consLoadContext(userText?false:true);
-  consUpdateModeBadge();
-  const record = { q:userText||'(정기 회의)', mode:(ctx.mode||'paper'), statements:[], interim:'', debate:[], ceo:'', improvements:[] };
   try{
-    const depts = CONS_AGENTS.filter(a=>a.id!=='ceo');
+    const ctx = await consLoadContext(userText?false:true);
+    consUpdateModeBadge();
+    const agenda = userText||'정기 회의 — 오늘 팀 현황 점검';
     const ceo = CONS_AGENTS.find(a=>a.id==='ceo');
-
-    // ① 각 부서 발언/답변 (병렬, 전체 수신 후 표시)
-    const deptAsk = (a)=>{
-      const base = consAgentSystem(a, ctx);
-      let sys, ask;
-      if(userText){
-        sys = base+'\n\n【전체 팀 회의 — 사용자 질문 답변 차례】 사용자 질문에 네 관할에서만 2~4문장으로 답해라. 관할 밖이면 누구 담당인지만. [[PARAM]]·[[ASK]]는 쓰지 마라.';
-        ask = '사용자 질문: '+userText+'\n\n네 관할에서 답해줘.';
-      }else{
-        sys = base+'\n\n【전체 팀 회의 — 현황 발언 차례】 네 관할에서 오늘 어땠는지 2~4문장. 다른 부서 일은 언급 마라. [[PARAM]]·[[ASK]]는 쓰지 마라.';
-        ask = '회의 발언을 해줘. 네 관할에서 잘한 점/걱정되는 점만 짧게.';
-      }
-      return callClaude({ model:'claude-haiku-4-5', max_tokens:500, system:sys, messages:[{role:'user',content:ask}] }, '회의:'+a.id)
-        .then(d=>({ agent:a, text:consStripTokens((d.content&&d.content[0]&&d.content[0].text)||(d.error?('⚠ '+(d.error.message||'')):'(발언 없음)')) }))
-        .catch(e=>({ agent:a, text:'⚠ '+e.message }));
-    };
-    let typing = consShowTyping({emoji:'🤝',color:'#7c3aed'});
-    const statements = await Promise.all(depts.map(deptAsk));
-    consRemove(typing);
-    statements.forEach(s=>{ consRenderMsg('ai', s.text, s.agent); record.statements.push({agent:s.agent.id,name:s.agent.name,text:s.text}); });
-    consScrollEnd();
-    const brief = statements.map(s=>s.agent.emoji+' '+s.agent.name+': '+s.text).join('\n');
-
-    // ② CEO 중간 제안 — 부서들이 반박/동의할 구체 방향을 던진다
-    consSysMsg('🧠 CEO가 중간 방향을 제안합니다. 각 부서가 동의하거나 반박해요.');
-    const interimSys = consAgentSystem(ceo, ctx)+'\n\n【전체 팀 회의 — CEO 중간 제안 차례】 각 부서 발언을 듣고, 오늘 팀이 바꾸면 좋을 구체적 방향을 1~2가지 제안해라(예: "스크리닝 기준을 더 높이자", "손절을 더 타이트하게"). 어느 부서가 관련되는지 짚어라(3~4문장). 아직 최종 결론은 아니다. [[PARAM]]은 쓰지 마라.';
-    const interimUser = (userText?('사용자 질문: '+userText+'\n\n'):'')+'각 부서 발언:\n'+brief+'\n\n중간 방향을 제안해줘.';
-    const iStream = consRenderStreaming(ceo);
-    const interim = await consComplete({ model:'claude-sonnet-4-5', max_tokens:700, system:interimSys, messages:[{role:'user',content:interimUser}] }, '회의:ceo제안', cur=>iStream.set('【CEO 제안】\n'+cur));
-    iStream.done('【CEO 제안】\n'+interim); record.interim=interim;
-
-    // ③ 토론 라운드 — 각 부서가 CEO 제안에 동의/반박
-    const debateAsk = (a)=>{
-      const sys = consAgentSystem(a, ctx)+'\n\n【전체 팀 회의 — 토론 차례】 CEO가 다음을 제안했다:\n"'+interim+'"\n네 관할에 영향이 있으면 동의 또는 정중한 반박을 근거와 함께 2~3문장. 관할과 무관하면 정확히 "관할 무관"이라고만 답해라. [[PARAM]]·[[ASK]]는 쓰지 마라.';
-      return callClaude({ model:'claude-haiku-4-5', max_tokens:500, system:sys, messages:[{role:'user',content:'CEO 제안에 대한 네 관할 입장을 말해줘.'}] }, '회의토론:'+a.id)
-        .then(d=>({ agent:a, text:consStripTokens((d.content&&d.content[0]&&d.content[0].text)||'(발언 없음)') }))
-        .catch(e=>({ agent:a, text:'⚠ '+e.message }));
-    };
-    typing = consShowTyping({emoji:'💬',color:'#7c3aed'});
-    const debate = await Promise.all(depts.map(debateAsk));
-    consRemove(typing);
-    debate.forEach(s=>{
-      if(/^관할\s*무관/.test(s.text.trim())) return;   // 무관 부서는 잡음 줄이려 생략
-      consRenderMsg('ai', '💬 '+s.text, s.agent); record.debate.push({agent:s.agent.id,name:s.agent.name,text:s.text});
-    });
-    consScrollEnd();
-    const debateBrief = record.debate.map(s=>s.name+': '+s.text).join('\n') || '(반박/이견 없음 — 대체로 동의)';
-
-    // ④ CEO 최종 종합 + 합의 개선안([[PARAM]]) 추출
-    const allKeys = Object.keys(CONS_TUNABLE);
-    const tunList = allKeys.map(k=>k+'('+CONS_TUNABLE[k].label+')').join(', ');
-    let ceoSys, ceoUser;
-    if(userText){
-      ceoSys = consAgentSystem(ceo, ctx)+'\n\n【전체 팀 회의 — CEO 최종 종합】 부서 발언과 토론을 종합해 사용자 질문에 팀 대표로 답해라. 핵심 결론 → 근거 → 다음 한 걸음(3~6문장). 토론에서 합의된 개선이 있으면 답변 맨 끝에 각각 한 줄로 [[PARAM:키=값|이유]] 형식(키는 이것만: '+tunList+'). 합의 안 된 건 적지 마라.';
-      ceoUser = '사용자 질문: '+userText+'\n\n부서 발언:\n'+brief+'\n\n토론:\n'+debateBrief+'\n\n최종 종합 답변과 (있으면) 개선안을 줘.';
-    }else{
-      ceoSys = consAgentSystem(ceo, ctx)+'\n\n【전체 팀 회의 — CEO 최종 종합】 토론을 듣고 ①오늘 팀 총평 2~3줄 ②가장 먼저 할 일 1가지 ③모드 유지/전환 의견. 합의된 개선이 있으면 맨 끝에 한 줄씩 [[PARAM:키=값|이유]](키는 이것만: '+tunList+'). 합의 안 된 건 적지 마라.';
-      ceoUser = '부서 발언:\n'+brief+'\n\n토론:\n'+debateBrief+'\n\n최종 종합해줘.';
-    }
-    const cStream = consRenderStreaming(ceo);
-    const ctext = await consComplete({ model:'claude-sonnet-4-5', max_tokens:1200, system:ceoSys, messages:[{role:'user',content:ceoUser}] }, '회의:ceo종합', cur=>cStream.set('【CEO 최종 종합】\n'+cur));
-    const parsed = cStream.done('【CEO 최종 종합】\n'+ctext, allKeys);
-    record.ceo = parsed.text.replace(/^【CEO 최종 종합】\s*/,'');
-    record.improvements = parsed.params.map(p=>({key:p.key, val:p.val, reason:p.reason}));
-    consState.meetingLog.push({ q:userText||'(정기 회의)', a:ctext });
-
-    // ⑤ 기록 저장 + 깃 커밋
-    record.ts = new Date().toISOString();
-    await consSaveMeeting(record);
+    const depts = CONS_AGENTS.filter(a=>a.id!=='ceo');
+    const parts = ['【전체 팀 회의 안건】 '+agenda, '', '아래 각 부서의 관할 현황을 보고 ①부서별로 자기 관할만 2~4문장 발언 ②CEO 종합(총평·가장 먼저 할 일 1가지·모드 유지/전환 의견) 순서로 회의록을 써줘. 다른 부서 일은 언급하지 말고, 특정 종목 매수/매도 지시는 하지 마.', ''];
+    depts.concat(ceo?[ceo]:[]).forEach(function(a){ parts.push('■ '+a.emoji+' '+a.name+' ('+a.role+')\n관할: '+a.charter.talk+'\n'+consScopedCtx(a,ctx)+'\n'); });
+    const prompt = parts.join('\n');
+    consCopyRow('회의 안건 복사 (claude.ai)', '팀 회의 안건', prompt);
+    if(userText) copyAsk('팀 회의 안건', prompt, {noMentor:true});
   }catch(e){
-    consRenderMsg('ai', '⚠ 회의 중 오류: '+e.message, {emoji:'🤝',color:'#7c3aed',name:'팀 회의'});
+    consSysMsg('⚠ 회의 안건 만들기 실패: '+e.message);
   }finally{
     consState.busy = false;
     const sb=document.getElementById('consSend'); if(sb && consState.meeting) sb.disabled=false;
   }
 }
 // ── 회의 결과 저장 + 깃 커밋(요구 2) ──
-async function consSaveMeeting(record){
-  try{
-    const r=await fetch('/api/agent/consult/meeting/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(record)});
-    const d=await r.json();
-    if(d && d.ok){
-      const c=d.committed?(' · 깃 커밋 '+(d.commit||'')):(d.reason?(' · '+d.reason):'');
-      let msg='🗂 회의 기록을 저장했어요 (총 '+(d.count||0)+'건)'+c+'. 다음 상담 때 참고할게요.';
-      consSysMsg(msg);
-      // 📋 회의 내용 적용 버튼 — 회의 화면 하단에 배치(요구 2). 대화에서 실행 항목을
-      // 추출해 체크리스트로 보여주고 선택 적용한다.
-      consMeetingApplyButton(record);
-      consState.ctxAt=0;   // 컨텍스트 캐시 무효화 → 다음 호출 시 최신 회의 반영
-    }else{
-      consSysMsg('⚠ 회의 기록 저장 실패: '+((d&&d.reason)||'알 수 없음'));
-    }
-  }catch(e){ consSysMsg('⚠ 회의 기록 저장 통신 오류: '+e.message); }
-}
-
 // ── 렌더 헬퍼 ──
 function consClearBody(){ const b=document.getElementById('consChatBody'); if(b) b.innerHTML=''; }
 function consClearChat(){
@@ -15385,231 +14293,17 @@ function consRenderMsg(side, text, agent){
   let inner = '<div class="cons-row-ava" style="background:'+avaBg+';color:'+avaCol+';">'+emoji+'</div>';
   let bub = '';
   if(side==='ai' && agent && agent.name){ bub += '<div class="cons-name-tag">'+consEsc(agent.name)+'</div>'; }
-  // 파라미터 제안 토큰 추출 — 제안 부서의 관할 키만 카드로 만든다(영역 침범 차단)
-  const allow = (agent && agent.tunables) ? agent.tunables : Object.keys(CONS_TUNABLE);
-  const parsed = consExtractParams(text, allow);
-  bub += '<div>'+consFmt(parsed.text)+'</div>';
-  parsed.params.forEach(p=>{ bub += consParamCard(p); });
+  bub += '<div>'+consFmt(text)+'</div>';
   inner += '<div class="cons-bub" style="flex:1;">'+bub+'</div>';
   row.innerHTML = inner;
   b.appendChild(row);
 }
 // [[PARAM:key=value|이유]] 토큰 파싱 — allow(허용 키 목록) 안의 키만 카드화
-function consExtractParams(text, allow){
-  const params=[];
-  const ok = allow || Object.keys(CONS_TUNABLE);
-  const re=/\[\[PARAM:\s*([a-zA-Z0-9_.]+)\s*=\s*([^|\]]+?)\s*(?:\|\s*([^\]]+?))?\s*\]\]/g;
-  let m;
-  while((m=re.exec(text))!==null){
-    const key=m[1].trim(); const val=m[2].trim(); const reason=(m[3]||'').trim();
-    if(CONS_TUNABLE[key] && ok.indexOf(key)>=0) params.push({key,val,reason});
-  }
-  const clean = text.replace(re,'').trim();
-  return { text:clean, params };
-}
-// [[ASK:부서id|질문]] 토큰 파싱(요구 3: 부서 간 협력 요청)
-function consExtractAsks(text){
-  const asks=[];
-  const re=/\[\[ASK:\s*([a-zA-Z_]+)\s*\|\s*([^\]]+?)\s*\]\]/g;
-  let m;
-  while((m=re.exec(text))!==null){
-    const dept=m[1].trim().toLowerCase(); const q=m[2].trim();
-    if(CONS_OWNER[dept]) asks.push({dept,q});
-  }
-  return { text:text.replace(re,'').trim(), asks };
-}
-// 스트리밍 중 토큰이 잠깐 보이지 않게 PARAM/ASK 토큰을 즉시 제거
-function consStripTokens(text){
-  return String(text==null?'':text)
-    .replace(/\[\[PARAM:[^\]]*\]\]/g,'')
-    .replace(/\[\[ASK:[^\]]*\]\]/g,'');
-}
-// ── 스트리밍 말풍선(요구 1): set()으로 점진 렌더, done()에서 토큰 정리 + 파라미터 카드 ──
-function consRenderStreaming(agent){
-  const b=document.getElementById('consChatBody'); if(!b) return null;
-  const row=document.createElement('div'); row.className='cons-row ai';
-  const emoji=(agent&&agent.emoji)||'💬';
-  const avaBg=(agent&&agent.color? agent.color+'1a':'var(--card)');
-  const nameTag=(agent&&agent.name)? '<div class="cons-name-tag">'+consEsc(agent.name)+'</div>':'';
-  row.innerHTML='<div class="cons-row-ava" style="background:'+avaBg+';">'+emoji+'</div>'+
-    '<div class="cons-bub" style="flex:1;">'+nameTag+'<div class="cons-stream-body"><span class="cons-cursor"></span></div></div>';
-  b.appendChild(row); consScrollEnd();
-  const sbody=row.querySelector('.cons-stream-body');
-  return {
-    row, agent,
-    set(text){ if(sbody){ sbody.innerHTML=consFmt(consStripTokens(text))+'<span class="cons-cursor"></span>'; } consScrollEnd(); },
-    // text=전체 텍스트, allowOverride=파라미터 허용 키(없으면 agent.tunables)
-    done(text, allowOverride){
-      const allow=allowOverride||(agent&&agent.tunables)||Object.keys(CONS_TUNABLE);
-      const asks=consExtractAsks(text);
-      const parsed=consExtractParams(asks.text, allow);
-      const bub=row.querySelector('.cons-bub');
-      if(bub){
-        let html=nameTag+'<div>'+consFmt(parsed.text)+'</div>';
-        parsed.params.forEach(p=>{ html+=consParamCard(p); });
-        bub.innerHTML=html;
-      }
-      consScrollEnd();
-      return { text:parsed.text, params:parsed.params, asks:asks.asks, raw:text };
-    },
-    fail(msg){ const bub=row.querySelector('.cons-bub'); if(bub) bub.innerHTML=nameTag+'<div>'+consFmt(msg)+'</div>'; }
-  };
-}
-let _consParamSeq=0;
-function consParamCard(p){
-  const meta=CONS_TUNABLE[p.key]||{label:p.key,hint:''};
-  const id='consPC'+(++_consParamSeq);
-  const cur=(consState.ctx&&consState.ctx.params&&consState.ctx.params[p.key]);
-  const locked=(consState.ctx&&consState.ctx.mode==='live');
-  const safe=consEsc.bind(null);
-  let html='<div class="cons-param" id="'+id+'">';
-  html+='<div class="cons-param-t">⚙ 파라미터 제안 · '+safe(meta.label)+'</div>';
-  if(p.reason) html+='<div class="cons-param-d">'+safe(p.reason)+'</div>';
-  else if(meta.hint) html+='<div class="cons-param-d">'+safe(meta.hint)+'</div>';
-  html+='<div class="cons-param-val">'+safe(p.key)+': '+(cur!=null?safe(String(cur))+' → ':'')+'<b>'+safe(p.val)+'</b></div>';
-  if(locked){
-    html+='<button class="cons-param-btn" disabled>🔒 실전 모드 — 모의에서만 적용</button>';
-  }else{
-    html+='<button class="cons-param-btn" onclick="consApplyParam(\''+id+'\',\''+safe(p.key)+'\',\''+safe(p.val)+'\')">✅ 적용 (yaml 수정 + 깃 커밋)</button>';
-  }
-  html+='</div>';
-  return html;
-}
-// 파라미터 적용 → 서버가 yaml 수정 + git 커밋 (paper 전용)
-async function consApplyParam(cardId, key, val){
-  const card=document.getElementById(cardId); if(!card) return;
-  const btn=card.querySelector('.cons-param-btn');
-  if(btn){ btn.disabled=true; btn.textContent='⏳ 적용 중…'; }
-  try{
-    const r=await fetch('/api/agent/consult/apply-param',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key,value:val})});
-    const d=await r.json();
-    if(d && d.ok){
-      card.classList.add('done');
-      const commit=d.commit?(' · 커밋 '+d.commit):(d.committed===false&&d.gitReason?(' · '+d.gitReason):'');
-      if(btn){ btn.textContent='✅ 적용 완료 ('+(d.applied&&d.applied[0]?d.applied[0].from+'→'+d.applied[0].to:val)+')'+commit; }
-      // 캐시 갱신
-      if(consState.ctx&&consState.ctx.params) consState.ctx.params[key]=isNaN(+val)?val:+val;
-    }else{
-      card.classList.add('fail');
-      if(btn){ btn.disabled=false; btn.style.background='var(--r)'; btn.textContent='❌ '+((d&&d.reason)||'적용 실패'); }
-    }
-  }catch(e){
-    card.classList.add('fail');
-    if(btn){ btn.disabled=false; btn.style.background='var(--r)'; btn.textContent='❌ 통신 오류: '+e.message; }
-  }
-}
-// ════════ 📋 회의 내용 적용 (요구 1~5) ════════
-// 회의 대화에서 실행 항목 자동 추출 → 체크리스트 → 선택 적용 → 검증/기록/커밋 → 이력/롤백.
-let _consMeetingSeq = 0;
-const _consMeetingData = {};   // boxId → {items, record}
 
 // 회의 화면 하단 "📋 회의 내용 적용" 버튼(요구 2).
-function consMeetingApplyButton(record){
-  const b=document.getElementById('consChatBody'); if(!b) return;
-  const id='consMA'+(++_consMeetingSeq);
-  _consMeetingData[id]={record:record||{}, items:null};
-  const nImp=(record&&record.improvements&&record.improvements.length)||0;
-  const row=document.createElement('div'); row.className='cons-row sys'; row.style.alignSelf='center'; row.style.maxWidth='96%';
-  row.innerHTML='<div class="cons-bub" style="text-align:center;">'
-    +'<div style="font-size:12px;font-weight:800;margin-bottom:6px;">📋 이 회의 내용을 전략에 반영할까요?</div>'
-    +'<div style="font-size:10.5px;color:var(--ts,#9aa);margin-bottom:8px;">대화에서 바꿀 항목을 자동으로 찾아 체크리스트로 보여드려요'+(nImp?(' (합의 개선안 '+nImp+'건 포함)'):'')+'.</div>'
-    +'<button id="'+id+'btn" class="cons-param-btn" style="background:linear-gradient(135deg,#3182f6,#7c3aed);" onclick="consMeetingApplyOpen(\''+id+'\')">📋 회의 내용 적용</button>'
-    +'<div id="'+id+'box" style="margin-top:8px;text-align:left;"></div>'
-    +'</div>';
-  b.appendChild(row); consScrollEnd();
-}
-
 // 실행 항목 추출 → 체크리스트 렌더(요구 1·2).
-async function consMeetingApplyOpen(id){
-  const slot=_consMeetingData[id]; if(!slot) return;
-  const box=document.getElementById(id+'box'); const btn=document.getElementById(id+'btn');
-  if(!box) return;
-  if(btn){ btn.disabled=true; btn.textContent='⏳ 실행 항목 찾는 중…'; }
-  try{
-    const r=await fetch('/api/agent/consult/meeting/extract',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(slot.record)});
-    const d=await r.json();
-    if(!d){ box.innerHTML='<div style="font-size:11px;color:var(--r,#f55);">❌ 추출 실패: 서버에서 빈 응답이 왔어요(응답 없음).</div>'; if(btn){btn.disabled=false;btn.textContent='📋 다시 시도';} return; }
-    if(!d.ok){
-      // 구체적 사유를 항상 보여준다(빈 사유 → 안내 문구). detail 있으면 접어서 노출.
-      const why=d.reason||d.message||'추출 처리 중 문제가 발생했어요(상세 사유 없음).';
-      let h='<div style="font-size:11px;color:var(--r,#f55);">❌ 추출 실패: '+consEsc(why)+'</div>';
-      if(d.detail){ h+='<details style="margin-top:3px;"><summary style="cursor:pointer;font-size:9.5px;color:var(--ts,#9aa);">자세히</summary><div style="font-size:9px;color:var(--ts,#9aa);white-space:pre-wrap;">'+consEsc(d.detail)+'</div></details>'; }
-      box.innerHTML=h; if(btn){btn.disabled=false;btn.textContent='📋 다시 시도';} return;
-    }
-    slot.items=d.items||[];
-    consMeetingRenderChecklist(id, d);
-    if(btn){ btn.style.display='none'; }
-  }catch(e){
-    box.innerHTML='<div style="font-size:11px;color:var(--r,#f55);">❌ 통신 오류: '+consEsc(e.message)+'</div>';
-    if(btn){ btn.disabled=false; btn.textContent='📋 다시 시도'; }
-  }
-}
-
 // 체크리스트 카드(요구 2·3): 항목별 체크박스 + 적용 전후 값 + 잠금 표시.
-function consMeetingRenderChecklist(id, d){
-  const box=document.getElementById(id+'box'); if(!box) return;
-  if(!d.items||!d.items.length){
-    box.innerHTML='<div style="font-size:11px;color:var(--ts,#9aa);">'+consEsc(d.message||'바꿀 항목을 못 찾았어요.')+'</div>'; return;
-  }
-  let html='<div class="cons-param" style="border-color:#3182f6;">';
-  html+='<div class="cons-param-t">📋 실행 항목 '+d.items.length+'개 (적용 가능 '+(d.applicable||0)+'개)</div>';
-  d.items.forEach((it,i)=>{
-    const cid=id+'chk'+i;
-    const badge = it.hard_limit ? '<span style="font-size:9px;background:#f5555533;color:#f88;padding:1px 6px;border-radius:6px;margin-left:4px;">🔒 하드리밋</span>'
-                : it.locked ? '<span style="font-size:9px;background:#fbbf2433;color:#fbbf24;padding:1px 6px;border-radius:6px;margin-left:4px;">🔒 실전</span>'
-                : (!it.applicable ? '<span style="font-size:9px;background:#88888833;color:#aaa;padding:1px 6px;border-radius:6px;margin-left:4px;">제외</span>' : '');
-    const dis = it.applicable ? '' : 'disabled';
-    const op = it.applicable ? '1' : '0.55';
-    html+='<label style="display:flex;gap:8px;align-items:flex-start;padding:7px 4px;border-top:1px solid var(--bd,#2a2d35);opacity:'+op+';cursor:'+(it.applicable?'pointer':'default')+';">'
-      +'<input type="checkbox" id="'+cid+'" data-i="'+i+'" '+(it.applicable?'checked':'')+' '+dis+' style="margin-top:2px;flex:none;">'
-      +'<span style="flex:1;min-width:0;">'
-      +'<div style="font-size:11.5px;font-weight:700;">'+consEsc(it.label)+badge+'</div>'
-      +'<div style="font-size:11px;color:var(--ts,#9aa);margin-top:1px;">'+consEsc(it.display)+'</div>'
-      +(it.note?('<div style="font-size:10px;color:#fbbf24;margin-top:1px;">'+consEsc(it.note)+'</div>'):'')
-      +(it.reason&&it.applicable?('<div style="font-size:10px;color:var(--ts,#9aa);margin-top:1px;">💬 '+consEsc(it.reason)+'</div>'):'')
-      +'</span></label>';
-  });
-  const anyApplicable = (d.applicable||0)>0;
-  if(anyApplicable){
-    html+='<button id="'+id+'apply" class="cons-param-btn" style="margin-top:8px;" onclick="consMeetingApplySelected(\''+id+'\')">✅ 선택 항목 적용 (yaml 수정 + 깃 커밋)</button>';
-  }else{
-    html+='<div style="font-size:10.5px;color:var(--ts,#9aa);margin-top:8px;">적용 가능한 항목이 없어요'+(d.mode!=='paper'?' — 🔒 실전 모드에서는 전략을 바꿀 수 없어요.':'.')+'</div>';
-  }
-  html+='<div id="'+id+'res" style="margin-top:8px;"></div>';
-  html+='</div>';
-  box.innerHTML=html;
-}
-
 // 선택 항목 적용(요구 3·4): 실제 yaml 반영 + 검증 + 기록 + 커밋.
-async function consMeetingApplySelected(id){
-  const slot=_consMeetingData[id]; if(!slot||!slot.items) return;
-  const box=document.getElementById(id+'box');
-  const checks=box?box.querySelectorAll('input[type=checkbox]:checked'):[];
-  const items=[];
-  checks.forEach(c=>{ const it=slot.items[+c.getAttribute('data-i')]; if(it&&it.applicable) items.push({key:it.key, value:it.proposed, label:it.label, reason:it.reason}); });
-  const res=document.getElementById(id+'res');
-  if(!items.length){ if(res) res.innerHTML='<div style="font-size:11px;color:#fbbf24;">선택된 항목이 없어요.</div>'; return; }
-  const btn=document.getElementById(id+'apply');
-  if(btn){ btn.disabled=true; btn.textContent='⏳ 적용 중…'; }
-  const rec=slot.record||{};
-  const payload={meeting_id:rec.ts||'', meeting_q:rec.q||'회의', meeting_ts:rec.ts||'', items:items};
-  try{
-    const r=await fetch('/api/agent/consult/meeting/apply',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-    const d=await r.json();
-    let html='';
-    if(d.locked){ html='<div style="font-size:11px;color:#fbbf24;">🔒 '+consEsc(d.reason||'실전 모드 — 적용 불가')+'</div>'; }
-    (d.applied||[]).forEach(a=>{ html+='<div style="font-size:11px;color:#22c55e;margin-top:2px;">✅ '+consEsc(a.display||(a.key+' 적용'))+(a.commit?(' · 커밋 '+consEsc(a.commit)):'')+'</div>'; });
-    (d.failed||[]).forEach(f=>{ html+='<div style="font-size:11px;color:#f55;margin-top:2px;">❌ '+consEsc(f.display||f.key)+' — '+consEsc(f.reason||'실패')+'</div>'; });
-    if(!html) html='<div style="font-size:11px;color:var(--ts,#9aa);">'+consEsc(d.message||d.reason||'결과 없음')+'</div>';
-    if(res) res.innerHTML=html;
-    if(btn){ btn.textContent=(d.applied&&d.applied.length)?('✅ '+d.applied.length+'건 적용 완료'):'다시 시도'; btn.disabled=!(d.applied&&d.applied.length)?false:true; }
-    consMeetingHistoryLoad();   // 이력 패널 갱신
-  }catch(e){
-    if(res) res.innerHTML='<div style="font-size:11px;color:#f55;">❌ 통신 오류: '+consEsc(e.message)+'</div>';
-    if(btn){ btn.disabled=false; btn.textContent='다시 시도'; }
-  }
-}
-
 // 🗳 회의 적용 이력 패널(요구 5): 타임라인 + 효과 + 롤백 버튼.
 async function consMeetingHistoryLoad(){
   const el=document.getElementById('meetingHistBody'); if(!el) return;
@@ -15653,13 +14347,6 @@ async function consMeetingRollback(decId, btn){
   }catch(e){ consSysMsg('⚠ 롤백 통신 오류: '+e.message); if(btn){btn.disabled=false;btn.textContent='↩️ 되돌리기';} }
 }
 
-function consShowTyping(agent){
-  const b=document.getElementById('consChatBody'); if(!b) return null;
-  const row=document.createElement('div'); row.className='cons-row ai';
-  row.innerHTML='<div class="cons-row-ava" style="background:'+((agent&&agent.color?agent.color+'1a':'var(--card)'))+';">'+((agent&&agent.emoji)||'💬')+'</div><div class="cons-bub"><div class="cons-typing"><span></span><span></span><span></span></div></div>';
-  b.appendChild(row); consScrollEnd(); return row;
-}
-function consRemove(el){ if(el&&el.parentNode) el.parentNode.removeChild(el); }
 function consScrollEnd(){ const b=document.getElementById('consChatBody'); if(b) b.scrollTop=b.scrollHeight; }
 function consEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 // 안전 마크다운: **굵게** + 줄바꿈만

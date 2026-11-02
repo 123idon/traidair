@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="build-ts" content="1793601781974">
+<meta name="build-ts" content="1793610037182">
 <title>TraidAIr 대시보드</title>
 <style>
 :root{
@@ -118,7 +118,7 @@ body{display:flex;flex-direction:column;overflow:hidden;}
   <div id="marketScore" class="score-badge" style="background:rgba(255,147,0,.1);color:var(--a);">시장 --/10</div>
   <div style="margin-left:auto;display:flex;gap:6px;">
     <button class="hdr-btn sec" onclick="autoLoadMarketData()">↺ 새로고침</button>
-    <button class="hdr-btn" onclick="runFullAIAnalysis()">🤖 AI 전체 분석</button>
+    <button class="hdr-btn" onclick="runFullAIAnalysis()">📋 시장 분석 질문 복사</button>
   </div>
 </div>
 
@@ -137,33 +137,15 @@ body{display:flex;flex-direction:column;overflow:hidden;}
       <div class="mkt-item"><div class="mkt-lbl">미국10년채</div><div class="mkt-val neu" id="m-bond">--</div><div class="mkt-chg neu" id="mc-bond">--</div></div>
       <div class="mkt-item"><div class="mkt-lbl">야간선물</div><div class="mkt-val neu" id="m-night">--</div><div class="mkt-chg neu" id="mc-night">--</div></div>
     </div>
-    <div class="verdict neutral" id="marketVerdict">📊 데이터를 입력하거나 AI 분석을 실행하세요</div>
+    <div class="verdict neutral" id="marketVerdict">📊 시장 데이터를 불러오는 중…</div>
   </div>
 
-  <!-- AI 분석 결과 -->
+  <!-- 시장 분석 질문 (LLM 미호출: 질문을 복사해 claude.ai에서 확인) -->
   <div class="card" style="grid-column:2/3;">
-    <div class="card-t">🤖 AI 시장 분석 <span id="aiAnalyzed"></span></div>
-    <div class="ai-section" id="aiSection">
-      <div class="ai-row">
-        <div class="label">📊 시장 방향</div>
-        <div class="val" id="ai-direction">AI 분석 버튼을 눌러주세요</div>
-      </div>
-      <div class="ai-row">
-        <div class="label">🔥 강세 섹터 TOP3</div>
-        <div class="val" id="ai-sectors">--</div>
-      </div>
-      <div class="ai-row">
-        <div class="label">⚠️ 오늘 주요 리스크</div>
-        <div class="val" id="ai-risks">--</div>
-      </div>
-      <div class="ai-row">
-        <div class="label">💡 오늘 매매 전략</div>
-        <div class="val" id="ai-strategy">--</div>
-      </div>
-      <div class="ai-row">
-        <div class="label">👁 외국인/기관 수급</div>
-        <div class="val" id="ai-flow">--</div>
-      </div>
+    <div class="card-t">📋 시장 분석 질문</div>
+    <div class="ai-section">
+      <div class="ai-row"><div class="val">이 앱은 AI 서버를 호출하지 않아요. 아래 버튼으로 오늘 날짜 기준 분석 질문을 복사해 claude.ai에 붙여넣으세요. 시세·지표 계산은 위 카드에서 로컬로 표시됩니다.</div></div>
+      <div class="ai-row"><button class="hdr-btn" onclick="runFullAIAnalysis()">📋 시장 분석 질문 복사</button></div>
     </div>
   </div>
 
@@ -171,7 +153,7 @@ body{display:flex;flex-direction:column;overflow:hidden;}
   <div class="card" style="grid-column:1/3;">
     <div class="card-t">🎯 오늘 진입 후보 <span id="candUpdated"></span></div>
     <div class="cand-list" id="candList">
-      <div class="loading"><div class="dot"></div><div class="dot"></div><div class="dot"></div> AI 분석 버튼을 눌러 후보 종목을 받아오세요</div>
+      <div class="loading"><div class="dot"></div><div class="dot"></div><div class="dot"></div> 진입 후보 계산 중… (후보가 없으면 관망)</div>
     </div>
   </div>
 
@@ -184,11 +166,11 @@ body{display:flex;flex-direction:column;overflow:hidden;}
     <div id="dashChartEmpty" style="text-align:center;padding:40px;color:var(--tm);font-size:11px;">HTS에서 종목을 선택하면 차트가 표시됩니다</div>
   </div>
 
-  <!-- AI 채팅 -->
+  <!-- 멘토 질문 (질문 복사) -->
   <div class="card chat-wrap">
-    <div class="card-t">💬 AI 트레이딩 멘토</div>
+    <div class="card-t">💬 멘토에게 질문 (복사)</div>
     <div class="chat-msgs" id="chatMsgs">
-      <div class="msg ai">안녕하세요! 오늘 매매 준비를 도와드릴게요.<br>AI 전체 분석 버튼을 누르면 시장 분석부터 진입 후보까지 한 번에 알려드려요 🚀</div>
+      <div class="msg ai">안녕하세요! 오늘 매매 준비를 도와드릴게요.<br>질문을 입력하면 오늘 날짜·대화 내용이 담긴 질문을 복사할 수 있게 열어 드려요. claude.ai에 붙여넣어 답을 받아보세요.</div>
     </div>
     <div class="quick-btns">
       <button class="qbtn" onclick="quickQ('오늘 시장 방향은?')">시장방향</button>
@@ -209,7 +191,7 @@ body{display:flex;flex-direction:column;overflow:hidden;}
 (function(){
   const meta = document.querySelector('meta[name="build-ts"]');
   const myBuildTs = meta ? meta.getAttribute('content') : '';
-  if(!myBuildTs || myBuildTs === '1793601781974') return;
+  if(!myBuildTs || myBuildTs === '1793610037182') return;
   let reloaded = false;
   async function check(){
     if(reloaded) return;
@@ -348,36 +330,44 @@ function loadMockStats(){
   }catch(e){ return {wins:0,total:0,pnl:0}; }
 }
 
-// ── Claude API 호출 ──
-async function callClaude(prompt, maxTokens=800){
-  try{
-    const res = await fetch('/api/claude',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({
-        model:'claude-sonnet-4-5',
-        max_tokens: maxTokens,
-        messages:[{role:'user',content:prompt}]
-      })
+// ── 질문 복사 — AI 서버를 호출하지 않고, 만든 질문을 복사해 claude.ai에 붙여넣도록 보여준다 ──
+function copyAsk(title, prompt){
+  var bg=document.getElementById('copyAskBg');
+  if(!bg){
+    bg=document.createElement('div'); bg.id='copyAskBg';
+    bg.style.cssText='position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:9999;display:none;align-items:center;justify-content:center;';
+    var box=document.createElement('div');
+    box.style.cssText='background:var(--card,#fff);color:var(--tp,#111);border-radius:12px;padding:14px;width:min(560px,94vw);box-shadow:0 8px 40px rgba(0,0,0,.25);';
+    var h=document.createElement('div'); h.id='copyAskTtl'; h.style.cssText='font-weight:800;margin-bottom:6px;';
+    var note=document.createElement('div'); note.style.cssText='font-size:11px;opacity:.7;margin-bottom:6px;line-height:1.5;';
+    note.textContent='아래 질문을 복사해 claude.ai에 붙여넣으세요. (이 앱은 AI 서버를 호출하지 않습니다)';
+    var ta=document.createElement('textarea'); ta.id='copyAskText'; ta.readOnly=true;
+    ta.style.cssText='width:100%;height:240px;font-size:11px;line-height:1.5;box-sizing:border-box;';
+    var msg=document.createElement('div'); msg.id='copyAskMsg'; msg.style.cssText='font-size:10px;min-height:14px;margin-top:4px;';
+    var row=document.createElement('div'); row.style.cssText='display:flex;gap:6px;justify-content:flex-end;margin-top:8px;';
+    var mk=function(t,fn){ var b=document.createElement('button'); b.textContent=t; b.style.cssText='padding:6px 12px;border-radius:6px;border:1px solid #ccc;cursor:pointer;'; b.addEventListener('click',fn); row.appendChild(b); };
+    mk('복사',function(){
+      var ok=function(){ msg.textContent='복사했습니다. claude.ai에 붙여넣으세요.'; };
+      var fail=function(){ ta.focus(); ta.select(); msg.textContent='자동 복사 실패 — Ctrl+C로 직접 복사하세요.'; };
+      try{
+        if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(ta.value).then(ok,fail); return; }
+        ta.select(); document.execCommand('copy')?ok():fail();
+      }catch(e){ fail(); }
     });
-    const d = await res.json();
-    if(d.error) throw new Error(JSON.stringify(d.error));
-    return d.content?.[0]?.text || '';
-  }catch(e){
-    console.error('Claude API 오류:', e);
-    throw e;
+    mk('claude.ai 열기',function(){ window.open('https://claude.ai/new','_blank','noopener'); });
+    mk('닫기',function(){ bg.style.display='none'; });
+    box.appendChild(h); box.appendChild(note); box.appendChild(ta); box.appendChild(msg); box.appendChild(row); bg.appendChild(box);
+    bg.addEventListener('click',function(e){ if(e.target===bg) bg.style.display='none'; });
+    document.body.appendChild(bg);
   }
+  document.getElementById('copyAskTtl').textContent=title||'질문 복사';
+  document.getElementById('copyAskText').value=prompt;
+  document.getElementById('copyAskMsg').textContent='';
+  bg.style.display='flex';
 }
 
-// ── AI 전체 분석 ──
-async function runFullAIAnalysis(){
-  const btn = document.querySelector('.hdr-btn:not(.sec)');
-  if(btn){ btn.disabled=true; btn.textContent='분석 중...'; }
-  
-  // 진행률 표시
-  showDashProgress('AI 시장 전체 분석 중...', 8);
-  addMsg('ai', '📊 오늘 시장 전체 분석을 시작할게요. 잠깐만요...');
-
+// ── AI 전체 분석 → 질문 복사(LLM 미호출) ──
+function runFullAIAnalysis(){
   const dateStr = curDate;
   const prompt = `⚠️ 분석 대상 날짜: ${dateStr} (절대 다른 날짜로 추정 금지)
 ${dateStr} 시점에서만 알 수 있던 정보(${dateStr} 직전 영업일까지의 시장 흐름·뉴스)만 사용.
@@ -385,96 +375,9 @@ ${dateStr} 이후 정보는 절대 사용 금지(미래 정보 leak 금지). 모
 
 단타 트레이더를 위한 장 전 종합 분석. 쉽고 직관적으로 (토스 알림처럼).
 
-다음 항목을 JSON으로 답해줘 (다른 텍스트 없이 JSON만):
-{
-  "direction": "매수우호적/중립/매수비우호적",
-  "directionReason": "2줄 이내 이유 (쉽게)",
-  "score": 7,
-  "sectors": [
-    {"rank":1,"name":"섹터명","reason":"한줄 이유","signal":"🔥강세"},
-    {"rank":2,"name":"섹터명","reason":"한줄 이유","signal":"🟡보통"},
-    {"rank":3,"name":"섹터명","reason":"한줄 이유","signal":"🟡보통"}
-  ],
-  "risks": "오늘 주의할 리스크 2가지 (쉽게)",
-  "strategy": "오늘 매매 전략 한마디",
-  "flow": "외국인/기관 수급 예상",
-  "candidates": [
-    {"rank":1,"name":"종목명","code":"코드","reason":"추천 이유 (쉽게)","strategy":"진입전략","stop":"손절 기준","target":"목표가 기준","signals":["신호1","신호2"]},
-    {"rank":2,"name":"종목명","code":"코드","reason":"추천 이유","strategy":"진입전략","stop":"손절 기준","target":"목표가 기준","signals":["신호1"]},
-    {"rank":3,"name":"종목명","code":"코드","reason":"추천 이유","strategy":"진입전략","stop":"손절 기준","target":"목표가 기준","signals":["신호1"]}
-  ]
-}`;
-
-  try{
-    const text = await callClaude(prompt, 1200);
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if(!jsonMatch) throw new Error('JSON 파싱 실패');
-    const d = JSON.parse(jsonMatch[0]);
-
-    // 시장 방향
-    const dirEl = document.getElementById('ai-direction');
-    const isUp = d.direction?.includes('매수우호');
-    const isDown = d.direction?.includes('비우호');
-    if(dirEl) dirEl.innerHTML = `<span class="ai-tag ${isUp?'tag-g':isDown?'tag-r':'tag-a'}">${d.direction||'중립'}</span> ${d.directionReason||''}`;
-
-    // 시장 점수
-    const badge = document.getElementById('marketScore');
-    const score = d.score||5;
-    if(badge){
-      badge.textContent = `시장 ${score}/10`;
-      badge.style.background = score>=7?'rgba(5,192,114,.15)':score>=5?'rgba(255,147,0,.15)':'rgba(240,64,64,.15)';
-      badge.style.color = score>=7?'#059669':score>=5?'#d97706':'#dc2626';
-    }
-
-    // verdict
-    const vd = document.getElementById('marketVerdict');
-    if(vd){
-      vd.className = 'verdict '+(isUp?'buy':isDown?'sell':'neutral');
-      vd.textContent = isUp?`📈 매수 우호적 (${score}/10점)`:isDown?`📉 매수 비우호적 (${score}/10점)`:`📊 중립 (${score}/10점)`;
-    }
-
-    // 강세 섹터
-    const secEl = document.getElementById('ai-sectors');
-    if(secEl && d.sectors){
-      secEl.innerHTML = d.sectors.map(s=>
-        `<div style="margin-bottom:3px;">${s.signal} <strong>${s.name}</strong> — ${s.reason}</div>`
-      ).join('');
-    }
-
-    // 리스크
-    const rkEl = document.getElementById('ai-risks');
-    if(rkEl) rkEl.innerHTML = (d.risks||'--').replace(/\n/g,'<br>');
-
-    // 전략
-    const stEl = document.getElementById('ai-strategy');
-    if(stEl) stEl.innerHTML = d.strategy||'--';
-
-    // 수급
-    const flEl = document.getElementById('ai-flow');
-    if(flEl) flEl.innerHTML = d.flow||'--';
-
-    document.getElementById('aiAnalyzed').textContent = `${new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'})} 업데이트`;
-
-    // 진입 후보
-    if(d.candidates) renderCandidates(d.candidates);
-
-    // 채팅 메시지
-    const dirText = isUp?'매수 우호적 🟢':isDown?'매수 비우호적 🔴':'중립 🟡';
-    addMsg('ai', `분석 완료!\n\n📊 시장: ${dirText} (${score}/10점)\n${d.directionReason||''}\n\n🔥 강세 섹터: ${(d.sectors||[]).slice(0,2).map(s=>s.name).join(', ')}\n\n🎯 오늘 후보: ${(d.candidates||[]).map(c=>c.name).join(', ')}`);
-
-    // HTS에 데이터 전달
-    try{
-      if(window.parent.setDashData){
-        window.parent.setDashData({score, direction:d.direction, sectors:d.sectors, candidates:d.candidates, date:curDate});
-      }
-    }catch(e){}
-
-  }catch(e){
-    addMsg('ai', `분석 실패: ${e.message}\n\nClaude API 키를 설정창에서 확인해주세요.`);
-  }
-
-  if(btn){ btn.disabled=false; btn.textContent='🤖 AI 전체 분석'; }
-  finishDashProgress('분석 완료');
+다음 항목을 알려줘: ①시장 방향(매수우호적/중립/매수비우호적)과 이유 2줄 ②시장 점수(1~10) ③강세 섹터 3개와 한줄 이유 ④오늘 주의할 리스크 2가지 ⑤오늘 매매 전략 한마디 ⑥외국인/기관 수급 예상 ⑦진입 후보 3종목(종목명·코드·추천 이유·진입전략·손절·목표가 기준). 확실하지 않은 종목은 만들어내지 말고 "후보 없음 — 관망"이라고 답해줘.`;
+  copyAsk('시장 전체 분석 질문', prompt);
+  addMsg('ai', '📋 질문을 복사할 수 있게 열어 두었어요. claude.ai에 붙여넣어 분석을 받아보세요. (이 앱은 AI 서버를 호출하지 않습니다)');
 }
 
 // ── 진입 후보 렌더 ──
@@ -526,7 +429,7 @@ function selectInHTS(code){
 }
 
 // ── 채팅 ──
-let hist=[], busy=false;
+let hist=[];
 function addMsg(role, text){
   const el = document.getElementById('chatMsgs');
   if(!el) return;
@@ -537,39 +440,16 @@ function addMsg(role, text){
   el.scrollTop = el.scrollHeight;
 }
 
-async function sendChat(){
-  if(busy) return;
+function sendChat(){
   const inp = document.getElementById('chatInput');
   const text = inp.value.trim();
   if(!text) return;
   inp.value='';
   addMsg('user', text);
-  busy=true;
-
-  const loadDiv = document.createElement('div');
-  loadDiv.className='msg ai loading';
-  loadDiv.innerHTML='<div class="dot"></div><div class="dot"></div><div class="dot"></div>';
-  document.getElementById('chatMsgs').appendChild(loadDiv);
-
   hist.push({role:'user',content:text});
-  const sysPrompt = `단타 트레이딩 멘토. 오늘 날짜: ${curDate}. 쉽고 직관적으로 3~5줄로 답해줘. 수치 기반으로.`;
-
-  try{
-    const res = await fetch('/api/claude',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:300,system:sysPrompt,messages:hist})
-    });
-    const d = await res.json();
-    const reply = d.content?.[0]?.text||'응답 없음';
-    hist.push({role:'assistant',content:reply});
-    loadDiv.remove();
-    addMsg('ai', reply);
-  }catch(e){
-    loadDiv.remove();
-    addMsg('ai', '오류: '+e.message);
-  }
-  busy=false;
+  const prompt = '단타 트레이딩 멘토. 오늘 날짜: '+curDate+'. 쉽고 직관적으로 3~5줄로 답해줘. 수치 기반으로.\n\n[대화]\n'+hist.slice(-10).map(function(m){ return (m.role==='user'?'[나] ':'[답변] ')+m.content; }).join('\n');
+  copyAsk('멘토에게 질문', prompt);
+  addMsg('ai', '📋 질문을 복사할 수 있게 열어 두었어요. claude.ai에 붙여넣어 답을 받아보세요. (이 앱은 AI 서버를 호출하지 않습니다)');
 }
 
 function quickQ(q){
@@ -724,7 +604,7 @@ async function autoLoadMarketData(){
 
   } catch(e) {
     console.error('시장 데이터 로드 실패:', e.message);
-    document.getElementById('marketVerdict').textContent = `⚠ 실시간 데이터 로드 실패: ${e.message} — AI 전체 분석으로 대체하거나 잠시 후 다시 시도하세요`;
+    document.getElementById('marketVerdict').textContent = `⚠ 실시간 데이터 로드 실패: ${e.message} — 잠시 후 다시 시도하세요`;
     failDashProgress('데이터 로드 실패');
     return;
   }
@@ -823,7 +703,7 @@ async function loadLocalHotSectors(force){
   }catch(e){ d = {ok:false, error:e.message}; }
   const el = document.getElementById('candList');
   if(!d || !d.ok){
-    if(el && d && d.error) el.innerHTML = '<div style="padding:10px;color:var(--tm);font-size:11px;">강세섹터 후보: ' + String(d.error).replace(/</g,'&lt;') + '</div>';
+    if(el) el.innerHTML = '<div style="padding:10px;color:var(--tm);font-size:11px;">강세섹터 후보: ' + String((d && d.error) || '응답 없음 — 관망').replace(/</g,'&lt;') + '</div>';
     return d;
   }
   const cands = [];
