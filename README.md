@@ -38,7 +38,15 @@ test/*.test.js          # node 단독 실행 테스트
 3. 로컬 실행 후 브라우저로 로그인해 pageerror 0건·`/api/claude` 요청 0건 확인
 4. 커밋 시 빌드 산출물(`trading-dashboard.html`)도 같이 커밋
 
-Railway 배포 시 `nixpacks.toml`이 `node build.js`를 자동 실행. 배포 확인은 `/api/version` 의 `htmlSize` 가 커밋된 `trading-hts.html` 크기와 같은지로 한다.
+Railway 배포 시 `nixpacks.toml`이 `node build.js`를 자동 실행.
+
+## 데이터 저장
+- 사용자 데이터(모의계좌·일지 등, `userdata.json`)와 KIS 토큰 캐시는 `DATA_DIR` 에 저장한다.
+  순서: `DATA_DIR` → `RAILWAY_VOLUME_MOUNT_PATH` → OS 임시 폴더(재배포 시 초기화, 로그에 `STORAGE EPHEMERAL`).
+- Railway 에서는 Volume 을 `/app/data` 에 연결하고 Variables 에 `DATA_DIR=/app/data` 를 넣는다.
+  `DATA_DIR` 을 지정했는데 쓸 수 없으면 서버는 시작을 거부한다(조용히 임시 폴더로 넘어가지 않음).
+- 쓰기는 원자적(임시 파일 → rename, 직전본 `.bak`). 파일이 손상돼 있으면 덮어쓰지 않고 저장을 거부한다.
+- KIS 키 등 비밀값은 디스크·GitHub 에 쓰지 않는다 — Railway Variables 에만 둔다. 배포 확인은 `/api/version` 의 `htmlSize` 가 커밋된 `trading-hts.html` 크기와 같은지로 한다.
 
 ## 주의
 - 매매 판단·계산 경로에서 LLM API 호출 금지. 새 AI 기능이 필요하면 `copyAsk(제목, 질문)` 으로 질문 복사 버튼을 만든다.

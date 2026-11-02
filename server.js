@@ -6,6 +6,25 @@ const crypto = require('crypto');
 
 const PORT = process.env.PORT || 3000;
 
+// ── 데이터 저장 폴더 ──
+// DATA_DIR(Railway Volume 마운트 경로, 예: /app/data) → RAILWAY_VOLUME_MOUNT_PATH → OS 임시 폴더 순.
+// 임시 폴더는 재배포 때 지워진다(로그에 STORAGE EPHEMERAL). DATA_DIR 을 지정했는데 쓸 수 없으면
+// 조용히 임시 폴더로 넘어가지 않고 시작을 거부한다 — 저장이 사라지는 것보다 멈추는 편이 안전.
+const os = require('os');
+const DATA_PERSISTENT = !!(process.env.DATA_DIR || process.env.RAILWAY_VOLUME_MOUNT_PATH);
+const DATA_DIR = process.env.DATA_DIR || process.env.RAILWAY_VOLUME_MOUNT_PATH || path.join(os.tmpdir(), 'traidair');
+try { fs.mkdirSync(DATA_DIR, { recursive: true }); fs.accessSync(DATA_DIR, fs.constants.W_OK); }
+catch (e) { console.error(`❌ 데이터 폴더 쓰기 불가: ${DATA_DIR} — ${e.message}`); process.exit(1); }   // 저장이 안 되는 채로 정상인 척 돌지 않는다
+console.log(`💾 데이터 폴더: ${DATA_DIR} (${DATA_PERSISTENT ? '영구 저장' : 'STORAGE EPHEMERAL — 재배포 시 초기화'})`);
+// 원자적 쓰기: 임시 파일에 다 쓴 뒤 rename(쓰다 죽어도 반쪽 파일이 남지 않음). 직전 파일은 .bak 한 벌 보관.
+function writeFileAtomic(file, text, mode) {
+  const tmp = file + '.tmp-' + process.pid;
+  fs.writeFileSync(tmp, text, mode ? { mode } : undefined);
+  try { if (fs.existsSync(file)) fs.copyFileSync(file, file + '.bak'); }
+  catch (e) { try { fs.unlinkSync(tmp); } catch (_e) {} throw new Error('백업(.bak) 생성 실패: ' + e.message); }
+  fs.renameSync(tmp, file);
+}
+
 
 // ── 환경변수 기반 설정 (Railway Variables에서 영구 유지)
 // cfg.json에서 키 로드 (git 제외, Railway에 영구 보존)
@@ -22,16 +41,6 @@ let runtimeConfig = {
   notionPageId: process.env.NOTION_LECTURE_PAGE_ID || _localCfg.np || '35a0717882e381ce8fc3d257a5c24e4b',
 };
 
-// 파일 저장 경로 (Railway 볼륨 없으면 /tmp 사용 — 재시작 후 날아가지만 환경변수로 복원됨)
-const CONFIG_PATH = path.join('/tmp', 'traidair_config.json');
-
-function saveToFile(data) {
-  try {
-    const merged = { ...runtimeConfig, ...data, updatedAt: new Date().toISOString() };
-    fs.writeFileSync(CONFIG_PATH, JSON.stringify(merged, null, 2));
-  } catch(e) {}
-}
-
 console.log('✅ 설정 로드:', {
   kis: runtimeConfig.kisAppKey ? '✅' : '❌',
   dart: runtimeConfig.dartKey ? '✅' : '❌',
@@ -44,17 +53,33 @@ console.log('✅ 설정 로드:', {
 // (특히 부팅 직후 mock 토큰 발급 → 곧바로 real 토큰 발급 시 같은 앱키라 real이
 //  레이트리밋에 걸려 volume-rank/investor가 "토큰 없음"으로 실패하던 문제 해소)
 const kisTokenCache = {};
-const TOKEN_CACHE_PATH = path.join(__dirname, 'kis_token_cache.json');
+const TOKEN_CACHE_PATH = path.join(DATA_DIR, 'kis_token_cache.json');
+const LEGACY_TOKEN_CACHE_PATH = path.join(__dirname, 'kis_token_cache.json');   // 예전 위치(이전 후 삭제)
 const TOKEN_SOFT_TTL_MS = 23 * 60 * 60 * 1000;
 const TOKEN_HARD_TTL_MS = 24 * 60 * 60 * 1000;
 
 (function loadTokenCache() {
-  try { Object.assign(kisTokenCache, JSON.parse(fs.readFileSync(TOKEN_CACHE_PATH, 'utf8'))); }
-  catch (e) {}
+  try {
+    Object.assign(kisTokenCache, JSON.parse(fs.readFileSync(TOKEN_CACHE_PATH, 'utf8')));
+    // 이전 때 지우지 못한 예전 파일이 남아 있으면 다시 지운다(액세스 토큰을 기본 권한 파일로 남기지 않음)
+    if (path.resolve(LEGACY_TOKEN_CACHE_PATH) !== path.resolve(TOKEN_CACHE_PATH) && fs.existsSync(LEGACY_TOKEN_CACHE_PATH)) {
+      try { fs.unlinkSync(LEGACY_TOKEN_CACHE_PATH); } catch (e) { console.warn('⚠ 예전 KIS 토큰 캐시 삭제 실패:', e.message); }
+    }
+    return;
+  } catch (e) {}
+  // 예전 위치(앱 폴더)의 캐시는 새 위치로 옮기고(0600) 지운다 — 액세스 토큰을 기본 권한 파일로 남기지 않음
+  if (path.resolve(LEGACY_TOKEN_CACHE_PATH) === path.resolve(TOKEN_CACHE_PATH) || !fs.existsSync(LEGACY_TOKEN_CACHE_PATH)) return;
+  try {
+    const old = JSON.parse(fs.readFileSync(LEGACY_TOKEN_CACHE_PATH, 'utf8'));
+    writeFileAtomic(TOKEN_CACHE_PATH, JSON.stringify(old), 0o600);
+    Object.assign(kisTokenCache, old);
+    fs.unlinkSync(LEGACY_TOKEN_CACHE_PATH);
+    console.log('🔑 KIS 토큰 캐시를 데이터 폴더로 옮김');
+  } catch (e) { console.warn('⚠ 예전 KIS 토큰 캐시 이전 미완료:', e.message); }
 })();
 
 function saveTokenCache() {
-  try { fs.writeFileSync(TOKEN_CACHE_PATH, JSON.stringify(kisTokenCache)); } catch (e) {}
+  try { writeFileAtomic(TOKEN_CACHE_PATH, JSON.stringify(kisTokenCache), 0o600); } catch (e) {}
 }
 
 function tokenErrorMessage(data) {
@@ -811,10 +836,8 @@ const server = http.createServer(async (req, res) => {
         if (cfg.dartKey)      runtimeConfig.dartKey = cfg.dartKey;
         if (cfg.notionToken)   runtimeConfig.notionToken = cfg.notionToken;
         if (cfg.notionPageId)  runtimeConfig.notionPageId = cfg.notionPageId;
-        saveToFile(runtimeConfig);
         console.log('✅ 설정 저장:', Object.keys(cfg).join(', '));
-        // GitHub에 영구 저장 (재배포 후에도 유지)
-        // 🔒 키를 GitHub(공개 저장소)에 저장하던 동작 제거
+        // 키는 메모리(runtimeConfig)에만 둔다 — 디스크·GitHub(공개 저장소)에 쓰지 않음. 영구 값은 Railway Variables.
         res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
         res.end(JSON.stringify({ ok: true, saved: Object.keys(cfg), github: false }));
       } catch(e) {
@@ -838,6 +861,7 @@ const server = http.createServer(async (req, res) => {
       kisMode: runtimeConfig.kisMode || 'mock', liveOrderEnabled: LIVE_ORDER_ENABLED,
       dartKey: '', dartSet: !!runtimeConfig.dartKey,
       notionToken: '', notionTokenSet: !!runtimeConfig.notionToken,
+      storagePersistent: DATA_PERSISTENT,
       notionPageId: runtimeConfig.notionPageId || '',
     }));
     return;
@@ -1507,27 +1531,14 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // ── 사용자 데이터 저장 (/api/user-data POST)
-  if (url === '/api/user-data' && req.method === 'POST') {
-    let body = '';
-    req.on('data', c => body += c);
-    req.on('end', () => {
-      try {
-        const data = JSON.parse(body);
-        const ok = saveUserData(data);
-        res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
-        res.end(JSON.stringify({ ok }));
-      } catch(e) {
-        res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
-        res.end(JSON.stringify({ ok: false, error: e.message }));
-      }
-    });
-    return;
-  }
-
   // ── 사용자 데이터 조회 (/api/user-data GET)
   if (url === '/api/user-data' && req.method === 'GET') {
-    const data = loadUserData();
+    const data = readUserDataFile();
+    if (data === null) {   // 손상 — 빈 데이터로 오인하지 않게 명시적 오류
+      res.writeHead(503, { 'Content-Type': 'application/json', ...CORS });
+      res.end(JSON.stringify({ ok: false, error: 'userdata_corrupt' }));
+      return;
+    }
     res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
     res.end(JSON.stringify({ ok: true, data }));
     return;
@@ -1540,10 +1551,10 @@ const server = http.createServer(async (req, res) => {
     req.on('data', c => body += c);
     req.on('end', () => {
       try {
-        const { value } = JSON.parse(body);
-        const ok = saveUserData({ [key]: value });
+        const { value, rev } = JSON.parse(body);
+        const r = saveUserDataKey(key, value, typeof rev === 'number' ? rev : undefined);
         res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
-        res.end(JSON.stringify({ ok, key }));
+        res.end(JSON.stringify({ ...r, key }));
       } catch(e) {
         res.writeHead(200, { 'Content-Type': 'application/json', ...CORS });
         res.end(JSON.stringify({ ok: false, error: e.message }));
@@ -2694,234 +2705,44 @@ server.listen(PORT, () => {
   console.log(`DART API: ${runtimeConfig.dartKey ? '✅' : '❌ 없음'}`);
 });
 
-// ── GitHub 기반 영구 설정 저장/로드 ──
-const GITHUB_TOKEN = process.env.GITHUB_TOKEN || '';
-const GITHUB_REPO = '123idon/traidair';
-const CONFIG_FILE = 'user.config.json';
-
-async function loadConfigFromGitHub() {
-  if (!GITHUB_TOKEN) return;
-  return new Promise((resolve) => {
-    const req = https.request({
-      hostname: 'api.github.com',
-      path: `/repos/${GITHUB_REPO}/contents/${CONFIG_FILE}`,
-      method: 'GET',
-      headers: {
-        'Authorization': `token ${GITHUB_TOKEN}`,
-        'User-Agent': 'traidair-server',
-        'Accept': 'application/vnd.github.v3+json',
-      },
-    }, res => {
-      let d = '';
-      res.on('data', c => d += c);
-      res.on('end', () => {
-        try {
-          if (res.statusCode === 200) {
-            const file = JSON.parse(d);
-            const content = Buffer.from(file.content, 'base64').toString('utf-8');
-            const cfg = JSON.parse(content);
-            if (cfg.kisAppKey)    runtimeConfig.kisAppKey = cfg.kisAppKey;
-            if (cfg.kisAppSecret) runtimeConfig.kisAppSecret = cfg.kisAppSecret;
-            if (cfg.kisAccount)   runtimeConfig.kisAccount = cfg.kisAccount;
-            if (cfg.kisMode)      runtimeConfig.kisMode = cfg.kisMode;
-            if (cfg.dartKey)      runtimeConfig.dartKey = cfg.dartKey;
-            console.log('✅ GitHub에서 설정 로드됨:', {
-              kis: cfg.kisAppKey ? '✅' : '❌',
-              account: cfg.kisAccount || '없음',
-            });
-          }
-        } catch(e) { console.log('GitHub 설정 파싱 실패:', e.message); }
-        resolve();
-      });
-    });
-    req.on('error', () => resolve());
-    req.setTimeout(5000, () => { req.destroy(); resolve(); });
-    req.end();
-  });
-}
-
-let _githubFileSha = null;
-async function saveConfigToGitHub(cfg) {
-  if (!GITHUB_TOKEN) return false;
-  const content = Buffer.from(JSON.stringify({...runtimeConfig, ...cfg, savedAt: new Date().toISOString()}, null, 2)).toString('base64');
-  
-  // 현재 SHA 가져오기 (업데이트에 필요)
-  if (!_githubFileSha) {
-    await new Promise(resolve => {
-      const req = https.request({
-        hostname: 'api.github.com',
-        path: `/repos/${GITHUB_REPO}/contents/${CONFIG_FILE}`,
-        method: 'GET',
-        headers: { 'Authorization': `token ${GITHUB_TOKEN}`, 'User-Agent': 'traidair-server', 'Accept': 'application/vnd.github.v3+json' },
-      }, res => {
-        let d = '';
-        res.on('data', c => d += c);
-        res.on('end', () => {
-          try { if (res.statusCode === 200) _githubFileSha = JSON.parse(d).sha; } catch(e) {}
-          resolve();
-        });
-      });
-      req.on('error', () => resolve());
-      req.end();
-    });
-  }
-
-  const body = JSON.stringify({
-    message: 'Update user config',
-    content,
-    ...(_githubFileSha ? { sha: _githubFileSha } : {}),
-  });
-
-  return new Promise(resolve => {
-    const req = https.request({
-      hostname: 'api.github.com',
-      path: `/repos/${GITHUB_REPO}/contents/${CONFIG_FILE}`,
-      method: 'PUT',
-      headers: {
-        'Authorization': `token ${GITHUB_TOKEN}`,
-        'User-Agent': 'traidair-server',
-        'Accept': 'application/vnd.github.v3+json',
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(body),
-      },
-    }, res => {
-      let d = '';
-      res.on('data', c => d += c);
-      res.on('end', () => {
-        try {
-          const result = JSON.parse(d);
-          if (result.content?.sha) { _githubFileSha = result.content.sha; }
-          console.log('✅ GitHub 설정 저장됨 (영구)');
-          resolve(true);
-        } catch(e) { resolve(false); }
-      });
-    });
-    req.on('error', () => resolve(false));
-    req.write(body); req.end();
-  });
-}
-
-// 서버 시작 시 GitHub에서 설정 로드
-loadConfigFromGitHub().then(() => {
-  console.log('설정 최종 상태:', {
-    kis: runtimeConfig.kisAppKey ? '✅' : '❌',
-    account: runtimeConfig.kisAccount ? '설정됨' : '없음',
-  });
-});
-
 // ── 사용자 데이터 영구 저장 (모의투자 계좌, 매매일지, 통계 등) ──
-const USER_DATA_PATH = '/tmp/traidair_userdata.json';
-
-function loadUserData() {
+const USER_DATA_PATH = path.join(DATA_DIR, 'userdata.json');
+const LEGACY_USER_DATA_PATH = '/tmp/traidair_userdata.json';
+// 예전 경로에만 데이터가 있으면 한 번 옮긴다(재배포 없이 재시작한 경우에만 남아 있다).
+// 검증된 내용을 새 위치에 쓴 뒤에만 성공 — 실패하면 시작을 거부(빈 새 파일이 생겨 데이터가 갈라지는 것 방지).
+if (path.resolve(LEGACY_USER_DATA_PATH) !== path.resolve(USER_DATA_PATH) && !fs.existsSync(USER_DATA_PATH) && fs.existsSync(LEGACY_USER_DATA_PATH)) {
   try {
-    if (fs.existsSync(USER_DATA_PATH)) {
-      return JSON.parse(fs.readFileSync(USER_DATA_PATH, 'utf8'));
-    }
-  } catch(e) {}
-  return {};
+    const legacy = fs.readFileSync(LEGACY_USER_DATA_PATH, 'utf8');
+    parseUserData(legacy);
+    writeFileAtomic(USER_DATA_PATH, legacy);
+    console.log('💾 예전 /tmp 사용자 데이터를 데이터 폴더로 옮김');
+  } catch (e) { console.error('❌ 예전 사용자 데이터 이전 실패 — 시작 거부:', e.message); process.exit(1); }
 }
 
-function saveUserData(data) {
+// 사용자 데이터는 일반 객체여야 한다(null·배열·문자열이면 손상으로 본다)
+function parseUserData(text) {
+  const o = JSON.parse(text);
+  if (!o || typeof o !== 'object' || Array.isArray(o)) throw new Error('사용자 데이터가 객체가 아님');
+  return o;
+}
+// 파일 없음 → {} / 손상 → null (null 이면 저장을 거부해 {} 로 덮어써 전부 잃는 사고를 막는다)
+function readUserDataFile() {
+  if (!fs.existsSync(USER_DATA_PATH)) return {};
+  try { return parseUserData(fs.readFileSync(USER_DATA_PATH, 'utf8')); }
+  catch (e) { console.error('userdata 파일 손상 — 저장 거부(덮어쓰기 방지):', e.message); return null; }
+}
+
+// 키 하나 저장 — rev(클라이언트 순번)가 저장된 값보다 오래되면 버린다(뒤늦게 도착한 옛 요청이 최신 값을 덮지 않게)
+function saveUserDataKey(key, value, rev) {
   try {
-    const current = loadUserData();
-    const merged = { ...current, ...data, _savedAt: new Date().toISOString() };
-    fs.writeFileSync(USER_DATA_PATH, JSON.stringify(merged), 'utf8');
-    // GitHub에도 백업
-    // 🔒 공개 저장소로의 사용자 데이터 백업 중단
-    return true;
-  } catch(e) {
-    console.error('userdata 저장 실패:', e.message);
-    return false;
-  }
+    const current = readUserDataFile();
+    if (current === null) return { ok: false, error: 'userdata_corrupt' };
+    const revs = (current._rev && typeof current._rev === 'object') ? current._rev : {};
+    if (typeof rev === 'number' && typeof revs[key] === 'number' && rev < revs[key]) return { ok: true, stale: true };   // 같은 rev(다른 탭 동시 저장)는 나중 도착이 이긴다
+    if (typeof rev === 'number') revs[key] = rev;
+    writeFileAtomic(USER_DATA_PATH, JSON.stringify({ ...current, [key]: value, _rev: revs, _savedAt: new Date().toISOString() }));
+    return { ok: true };
+  } catch (e) { console.error('userdata 저장 실패:', e.message); return { ok: false, error: e.message }; }
 }
 
-// GitHub 백업
-async function saveUserDataToGitHub(data) {
-  if (!GITHUB_TOKEN) return;
-  const content = Buffer.from(JSON.stringify(data, null, 2)).toString('base64');
-  const body = JSON.stringify({
-    message: 'Update user data',
-    content,
-    ...(_userDataSha ? { sha: _userDataSha } : {}),
-  });
-  let _userDataSha_new = null;
-  await new Promise(resolve => {
-    // 먼저 현재 SHA 확인
-    const getReq = https.request({
-      hostname: 'api.github.com',
-      path: `/repos/${GITHUB_REPO}/contents/userdata.json`,
-      method: 'GET',
-      headers: { 'Authorization': `token ${GITHUB_TOKEN}`, 'User-Agent': 'traidair-server', 'Accept': 'application/vnd.github.v3+json' },
-    }, res => {
-      let d = ''; res.on('data', c => d += c);
-      res.on('end', () => {
-        try { _userDataSha = JSON.parse(d).sha || null; } catch(e) {}
-        resolve();
-      });
-    });
-    getReq.on('error', () => resolve());
-    getReq.end();
-  });
-
-  const bodyWithSha = JSON.stringify({
-    message: 'Update user data',
-    content,
-    ...(_userDataSha ? { sha: _userDataSha } : {}),
-  });
-  return new Promise(resolve => {
-    const req = https.request({
-      hostname: 'api.github.com',
-      path: `/repos/${GITHUB_REPO}/contents/userdata.json`,
-      method: 'PUT',
-      headers: {
-        'Authorization': `token ${GITHUB_TOKEN}`,
-        'User-Agent': 'traidair-server',
-        'Accept': 'application/vnd.github.v3+json',
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(bodyWithSha),
-      },
-    }, res => {
-      let d = ''; res.on('data', c => d += c);
-      res.on('end', () => {
-        try { _userDataSha = JSON.parse(d).content?.sha || _userDataSha; } catch(e) {}
-        resolve();
-      });
-    });
-    req.on('error', () => resolve());
-    req.write(bodyWithSha); req.end();
-  });
-}
-let _userDataSha = null;
-
-// GitHub에서 userdata 로드
-async function loadUserDataFromGitHub() {
-  if (!GITHUB_TOKEN) return null;
-  return new Promise(resolve => {
-    const req = https.request({
-      hostname: 'api.github.com',
-      path: `/repos/${GITHUB_REPO}/contents/userdata.json`,
-      method: 'GET',
-      headers: { 'Authorization': `token ${GITHUB_TOKEN}`, 'User-Agent': 'traidair-server', 'Accept': 'application/vnd.github.v3+json' },
-    }, res => {
-      let d = ''; res.on('data', c => d += c);
-      res.on('end', () => {
-        try {
-          const file = JSON.parse(d);
-          _userDataSha = file.sha;
-          const data = JSON.parse(Buffer.from(file.content, 'base64').toString('utf8'));
-          // /tmp에도 저장
-          fs.writeFileSync(USER_DATA_PATH, JSON.stringify(data, null, 2));
-          console.log('✅ GitHub userdata 로드됨');
-          resolve(data);
-        } catch(e) { resolve(null); }
-      });
-    });
-    req.on('error', () => resolve(null));
-    req.setTimeout(8000, () => { req.destroy(); resolve(null); });
-    req.end();
-  });
-}
-
-// 서버 시작 시 GitHub에서 userdata 로드
-loadUserDataFromGitHub().catch(() => {});
 // v1779288584

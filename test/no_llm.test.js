@@ -78,8 +78,7 @@ console.log('[G] onclick 등 인라인 핸들러가 부르는 함수가 모두 �
 const defs = new Set();
 for (const re of [/function\s+([A-Za-z_$][\w$]*)/g, /window\.([A-Za-z_$][\w$]*)\s*=/g, /(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=/g]) { let m; while ((m = re.exec(html))) defs.add(m[1]); }
 const builtins = new Set(['if', 'document', 'window', 'this', 'event', 'alert', 'confirm', 'location', 'setTimeout', 'var', 'const', 'let', 'return', 'navigator', 'history']);
-const KNOWN_MISSING = new Set(['quickSwitch']);   // main 에서부터 정의 없음(기존 문제, 별도 수정 대상)
-const missing = new Set(); { const re = /on(?:click|change|input|keydown|keyup|submit|mouseover|mouseout)=\\?["']\s*(?:return\s+)?([A-Za-z_$][\w$]*)\s*\(/g; let m; while ((m = re.exec(html))) if (!builtins.has(m[1]) && !defs.has(m[1]) && !KNOWN_MISSING.has(m[1])) missing.add(m[1]); }
+const missing = new Set(); { const re = /on(?:click|change|input|keydown|keyup|submit|mouseover|mouseout)=\\?["']\s*(?:return\s+)?([A-Za-z_$][\w$]*)\s*\(/g; let m; while ((m = re.exec(html))) if (!builtins.has(m[1]) && !defs.has(m[1])) missing.add(m[1]); }
 ok(missing.size === 0, '정의 안 된 인라인 핸들러 없음' + (missing.size ? ': ' + [...missing].join(', ') : ''));
 
 console.log('[I] btState — /api/backtest/state 요청 합치기');
@@ -94,6 +93,82 @@ const btTests = (async () => {
   ok(n === 1, '동시 호출 2번 → 서버 요청 1번');
   a.v = 99; ok(b.v === 1, '호출마다 별도 객체(한쪽 수정이 다른 쪽에 안 섞임)');
   now += 500; await ctx.btState(); ok(n === 2, '0.45초가 지나면 새로 요청');
+})();
+
+console.log('[K] 가짜 데이터 금지(규칙 3) + 폴링 단일화');
+const filtersSrc = (/const FILTERS=\[[\s\S]*?\];/.exec(html) || [''])[0];
+ok(filtersSrc && !/stocks\s*:/.test(filtersSrc), 'FILTERS 에 고정 종목 "결과" 없음');
+ok(/const NEWS=\[\];/.test(html), 'NEWS 고정 헤드라인 없음(실시간 피드 연동 전 빈 목록)');
+ok(!/HBM4/.test(html), '가짜 뉴스 문구 없음');
+ok(!/\.stocks\b/.test(extractFn(html, 'applySelectedFilters')), '조건검색이 고정 종목으로 결과를 만들지 않음');
+ok((html.match(/btOnTick\(/g) || []).length >= 3 && !/setInterval\(tick,\s*[23]000\)/.test(html), '상태 위젯은 공용 2초 주기(btOnTick) 하나만 사용');
+ok(/if\(document\.hidden\) return;/.test(extractFn(html, '_btTickRun')), '숨겨진 탭에서는 위젯 폴링 중지');
+
+console.log('[L] saveToServer — 키별 큐(순서 보장·즉시 저장·실패 재시도·이탈 시 전송) + 매매 상태 localStorage 금지');
+const saveTests = (async () => {
+  const src = ['_nextSaveRev', 'saveToServer', '_saveFlush', '_saveOnPageHide'].map((fn) => extractFn(html, fn)).join('\n');
+  const mk = (respond) => {
+    const timers = [], posts = [], ls = {}, alerts = [];
+    const ctx = {
+      _saveQ: {}, _saveWarned: false, _saveRevSeq: 0, _SERVER_ONLY_KEYS: { htsMock: 1, htsStopOrders: 1 }, JSON, Math, Date, Object, console, Blob,
+      localStorage: { setItem: (k, v) => { ls[k] = v; } },
+      setTimeout: (fn, ms) => { timers.push({ fn, ms }); return timers.length; }, clearTimeout: (id) => { if (id) timers[id - 1] = null; },
+      showAlert: (t) => alerts.push(t),
+      fetch: (u, o) => { const b = JSON.parse(o.body); const p = { key: u.split('/').pop(), value: b.value, rev: b.rev, keepalive: !!o.keepalive }; posts.push(p); return respond(p); },
+    };
+    vm.createContext(ctx); vm.runInContext(src, ctx);
+    const run = async () => { for (let k = 0; k < 20; k++) { const t = timers.find((x) => x); if (!t) break; timers[timers.indexOf(t)] = null; t.fn(); await new Promise((r) => setImmediate(r)); } };
+    return { ctx, timers, posts, ls, alerts, run };
+  };
+  const okResp = () => Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true }) });
+
+  let t = mk(okResp);
+  t.ctx.saveToServer('htsMock', { trades: [1] }); t.ctx.saveToServer('htsStopOrders', {}); t.ctx.saveToServer('htsJournals', 'j1'); t.ctx.saveToServer('htsJournals', 'j2');
+  ok(t.timers.filter((x) => x && x.ms === 0).length === 2, '매매 상태 키는 기다리지 않고(0ms) 바로 저장 예약');
+  await t.run();
+  const keys = t.posts.map((p) => p.key);
+  ok(keys.includes('htsMock') && keys.includes('htsStopOrders'), '연달아 저장한 두 키가 모두 서버로 전송(htsMock 유실 버그 회귀 방지)');
+  ok(keys.filter((k) => k === 'htsJournals').length === 1 && t.posts.find((p) => p.key === 'htsJournals').value === 'j2', '일반 키는 디바운스로 마지막 값 1회만 전송');
+  ok(!('htsMock' in t.ls) && !('htsStopOrders' in t.ls) && t.ls.htsJournals === 'j2', '매매 상태는 localStorage 금지(규칙 4), 그 외 키는 사본 유지');
+
+  // 같은 키: 진행 중이면 다음 값을 기다렸다가 최신 값 1개만 이어서 전송
+  let release; t = mk((p) => p.value === 'a' ? new Promise((r) => { release = () => r({ ok: true, json: () => Promise.resolve({ ok: true }) }); }) : okResp());
+  t.ctx.saveToServer('htsMock', 'a'); await t.run();
+  t.ctx.saveToServer('htsMock', 'b'); t.ctx.saveToServer('htsMock', 'c'); await t.run();
+  ok(t.posts.length === 1, '같은 키 요청이 진행 중이면 다음 요청을 겹쳐 보내지 않음(순서 역전 방지)');
+  release(); await new Promise((r) => setImmediate(r)); await t.run();
+  ok(t.posts.map((p) => p.value).join() === 'a,c', '앞 요청이 끝난 뒤 최신 값(c)만 전송');
+
+  // 실패(ok:false) → 재시도 + 경고 1회
+  let n = 0; t = mk(() => (++n === 1 ? Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: false, error: 'disk' }) }) : okResp()));
+  t.ctx.saveToServer('htsMock', 'x'); await t.run();
+  ok(t.posts.length === 2 && t.posts[1].value === 'x', '서버가 저장을 거부하면 같은 값을 재시도');
+  ok(t.alerts.length === 1, '저장 실패는 사용자에게 1회 경고');
+  // 연속 실패 시 재시도 간격 2s → 4s → 8s … (최대 64s), 활성 타이머는 하나
+  t = mk(() => Promise.resolve({ ok: false, json: () => Promise.resolve({ ok: false }) }));
+  t.ctx.saveToServer('htsMock', 'z');
+  const delays = [];
+  for (let k = 0; k < 8; k++) { const live = t.timers.filter((x) => x); if (live.length !== 1) break; const tm = live[0]; delays.push(tm.ms); t.timers[t.timers.indexOf(tm)] = null; tm.fn(); for (let w = 0; w < 4; w++) await new Promise((r) => setImmediate(r)); }
+  ok(delays.join() === '0,2000,4000,8000,16000,32000,64000,64000', '재시도 간격 2s→…→64s 상한, 활성 타이머 1개 (실제 ' + delays.join() + ')');
+
+  ok(t.posts.every((p) => typeof p.rev === 'number') && t.posts[0].rev <= t.posts[1].rev, '저장마다 rev(순번)를 함께 전송');
+
+  // 응답이 ok:true 가 아니면(예: {}) 성공으로 보지 않음
+  let m = 0; t = mk(() => (++m === 1 ? Promise.resolve({ ok: true, json: () => Promise.resolve({}) }) : okResp()));
+  t.ctx.saveToServer('htsMock', 'y'); await t.run();
+  ok(t.posts.length === 2, 'ok:true 가 아닌 200 응답({})도 실패로 보고 재시도');
+
+  // 페이지 이탈: 진행 중(응답 대기) 값과 대기 값 중 최신을 같은 rev 로 keepalive 재전송
+  t = mk(() => new Promise(() => {}));   // 응답이 오지 않는 상태
+  t.ctx.saveToServer('htsMock', 'inflight-v'); await t.run();
+  ok(!!t.ctx._saveQ.htsMock.inflight && !t.ctx._saveQ.htsMock.pending, '(준비) 값이 진행 중 상태');
+  t.ctx._saveOnPageHide();
+  const ka = t.posts.filter((p) => p.keepalive);
+  ok(ka.length === 1 && ka[0].value === 'inflight-v' && ka[0].rev === t.posts[0].rev, '이탈 시 진행 중 값도 같은 rev 로 keepalive 재전송');
+  t.ctx.saveToServer('htsMock', 'newer'); t.ctx._saveOnPageHide();
+  const ka2 = t.posts.filter((p) => p.keepalive);
+  ok(ka2[ka2.length - 1].value === 'newer', '대기 값이 있으면 그 최신 값을 전송');
+  ok(/addEventListener\('pagehide', _saveOnPageHide\)/.test(html), 'pagehide 이벤트에 연결됨');
 })();
 
 console.log('[J] 상담 전략 변경은 확인 후 적용');
@@ -124,6 +199,7 @@ const runLSR = async (simDate, sectors) => {
 };
 const lsrTests = (async () => {
   await btTests;
+  await saveTests;
   const past = await runLSR('2026-10-15', []);
   ok(past.calls.length === 0, '과거 날짜 리플레이에서는 강세섹터 API 를 부르지 않음');
   ok(/과거 리플레이/.test(past.el.firstChild.textContent), '과거 날짜 리플레이 안내 표시');
